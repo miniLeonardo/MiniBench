@@ -87,7 +87,7 @@ Minibench-Daten     Datenordner neben der exe: Berichte, Datenbank (JSON, PC-Dia
    zwingend Windows braucht: Set-ItResult -Skipped mit Test-IstWindows.
 
 ## Git
-Repository: https://github.com/sudoMrMCaffe/MiniBench (Zweig main). Bauen.cmd committet nach bestandenen Tests lokal
+Repository: https://github.com/miniLeonardo/MiniBench (Zweig main). Bauen.cmd committet nach bestandenen Tests lokal
 und pusht automatisch nach GitHub (git push). Jede Version ein Commit "Release vX.Y: <Titel aus Versionen.cs>". Vor der Arbeit
 git log seit dem in Doku\Projektstand.md genannten Commit lesen.
 

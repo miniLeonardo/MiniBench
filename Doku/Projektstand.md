@@ -3,7 +3,7 @@
 Gemeinsamer Stand fÃƒÂ¼r alle Agenten (Claude, Antigravity). Wird am Ende jeder Version aktualisiert (siehe AGENTS.md).
 
 ## Stand: Version 3.83 (23.10.2026)
-Release-Commit "Release v3.83: Hotfix 3: System-Umzug Schnell-Scan per Knopfdruck, Karten-Layout im Lasttest-Stil & Zeichensatz-Korrektur" (Commit bcf7dbe).
+Release-Commit "Initial commit: Leos Minibench v3.83" (Commit b7ee742) auf https://github.com/miniLeonardo/MiniBench.
 Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.
 
 Inhalt von 3.83 (Einzelheiten in Doku\Ã„nderungen_v3.83.txt):
