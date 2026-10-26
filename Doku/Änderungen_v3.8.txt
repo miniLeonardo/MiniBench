@@ -1,0 +1,80 @@
+﻿LEOS MINIBENCH 3.8: ÄNDERUNGEN
+==============================
+
+Version 3.8 führt das neue Kernmodul „System-Umzug & Neuinstallation“ ein. Es ermöglicht vor einer
+anstehenden Windows-Neuinstallation die lückenlose, transparente Sicherung aller persönlichen Benutzerdaten,
+des Desktop-Zustands und des Software-Inventars auf Wechsellaufwerke (USB-Stick, externe SSD) oder
+Netzlaufwerke (NAS). Das Besondere: Die Sicherung enthält ein vollständig autarkes, minibenchinunabhängiges
+1-Klick-Wiederherstellungspaket (Wiederherstellen.cmd / .ps1), mit dem auf dem frisch installierten
+Windows-PC alle Dateien, Layouts und Programme mit einem einzigen Klick zurückgespielt werden können.
+
+1. MODUL „SYSTEM-UMZUG & NEUINSTALLATION“
+  Seitenleiste & Navigation  Das neue Modul ist unter der Gruppe „Werkzeuge“ in der Seitenleiste verankert
+                             (System-Umzug: Daten, Desktop & Programme für Neuinstallation sichern).
+  Sicherungsziel             Unterstützt alle erkannten beschreibbaren Wechsellaufwerke (USB-Sticks, externe
+                             SSDs und HDDs) sowie vorkonfigurierte NAS-Netzlaufwerke aus Netzwerk.json.
+                             Benutzerdefinierte Zielordner können über einen Auswahldialog gewählt werden.
+  Dateisystem-Schutz         Erkennt automatisch FAT32-formatierte Ziellaufwerke und warnt vor der technischen
+                             Begrenzung auf 4 GB je Einzeldatei mit der Empfehlung, NTFS oder exFAT zu nutzen.
+  Kapazitätsprüfung          Berechnet vorab das geschätzte Sicherungsvolumen und vergleicht es mit dem
+                             verfügbaren freien Speicher auf dem Zielmedium (mit Grün-/Rot-Statusanzeige).
+
+2. SICHERUNGSUMFANG & ROBOCOPY-ENGINE
+  Benutzer-Bibliotheken      Sichert Desktop, Dokumente, Downloads, Bilder, Musik und Videos des aktuellen
+                             Benutzers. Ermittelt verschobene Standardpfade zuverlässig über die Windows-Registry
+                             (User Shell Folders) und Fallback-APIs.
+  Selektive AppData          Sichert Browser-Profile, Lesezeichen und Sitzungen von Microsoft Edge, Google Chrome,
+                             Mozilla Firefox, Brave sowie E-Mail-Konten aus Mozilla Thunderbird.
+  Ausschlussfilter (Excludes) Robocopy spiegelt mit /XJ zur Vermeidung von Junction- und Symlink-Schleifen.
+                             Temporäre Ordner und Cache-Verzeichnisse (Temp, Cache, Code Cache, GPUCache,
+                             Service Worker, CrashDumps, node_modules) werden konsequent ausgeschlossen.
+  Dateizugriffsschutz        Verwendet /R:1 /W:1 /COPY:DAT, um bei gesperrten Dateien nicht hängenzubleiben
+                             und veraltete Sicherheitskennungen (SIDs) nicht auf neue Systeme zu übertragen.
+  C:\-Zusatzordner           Scannt das Stammverzeichnis von Laufwerk C:\ nach benutzerdefinierten Ordnern
+                             (z. B. C:\Projekte, C:\Tools, C:\Games) unter Ausschluss der Windows-System-
+                             Blacklist und sichert diese selektiv nach C_Laufwerk_Zusatz\.
+
+3. DESKTOP-ZUSTAND 1:1 (LAYOUT & ICONS)
+  Hintergrundbild            Extrahiert das aktive Desktop-Wallpaper aus TranscodedWallpaper als Wallpaper.jpg
+                             und speichert den Darstellungsstil (WallpaperStyle, TileWallpaper) in Layout.json.
+  Icon-Positionen            Exportiert die Shell-Bags der Icon-Koordinaten aus der Windows-Registry nach
+                             IconPositionen.reg und legt eine lesbare Icons.json mit Auflösung und Dateiliste an.
+
+4. SOFTWARE-INVENTARISIERUNG & WINGET
+  Paket-Export               Exportiert installierte Software über den Windows-Paket-Manager (winget export
+                             nach Programme\winget-pakete.json).
+  Manuelle Installationen    Vergleicht alle in der Windows-Registry registrierten Programme (Uninstall-Keys)
+                             mit dem Winget-Katalog und fasst alle nicht automatisch installierbaren Programme
+                             in Nicht-Winget-Programme.txt zusammen (inkl. Hersteller, Version, Installations-
+                             pfad und direktem Google-Suchlink).
+
+5. AUTARKES WIEDERHERSTELLUNGS-PAKET (RESTORE)
+  Wiederherstellen.cmd       Liegt direkt im Stammverzeichnis der Sicherung. Prüft auf Administratorrechte
+                             (fordert diese bei Bedarf via UAC an) und startet das Wiederherstellungsskript
+                             ohne Abhängigkeit von einer Minibench-Installation.
+  Wiederherstellen.ps1       Dynamischer Profil-Restore: Verwendet dynamisch $env:USERPROFILE des neuen Systems,
+                             sodass Daten auch bei abweichendem Benutzernamen (z. B. alt Leo, neu leona)
+                             im richtigen Zielprofil landen. Stellt Bibliotheken, Zusatzordner und Browserdaten
+                             wieder her, aktiviert das Wallpaper via SystemParametersInfo, importiert die
+                             Icon-Koordinaten, startet den Windows Explorer neu, spielt Winget-Pakete ein und
+                             öffnet die Liste der manuellen Installationen zur Kontrolle im Texteditor.
+
+
+GEFUNDEN UND BEHOBEN
+  Verschobene Benutzerbibliotheken wurden bisher nur über Standardpfade gesucht; behoben durch Auflösung über User Shell Folders in der Registry.
+  Junction-Endlosschleifen in Benutzerprofilen vermieden durch konsequente Robocopy-Option /XJ.
+  Kollision alter Dateiberechtigungen auf neuen Systemen vermieden durch /COPY:DAT statt /COPYALL.
+  FAT32-Größenbegrenzung führte auf USB-Sticks zu unvollständigen Sicherungen; behoben durch automatische Dateisystemerkennung und Warnhinweis.
+  Software-Wiederherstellung berücksichtigte bisher nur Winget-Pakete; behoben durch Registry-Abgleich und Ausgabe von Nicht-Winget-Programme.txt.
+
+GRENZEN
+  Verschlüsselte Browserdaten (wie gespeicherte Kennwörter in Chrome oder Edge mit DPAPI-Bindung) können aus Sicherheitsgründen des Windows-Schlüsselbunds nicht auf fremde Windows-Installationen übertragen werden; Lesezeichen, Einstellungen und Sitzungen werden vollständig übernommen.
+  Treiber und hardwaregebundene Systemkomponenten werden bewusst nicht übernommen, um Treiberkonflikte auf der Neuinstallation auszuschließen.
+
+UMSTIEG
+  Das Modul System-Umzug ergänzt die bestehenden Diagnose-, Benchmark- und Wartungsfunktionen. Bisherige Datenbanken, Vergleichsdaten und Berichte bleiben uneingeschränkt kompatibel.
+
+QUELLEN
+  Microsoft Docs: Robocopy Command Reference & Options (/XJ, /COPY:DAT).
+  Microsoft Docs: Windows Package Manager (winget export / import).
+  Microsoft Docs: SystemParametersInfo Win32 API (SPI_SETDESKWALLPAPER).

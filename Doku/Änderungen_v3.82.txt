@@ -1,0 +1,78 @@
+﻿LEOS MINIBENCH 3.82: Ã„NDERUNGEN
+===============================
+
+Version 3.82 ist der zweite Hotfix fÃ¼r das Modul â€žSystem-Umzug & Neuinstallationâ€œ. Das Release
+behebt die Ursache einer mehr als 15-minÃ¼tigen VerzÃ¶gerung bei Teilsicherungen (wie reinem
+Desktop-Layout), eliminiert verdÃ¤chtige Arbeitsspeicher-Spitzen beim Laden der BenutzeroberflÃ¤che,
+fÃ¼hrt einen schnellen, speicherschonenden Vorab-Scan zur kategorisierten Erkennung tatsÃ¤chlicher
+Installationen ein, ergÃ¤nzt ein mitlaufendes Echtzeit-Protokollfenster (Live-Log) und korrigiert
+die Breiten- und Rahmenausrichtung aller Kartenpanel im Fluent-Design.
+
+1. PROZESSABLAUF & PERFORMANCESPRUNG (BEHEBUNG 15-MINUTEN-HÃ„NGER)
+  Bauplan-Neuordnung         In Version 3.8 und 3.81 war Module\Umzug\Ablauf.ps1 am Ende des Bauplans
+                             hinter Ablauf\Start.ps1 und allen Diagnose-, Benchmark- und Wartungsmodulen
+                             eingeordnet. Da im Hilfsmodus -Umzug kein Diagnosemodul Ã¼bergeben wurde,
+                             initialisierte Grundgeruest.ps1 standardmÃ¤ÃŸig $ModDiag = $true. Infolgedessen
+                             fÃ¼hrte der Kindprozess vor Erreichen des Umzugscodes eine vollstÃ¤ndige,
+                             15-minÃ¼tige Systemdiagnose (CIM-Abfragen, EventLogs, SMART, Windows Update)
+                             durch. Durch Einordnung von Module\Umzug\Ablauf.ps1 vor Ablauf\Start.ps1
+                             sowie einen sofortigen Vorab-Ausstieg fÃ¼hrt der Sicherungsprozess exklusiv
+                             den gewÃ¤hlten Backup-Umfang aus und beendet in 2 bis 3 Sekunden.
+  Adminrechte-Ausschluss     Der Startparameter -Umzug wurde in Kern\Adminrechte.ps1 aufgenommen. Dadurch
+                             wird verhindert, dass ein im Benutzerkontext gestarteter Umzugsprozess
+                             im Hintergrund erfolglos versucht, UAC-ErhÃ¶hungsdialoge anzufordern oder
+                             in modalen Dialogen blockiert.
+  Externe Werkzeug-Timeouts  Aufrufe von winget.exe export und reg.exe export wurden mit festen Timeouts
+                             (60 s bzw. 15 s) und automatischer Prozessbeendigung gegen Blockaden abgesichert.
+
+2. KATEGORISIERTER SCHNELL-SCAN
+  Vorab-Erkennung            Vor der Auswahl des Sicherungsumfangs fÃ¼hrt die OberflÃ¤che einen leichten,
+                             unter 10 ms schnellen Vorab-Scan durch. Er ermittelt, welche Standardbibliotheken,
+                             Layout-Eigenschaften, Paketmanager und Anwendungsprofile auf dem Rechner
+                             tatsÃ¤chlich existieren.
+  Kategorisierte Anzeige     Statt pauschaler Auflistungen nicht vorhandener Software zeigt die OberflÃ¤che
+                             nur noch die tatsÃ¤chlich auf diesem PC erkannten Komponenten mit Status
+                             und Anzahl an (unter anderem Webbrowser, Thunderbird, Editoren, Remotewerkzeuge).
+  Statusergebnis             Ein grÃ¼ner Statusbalken (â€žâœ“ Schnell-Scan abgeschlossen: X Komponenten und
+                             Profile auf diesem PC erkanntâ€œ) gibt dem Anwender sofortige RÃ¼ckmeldung.
+
+3. ECHTZEIT-PROTOKOLLFENSTER (LIVE-LOG)
+  Mitlaufendes Log           Im Statusbereich der Umzug-Seite wurde ein festes, durchlaufendes Protokollfenster
+                             (txtUmzugLog) integriert.
+  Transparenz                Jede kopierte Datei, jedes Unterverzeichnis, Statuswechsel sowie Ereignisse des
+                             Arbeitsprozesses (@@UMZUG, @@LOG, Robocopy) werden mit Zeitstempel live
+                             im Logfenster ausgegeben und automatisch zum aktuellen Eintrag gescrollt.
+
+4. KARTENLAYOUT & RAHMEN-BÃœNDIGKEIT
+  Einheitliche Gruppenbreite Alle drei Kartenpanel (Zielmedium, Sicherungsumfang, Status & Sicherung) sind
+                             strikt auf die einheitliche Gruppenbreite (grpW = UI.S(780)) fixiert.
+  Rahmen-AbschlÃ¼sse          TextumbrÃ¼che (MaximumSize) aller Beschriftungen und Auswahlelemente verhindern,
+                             dass Inhalte Ã¼ber die inneren Begrenzungen hinausragen; alle RÃ¤nder schlieÃŸen
+                             auf hellen wie dunklen Farbschemata und bei beliebiger Skalierung sauber ab.
+
+5. ARBEITSSPEICHER-OPTIMIERUNG (0 MB OVERHEAD)
+  Keine rekursive ZÃ¤hlung    Die synchrone, rekursive DateizÃ¤hlung (EnumerateFiles("*", AllDirectories))
+                             beim Laden von Stammordnern auf Laufwerk C:\ wurde vollstÃ¤ndig entfernt.
+                             Dadurch werden beim Laden der Seite keinerlei Millionen von Dateiobjekten mehr
+                             in den RAM geladen.
+
+
+GEFUNDEN UND BEHOBEN
+  Teilsicherungen (wie Desktop-Layout) dauerten Ã¼ber 15 Minuten und schienen einzufrieren; behoben durch Verschiebung von Module\Umzug\Ablauf.ps1 vor Ablauf\Start.ps1 und sofortigen Ausstieg nach der Sicherung.
+  Kindprozess im Umzug-Modus forderte ohne Administratorrechte UAC an und blockierte; behoben durch Ausschluss von -Umzug in Kern\Adminrechte.ps1.
+  Arbeitsspeicher stieg beim Ã–ffnen der Umzug-Seite sprunghaft an; behoben durch Beseitigung synchroner rekursiver DateizÃ¤hlungen auf C:\.
+  Auswahl zeigte pauschale Textlisten statt tatsÃ¤chlicher Installationen; behoben durch kategorisierten Schnell-Scan mit Erkennung vorhandener Software und Profile.
+  WÃ¤hrend des Kopiervorgangs fehlte ein durchlaufendes Protokoll; behoben durch Integration des Echtzeit-Protokollfensters txtUmzugLog.
+  Kartenrahmen der Umzug-Seite waren ungleich breit und schnitten an RÃ¤ndern ab; behoben durch einheitliche Breitenfixierung auf grpW und korrekte MaximumSize-UmbrÃ¼che.
+  Externe Befehle (winget export, reg export) besaÃŸen keine Abbruchfrist; behoben durch Timeouts von 60 s und 15 s mit Prozess-Kill.
+
+GRENZEN
+  Auf Systemen ohne winget kÃ¶nnen weiterhin nur Registry-Programme inventarisiert werden; die erzeugte Nicht-Winget-Programme.txt unterstÃ¼tzt hier die manuelle Nachinstallation.
+  Sehr groÃŸe Einzeldateien (>= 4 GB) kÃ¶nnen auf FAT32-Medien technisch nicht abgelegt werden; die OberflÃ¤che warnt weiterhin vor FAT32-Zielmedien.
+
+UMSTIEG
+  Version 3.82 ist voll abwÃ¤rtskompatibel zu 3.8 und 3.81. Sicherungen aller 3.8x-StÃ¤nde kÃ¶nnen mit den generierten Wiederherstellungsskripten unterbrechungsfrei eingespielt werden.
+
+QUELLEN
+  Microsoft Docs: Process.WaitForExit Method (Int32).
+  Microsoft Docs: DirectoryInfo.EnumerateFiles vs EnumerateDirectories.

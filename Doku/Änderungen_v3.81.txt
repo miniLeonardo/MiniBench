@@ -1,0 +1,79 @@
+﻿LEOS MINIBENCH 3.81: ÄNDERUNGEN
+===============================
+
+Version 3.81 ist ein Hotfix- und Optimierungs-Release für das in Version 3.8 eingeführte Modul
+„System-Umzug & Neuinstallation“. Das Release adressiert die Performance bei Kopiervorgängen,
+die Transparenz während der Sicherung, den Schutz des Quellsystems vor unbeabsichtigten
+Veränderungen, die Ausweitung der selektiven Konfigurationssicherung (Profile/Configs) sowie
+die Filterung und Berechnung zusätzlicher Stammverzeichnisse auf Laufwerk C:\.
+
+1. PERFORMANCE & MULTITHREADING
+  Robocopy-Beschleunigung    Die Dateispiegelung via Robocopy wurde um den Parameter /MT:16 erweitert.
+                             Auf modernen SSDs und schnellen Datenträgern führt das parallele Kopieren
+                             über 16 Arbeitsthreads zu einer deutlichen Verkürzung der Sicherungsdauer,
+                             insbesondere bei Verzeichnissen mit vielen kleinen Einzeldateien.
+  Dateigrößen-Vorankündigung Vor dem Start des Kopiervorgangs einer Bibliothek oder eines Zusatzordners
+                             wird das berechnete Datenvolumen (MB bzw. GB) ermittelt und im Ereigniskanal
+                             sowie im Protokoll transparent ausgewiesen.
+
+2. TRANSPARENZ & LIVE-STATUS
+  Live-Kopieranzeige         Die Benutzeroberfläche zeigt nun unter dem Hauptfortschrittsbalken und der
+                             Schrittanzeige ein dediziertes Detail-Etikett, das in Echtzeit den Namen
+                             der aktuell übertragenen Datei bzw. des Unterverzeichnisses visualisiert.
+                             Dies verhindert den Eindruck eines eingefrorenen Programms bei großen Datenmengen.
+  Drosselung der Ereignisse  Ereignismeldungen aus der Robocopy-Ausgabe werden im Arbeitsprozess zeitlich
+                             gedrosselt (maximal alle 150 ms), um eine flüssige Bedienung der grafischen
+                             Oberfläche auch bei hohem Dateidurchsatz zu gewährleisten.
+
+3. PROFILE & KONFIGURATIONEN (CONFIGS)
+  Umfassende Konfigurationen Der bisherige Punkt „Browser-Profile“ wurde zum Bereich „Profile & Konfigurationen
+                             (Configs)“ ausgebaut. Das Modul sichert neben Webbrowsern nun auch E-Mail-Profile,
+                             Entwicklungsumgebungen, Texteditoren und Remote-Werkzeuge.
+  Webbrowser                 Edge, Chrome, Brave, Vivaldi, Firefox, Opera und Opera GX (Lesezeichen,
+                             Einstellungen, Profile und Sitzungsdaten; Caches und temporäre Daten ausgeschlossen).
+  E-Mail-Clients             Mozilla Thunderbird (%APPDATA%\Thunderbird).
+  Editoren & Entwicklung     VS Code (%APPDATA%\Code\User), Cursor (%APPDATA%\Cursor\User), Notepad++
+                             (%APPDATA%\Notepad++), Git (.gitconfig, .gitignore_global) sowie PowerShell-
+                             Profile aus den Benutzerdokumenten.
+  Werkzeuge & Remote         FileZilla (%APPDATA%\FileZilla), WinSCP (WinSCP.ini), Total Commander
+                             (%APPDATA%\GHISLER) sowie Export gespeicherter PuTTY-Sessions aus der Registry.
+  Windows Terminal           Sicherung der Benutzereinstellungen (settings.json).
+  Granulare Auswahl          In der Benutzeroberfläche können die Teilbereiche der Profile über eingerückte
+                             Auswahlfelder individuell angewählt oder abgewählt werden.
+  Autarker Restore           Wiederherstellen.ps1 spiegelt alle Konfigurationen dynamisch an die korrekten
+                             neuen Profilpfade zurück und importiert PuTTY-Sitzungen automatisch in die Registry.
+
+4. ERWEITERTE BLACKLIST & SPEICHERPLATZKALKULATION
+  Filterung von Stammordnern Ordner mit Punkt-Präfix (.cache, .npm etc.) sowie Treiber-, Einrichtungs- und
+                             temporäre Ordner (AMD, Intel, NVIDIA, Dell, HP, Lenovo, inetpub, Drivers,
+                             Treiber, temp, tmp, cache, minidump, wsl) werden bei der Ordnersuche auf C:\
+                             vollständig ignoriert und nicht mehr zur Sicherung angeboten.
+  Standard-Deaktivierung     Alle erkannten zulässigen Zusatzordner auf C:\ sind standardmäßig deaktiviert,
+                             sodass sehr große Verzeichnisse (z. B. Spiele-Installationen) nicht ungewollt
+                             gesichert werden.
+  Exakte Größenberechnung    Die tatsächliche Ordnergröße der gewählten Zusatzordner fließt nun präzise
+                             in die Gesamtschätzung und den Vergleich mit dem Zielspeicherplatz ein.
+
+5. OBERFLÄCHEN-KORREKTUREN
+  Ampersand-Darstellung      In Optionsfeldern (CheckBox) wurde UseMnemonic deaktiviert, sodass kaufmännische
+                             Und-Zeichen (&) in Bezeichnungen wie „Desktop-Layout (Icon-Positionen & Hintergrundbild)“
+                             korrekt als Zeichen und nicht als Zugriffstaste (Tastaturkürzel) gerendert werden.
+
+
+GEFUNDEN UND BEHOBEN
+  Zusatzordner auf C:\ wurden standardmäßig angehakt, wodurch ungewollt sehr große Datenmengen (wie Spiele) die Sicherung blockierten; behoben durch Deaktivierung als Vorgabe.
+  Treiber- und Webserverordner (AMD, inetpub, .cache) wurden fälschlich als Sicherungsordner angeboten; behoben durch erweiterte System-Blacklist.
+  Größenberechnung der Zusatzordner war auf pauschale Werte fixiert; behoben durch exakte dynamische Aufsummierung der tatsächlichen Verzeichnisgrößen.
+  Robocopy-Kopiervorgänge liefen einkanalig und ohne Rückmeldung der einzelnen Dateien; behoben durch /MT:16 und Live-Streaming der Dateiübertragungen in die Benutzeroberfläche.
+  Kaufmännische Und-Zeichen in Kontrollkästchen wurden von WinForms als Menü-Tastaturkürzel interpretiert und nicht dargestellt; behoben durch Deaktivierung von UseMnemonic.
+
+GRENZEN
+  Sehr große Dateien oder Archive (> 4 GB) können weiterhin nicht auf FAT32-formatierten Wechseldatenträgern abgelegt werden; die Warnmeldung empfiehlt hierfür NTFS oder exFAT.
+  Hardware-spezifische Treiber und Systemkomponenten werden zur Vermeidung von Instabilitäten auf der Neuinstallation bewusst nicht übernommen.
+
+UMSTIEG
+  Version 3.81 ist vollständig abwärtskompatibel zu Version 3.8. Mit Version 3.8 erstellte Sicherungspakete lassen sich weiterhin uneingeschränkt mit den enthaltenen Wiederherstellungsskripten zurückspielen.
+
+QUELLEN
+  Microsoft Docs: Robocopy Multithreaded Processing (/MT).
+  Microsoft Docs: Windows Forms CheckBox.UseMnemonic Property.

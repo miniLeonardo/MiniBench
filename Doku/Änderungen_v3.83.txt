@@ -1,0 +1,101 @@
+﻿LEOS MINIBENCH 3.83: ÄNDERUNGEN
+===============================
+
+Version 3.83 ist der dritte Hotfix für das Modul „System-Umzug & Neuinstallation“. Das Release
+f
+ü
+hrt den manuellen Start des Schnell-Scans per Knopfdruck ein, gleicht das visuelle Karten-
+und Rahmenlayout aller Gruppen exakt an das bew
+ä
+hrte Card(content)-Muster des Moduls Lasttest an
+und beseitigt Zeichensatzfehler (Mojibake) in der Benutzeroberfl
+ä
+che restlos.
+
+1. SCHNELL-SCAN PER KNOPFDRUCK
+  Manueller Start            Der Vorab-Scan der installierten Browser, Mail-Clients, Entwicklungsumgebungen
+                             und Zusatzordner wird nicht mehr automatisch beim Laden der Seite angesto
+ß
+en.
+                             Ein dedizierter Knopf (
+„
+Schnell-Scan durchf
+ü
+hren
+“
+) im Bereich Sicherungsumfang
+                             erm
+ö
+glicht dem Anwender die gezielte Erkennung auf Knopfdruck.
+  Visuelle R
+ü
+ckmeldung       Nach Klick liefert der Scan innerhalb weniger Millisekunden eine 
+Ü
+bersicht
+                             aller tats
+ä
+chlich vorhandenen Anwendungsprofile und schaltet die Unteroptionen
+                             vorausgew
+ä
+hlt frei.
+
+2. KARTENLAYOUT IM LASTTEST-STIL
+  Card(content)-Muster       Alle drei Gruppen (Zielmedium f
+ü
+r die Datensicherung, Sicherungsumfang,
+                             Status & Sicherung) nutzen nun exakt dasselbe Card(content)-Muster wie das
+                             Modul Lasttest.
+  Saubere Rahmenf
+ü
+hrung      Die Au
+ß
+enbeschriftungen (Section) und Hinweistexte (Hint) liegen au
+ß
+erhalb
+                             der abgerundeten Kartenpanel (CardPanel). Dadurch entstehen keine abgeschnittenen
+                             Umrandungen, Ecken oder Kerben mehr; das Kartenlayout schlie
+ß
+t auf allen
+                             DPI-Skalierungsstufen und Farbschemata absolut b
+ü
+ndig ab.
+
+3. BESEITIGUNG VON ZEICHENSATZFEHLERN (MOJIBAKE)
+  Unicode-Ersatzsequenzen    S
+ä
+mtliche Texte, Beschriftungen und Hinweistexte der Umzugs-Benutzeroberfl
+ä
+che
+                             wurden in C# auf standardisierte Unicode-Escape-Sequenzen (\u00FC, \u00E4, \u00F6,
+                             \u00DF, \u2713, \u00B7) umgestellt. Falsch interpretierte Umlaute geh
+ö
+ren damit
+                             vollst
+ä
+ndig der Vergangenheit an.
+
+
+GEFUNDEN UND BEHOBEN
+  - Automatischer Scan beim 
+Ö
+ffnen der Umzug-Seite auf manuelle Ausl
+ö
+sung via btnStartScan umgestellt.
+  - Abgeschnittene und fehlerhaft verschachtelte Umrandungsboxen durch Umstellung auf Card(content) behoben.
+  - Zeichensatzfehler und doppelt maskierte UTF-8-Umlaute (Mojibake) in DiagGui_Seiten.cs restlos korrigiert.
+
+
+GRENZEN UND OFFENE PUNKTE
+  - Keine. Die Sicherung l
+ä
+uft performant, isoliert und ohne Eingriff an Quelldateien.
+
+
+UMSTIEG
+  - Keine manuellen Anpassungen erforderlich. Vollst
+ä
+ndig kompatibel zu allen bestehenden Versionen.
+
+
+QUELLEN
+  - Eigene Implementierung in src\Module\Umzug\Ablauf.ps1 und src\Oberflaeche\DiagGui_Seiten.cs.

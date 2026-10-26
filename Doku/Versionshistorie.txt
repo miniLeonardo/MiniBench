@@ -1,0 +1,567 @@
+﻿LEOS MINIBENCH: VERSIONSHISTORIE
+================================
+
+Neueste Version zuerst. Einzelheiten je Version in Doku\Ã„nderungen_vX.Y.txt (ab 2.2). FÃ¼r 1.0 bis 2.1 gibt es
+keine Ã„nderungsdateien mehr; die EintrÃ¤ge nennen nur, was im Quelltext und in den Ã„nderungen zu 2.2 belegt ist.
+Die Liste steht auch im Programm (Info-Knopf oben rechts, Quelle: src\Oberflaeche\Versionen.cs).
+
+VERSION 3.83   (23.10.2026)  HOTFIX 3: SYSTEM-UMZUG SCHNELL-SCAN PER KNOPFDRUCK, KARTEN-LAYOUT IM LASTTEST-STIL & ZEICHENSATZ-KORREKTUR
+====================================================================================================
+Manueller Schnell-Scan: Der Vorab-Scan startet nun nicht mehr automatisch beim Öffnen der Seite,
+sondern gezielt per Schaltfläche ('Schnell-Scan durchführen'); erst nach Klick werden installierte
+Browser, Mail-Clients, Entwickler-Tools und Zusatzordner analysiert und vorausgewählt.
+Kartenlayout im Lasttest-Stil: Vollständige Vereinheitlichung aller drei Umzug-Gruppen (Zielmedium,
+Sicherungsumfang, Status & Sicherung) auf das bewährte Card(content)-Muster mit abgerundetem Rahmen
+(CardPanel), konsistenten Rändern und bündigen Kanten ohne abgeschnittene Umrandungen.
+Beseitigung von Zeichensatzfehlern: Alle Texte und Beschriftungen der Umzugsseite wurden auf saubere
+Unicode-Ersatzsequenzen umgestellt, wodurch falsch dargestellte Umlaute und Sonderzeichen dauerhaft
+ausgeschlossen sind.
+
+VERSION 3.82   (23.10.2026)  HOTFIX 2: SYSTEM-UMZUG PROZESSABLAUF, VORAB-SCAN, LIVE-LOG & KARTENLAYOUT
+====================================================================================================
+Prozess- & Performance-HÃ¤rtung: Behebung einer 15-minÃ¼tigen VerzÃ¶gerung durch sofortigen Vorab-Ausstieg
+des Umzug-Hilfsmodus vor der Diagnose-Initialisierung; Ausschluss von UAC-ErhÃ¶hungsversuchen im
+nicht-privilegierten Kontext; Zeitbegrenzungen fÃ¼r externe Werkzeug-Aufrufe (winget export, reg.exe);
+Beseitigung von Arbeitsspeicher-Spitzen durch Entfernung rekursiver DateizÃ¤hlungen beim Laden der Seite.
+Kategorisierter Schnell-Scan: Automatische Vorab-Erkennung vorhandener Standardbibliotheken, Desktop-Layout-
+Eigenschaften, des Winget-Paketmanagers sowie tatsÃ¤chlich installierter Softwareprofile (Webbrowser,
+Thunderbird, Entwicklungsumgebungen, Hilfswerkzeuge, Windows Terminal); Ã¼bersichtliche Darstellung mit Status
+und automatischer Vorauswahl.
+Echtzeit-Protokollfenster (Live-Log): ErgÃ¤nzung eines durchlaufenden, mitlaufenden Protokollfensters in der
+BenutzeroberflÃ¤che zur vollstÃ¤ndigen Transparenz Ã¼ber kopierte Dateien, Einzelschritte und Statusmeldungen
+wÃ¤hrend der laufenden Sicherung.
+Karten- und MenÃ¼-Layout: Exakte Breitenanpassung aller Kartenpanel auf einheitliche Gruppenbreite (grpW);
+TextumbrÃ¼che und RÃ¤nder optimiert, sodass Umrandungen auf allen DPI-Stufen bÃ¼ndig abschlieÃŸen und keine
+Inhalte mehr Ã¼ber den Kartenrahmen hinausragen.
+
+VERSION 3.81   (23.10.2026)  HOTFIX: SYSTEM-UMZUG OPTIMIERUNG, PROFILE & KONFIGURATIONEN, PERFORMANCE & FILTERUNG
+====================================================================================================
+System-Umzug HÃ¤rtung & Performance: Umstellung der Robocopy-Spiegelung auf paralleles Multithreading (/MT:16)
+und Live-Streaming der aktuell kopierten Dateien und Unterverzeichnisse an die BenutzeroberflÃ¤che; VorankÃ¼ndigung
+der Datenvolumina je Bibliothek; strikt lesender Zugriff schÃ¼tzt Quellsysteme garantiert vor VerÃ¤nderungen.
+Profile & Konfigurationen (Configs): Umfassende Sicherung und granulare Auswahl fÃ¼r Browser-Profile (Edge,
+Chrome, Brave, Firefox, Opera, Vivaldi), E-Mail-Clients (Thunderbird), Entwicklungsumgebungen und Editoren (VS Code,
+Cursor, Notepad++, Git-Konfiguration, PowerShell-Profile), Remotewerkzeuge (FileZilla, WinSCP, PuTTY-Sessions) sowie
+Windows Terminal; vollautomatisches ZurÃ¼ckspielen im 1-Klick-Restore.
+Erweiterte Blacklist fÃ¼r Stammordner: Ausschluss von Treiber-, Cache- und temporÃ¤ren Ordnern auf Laufwerk C:\
+(unter anderem .cache, AMD, Intel, NVIDIA, inetpub, temp); gefundene Zusatzordner standardmÃ¤ÃŸig deaktiviert
+zur Vermeidung ungewollt riesiger SicherungslÃ¤ufe; exakte BerÃ¼cksichtigung der OrdnergrÃ¶ÃŸen in der Speicherplatzberechnung.
+OberflÃ¤chen-Feinschliff: Behebung verschluckter kaufmÃ¤nnischer Und-Zeichen (&) in Optionsfeldern; kompakte Anordnung
+und visuelle Transparenz wÃ¤hrend des Kopiervorgangs.
+
+VERSION 3.8    (23.10.2026)  MODUL â€žSYSTEM-UMZUG & NEUINSTALLATIONâ€œ (BACKUP & 1-KLICK-RESTORE)
+====================================================================================================
+Modul System-Umzug: Neues Modul in Seitenleiste und Arbeitsablauf zur transparenten Sicherung persÃ¶nlicher
+Dateien, Standardbibliotheken, Desktop-Layout und installierter Programme vor einer Windows-Neuinstallation.
+Autarkes Wiederherstellungspaket: Automatische Erstellung von Wiederherstellen.cmd (ohne BOM) und dynamischem
+Wiederherstellen.ps1 im Sicherungsordner, mit denen gesicherte Daten und Programme auf dem frisch installierten
+Windows-PC mit einem Klick und ohne Minibench-AbhÃ¤ngigkeit wiederhergestellt werden.
+Desktop-Layout & Optik 1:1: Extraktion des aktiven Hintergrundbilds als Wallpaper.jpg mit WallpaperStyle-Metadaten
+sowie vollstÃ¤ndige Sicherung der Desktop-Icon-Positionen Ã¼ber Shell-Bags (IconPositionen.reg) und Icons.json.
+Software-Inventarisierung: Winget-Paketexport (winget-pakete.json) und Registry-Abgleich mit detaillierter
+Ãœbersicht nicht katalogisierter Programme (Nicht-Winget-Programme.txt) inklusive Download-Suchlinks.
+Dateisystem-Schutz & SpeicherplatzprÃ¼fung: Automatische Erkennung von Wechsellaufwerken und NAS-Freigaben,
+Warnung bei FAT32-Dateisystemen (4-GB-Limit) und vorherige Speicherplatzkalkulation mit visueller Bereitschaftsanzeige.
+
+VERSION 3.73   (17.10.2026)  KOMPAKTE MODULNAMEN, LMB.EXE, MATHEMATISCHE MODELLKORREKTUR, DASHBOARD-FALLBACK & BEREINIGUNG EXTERNER QUELLEN
+====================================================================================================
+Kompakte Modulnamen & LMB.exe: Straffung der Bezeichnungen in Seitenleiste und Kopfzeilen (â€žDatenbankâ€œ statt
+â€žVergleichsdatenbankâ€œ, â€žÃ„nderungenâ€œ statt â€žSystemÃ¤nderungenâ€œ); Umstellung der Haupt-BinÃ¤rdatei auf LMB.exe
+(unter Beibehaltung von LMB.cmd und LeosMinibench.cmd zur AbwÃ¤rtskompatibilitÃ¤t).
+Dashboard-Optimierungen: Chronologische Sortierung der Systemauswahl und Vergleichs-Chips standardmÃ¤ÃŸig absteigend
+nach Messdatum (neueste Systeme zuerst); automatisches Fallback auf Benchmark-Sensordaten bei fehlender
+Lasttest-Zeitreihe verhindert leere Diagramme.
+Mathematische Modellkorrektur: Gesamtsystem-Effizienzscore auf gewichtetes harmonisches Mittel der gemessenen
+Benchmark-Effizienzen von CPU und GPU umgestellt, sodass hÃ¶here Einzelkomponenten-Effizienz stets zu einem hÃ¶heren
+Gesamtscore fÃ¼hrt; Nutzungsprofil â€žWorkstationâ€œ durch deutliche StÃ¤rkung der Mehrkern-Rechenleistung (CPU_MT 6,0)
+auf realistische Skalierung kalibriert.
+Bereinigung externer Quellen: VollstÃ¤ndige Entfernung inoffizieller Drittanbieter-Mirrors im Optimierungsmodul;
+Download externer Hilfswerkzeuge ausschlieÃŸlich Ã¼ber offizielle Herstellerquellen, GitHub-Releases oder winget.
+Dokumentation & GitHub-PrÃ¤senz: Umfassende Aktualisierung von README.md, neuen Bildschirmfotos und strukturierter
+CHANGELOG.md sowie Aufnahme einer respektvollen WÃ¼rdigung des Projekts Windows Optimisation Pack von Marvin700.
+
+VERSION 3.72   (16.10.2026)  NEUE DREITEILIGE STARTSEITE, INTERAKTIVER SCHNELLSTART & SYSTEM-FEINSCHLIFF
+====================================================================================================
+Neue dreiteilige Startseite: Moderne Einstiegsseite nach dem Drei-Fragen-Prinzip (â€žWas ist das fÃ¼r ein PC?â€œ,
+â€žWas kann ich hier tun?â€œ, â€žWas ist seit dem letzten Mal passiert?â€œ) als Standardansicht beim Programmstart.
+Zustand A fÃ¼r den Erststart mit Hardware-Steckbrief, vier interaktiven Aufgabenkarten, Ablauf-ErklÃ¤rung und
+Werkzeug-Verweisen; Zustand B fÃ¼r Folgestarts mit SchnellÃ¼bersicht der Hardware in Badges, Kachel fÃ¼r den
+letzten Lauf mit vier Kennzahlen (Gesamt, CPU, RAM, GPU) und Direktlinks, asynchroner Kachel â€žSchnell behebbarâ€œ
+fÃ¼r KonfigurationsprÃ¼fungen ohne Last sowie Aufgaben- und Werkzeuglisten.
+Interaktiver Schnellstart: Direkte Aufgabenwahl hakt die erforderlichen Module an, lÃ¤dt sinnvolle Standardprofile
+und wechselt zur ersten Arbeitsseite; FuÃŸleiste mit deaktiviertem Startknopf â€žAblauf wÃ¤hlenâ€œ im Leerzustand.
+Bereinigung veralteter WinSAT-Funktionen: VollstÃ¤ndige Entfernung aller WinSAT-Messungen, Optionen und Diagramme.
+Automatische Standard-Referenz: Automatische Wahl von Referenz_Notebook.json bzw. Referenz_Desktop.json je nach GerÃ¤tetyp.
+System-Feinschliff: Sachliche Benennung der KonfigurationsprÃ¼fung im Diagnosebericht und asynchrone HintergrundprÃ¼fung.
+
+VERSION 3.71   (15.10.2026)  PRÃ„ZISE STROMVERBRAUCHSSCHÃ„TZUNG, STARTZEIT-TRANSPARENZ, PROFILKARTEN UND DASHBOARD-KORREKTUREN
+====================================================================================================
+PrÃ¤zise StromverbrauchsschÃ¤tzung: Hardware- und Netzteil-Modellierung mit 230V EU-Effizienzkurven (Unbekannt bis 80 PLUS Titanium)
+Ã¼ber lineare StÃ¼tzstellen-Interpolation (5 % bis 100 % Last); interaktive Konfiguration von Nennleistung (Watt) und Effizienzklasse
+direkt im HTML-Bericht mit Live-Neuberechnung aller Verbrauchswerte, Auslastungsgrade und Stromkosten sowie browserseitiger Persistenz;
+genaue DC-Berechnung inkl. VRM-Wandlerverlusten, AMD-Radeon-TBP-ZuschlÃ¤gen, DIMM-, DatentrÃ¤ger- und LÃ¼fter-BasisverbrÃ¤uchen sowie
+Ãœberlastwarnung (> 85 % unter Volllast).
+Startzeit-Transparenz & Nutzungsprofile: StandardmÃ¤ÃŸig geÃ¶ffnete Boot-Performance-Sektion mit getrennter Ausweisung von Kernel- und
+Treiberstart (MainPathBootTime, Desktop einsatzbereit) und Hintergrund-Initialisierung (BootPostBootTime, vollstÃ¤ndiger Leerlauf);
+Nutzungsprofile (Gaming, BÃ¼ro, Workstation) und Komponentenkarten im Benchmark mit transparentem Hover-Tooltip zur exakten Zusammensetzung
+und Gewichtung der Teilwerte.
+Dashboard & Dark Mode: Horizontale und vertikale Trennlinien in Spalte 1 im Dark Mode mittels kontrastreicher Randlinien und z-index-Priorisierung
+repariert; Emojis (ðŸŽ®, ðŸ’¼, ðŸš€, ðŸ“Š) beibehalten.
+
+VERSION 3.7    (15.10.2026)  SCHNELL BEHEBBARE SYSTEMFEHLER, STARTZEIT-ANALYSE, SENSOREN-HARMONISIERUNG UND MODULARES DASHBOARD
+====================================================================================================
+Schnell behebbare Konfigurationsfehler: Automatische Erkennung von LAN-Verhandlungsrate gebremst (100 Mbit/s oder Halbduplex an Gigabit/2.5GbE-Adaptern),
+Monitorkabel an iGPU statt dGPU bei Desktops, Hz-Bremse bei Monitoren >= 75 Hz auf 60 Hz limitiert, inaktivem RAM-Speicherprofil (XMP/EXPO/DOCP)
+und veraltetem BIOS (> 2 Jahre) mit direkten Hersteller-Supportlinks sowie transparenter BestÃ¤tigung der PrÃ¼fung im Bericht.
+Startzeit-Analyse: AufschlÃ¼sselung der Boot Performance aus Event 100 (Kernel-Initialisierung, Desktop/PostBoot) und BIOS-POST-Dauer mit visueller
+Wasserfall-/Stack-Kaskade im Bericht (eingeklappt am Berichtsende) sowie Erfassung von Autostart-VerzÃ¶gerern (Event 101-110 ab 1,0 s); robuster Fallback ohne SchÃ¤tzwerte bei deaktiviertem Protokoll.
+Sensoren-Harmonisierung: Vereinheitlichte 4-Stufen-Zustandsmaschine (VollstÃ¤ndig, EingeschrÃ¤nkt, Inaktiv, Fehler) fÃ¼r Treiber und Monitoring;
+automatische Treiberinitialisierung bei Vorliegen von Administratorrechten ohne stÃ¶rende RÃ¼ckfragen und garantierte restlose Treiberbereinigung beim Beenden.
+Benchmark-Vereinfachung & Dashboard: Entfernen redundanter Dropdowns und Checkboxen (Messdauer, Referenz, DB-Speicherung); Benchmark speichert immer in der Vergleichsdatenbank. Beseitigung der Scrollbars in der Vergleichsmatrix mit Wiederholung der Systemnamen am Tabellenende, gut sichtbaren Zeilentrennlinien in der Basiskolumne und metrischen Einheiten (Â°C, %).
+Modulares Dashboard: VollstÃ¤ndige Trennung des Dashboard-Quelltexts in dedizierte Template-, Stylesheet- und JavaScript-Dateien (dashboard.html, dashboard.css, daten.js, matrix.js, profile.js, diagramme.js) mit build-zeitiger Einbettung.
+
+VERSION 3.67   (14.10.2026)  MULTI-SYSTEM-SENSORVERLAUF, DIFFERENZIERTE NUTZUNGSPROFILE UND KALIBRIERTE MODULDAUERN
+====================================================================================================
+Sensorverlauf im Dashboard: Y-Achsenbeschriftung fÃ¼r Temperatur (Â°C) durch 75 px Randabstand und linksbÃ¼ndige Platzierung
+vollstÃ¤ndig lesbar; Tooltip mit kompakten Systemnamen ohne unschÃ¶ne EinheitenumbrÃ¼che, zweizeiligem Layout und stets
+an oberster Stelle angefÃ¼hrtem Basissystem (auch wenn keine Zeitreihe vorliegt).
+Nutzungsprofile: Differenzierte Gewichtungsformeln fÃ¼r Gaming (70 % GPU-FPS, 20 % ST, 10 % RAM/SSD; Kerne > 8 neutral),
+BÃ¼ro/Desktop (45 % SSD-Reaktionszeit, 35 % ST, 20 % RAM-Latenz; 0 % GPU/MT) und Workstation (45 % MT, 20 % Instruktionen,
+20 % RAM-Bandbreite, 15 % Dauertransfer); redundante Stromverbrauchs-Badges in den Profilkarten entfernt.
+Basissystem-Hervorhebung: Leuchtende Akzent-Umrandung mit Anker-Symbol im oberen Auswahlbereich, durchgehende Spaltenhervorhebung
+mit 100-%-Basis-Badge in Hardware- und Matrix-Tabelle sowie Akzent-Rahmen in den Profilkarten.
+Hardware-Spezifikationen: Redundante Diagnoseberichts-Zeile entfernt; kompakte DatentrÃ¤ger-Zusammenfassung nach Anzahl SSDs
+(NVMe/SATA), HDDs und GesamtkapazitÃ¤t mit vollstÃ¤ndigen Modellbezeichnungen im Tooltip beim Ãœberfahren.
+GeschÃ¤tzte Moduldauern: Diagnose-Grundzeit auf 0 Min. gesenkt, ZuschlÃ¤ge fÃ¼r Dateisystem/DISM/sfc (3 Min.), SMART (2 Min.),
+Defender (1 Min.) und WinSAT (1 Min.) auf realistische SSD-Laufzeiten kalibriert.
+
+VERSION 3.66   (14.10.2026)  DARK MODE BEIM PROGRAMMSTART, DASHBOARD-TELEMETRIE UND GPU-EFFIZIENZ IN FPS/WATT
+====================================================================================================
+Dark Mode beim Start: Bevorzugter Farbmodus (SetPreferredAppMode) wird vor der Steuerelement-Erzeugung gesetzt; OnShown
+und Seitenwechsel wenden das native DarkMode_Explorer-Theme auf alle Bildlaufleisten und Container an, sodass Scrollbars
+bereits beim ersten Erscheinen dunkel sind.
+Sensor-Status: Dezentes Status-Badge in der Kopfzeile signalisiert den Zustand der Treiberanbindung (LHM + PawnIO aktiv
+oder Windows-Fallback).
+Dashboard-Telemetrie: Korrigierte Ablaufreihenfolge im Abschluss stellt sicher, dass neu erstellte Lasttest-VerlÃ¤ufe
+sofort im Vergleichsdashboard visualisiert werden; UnterstÃ¼tzung fÃ¼r .minibench-Container und Fallback auf Arbeitsverzeichnisse.
+Canvas-Diagramm: Zwei getrennte Y-Achsen (links Temperatur in Â°C, rechts Leistung in Watt), Temperatur- und Wattkurven
+visuell unterschieden; Ã¼bersichtliche Infokarte mit gemessenen Peak-Werten bei Systemen ohne Zeitreihe.
+GPU-Effizienz: Strikt als Bilder pro Sekunde je Watt (GPU|REND / GpuWMax in FPS/W) berechnet statt fehlerhafter Renderpunkte.
+HTML-Bericht: Sticky-Navigation beim Herunterscrollen fixiert und mit dezentem Schatten versehen; neuer Nach-oben-Knopf
+unten rechts fÃ¼r schnelles ZurÃ¼ckspringen an den Seitenanfang.
+
+VERSION 3.65   (14.10.2026)  EINHEITLICHE KARTEN, WARTUNG IM AUFBAU DER OPTIMIERUNG, ANGEGLICHENE LAUFANSICHT UND KORREKTUREN NACH DEM ERSTEN WINDOWS-TEST
+====================================================================================================
+Einheitliche Karten: Optionen der Diagnose, Tabellen des Lasttests, die Paketauswahl der Tools und die Listen der
+Laufansicht stehen in abgerundeten Karten wie die Werkzeugkarten.
+Wartung im Aufbau der Optimierung: jede Gruppe mit Beschreibung, alle und keine, Etiketten rechts und Knopf Alle
+aufklappen; die Befehle der MaÃŸnahmen stehen im Hinweis beim Ãœberfahren.
+Laufansicht angeglichen: TitelgrÃ¶ÃŸe, Karte um die Listen, Etiketten in normaler Schreibweise, Bericht Ã¶ffnen als groÃŸer
+Hauptknopf, Protokollfeld im Hellschema hell.
+Korrekturen nach dem ersten Windows-Test: Zeitangabe unter dem Diagnoseprofil mit paralleler AusfÃ¼hrung wie in der
+Seitenleiste, Diagnose (parallel) an der richtigen Stelle der FuÃŸleiste, KnÃ¶pfe der Optimierung in zwei Zeilen, Einzahl bei
+einem verwalteten Eintrag, Netzlaufwerk-Karte ohne abgeschnittenen Text, grÃ¶ÃŸeres Schildsymbol im Knopf Starten,
+KPI-Kopfzeile im Diagnosebericht einzeilig ohne Zeilenumbruch der ZuverlÃ¤ssigkeits-Kachel.
+
+VERSION 3.64   (14.10.2026)  ÃœBERARBEITETE OBERFLÃ„CHE: KLARE NAVIGATION, EINDEUTIGER STARTKNOPF, ETIKETTEN FÃœR RISIKOSTUFEN UND EINHEITLICHES RASTER
+====================================================================================================
+Seitenleiste: zwei Gruppen, Ablauf (Module mit Haken) und Werkzeuge (Seiten ohne Haken). Die angezeigte Seite erkennt man
+am Akzentbalken, ausgefÃ¼hrt wird, was angehakt ist; angehakte Module zeigen ihre geschÃ¤tzte Dauer.
+Kopfzeile: flacher, SymbolknÃ¶pfe fÃ¼r Farbschema und Info statt Emoji-Text, Version nur noch in Titelleiste und Info.
+Die Seite Ã„nderungen heiÃŸt SystemÃ¤nderungen.
+FuÃŸleiste: Module in Ablaufreihenfolge mit Gesamtdauer, der Startknopf sagt, was er startet (Diagnose starten,
+3 Module starten), und hat im Dunkelschema dunkle Schrift (vorher etwa 2:1 Kontrast). Voreinstellungen und Ablage stehen
+links, ein Klick auf die Ablage Ã¶ffnet den Datenordner.
+Vor dem Start erscheint eine Zusammenfassung nur, wenn Eingriffe, Neustarts oder ein abgewÃ¤hlter Wiederherstellungspunkt
+dabei sind; sie ersetzt die getrennten RÃ¼ckfragen von Wartung und Optimierung.
+Diagnose: Profile VollstÃ¤ndig, Schnell und Benutzerdefiniert als Segmentschalter mit stimmiger Zeitangabe; Funktionstest und
+Nur Absturzanalyse entfallen in der OberflÃ¤che. Lesende PrÃ¼fungen parallel ausfÃ¼hren ersetzt den Begriff Schneller Modus.
+Optionen, die etwas verÃ¤ndern, tragen ein Etikett.
+Benchmark und Lasttest: Messungen und Komponenten mit Detailzeile, Lasttest als Tabelle aus Komponente, Dauer und
+Einstellungen mit Gesamtdauer, Hinweisen am passenden Feld, Akkuhinweis und PawnIO-Etikett. Referenz-Zustand als eigene Zeile.
+Wartung und Optimierung: Etiketten fÃ¼r Ã„ndern, Eingriff, Neustart, verwaltet und Zustand, Legende oben, Warnung bei
+Eingriffen ohne Wiederherstellungspunkt. Tools: eine Bildlaufleiste, Werkzeugkarten mit Zustand und festen Knopfspalten,
+Netzlaufwerk als eigener Bereich.
+
+VERSION 3.63   (13.10.2026)  GESCHÃ„TZTER GESAMTSYSTEMVERBRAUCH, EFFIZIENZ-METRIKEN (PUNKTE PRO WATT) UND INTERAKTIVER STROMKOSTENRECHNER
+====================================================================================================
+GeschÃ¤tzter Gesamtsystemverbrauch: Mathematische Modellierung der internen DC-Leistungsaufnahme sowie der realen
+Leistung an der Steckdose (AC) fÃ¼r Desktop-Systeme und Notebooks. BerÃ¼cksichtigt gemessene Sensorwerte von CPU und GPU,
+RAM-KapazitÃ¤t und Auslastung, Chipsatz/Peripherie, NVMe/SSDs, Spannungswandler-Wirkungsgrade und Netzteil-Effizienz.
+Effizienz-Metriken (Punkte pro Watt): Ermittlung standardisierter Effizienzwerte fÃ¼r CPU-Mehrkernleistung (CPU|MT / Watt),
+Grafikleistung (GPU / Watt) sowie Gesamtsystem-Effizienz (Gesamt-Score / Watt) fÃ¼r faire Vergleiche zwischen Notebooks
+und High-End-Desktops.
+Interaktiver Stromkostenrechner: Integrierter Rechner im HTML-Bericht zur Hochrechnung jÃ¤hrlicher Energiekosten mit
+stufenlos anpassbaren tÃ¤glichen Betriebsstunden (BÃ¼ro/Alltag und Last) sowie einstellbarem Kilowattstundenpreis.
+Dashboard-Telemetrie mit Leistungsaufnahme: Das Multi-System Dashboard ergÃ¤nzt eine neue Kurvenansicht "Leistung (W)"
+zur visuellen GegenÃ¼berstellung des Systemverbrauchs Ã¼ber die Zeit sowie Systemkarten mit Leistungskennzahlen.
+Fehlertoleranz & Automatisierung: Systeme ohne Hardwaresensoren fÃ¼r Leistung weisen dies transparent als n/v aus, ohne
+Fehlberechnungen; Testen.cmd beendet TestlÃ¤ufe vollautomatisch ohne erforderlichen Tastendruck.
+
+VERSION 3.62   (13.10.2026)  BEDARFSORIENTIERTER LAUF-EXPORT (.MINIBENCH), KERNE UND THREADS IN ALLEN REFERENZEN, KOMPAKTER LASTTEST UND AUTOMATISCHER GITHUB-PUSH
+====================================================================================================
+Bedarfsorientierter Lauf-Export (.minibench): Die .minibench-Austauschdatei entsteht nicht mehr automatisch am Ende jedes
+Laufs, sondern gezielt bei Bedarf. Am Ende des Laufs steht dafÃ¼r eine neue SchaltflÃ¤che "Lauf exportieren â€¦" direkt in der
+Abschlussansicht bereit (ebenso wie weiterhin in der Vergleichsdatenbank).
+Keine Diagnosebericht.txt bei erzeugtem HTML: Die reine Textfassung des Diagnoseberichts entfÃ¤llt im regulÃ¤ren Lauf; sie dient
+nur noch als Sicherheits-Fallback bei Fehlern wÃ¤hrend der HTML-Erstellung.
+Kerne und Threads in allen Referenzen: Alle mitgelieferten Referenzsysteme (Desktop High-End, Desktop Mittelklasse, Mini-PC APU,
+Notebook Standard, Workstation Mobil) enthalten nun korrekte Werte fÃ¼r reale Kerne und logische Threads und wurden in die
+eingebetteten Referenzen Ã¼bernommen.
+Kompakter Lasttest als Standard: Die Auswahldauer fÃ¼r CPU, RAM, GPU und DatentrÃ¤ger auf der Lasttestseite startet standardmÃ¤ÃŸig
+mit 2 Minuten (bisher 15 Minuten).
+Automatischer GitHub-Push: Bauen.cmd committet nach bestandenen Tests lokal und Ã¼bertrÃ¤gt alle Ã„nderungen inklusive aktualisierter
+README.md automatisch nach GitHub (git push).
+
+VERSION 3.61   (13.10.2026)  ALL-IN-ONE-AUSTAUSCHFORMAT (.MINIBENCH), ERWEITERTER BERICHTS-IMPORT MIT DOPPELKLICK-VERKNÃœPFUNG, LASTTEST-TELEMETRIE IN REFERENZEN UND UNTERBRECHUNGSFREIER START
+====================================================================================================
+Austauschformat (.minibench): Ein selbsttragendes ZIP-Archiv bÃ¼ndelt Datenbankeintrag (Datenbank.json), Berichte (HTML, TXT),
+Anhang.zip und Telemetrie fÃ¼r den unkomplizierten Transfer zwischen PCs. Wird am Ende jedes Durchlaufs automatisch im Berichtsordner
+erzeugt; Export beliebiger LÃ¤ufe Ã¼ber die SchaltflÃ¤che und das KontextmenÃ¼ der Vergleichsdatenbank. Die nicht mehr benÃ¶tigte
+KI-Kurzfassung wurde restlos entfernt.
+Erweiterter Import mit Berichtskopie: Importdialog akzeptiert Ordner, .minibench, .zip und .json Dateien. Beim Import wird der
+Berichtsordner vollstÃ¤ndig nach Minibench-Daten\Berichte kopiert und im Datenbankeintrag verlinkt; Doppelklick auf einen importierten
+Eintrag Ã¶ffnet sofort den Diagnosebericht im Browser.
+Lasttest-Telemetrie in Referenzprofilen: Alle mitgelieferten Referenzen (inklusive echtem GTX 1070 Profil) enthalten strukturierte
+Lasttest-Messwerte (HÃ¶chsttemperaturen, Watt, TaktstabilitÃ¤t). Bericht und Dashboard zeigen Lasttest-Deltas und Drosselung gegen
+die Referenzen; -MedianAktualisieren pflegt Lasttest-Mediane ein.
+Unterbrechungsfreier Durchlauf-Start: Popups vor dem Durchlauf (Treiber- und Sensorabfrage) entfernt. Sensormessung mit PawnIO-Treiber
+ist standardmÃ¤ÃŸig aktiviert; fehlende Werkzeuge werden lautlos nachgeladen oder auf ACPI-Ersatzsensoren zurÃ¼ckgegriffen. Manuelle
+Treiber- und Werkzeugkonfiguration bleibt auf der Seite Sensoren live verfÃ¼gbar.
+
+VERSION 3.6    (10.10.2026)  MEDIAN-REFERENZ JE GERÃ„TEKLASSE, DIAGNOSE UND WARTUNG ÃœBERSICHTLICH, SENSOR- UND AKKUDIAGNOSE AUS PRAXISTESTS
+====================================================================================================
+Median je GerÃ¤teklasse: Feste Referenzdateien fÃ¼r Notebook und Desktop (Referenz_Notebook.json, Referenz_Desktop.json),
+auf Knopfdruck oder per -MedianAktualisieren aus bereinigten DatenbanklÃ¤ufen neu berechenbar, verhindern schwankende
+Vergleichswerte und AusreiÃŸer.
+Wartung und Diagnose gegliedert: 23 WartungsmaÃŸnahmen in vier Gruppen mit Aufklappfunktion und Auswahlanzeige; PrÃ¼fungen
+auf der Diagnoseseite standardmÃ¤ÃŸig eingeklappt mit dynamischer Zusammenfassung (Profil Schnell/Standard/Umfassend).
+Dunkles Farbschema: UI.ThemeDialog formatiert alle Formulare und Unterdialoge konsistent ohne schwarze Schrift auf dunklem Grund.
+Hardware-Details und CPU-Anzeige: Kerne und Threads in der Datenbank erfasst; herstellerbereinigte CPU-Anzeigenamen
+(Get-CpuAnzeigename) in Berichten, Systemvergleich und Dashboard.
+Dashboard und Telemetrie: Multi-System-Sensorverlauf mit GPU-Metriken (Takt, Watt, IGpu) vor Befunden platziert, synthetische
+Verlaufskurven entfernt, Profilkarten nach Punktzahl sortiert.
+Sensor- und Praxistest-HÃ¤rtung: HintergrundlastprÃ¼fung vor Messungen (> 15 % verwirft Leerlauf-Etikett mit 90/80 Â°C Schwellen),
+Schutz vor AkkuverschleiÃŸ-Fehlalarmen, saubere Hybridgrafik-Erkennung (Optimus dGPU ohne Desktop), Filterung unplausibler
+Leerlaufspannungen und Sensortemperaturen unter 5 Â°C, Akkubetrieb im Benchmark protokolliert.
+
+VERSION 3.54   (09.10.2026)  NETZLAUFWERK ALS SPIEGEL MIT ABGLEICH AUF KNOPFDRUCK, LÃ„UFE VOLLSTÃ„NDIG ENTFERNEN UND UMBENENNEN
+====================================================================================================
+Der Datenordner liegt immer auf dem Stick; der Start greift nie auf das Netzlaufwerk zu, Werkzeuge und Sensoren kommen
+immer vom Stick. Ein eingerichtetes Netzlaufwerk ist ein Spiegel: Aktualisieren auf der Seite Vergleichsdatenbank
+gleicht Berichte, Datenbank, Ã„nderungsprotokolle, Voreinstellungen und Referenz in beide Richtungen ab. Die neuere
+Fassung gilt, die Ã¤ltere und alles GelÃ¶schte kommt ins Archiv (Archiv\Abgleich). Fehlt auf einer Seite ein groÃŸer Teil
+der Daten, hÃ¤lt der Abgleich an. Netzwerk.json steht nur noch auf dem Stick, ohne Kennwort; ein Pfad mit nur einem \
+am Anfang wird abgelehnt. Entfernen verschiebt Datenbankeintrag und Berichtsordner ins Archiv, Name Ã¤ndern benennt Datei
+und Berichtsordner um. Datenpflege: PawnIO-Merker bleibt, verwaiste temporÃ¤re Dateien werden wieder gefunden.
+
+VERSION 3.53   (09.10.2026)  TESTSUITE NACH FACHGEBIETEN, WINGET MIT Ã„NDERUNGSPROTOKOLL, GRAFIKAUSWAHL IM LASTTEST
+====================================================================================================
+Softwarepakete der Seite Tools: winget lÃ¤uft im Arbeitsprozess (Hilfsmodus -SoftwareInstallieren) mit einer Frist von
+20 Minuten je Paket und vollstÃ¤ndig gelesener Ausgabe; vorher konnte die Installation unbegrenzt hÃ¤ngen. Jede
+Installation steht als Eingriff auf der Seite Ã„nderungen und lÃ¤sst sich dort zurÃ¼cknehmen (winget uninstall). Schon
+vorhandene Programme bleiben unberÃ¼hrt. Die Grafikeinheit auf der Seite Lasttest sprang auf den Wert des Benchmarks
+zurÃ¼ck; beide Seiten gleichen sich jetzt in beide Richtungen ab. Minidumps mit Kerneladressen als Parameter werden
+wieder gelesen. Die Testsuite ist nach Fachgebieten statt nach Versionen geordnet, die OberflÃ¤che wird je Testlauf
+einmal Ã¼bersetzt und mit einem Selbsttest geprÃ¼ft. Bauen.cmd committet nur nach bestandenen Tests.
+
+VERSION 3.52   (07.10.2026)  NETZLAUFWERK-HÃ„RTUNG, DASHBOARD-LINK-FIX, DATENPFLEGE & HISTORIE 1.0â€“1.8
+====================================================================================================
+Netzlaufwerk- und NAS-HÃ¤rtung: Klare Trennung zwischen Berichten/Datenbank auf dem Netzlaufwerk und
+strikt lokalen Binaries/Caches auf dem USB-Stick oder im lokalen Temp-Verzeichnis. Ausnahme
+'Pfadformat nicht unterstÃ¼tzt' und CAS-Sicherheitsblockaden bei OpenRead und externen Treibern (smartctl,
+PawnIO, LibreHardwareMonitor) behoben.
+Dashboard-Link-Korrektur: Relative PfadauflÃ¶sung von Berichts-Links im interaktiven Multi-System-Dashboard
+(Dashboard.html) bereinigt; AuflÃ¶sung auf <Lauf-Ordner>/Diagnosebericht.html mit VorwÃ¤rtsslash ohne doppeltes
+Berichte-PrÃ¤fix (ERR_FILE_NOT_FOUND behoben).
+Erweiterte Datenpflege: Verwaiste und beschÃ¤digte DatenbankeintrÃ¤ge (ohne Berichtsordner oder leere
+JSON-Dateien) werden automatisch ins Archiv verschoben; verwaiste Locks, Checkpoints und temporÃ¤re Reste
+im Laufzeitordner werden bereinigt und freigegebener Speicherplatz detailliert protokolliert.
+OberflÃ¤chen-Verfeinerung: Redundante Vergleichs-Checkliste auf der Benchmark-Startseite entfernt;
+Diagnose-Optionen in moderne Fluent-Karten mit Icons kategorisiert; StartfenstergrÃ¶ÃŸe weiter vergrÃ¶ÃŸert
+fÃ¼r scrollbalkenfreie Darstellung.
+VollstÃ¤ndige Versionshistorie: Dokumentation aller Einzelversionen von 1.0 bis 1.8 mit konkreten
+Changelogs nachgepflegt.
+
+VERSION 3.51   (07.10.2026)  DASHBOARD-BERICHTSVERLINKUNG, REFERENZ-DEDUPLIZIERUNG & PERSISTENTE NETZLAUFWERKE
+====================================================================================================
+Dashboard-Berichtsverlinkung: VollstÃ¤ndige Diagnoseberichte kÃ¶nnen im Multi-System-Dashboard
+(Dashboard.html) direkt durch Klick auf Systemnamen oder Ã¼ber die neuen Bericht-SchaltflÃ¤chen geÃ¶ffnet
+werden. Auf der Vergleichsseite in der BenutzeroberflÃ¤che steht zusÃ¤tzlich ein Button "Bericht Ã¶ffnen" bereit.
+Bereinigung der Referenzprofile: Referenzsysteme erscheinen im Dashboard sauber und ausschlieÃŸlich
+einmalig unter "Referenzprofile (Eingebettet)" mit Stern-Symbol (â­) statt fÃ¤lschlich zusÃ¤tzlich in der
+regulÃ¤ren Datenbankliste.
+Persistente Netzlaufwerk-Verbindung: Die Konfiguration fÃ¼r NAS- und Netzlaufwerkablagen (Netzwerk.json)
+wird redundant an allen lokalen Speicherorten abgelegt. Beim Programmstart wird die Verbindung bei Bedarf
+automatisch via net use wiederhergestellt, sodass alle Berichte und Benchmark-Daten der Freigabe sofort
+geladen werden.
+
+VERSION 3.5    (06.10.2026)  TASKLEISTEN-BUGFIX, MINIMAL-PRESET, WINGET & NAS-INTEGRATION
+====================================================================================================
+Fehlerbehebung & Optimierungs-Presets: Entkopplung der Taskleisten-Gruppierung vom Task-Beenden;
+TaskbarEndTask als eigenstÃ¤ndiger Eintrag mit Vorlagen MSE. Das Preset Minimal wurde auf ein
+schlankes Basispaket gestrafft und ist die neue Standardvorauswahl beim Start.
+Erweitertes Fensterlayout: VergrÃ¶ÃŸerte, responsive StartfenstergrÃ¶ÃŸe (1220x740 mit Begrenzung auf
+95 % / 92 % des Arbeitsbereichs) fÃ¼r optimalen Ãœberblick ohne Ãœberlauf auf skalierten Displays.
+Softwarepakete installieren (winget): Neues Werkzeug im Modul Tools zur einfachen Installation
+populÃ¤rer Standardprogramme (Chrome, Firefox, Opera, Steam, Discord, Notepad++, OnlyOffice, 7-Zip,
+VLC) per Mausklick mit Statuserkennung.
+NAS- & Netzlaufwerk-Integration: Konfigurierbare Netzwerkpfade fÃ¼r Berichte und Vergleichsdatenbank
+(Netzwerk.json) mit schnellem Verbindungsdialog und robustem, automatischem lokalem Fallback bei
+Verbindungsverlust.
+Berichts-Diagramme & Bereinigung: Sensor-Charts im Diagnosebericht mit interaktiven Hover-Tooltips
+(Zeitstempel, Â°C, GHz, Watt und Auslastung) sowie Bereinigung der Befunde-Suchleiste zugunsten
+Ã¼bersichtlicher Stufen-Filter.
+
+VERSION 3.4    (06.10.2026)  MODUL TOOLS, LEOS EMPFEHLUNG & INTERAKTIVER HAUPTBERICHT
+====================================================================================================
+Neues Modul Tools: Eigene Navigationsseite mit portablen Werkzeugen (Revo Uninstaller, MiniTool
+Partition Wizard, WizTree) inklusive automatischer Erkennung und Administrator-Start sowie
+System-Shortcuts (Ins BIOS/UEFI neu starten, DatentrÃ¤gerverwaltung, GerÃ¤te-Manager, ZuverlÃ¤ssigkeitsverlauf).
+Erweiterung 'Leos Empfehlung': Neue Optimierung fÃ¼r Windows 11 zum sofortigen Beenden von Tasks per
+Rechtsklick auf die Taskleiste (TaskbarEndTask) sowie Desktop-KontextmenÃ¼-Shortcut fÃ¼r UEFI-Neustarts.
+Interaktiver Diagnosebericht & Designangleichung: Hauptbericht (Diagnosebericht.html) mit dynamischer
+Abschnitt-Navigation, Live-Suche und Stufen-Filtern fÃ¼r Befunde, schwebenden Tooltips auf
+Sensor-Messpunkten und einheitlicher kontraststarker Farbwelt auf Basis von Stil.ps1.
+
+VERSION 3.32   (06.10.2026)  DARK-MODE-FEINSCHLIFF & KONSOLIDIERUNG DES SYSTEMVERGLEICHS
+====================================================================================================
+Dark-Mode-Feinschliff: Native dunkle Win32-Scrollbars fÃ¼r Inhalts- und Navigationsbereiche Ã¼ber
+SetPreferredAppMode (ForceDark) und SetWindowTheme (DarkMode_Explorer), neue DarkComboBox fÃ¼r
+nahtlos dunkle Dropdown-MenÃ¼s, einheitlich abgedunkelte TabellenkÃ¶pfe (Owner-Draw SysHeader32) und
+kontrastreiche Textdarstellung fÃ¼r deaktivierte Steuerelemente ohne Windows-GDI-Schattendruck.
+Konsolidierung des Systemvergleichs: Das interaktive Multi-System-Dashboard deckt sÃ¤mtliche
+Hardware-GegenÃ¼berstellungen, Benchmark-Matrizen und Befundvergleiche ab; die redundante statische
+Vergleichsfunktion wurde zugunsten eines einheitlichen Workflows abgelÃ¶st und die Vergleichsdatenbank
+entsprechend aktualisiert.
+
+VERSION 3.31   (06.10.2026)  MULTI-SYSTEM DASHBOARD (N >= 2), NATIVER GUI DARK MODE & BUILD-SYNC
+====================================================================================================
+Multi-System-Vergleich im Dashboard: Beliebige Anzahl von Systemen (N >= 2) mit dynamischer Systemauswahl,
+direkter Hardware-GegenÃ¼berstellung, vollstÃ¤ndiger Benchmark-Matrix aller Messwerte (CPU ST/MT/Krypto,
+RAM-Bandbreite und -Latenzen, GPU Frametimes und Mikroruckler, DatentrÃ¤ger sequentiell und 4K) mit
+Bestwert-Hervorhebung ("ðŸ‘‘ Bestwert"), synoptischer GegenÃ¼berstellung der Befunde (Kritisch/Warnung/Info)
+sowie interaktivem Multi-System Canvas-Chartvergleich fÃ¼r Takt und Temperatur.
+Paralleler Betriebsmodus: Sowohl der bewÃ¤hrte statische Vergleichsbericht ("Vergleichen (Klassisch)") als auch
+das neue interaktive Dashboard ("Interaktives Dashboard") stehen in der Datenbank-Toolbar und im KontextmenÃ¼
+vollwertig zur VerfÃ¼gung.
+Nativer WinForms Dark Mode: VollstÃ¤ndig integriertes dynamisches Theme-System (Hell/Dunkel) fÃ¼r das Hauptprogramm
+mit diskretem Theme-Schalter in der Titelleiste, DWM Immersive Dark Mode fÃ¼r die Fensterleiste und dauerhafter
+Speicherung in Minibench-Daten\Einstellungen.json (Fallback auf Windows-Systemdesign).
+Build- und Git-Synchronisation: Bauen.cmd synchronisiert und committet Quelltexte und Dokumentation nach
+erfolgreichem Bau und bestandenen Tests automatisch lokal in Git.
+
+VERSION 3.3   (06.10.2026)  INTERAKTIVES BENCHMARK- & DIAGNOSE-DASHBOARD, LASTTEST-TELEMETRIE & DARK MODE
+====================================================================================================
+EigenstÃ¤ndiges HTML5-Dashboard: VollstÃ¤ndig offline-fÃ¤higes, interaktives Analyse- und Vergleichs-Dashboard mit
+Export-Funktion (Export-BenchDashboardData, New-BenchDashboardHtml) und Direktaufruf aus der Vergleichsseite
+sowie per CLI (-Dashboard und -DashboardExport <Pfad>).
+Dual-Axis Telemetrie-Visualisierung: Interaktiver HTML5-Canvas-Chart fÃ¼r Takt (GHz/MHz) und Temperatur (Â°C) Ã¼ber
+den Lasttestverlauf mit TjMax-Referenzlinie, dynamischen Drosselungs-Markierungen (Thermal/Power Throttling)
+und hochprÃ¤zisen Cursor-Tooltips ohne externe Bibliotheken.
+Fluent 2 / Wintoys-UI & Theming: Kachel- und Kartendesign im Windows 11 Fluent 2-Look, interaktiver
+Dark/Light-Mode Switch mit Zustandsspeicherung in localStorage und sauberer responsiver Skalierung.
+Umfassende Vergleichsmetriken: Live-GegenÃ¼berstellung gegen alle fÃ¼nf eingebetteten Referenzprofile mit Gaming-,
+BÃ¼ro- und Workstation-Scores sowie Differenz-Pillen fÃ¼r CPU, RAM, GPU und DatentrÃ¤ger.
+
+VERSION 3.2   (06.10.2026)  FLUENT 2 / WINTOYS-LOOK, WINDOWS 11 DWM-RUNDUNGEN, SEGOE-ICONS & RESPONSIVE SKALIERUNG
+====================================================================================================
+Fluent 2-Designsystem: Modernes helles Farbschema (#F9F9FB Hintergrund, weiÃŸe Karten mit feinem 1px-Rahmen #E5E7EB,
+Windows 11-Akzentblau #0067C0 und weiche pastellfarbene Status-Badges fÃ¼r OK, Warnung, Kritisch und Info).
+Moderne Steuerelemente: Eigener ToggleSwitch im Windows 11-Pillendesign mit animiertem Schieber, barrierefreier
+Tastaturbedienung und Tooltip-UnterstÃ¼tzung; FluentCard-Komponente fÃ¼r modulare Optionen mit Segoe-Icons und Toggle-Schaltern.
+Modul-Navigation: Neugestaltetes NavItem im Windows 11-Sidebar-Stil mit sanfter 6 px Eckenrundung, aktivem
+3 px-Akzentbalken, sanftem Auswahlhintergrund und gestochen scharfen Segoe-Symbolen (Segoe Fluent Icons / MDL2 Assets).
+DWM-Integration: Echte Windows 11-Fensterabrundung Ã¼ber DWMWA_WINDOW_CORNER_PREFERENCE (DWMWCP_ROUND) und
+PerMonitorV2 DPI-Awareness ohne den veralteten P/Invoke-Aufruf SetProcessDPIAware().
+Zentraler DPI-Helper & Notebook-Sicherheit: VollstÃ¤ndige Skalierung Ã¼ber UI.S(...) und UI.SF(...), dynamische
+Berechnung der FenstermaÃŸe anhand der sichtbaren WorkingArea gegen Ãœberlauf auf 1080p-Notebooks mit 150 % Skalierung.
+Laufansicht & OwnerDraw: Skalierte Tabellenzeilen (34 px), Badge-Pillen (20 px HÃ¶he) mit zentrierter
+Textmessung sowie verbreiterte Messwert-Bereiche (48 px) fÃ¼r WinSAT- und Index-Balken (8 px HÃ¶he).
+
+VERSION 3.1   (05.10.2026)  BUGFIX: VERGLEICHSSEITE, REFERENZDATEN, CPU-REGRESSION, GPU-FEHLER
+====================================================================================================
+
+Vergleichsseite: Fehlerbehebung beim Einlesen der Systemdatenbank und Logging im JSON-Parser (DbEntry.Load),
+sodass Systeme in der Vergleichsansicht stets zuverlÃ¤ssig geladen und angezeigt werden.
+Eingebettete Referenzdaten: FÃ¼nf anonyme Referenzprofile (Desktop High-End bis Notebook Standard) direkt im
+Skript eingebettet und bei leerer Datenbank automatisch entpackt (Vergleiche ab Erststart ohne Datenordner).
+Prozessor-Benchmark: Behebung der CPU-Leistungsregression durch verbindliche AusfÃ¼hrung unter Windows PowerShell 5.1;
+Beseitigung von RyuJIT-Verlangsamungen und Sensor-Abfragekollisionen.
+Grafik-Benchmark: Robuste Bildzeit- und Perzentil-Erfassung bei niedrigen Bildraten (z. B. Intel UHD Graphics 620
+auf Dell Notebooks); Vermeidung von Datenverlust bei aktiver Vorschau; Fallback-Erkennung fÃ¼r Hybrid-Grafik.
+
+VERSION 3.0   (05.10.2026)  DUAL-RUNTIME (POWERSHELL 7 / 5.1), SICHERES ÃœBERSPRINGEN, 0,1 %-LOW & MIKRORUCKLER
+====================================================================================================
+Dual-Runtime-UnterstÃ¼tzung: Automatische Bevorzugung von PowerShell 7 (pwsh.exe) fÃ¼r maximale Geschwindigkeit
+mit nahtlosem Fallback auf Windows PowerShell 5.1 fÃ¼r 100 % portable AusfÃ¼hrung vom USB-Stick.
+Sicheres Ãœberspringen langwieriger Einzelschritte mit dynamischer Freigabe (SKIP_ALLOWED) in OberflÃ¤che und Skript.
+Hintergrundjobs werden bei Ãœberspringen sauber gestoppt; Behebung des Abbruchfehlers (Add-TestResult).
+Erweiterte Frametime-Analyse im Rendertest: Erfassung von 0,1 %-Low FPS und Mikroruckler-Anteil (Frames Ã¼ber 50 ms)
+in Messwerten, Kurvengrafik und HTML-Bericht.
+FÃ¼nf eingebettete Referenzprofile (Desktop High-End bis Notebook Standard) direkt im Build fÃ¼r sofortige Vergleiche
+ohne externe Dateien. Standard-Referenz Desktop Mittelklasse wird automatisch aktiv.
+Bereinigte Benchmark-Darstellung im HTML-Bericht mit bewÃ¤hrter Detailtabellen-Optik (Messung, Wert, Index,
+Referenz, Vergleich, Ergebnis) unter Beibehaltung des Gesamtleistungs-Banners und der Profilkarten.
+
+VERSION 2.95  (05.10.2026)  ANONYME VERGLEICHSDATEN, BENCHMARK-PROFILE, MINIDUMP-INSPECTOR, SCHRITT ÃœBERSPRINGEN
+====================================================================================================
+Feste Einbindung von fÃ¼nf anonymisierten, bereinigten Referenzsystemen von Desktop High-End bis Notebook Standard
+fÃ¼r sofortige Vergleichbarkeit ab dem ersten Start. Gesamtleistungs-Banner im Bericht-Header mit prozentualer
+Gesamtbewertung zur Referenz. Benchmark-Darstellung im UserBenchmark-Stil: Drei gewichtete Nutzungsprofile
+(Gaming, BÃ¼ro/Desktop, Workstation), prominente Komponenten-KÃ¶pfe in den Detailabschnitten und modernes Spalten-Layout
+fÃ¼r MessgrÃ¶ÃŸen von Prozessor, Arbeitsspeicher und Grafik.
+Modul Wartung mit angepasster Standardauswahl fÃ¼r risikoarme Bereinigungen und Schnellwahlschaltern Ã¼ber der
+Aufgabenliste. Neue SchaltflÃ¤che â€žDiesen Schritt Ã¼berspringenâ€œ in der Laufansicht mit Ereignis @@SCHRITT_UEBERSPRINGEN.
+Minidump Crash Inspector mit nativer BinÃ¤ranalyse von Windows-Absturzabbildern (.dmp), Bugcheck-Erkennung und
+konkreten Handlungsempfehlungen in Diagnose, HTML-Bericht und KI-Datei.
+Grafiktreiber-Gesundheitscheck mit Warnung vor dem Microsoft Basic Display Adapter, Alterswarnung ab 18 Monaten
+und Erkennung von TreiberabstÃ¼rzen (Event 4101) mit DDU-Empfehlung.
+Durchlaufzeit-Optimierung durch Zwischenspeicherung statischer WMI- und CIM-Systemabfragen (Get-CimCached).
+
+VERSION 2.9  (05.10.2026)  PHASEN 0 UND 1: ARM64, HIGH-DPI, MODULARISIERUNG, WARTUNG, GESAMTBILD, VERGLEICHSSEITE
+====================================================================================================
+Hardware-Erkennung mit ARM64-Erkennung und Warnhinweis fÃ¼r ARM64-Systeme im Bericht. High-DPI-Optimierung mit
+Per-Monitor V2 DPI-Awareness im Anwendungsmanifest fÃ¼r gestochen scharfe Anzeige bei 150 % bis 225 % Skalierung.
+Modularisierung der C#-OberflÃ¤che in Ã¼bersichtliche Teilklassen (Steuerelemente, Modelle, Vergleich, Seiten).
+Modul Reparatur in Wartung umbenannt mit 22 Wartungsschritten, Bereinigungsaufgaben aus Optimierung Ã¼berfÃ¼hrt und
+Redundanzen im Katalog bereinigt. Neues Voreinstellungs-Preset Leos Empfehlung als Standard aktiv. Neugewichtung
+im Gesamtbild: Prozessor und Grafik erhalten doppeltes Gewicht, der GPU-Rendertest (FPS) dreifaches Gewicht
+gegenÃ¼ber Durchsatzwerten. Vergleichsseite: System-Anzeigename editierbar und Vergleichsdatenbank nach Spalten sortierbar.
+
+VERSION 2.8  (03.10.2026)  MODUL OPTIMIERUNG, SENSOREN OHNE LIBREHARDWAREMONITOR
+====================================================================================================
+Neues Modul Optimierung: alle Einstellungen des Windows Optimisation Pack, seiner Sophia-Konfiguration und der
+O&O-Auswahl als 163 einzelne EintrÃ¤ge in 14 Kategorien, mit Vorlagen Minimal, Standard und Erweitert,
+ZustandsprÃ¼fung, Wiederherstellungspunkt und RÃ¼ckgÃ¤ngig je Einstellung. Sophia Script und O&O ShutUp10++ laufen nicht
+mehr; DDU und NVIDIA Profile Inspector sind optionale Werkzeuge mit PrÃ¼fsumme. Ohne LibreHardwareMonitor liefern
+Grafiktreiber und Windows GPU-Temperatur, Takt, LÃ¼fter, Auslastung und, wo vorhanden, die CPU-Leistung; Bericht und
+OberflÃ¤che nennen den wahren Grund fehlender Werte und bieten das Holen an. Kurven ohne Ã¼berlappende Beschriftungen,
+Unterbrechungen im Benchmark ohne WinSAT, kÃ¼rzere WLAN- und ZuverlÃ¤ssigkeitstexte, Laufzeit mit Minuten,
+NVMe-Klasse ohne lesbare Anbindung geschÃ¤tzt.
+
+VERSION 2.7  (03.10.2026)  BEDIENUNG, SENSOREN IM BENCHMARK, DATENPFLEGE
+====================================================================================================
+Jedes Bedienelement erklÃ¤rt sich beim Ãœberfahren mit der Maus. Der Benchmark zeichnet wÃ¤hrend aller Messungen
+Temperatur, Takt und Leistung auf; der Bericht zeigt sie je Abschnitt (Prozessor, Arbeitsspeicher, Grafik,
+DatentrÃ¤ger, WinSAT) mit Kurven wie nach dem Lasttest, die Laufansicht zeigt die Kurven live. Der
+CPU-StabilitÃ¤tstest der Diagnose entfÃ¤llt, das Modul Lasttest prÃ¼ft die CPU grÃ¼ndlicher. Neue Seite Versionen mit
+dieser Historie. Die Datenpflege verschiebt Lasttests vor v2.67, abgebrochene LÃ¤ufe ohne Bericht und kurze LÃ¤ufe ins
+Archiv, beim Start von selbst und Ã¼ber AufrÃ¤umen auf der Seite Vergleichsdatenbank. Bauen.cmd legt den vorigen Build
+unter Archiv\v<Version> ab.
+
+VERSION 2.67  (03.10.2026)  GLEICHMÃ„SSIGE CPU-LAST IM EIGENEN PROZESS
+====================================================================================================
+CPU- und RAM-Last laufen in einem eigenen PowerShell-Prozess ohne Speicherbereinigung; die Lastschleifen kommen ohne
+Aufrufe aus (Sinus als Polynom). Ursache der ungleichmÃ¤ÃŸigen Last war Math.Sin in der Rechenschleife: Die
+Speicherbereinigung konnte die Threads nicht anhalten. Lasttestergebnisse Ã¤lterer Versionen (RechendurchlÃ¤ufe,
+Unterbrechungen) sind damit nicht vergleichbar; das Rechenwerk des Benchmarks blieb gleich.
+
+VERSION 2.66  (03.10.2026)  UNTERBRECHUNGEN MESSEN, SENSOREN ROBUSTER
+====================================================================================================
+Messung von Unterbrechungen Ã¼ber 50 ms mit den Speicherbereinigungen je Generation in Lasttest, CPU-Test und
+Benchmark. Sensoren Ã¼berstehen verspÃ¤tete Abfragen (letzte Werte bis 10 s, Ausfall erst nach 30 s), DatentrÃ¤ger
+werden in einem eigenen Thread gelesen. KI-Auftrag mit Klickpfad und fertigen PowerShell-Befehlen. Keine RÃ¼ckfrage
+mehr vor dem Grafik-Lasttest.
+
+VERSION 2.65  (02.10.2026)  PRAXISTEST AUF ULB-PC UND TORRENT
+====================================================================================================
+GPU-Sensorwerte wieder vollstÃ¤ndig, RAM-Test neben der CPU-Last mit niedriger PrioritÃ¤t, flÃ¼ssige Vorschau des
+Rendertests, Warnung bei einer Bildratengrenze, Auswahl der Grafikeinheit, Lasttest ab 2 Minuten. DatentrÃ¤ger- und
+Grafiklast abgesichert, Referenz nur noch Ã¼ber den Haken, ZuverlÃ¤ssigkeit vorn im Bericht, Voreinstellungen zum
+Weitergeben, kÃ¼rzere Texte.
+
+VERSION 2.6  (02.10.2026)  RENDERTEST, SCHNELLER MODUS, SCHNELLER START
+====================================================================================================
+Fasst die geplanten Versionen 2.5 und 2.6 zusammen (eine 2.5 gibt es nicht). Lasttest lÃ¤uft eigenstÃ¤ndig und liefert
+immer ein Ergebnis. Eigener Rendertest mit Direct3D 11 auf jeder Grafikeinheit. Schneller Modus mit parallelen
+PrÃ¼fungen. Startfenster sofort, Skript und Arbeitsordner im lokalen TEMP, deutlich weniger Schreibzugriffe auf den
+Stick (Anhang.zip). Programmsymbol blaues L.
+
+VERSION 2.4  (02.10.2026)  PRAXISTEST VOM 01.10.2026
+====================================================================================================
+Kein leerer Bericht bei einzelnen Modulen, CPU-Takt wie im Task-Manager (PDH), Grenzwerte und unplausible
+Sensorwerte erkannt, Grafikkarte und Prozessorgrafik getrennt, WinSAT bei Hybridgrafik auf der Grafikkarte, KI-Datei
+mit Gewichtungsregeln, Akkubericht, Standby-Sperre wÃ¤hrend des Laufs, SMART-Langtest hÃ¶chstens 120 Minuten,
+Hilfswerkzeuge je GerÃ¤t behalten.
+
+VERSION 2.3  (01.10.2026)  SENSOREN
+====================================================================================================
+LibreHardwareMonitor portabel mit festen PrÃ¼fsummen, Treiber PawnIO nur nach RÃ¼ckfrage und nur vorÃ¼bergehend,
+Ersatzquellen (Windows, ACPI, nvidia-smi). Seite Sensoren live, Lasttest mit Kurven, Drosselnachweis und
+Abbruchschwelle, Sensoren als Momentaufnahme in der Diagnose.
+
+VERSION 2.2  (01.10.2026)  NEUES FUNDAMENT
+====================================================================================================
+Quelltext in Teilen (src) mit Bauen.cmd, Modulvertrag je Modul, Risikostufen (Lesen, Ã„ndern, Eingriff, ZerstÃ¶rend),
+Ã„nderungsprotokoll mit RÃ¼ckgÃ¤ngig, Werkzeug-Manifest mit SHA-256, Datenbankformat 2 mit GerÃ¤teidentitÃ¤t,
+Pester-Tests und Testmatrix. Bedienung, Berichte und Ablage blieben wie in 2.1.
+
+VERSION 2.0 bis 2.1  (bis 01.10.2026)  LEOS MINIBENCH
+====================================================================================================
+Neuer Name Leos Minibench, Start als LeosMinibench.exe vom Stick, Datenordner Minibench-Daten neben der exe (ein
+Ordner PC-Diagnose-Daten wird Ã¼bernommen). OberflÃ¤che mit den Modulen Diagnose, Benchmark, Lasttest und Reparatur,
+Vergleichsdatenbank (Format 1), HTML- und Textbericht, KI-Datei. smartctl lag im Tools-Ordner noch ohne Manifest.
+Stand 2.1 ist die Grundlage, die 2.2 in Teile zerlegt hat.
+
+VERSION 1.8   (30.09.2026)  GRUPPIERTER BENCHMARK UND REFERENZ
+====================================================================================================
+Der Benchmark ist in vier ausklappbare BlÃ¶cke gegliedert, im Bericht und in der OberflÃ¤che. Laufwerke
+stehen kompakt in einer Zeile pro Laufwerk. Neue Messungen:
+Â· CPU: AES-256, SHA-256, Kompression
+Â· RAM: Kopieren
+Â· GPU: PCIe-Anbindung, Grafikspeicher
+Â· Laufwerke: 4K schreiben
+
+VERSION 1.7   (29.09.2026)  BENCHMARK-KORREKTUR UND SCHLANKERE AUSGABE
+====================================================================================================
+Fehler behoben, durch den nur die CPU gemessen wurde. Jeder Teil des Benchmarks lÃ¤uft jetzt abgesichert
+fÃ¼r sich. Die Ausgabe ist entschlackt: Im Ordner liegen nur noch der HTML- und der Textbericht, alles
+andere steckt in Anhang.zip.
+
+VERSION 1.6   (28.09.2026)  BENCHMARK UND LASTTEST
+====================================================================================================
+Benchmark fÃ¼r CPU (Einzel- und Mehrkern, Takt), RAM (Lesen, Schreiben, Latenz), GPU (WinSAT) und
+Laufwerke (sequentiell und 4K, ohne Windows-Cache). Jeder Wert bekommt einen Index fÃ¼r seine Hardwareklasse
+und wird mit frÃ¼heren LÃ¤ufen verglichen. PCIe-Anbindung von Grafikkarte und NVMe wird geprÃ¼ft. Lasttest mit
+wÃ¤hlbarer Dauer, Takt- und Temperaturkurve, Drosselungserkennung und Abbruchknopf.
+
+VERSION 1.5   (27.09.2026)  KURZTEST UND NEUES DESIGN
+====================================================================================================
+Kurztest-Modus, der alles Langwierige Ã¼berspringt. Die OberflÃ¤che ist komplett Ã¼berarbeitet, mit Kacheln,
+Statuskarten und Reitern, und Ã¶ffnet sich im Vordergrund. Die exe fordert Administratorrechte selbst an.
+Dazu Korrekturen aus dem Code-Review.
+
+VERSION 1.4   (26.09.2026)  OBERFLÃ„CHE UND HTML-BERICHT
+====================================================================================================
+Optionale grafische OberflÃ¤che mit Live-Befunden, Testergebnissen und Protokoll. Grafischer Endbericht
+als HTML mit Hell- und Dunkelmodus. Ein Build-Skript kompiliert die exe direkt auf dem Desktop, ganz
+ohne Download.
+
+VERSION 1.3   (25.09.2026)  ABSTURZSICHERHEIT UND KORREKTUREN
+====================================================================================================
+Checkpoints werden direkt auf die Platte geschrieben, damit sie auch einen Absturz Ã¼berstehen. Nach
+einem abgebrochenen Lauf startet eine Absturzanalyse: Bluescreen-Stoppcode, Kernel-Power 41, WHEA-Fehler
+und der Schritt, in dem der PC ausfiel. Neue Option Absturzanalyse (-AnalyzeLastRun). Behoben wurden die
+Fehler aus dem ersten Praxislauf: Auswertung von SFC, Fehlalarme bei NTFS und Store-Apps, SMART-Meldung,
+Firmwaretyp und Konsolenkodierung.
+
+VERSION 1.2   (24.09.2026)  KODIERUNG
+====================================================================================================
+Das Skript repariert sich selbst, wenn die UTF-8-Kennung (BOM) beim Kopieren verloren geht. Hashtable-SchlÃ¼ssel
+mit Umlauten stehen jetzt in AnfÃ¼hrungszeichen.
+
+VERSION 1.1   (23.09.2026)  STARTEN UND FORTSCHRITT
+====================================================================================================
+Start-CMD mit MenÃ¼ und eine exe als Starter. Die Administratorrechte holt sich die CMD selbst, und das
+Fenster bleibt bei Fehlern offen. Klare Fortschrittsbalken fÃ¼r den Gesamtlauf und den einzelnen Schritt.
+
+VERSION 1.0   (22.09.2026)  GRUNDVERSION
+====================================================================================================
+Diagnoseskript fÃ¼r Windows 11. Es erfasst die Hardware und das System: Firmware, TPM, BitLocker, CPU,
+RAM-Module, GPU, DatentrÃ¤ger, SMART, Akku, Netzwerk, Treiber, Updates, Sicherheit, Autostart und Software.
+Dazu kommen Tests: WinSAT, chkdsk-Onlinescan, DISM und SFC, Defender-Schnellscan, SMART-Langtest, RAM-Mustertest,
+CPU-StabilitÃ¤tstest, Netzwerk- und Energieanalyse sowie die Auswertung der Ereignisprotokolle. Der komplette
+Bericht landet in der Zwischenablage und als Textdatei auf dem Desktop.
+
+
