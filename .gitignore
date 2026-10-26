@@ -28,3 +28,4 @@ Desktop.ini
 *.exe
 Aktueller Build/*.exe
 Archiv/**/*.exe
+*.zip
