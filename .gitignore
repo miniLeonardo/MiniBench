@@ -24,8 +24,22 @@ Archiv/Minibench-Daten/
 Thumbs.db
 Desktop.ini
 
-# Kompilierte Binärdateien (gehören in GitHub Releases, nie in das Git-Repository)
+# Archive und gepackte Dateien (gehören in GitHub Releases, nie in das Git-Repository)
+*.zip
+*.7z
+*.tar
+*.gz
+*.bz2
+*.xz
+*.rar
+
+# Kompilierte Binärdateien, Treiber & Bibliotheken
 *.exe
+*.dll
+*.sys
+*.node
+*.obj
+*.pdb
+*.bin
 Aktueller Build/*.exe
 Archiv/**/*.exe
-*.zip

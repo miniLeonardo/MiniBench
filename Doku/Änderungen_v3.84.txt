@@ -1,0 +1,74 @@
+﻿LEOS MINIBENCH 3.84: ÄNDERUNGEN
+===============================
+
+Version 3.84 sichert das Repository und die Release-Pipeline dauerhaft gegen GitHub-Sperren ab,
+beseitigt historische Zeichensatzfehler (Mojibake) in der Versionsübersicht, unterdrückt interaktive
+Fenster bei der Treiber-Deinstallation zuverlässig und erweitert das Modul „System-Umzug“ um eine
+granulare Bibliotheksauswahl sowie eine exakte Größenmessung vor der Sicherung.
+
+
+1. GITHUB-HÄRTUNG UND GIT-DISZIPLIN (ACCOUNT-SCHUTZ)
+  Ausschluss von Binärdateien Striktes Verbot des Eincheckens von Binärarchiven (*.zip, *.7z, *.tar,
+                             *.rar), ausführbaren Programmen (*.exe, *.dll, *.sys) oder Treibern in
+                             das Git-Repository. Alle Archiv- und Binärtypen wurden dauerhaft in
+                             .gitignore verankert.
+  Build-Sicherheit           Bauen.cmd und die Git-Pipeline erfassen ausschließlich reine Quelltexte,
+                             Skripte und Dokumentation. Externe Treiber und Werkzeuge werden zur
+                             Laufzeit über verifizierte URLs mit fester SHA-256-Prüfsumme bezogen.
+
+
+2. GRANULARE UMZUGS-BIBLIOTHEKEN & ECHTE GRÖSSENMESSUNG
+  Individuelle Bibliotheken  Ersetzung der monolithischen Bibliotheks-Checkbox durch individuelle
+                             Auswahlfelder für Desktop, Dokumente, Downloads, Bilder, Musik und Videos.
+                             Der Downloads-Ordner ist standardmäßig abgewählt, um unnötige Datenberge
+                             bei Neuinstallationen zu vermeiden.
+  Schnellschalter            Ergänzung von Schnellschaltern (Alle / Keine) zur komfortablen Auswahl aller
+                             oder keiner Benutzerbibliotheken mit einem Klick.
+  Echte Größenmessung        Vollständiger Verzicht auf statische 2-GB-Pauschalen. Beim Klick auf
+                             „Schnell-Scan durchführen“ werden alle Ordnergrößen (Bibliotheken, Profile
+                             und C:\-Zusatzordner) rekursiv und zugriffssicher in Bytes gemessen.
+  Dynamische Beschriftung    Die Checkboxen zeigen nach dem Scan das tatsächliche Datenvolumen an
+                             (z. B. „Dokumente (14,2 GB)“, „Desktop (480 MB)“).
+  Exakte Statuskalkulation   updateCalc summiert die realen Messwerte der markierten Optionen auf und
+                             vergleicht das Datenvolumen mit dem freien Speicherplatz des Zielmediums.
+
+
+3. LAUTLOSER SENSOREN-LIFECYCLE
+  Kein Uninstaller im Lauf   Der PawnIO-Treiber bleibt während aller aufeinanderfolgenden Prüfschritte
+                             (Diagnose, Benchmark, Lasttest) aktiv im Speicher und wird ausschließlich
+                             am Gesamtlaufende freigegeben.
+  Strikte Silent-Parameter   Uninstall-PawnIo übergibt umfassende Schalter für InnoSetup, NSIS und
+                             Treiber-Wrapper (/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /S -uninstall -silent),
+                             um jegliche Dialog- oder Abfragefenster zuverlässig zu unterdrücken.
+  Nicht-blockierender Status Fehler beim Entfernen werden sachlich protokolliert, ohne modale
+                             Fehlerdialoge anzuzeigen.
+
+
+4. FEINABSTIMMUNG OBERFLÄCHE & TEXTE
+  Anonymisierungs-Option     Beschriftung der Checkbox chkAnon in der Fußleiste präzise und kompakt
+                             auf „Personenbezogene Daten entfernen“ verkürzt; Tooltip und automatische
+                             Layout-Berechnung in footLayout angepasst.
+  Stichpunkte statt Fließtext Alle Versionseinträge auf der Seite „Info und Versionen“ wurden in
+                             prägnante, lesbare Aufzählungspunkte (•) überführt.
+  Beseitigung von Mojibake   Historische Zeichensatzfehler in Versionen.cs wurden vollständig bereinigt;
+                             die Datei ist als sauberes UTF-8 mit BOM gespeichert.
+
+
+GEFUNDEN UND BEHOBEN
+  - Interaktives Deinstallations-Popup von PawnIO während Mehrfachprüfungen durch Lifecycle-Anpassung und Silent-Schalter behoben.
+  - Statische 2-GB-Pauschalschätzung im System-Umzug durch echte Ordnergrößenmessung in C# ersetzt.
+  - Downloads-Ordner standardmäßig abgewählt, um versehentliches Sichern riesiger temporärer Datenmengen zu verhindern.
+  - Zeichensatzfehler (doppelt kodierte Umlaute) in Versionen.cs behoben.
+  - .gitignore um alle Binär- und Archivformate erweitert, um automatische GitHub-Sperren dauerhaft auszuschließen.
+
+
+GRENZEN UND OFFENE PUNKTE
+  - Keine. Alle Module und Werkzeuge arbeiten isoliert und rückstandsfrei.
+
+
+UMSTIEG
+  - Keine manuellen Anpassungen erforderlich. Vollständig abwärtskompatibel zu bestehenden Umzug-Sicherungen.
+
+
+QUELLEN
+  - Eigene Implementierung in src\Module\Umzug\Ablauf.ps1, src\Oberflaeche\DiagGui_Seiten.cs, src\Oberflaeche\DiagGui.cs, src\Kern\Sensoren.ps1 und src\Oberflaeche\Versionen.cs.

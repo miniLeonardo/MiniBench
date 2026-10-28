@@ -620,7 +620,7 @@ Describe 'PawnIO nur vorübergehend' {
         Mock -ModuleName MinibenchTest Invoke-External {
             $script:Calls += ('{0} {1}' -f $File, $Arguments)
             if ($Arguments -like '-install*') { $script:Reg = [pscustomobject]@{ Version = '2.2.0.0'; Ort = 'C:\Program Files\PawnIO'; Deinstallation = '' } }
-            if ($Arguments -like '-uninstall*' -and -not $script:UninstallFails) { $script:Reg = $null }
+            if ($Arguments -like '*-uninstall*' -and -not $script:UninstallFails) { $script:Reg = $null }
             [pscustomobject]@{ ExitCode = 0; Output = ''; Error = ''; TimedOut = $false }
         }
     }

@@ -2,6 +2,21 @@
 
 Alle wesentlichen Ã„nderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v3.84 (28.10.2026)
+
+### Neu
+* **Granulare Bibliotheks-Auswahl beim System-Umzug:** Individuelle Checkboxen für alle Standardbibliotheken (Desktop, Dokumente, Downloads, Bilder, Musik, Videos) mit Schnellauswahl (Alle / Keine). Der Downloads-Ordner ist standardmäßig abgewählt, um unnötige Datenberge bei Neuinstallationen zu vermeiden.
+* **Echte Größenmessung im Schnell-Scan:** Vollständiger Verzicht auf statische 2-GB-Pauschalen. Beim Klick auf Schnell-Scan durchführen werden die exakten Ordnergrößen aller Bibliotheken und erkannten C:\*-Zusatzordner gemessen und dynamisch in den Checkbox-Beschriftungen sowie der Speicherplatzkalkulation angezeigt.
+
+### Verbessert
+* **GitHub-Härtung & Account-Schutz:** Striktes Verbot und vollständige .gitignore-Absicherung gegen das Einchecken von Binärarchiven (*.zip, *.7z, *.tar, *.rar), ausführbaren Dateien (*.exe, *.dll, *.sys) oder Treibern zur dauerhaften Vermeidung automatisierter GitHub-Sperren.
+* **Text- & Oberflächen-Feinschliff:** Fußleisten-Option präzise und kompakt in Personenbezogene Daten entfernen umbenannt; dynamisches Layout der Fußleiste angepasst.
+* **Versionsseite mit Stichpunkten:** Alle Versionseinträge auf der Seite Info und Versionen von Fließtext auf übersichtliche, lesbare Aufzählungspunkte (•) umgestellt und Zwischenabstände für schnelle Erfassbarkeit optimiert.
+
+### Behoben
+* **Lautloser Sensoren-Lifecycle:** Beseitigung störender Deinstallationsfenster von PawnIO während Prüfläufen oder beim Modulwechsel. Der Treiber bleibt während aller gewählten Schritte im Speicher und wird erst am Gesamtlaufende mit umfassenden Silent-Parametern (/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /S -uninstall -silent) freigegeben; Deinstallationsstatus wird sachlich protokolliert statt blockierende Fehlerfenster zu öffnen.
+* **Beseitigung von Encoding-Fehlern (Mojibake):** Historische Zeichensatzfehler in Versionen.cs restlos bereinigt und Datei als sauberes UTF-8 mit BOM gespeichert.
+
 ## v3.83 (23.10.2026)
 
 ### Neu

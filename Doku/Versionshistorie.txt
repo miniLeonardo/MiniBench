@@ -5,6 +5,14 @@ Neueste Version zuerst. Einzelheiten je Version in Doku\Ã„nderungen_vX.Y.txt 
 keine Ã„nderungsdateien mehr; die EintrÃ¤ge nennen nur, was im Quelltext und in den Ã„nderungen zu 2.2 belegt ist.
 Die Liste steht auch im Programm (Info-Knopf oben rechts, Quelle: src\Oberflaeche\Versionen.cs).
 
+VERSION 3.84   (28.10.2026)  GITHUB-HÄRTUNG, GRANULARE UMZUGS-MESSUNG, LAUTLOSER SENSOREN-LIFECYCLE & TEXT-FEINSCHLIFF
+====================================================================================================
+• GitHub-Härtung & Git-Disziplin: Striktes Verbot und globale .gitignore-Absicherung für Binärarchive (*.zip, *.7z, *.tar), ausführbare Dateien (*.exe, *.dll, *.sys) und Treiber; Schutz vor automatischen GitHub-Sperren.
+• Granulare Umzugs-Bibliotheken: Individuelle Auswahl aller Standardbibliotheken (Desktop, Dokumente, Downloads, Bilder, Musik, Videos) mit Schnellauswahl (Alle / Keine); Downloads standardmäßig abgewählt zum Schutz vor Datenbergen.
+• Echte Größenmessung beim Schnell-Scan: Beseitigung statischer 2-GB-Pauschalen; exakte Ordnergrößenermittlung für Bibliotheken, Profile und C:\-Zusatzordner mit dynamischer Größenbeschriftung und Speicherplatzkalkulation.
+• Lautloser Sensoren-Lifecycle: Zuverlässige Unterdrückung interaktiver Deinstallationsdialoge von PawnIO durch umfassende Silent-Parameter (/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /S -uninstall -silent); Deinstallation ausschließlich am Gesamtlaufende.
+• Text- & Oberflächen-Feinschliff: Anonymisierungsoption in der Fußleiste präzise als 'Personenbezogene Daten entfernen' beschriftet; Seite Versionen vollständig von Mojibake bereinigt und auf übersichtliche Stichpunkte umgestellt.
+
 VERSION 3.83   (23.10.2026)  HOTFIX 3: SYSTEM-UMZUG SCHNELL-SCAN PER KNOPFDRUCK, KARTEN-LAYOUT IM LASTTEST-STIL & ZEICHENSATZ-KORREKTUR
 ====================================================================================================
 Manueller Schnell-Scan: Der Vorab-Scan startet nun nicht mehr automatisch beim Öffnen der Seite,

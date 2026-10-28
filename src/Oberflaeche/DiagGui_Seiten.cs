@@ -1,4 +1,4 @@
-// Seiten der grafischen Oberfläche: Versionen und Änderungen (Teilklasse DiagGui)
+﻿// Seiten der grafischen Oberfläche: Versionen und Änderungen (Teilklasse DiagGui)
 public partial class DiagGui
 {
     Control BuildVersionPage()
@@ -16,9 +16,9 @@ public partial class DiagGui
             rt.SelectionFont = fh; rt.SelectionColor = UI.Text;
             rt.AppendText("Version " + e.Version + (e.Version == this.version ? "  (diese Version)" : "") + "\r\n");
             rt.SelectionFont = fd; rt.SelectionColor = UI.Muted;
-            rt.AppendText(e.Datum + "   ·   " + e.Titel + "\r\n");
+            rt.AppendText(e.Datum + "   \u00B7   " + e.Titel + "\r\n\r\n");
             rt.SelectionFont = fb; rt.SelectionColor = UI.Text;
-            rt.AppendText(e.Text + "\r\n\r\n");
+            rt.AppendText(e.Text + "\r\n\r\n\r\n");
         }
         rt.SelectionStart = 0; rt.ScrollToCaret();
         f.Controls.Add(rt);
@@ -815,6 +815,94 @@ public partial class DiagGui
         public Action Action;
     }
 
+    static long SafeDirectorySize(string path)
+    {
+        if (String.IsNullOrEmpty(path) || !Directory.Exists(path)) return 0;
+        long total = 0;
+        try
+        {
+            Queue<string> q = new Queue<string>();
+            q.Enqueue(path);
+            while (q.Count > 0)
+            {
+                string cur = q.Dequeue();
+                try
+                {
+                    DirectoryInfo di = new DirectoryInfo(cur);
+                    foreach (FileInfo fi in di.GetFiles())
+                    {
+                        try { total += fi.Length; } catch { }
+                    }
+                    foreach (DirectoryInfo sub in di.GetDirectories())
+                    {
+                        try
+                        {
+                            if ((sub.Attributes & FileAttributes.ReparsePoint) != 0) continue;
+                            q.Enqueue(sub.FullName);
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+            }
+        }
+        catch { }
+        return total;
+    }
+
+    static string FormatByteSize(long bytes)
+    {
+        if (bytes <= 0) return "0 B";
+        if (bytes >= 1073741824L) return (bytes / 1073741824.0).ToString("N1") + " GB";
+        if (bytes >= 1048576L) return (bytes / 1048576.0).ToString("N0") + " MB";
+        if (bytes >= 1024L) return (bytes / 1024.0).ToString("N0") + " KB";
+        return bytes + " B";
+    }
+
+    static string GetUserShellFolder(string regKeyName, Environment.SpecialFolder fallback)
+    {
+        try
+        {
+            using (Microsoft.Win32.RegistryKey rk = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders"))
+            {
+                if (rk != null)
+                {
+                    object val = rk.GetValue(regKeyName);
+                    if (val != null)
+                    {
+                        string expanded = Environment.ExpandEnvironmentVariables(val.ToString());
+                        if (Directory.Exists(expanded)) return expanded;
+                    }
+                }
+            }
+        }
+        catch { }
+        try { return Environment.GetFolderPath(fallback); } catch { return ""; }
+    }
+
+    static string GetDownloadsPath()
+    {
+        try
+        {
+            using (Microsoft.Win32.RegistryKey rk = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders"))
+            {
+                if (rk != null)
+                {
+                    object val = rk.GetValue("{374DE290-123F-4565-9164-39C4925E467B}");
+                    if (val == null) val = rk.GetValue("{7D83EE9B-2244-4E70-B1F5-5393042AF1E4}");
+                    if (val != null)
+                    {
+                        string expanded = Environment.ExpandEnvironmentVariables(val.ToString());
+                        if (Directory.Exists(expanded)) return expanded;
+                    }
+                }
+            }
+        }
+        catch { }
+        string def = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+        return Directory.Exists(def) ? def : "";
+    }
+
     Control BuildUmzugPage()
     {
         FlowLayoutPanel f = Page("System-Umzug & Neuinstallation", "Sichert pers\u00F6nliche Dateien, Desktop-Layout und Programme vor einer Neuinstallation und stellt sie mit 1 Klick wieder her.", -1);
@@ -865,7 +953,7 @@ public partial class DiagGui
         scopePanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         scopePanel.BackColor = UI.Panel;
 
-        // Zeile fÃ¼r manuellen Schnell-Scan
+        // Zeile für manuellen Schnell-Scan
         FlowLayoutPanel scanRow = Row();
         scanRow.Margin = new Padding(0, 0, 0, UI.S(8));
 
@@ -881,9 +969,72 @@ public partial class DiagGui
         scanRow.Controls.Add(lblScanInfo);
         scopePanel.Controls.Add(scanRow);
 
-        CheckBox chkLibs = Chk("Benutzer-Bibliotheken (Desktop, Dokumente, Downloads, Bilder, Musik, Videos)", true);
-        Tip(chkLibs, "Sichert die pers\u00F6nlichen Standardbibliotheken des aktuellen Benutzers.");
-        scopePanel.Controls.Add(chkLibs);
+        // Granulare Bibliotheken
+        FlowLayoutPanel libHeaderRow = Row();
+        libHeaderRow.Margin = new Padding(0, 0, 0, UI.S(2));
+        Label lblLibsHead = Lbl("Benutzer-Bibliotheken:", 9.5f, true, UI.Text);
+        lblLibsHead.Margin = new Padding(0, UI.S(2), UI.S(8), UI.S(2));
+        Tip(lblLibsHead, "Pers\u00F6nliche Standardbibliotheken des Benutzers ausw\u00E4hlen.");
+
+        LinkLabel lnkLibsAll = new LinkLabel();
+        lnkLibsAll.Text = "(Alle";
+        lnkLibsAll.AutoSize = true;
+        lnkLibsAll.Font = new Font("Segoe UI", 8.5f);
+        lnkLibsAll.LinkColor = UI.Accent;
+        lnkLibsAll.ActiveLinkColor = UI.Accent;
+        lnkLibsAll.Margin = new Padding(0, UI.S(4), 0, UI.S(2));
+        Tip(lnkLibsAll, "Alle Benutzer-Bibliotheken markieren.");
+
+        Label lblLibsSlash = Lbl("/", 8.5f, false, UI.Muted);
+        lblLibsSlash.Margin = new Padding(UI.S(2), UI.S(4), UI.S(2), UI.S(2));
+
+        LinkLabel lnkLibsNone = new LinkLabel();
+        lnkLibsNone.Text = "Keine)";
+        lnkLibsNone.AutoSize = true;
+        lnkLibsNone.Font = new Font("Segoe UI", 8.5f);
+        lnkLibsNone.LinkColor = UI.Accent;
+        lnkLibsNone.ActiveLinkColor = UI.Accent;
+        lnkLibsNone.Margin = new Padding(0, UI.S(4), 0, UI.S(2));
+        Tip(lnkLibsNone, "Alle Benutzer-Bibliotheken abw\u00E4hlen.");
+
+        libHeaderRow.Controls.Add(lblLibsHead);
+        libHeaderRow.Controls.Add(lnkLibsAll);
+        libHeaderRow.Controls.Add(lblLibsSlash);
+        libHeaderRow.Controls.Add(lnkLibsNone);
+        scopePanel.Controls.Add(libHeaderRow);
+
+        FlowLayoutPanel libSubFlow = new FlowLayoutPanel();
+        libSubFlow.FlowDirection = FlowDirection.TopDown;
+        libSubFlow.WrapContents = false;
+        libSubFlow.AutoSize = true;
+        libSubFlow.Margin = new Padding(UI.S(16), 0, 0, UI.S(4));
+        libSubFlow.BackColor = UI.Panel;
+
+        CheckBox chkLibDesktop = Chk("Desktop", true);
+        Tip(chkLibDesktop, "Sichert den Desktop-Ordner des aktuellen Benutzers.");
+        libSubFlow.Controls.Add(chkLibDesktop);
+
+        CheckBox chkLibDocs = Chk("Dokumente", true);
+        Tip(chkLibDocs, "Sichert den Dokumente-Ordner des aktuellen Benutzers.");
+        libSubFlow.Controls.Add(chkLibDocs);
+
+        CheckBox chkLibDownloads = Chk("Downloads", false);
+        Tip(chkLibDownloads, "Sichert den Downloads-Ordner (standardm\u00E4\u00DFig deaktiviert wegen oft hohem Datenvolumen).");
+        libSubFlow.Controls.Add(chkLibDownloads);
+
+        CheckBox chkLibPictures = Chk("Bilder", true);
+        Tip(chkLibPictures, "Sichert den Bilder-Ordner des aktuellen Benutzers.");
+        libSubFlow.Controls.Add(chkLibPictures);
+
+        CheckBox chkLibMusic = Chk("Musik", true);
+        Tip(chkLibMusic, "Sichert den Musik-Ordner des aktuellen Benutzers.");
+        libSubFlow.Controls.Add(chkLibMusic);
+
+        CheckBox chkLibVideos = Chk("Videos", true);
+        Tip(chkLibVideos, "Sichert den Videos-Ordner des aktuellen Benutzers.");
+        libSubFlow.Controls.Add(chkLibVideos);
+
+        scopePanel.Controls.Add(libSubFlow);
 
         CheckBox chkLayout = Chk("Desktop-Layout (Icon-Positionen & Hintergrundbild)", true);
         Tip(chkLayout, "Sichert das aktive Desktop-Wallpaper sowie die Icon-Koordinaten.");
@@ -936,7 +1087,7 @@ public partial class DiagGui
         Label lblSummary = Lbl("Pr\u00FCfe Speicherplatz ...", 9.5f, true, UI.Ok);
         lblSummary.Margin = new Padding(0, 0, 0, UI.S(8));
         lblSummary.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 32), 0);
-        Tip(lblSummary, "Vergleich zwischen gesch\u00E4tztem Datenvolumen und freiem Speicher auf dem Zielmedium.");
+        Tip(lblSummary, "Vergleich zwischen gemessenem Datenvolumen und freiem Speicher auf dem Zielmedium.");
         statusPanel.Controls.Add(lblSummary);
 
         Button btnStartUmzug = UI.Primary("Umzug-Sicherung starten");
@@ -986,6 +1137,16 @@ public partial class DiagGui
         statusPanel.Controls.Add(txtUmzugLog);
 
         f.Controls.Add(Card(statusPanel));
+
+        long sizeDesktop = 0, sizeDocs = 0, sizeDownloads = 0, sizePictures = 0, sizeMusic = 0, sizeVideos = 0;
+        long sizeLayout = 10485760L;
+        long sizeSoftware = 20971520L;
+        long sizeProfBrowser = 314572800L;
+        long sizeProfMail = 209715200L;
+        long sizeProfDev = 104857600L;
+        long sizeProfTools = 20971520L;
+        long sizeProfTerm = 5242880L;
+        List<long> customSizes = new List<long>();
 
         CheckBox chkProfBrowser = null;
         CheckBox chkProfMail = null;
@@ -1055,44 +1216,74 @@ public partial class DiagGui
             bool isFat = curFs.IndexOf("FAT", StringComparison.OrdinalIgnoreCase) >= 0;
             lblFatWarn.Visible = isFat;
 
-            long estimatedBytes = 0;
-            if (chkLibs.Checked) estimatedBytes += 2147483648L;
-            if (chkLayout.Checked) estimatedBytes += 10485760L;
-            if (chkSoftware.Checked) estimatedBytes += 20971520L;
+            long totalBytes = 0;
+            if (chkLibDesktop.Checked) totalBytes += sizeDesktop;
+            if (chkLibDocs.Checked) totalBytes += sizeDocs;
+            if (chkLibDownloads.Checked) totalBytes += sizeDownloads;
+            if (chkLibPictures.Checked) totalBytes += sizePictures;
+            if (chkLibMusic.Checked) totalBytes += sizeMusic;
+            if (chkLibVideos.Checked) totalBytes += sizeVideos;
+
+            if (chkLayout.Checked) totalBytes += sizeLayout;
+            if (chkSoftware.Checked) totalBytes += sizeSoftware;
             if (chkProfiles.Checked)
             {
-                if (chkProfBrowser != null && chkProfBrowser.Checked) estimatedBytes += 314572800L;
-                if (chkProfMail != null && chkProfMail.Checked) estimatedBytes += 209715200L;
-                if (chkProfDev != null && chkProfDev.Checked) estimatedBytes += 104857600L;
-                if (chkProfTools != null && chkProfTools.Checked) estimatedBytes += 20971520L;
-                if (chkProfTerm != null && chkProfTerm.Checked) estimatedBytes += 5242880L;
+                if (chkProfBrowser != null && chkProfBrowser.Checked) totalBytes += sizeProfBrowser;
+                if (chkProfMail != null && chkProfMail.Checked) totalBytes += sizeProfMail;
+                if (chkProfDev != null && chkProfDev.Checked) totalBytes += sizeProfDev;
+                if (chkProfTools != null && chkProfTools.Checked) totalBytes += sizeProfTools;
+                if (chkProfTerm != null && chkProfTerm.Checked) totalBytes += sizeProfTerm;
             }
 
             for (int i = 0; i < customBoxes.Count; i++)
             {
                 if (customBoxes[i].Checked)
                 {
-                    estimatedBytes += 1073741824L;
+                    totalBytes += (i < customSizes.Count) ? customSizes[i] : 0;
                 }
             }
 
-            double estGb = estimatedBytes / 1073741824.0;
+            double totalGb = totalBytes / 1073741824.0;
             double freeGb = curFree / 1073741824.0;
+            string sizeStr = (totalGb >= 0.1 || totalBytes == 0) ? totalGb.ToString("N1") + " GB" : FormatByteSize(totalBytes);
 
-            if (curFree > 0 && estimatedBytes > curFree)
+            if (curFree > 0 && totalBytes > curFree)
             {
-                lblSummary.Text = "Gesamtgr\u00F6\u00DFe (gesch\u00E4tzt): ~" + estGb.ToString("N1") + " GB \u00B7 Freier Speicher auf Ziel: " + freeGb.ToString("N1") + " GB (Nicht ausreichend Speicherplatz!)";
+                lblSummary.Text = "Gesamtgr\u00F6\u00DFe: " + sizeStr + " \u00B7 Freier Speicher auf Ziel: " + freeGb.ToString("N1") + " GB (Nicht ausreichend Speicherplatz!)";
                 lblSummary.ForeColor = UI.Crit;
             }
             else
             {
-                lblSummary.Text = "Gesamtgr\u00F6\u00DFe (gesch\u00E4tzt): ~" + estGb.ToString("N1") + " GB \u00B7 Freier Speicher auf Ziel: " + freeGb.ToString("N1") + " GB (Ausreichend)";
+                lblSummary.Text = "Gesamtgr\u00F6\u00DFe: " + sizeStr + " \u00B7 Freier Speicher auf Ziel: " + freeGb.ToString("N1") + " GB (Ausreichend)";
                 lblSummary.ForeColor = UI.Ok;
             }
         };
 
         cmbDest.SelectedIndexChanged += delegate { updateCalc(); };
-        chkLibs.CheckedChanged += delegate { updateCalc(); };
+        lnkLibsAll.LinkClicked += delegate {
+            chkLibDesktop.Checked = true;
+            chkLibDocs.Checked = true;
+            chkLibDownloads.Checked = true;
+            chkLibPictures.Checked = true;
+            chkLibMusic.Checked = true;
+            chkLibVideos.Checked = true;
+            updateCalc();
+        };
+        lnkLibsNone.LinkClicked += delegate {
+            chkLibDesktop.Checked = false;
+            chkLibDocs.Checked = false;
+            chkLibDownloads.Checked = false;
+            chkLibPictures.Checked = false;
+            chkLibMusic.Checked = false;
+            chkLibVideos.Checked = false;
+            updateCalc();
+        };
+        chkLibDesktop.CheckedChanged += delegate { updateCalc(); };
+        chkLibDocs.CheckedChanged += delegate { updateCalc(); };
+        chkLibDownloads.CheckedChanged += delegate { updateCalc(); };
+        chkLibPictures.CheckedChanged += delegate { updateCalc(); };
+        chkLibMusic.CheckedChanged += delegate { updateCalc(); };
+        chkLibVideos.CheckedChanged += delegate { updateCalc(); };
         chkLayout.CheckedChanged += delegate { updateCalc(); };
         chkSoftware.CheckedChanged += delegate { updateCalc(); };
         chkProfiles.CheckedChanged += delegate {
@@ -1112,13 +1303,35 @@ public partial class DiagGui
             string userProf = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
 
+            string pDesktop = GetUserShellFolder("Desktop", Environment.SpecialFolder.Desktop);
+            string pDocs = GetUserShellFolder("Personal", Environment.SpecialFolder.MyDocuments);
+            string pDownloads = GetDownloadsPath();
+            string pPictures = GetUserShellFolder("My Pictures", Environment.SpecialFolder.MyPictures);
+            string pMusic = GetUserShellFolder("My Music", Environment.SpecialFolder.MyMusic);
+            string pVideos = GetUserShellFolder("My Video", Environment.SpecialFolder.MyVideos);
+
+            // Echte Größenmessung der Bibliotheken
+            sizeDesktop = SafeDirectorySize(pDesktop);
+            sizeDocs = SafeDirectorySize(pDocs);
+            sizeDownloads = SafeDirectorySize(pDownloads);
+            sizePictures = SafeDirectorySize(pPictures);
+            sizeMusic = SafeDirectorySize(pMusic);
+            sizeVideos = SafeDirectorySize(pVideos);
+
+            chkLibDesktop.Text = "Desktop (" + FormatByteSize(sizeDesktop) + ")";
+            chkLibDocs.Text = "Dokumente (" + FormatByteSize(sizeDocs) + ")";
+            chkLibDownloads.Text = "Downloads (" + FormatByteSize(sizeDownloads) + ")";
+            chkLibPictures.Text = "Bilder (" + FormatByteSize(sizePictures) + ")";
+            chkLibMusic.Text = "Musik (" + FormatByteSize(sizeMusic) + ")";
+            chkLibVideos.Text = "Videos (" + FormatByteSize(sizeVideos) + ")";
+
             int libCount = 0;
-            if (Directory.Exists(Environment.GetFolderPath(Environment.SpecialFolder.Desktop))) libCount++;
-            if (Directory.Exists(docs)) libCount++;
-            if (Directory.Exists(Path.Combine(userProf, "Downloads"))) libCount++;
-            if (Directory.Exists(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures))) libCount++;
-            if (Directory.Exists(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic))) libCount++;
-            if (Directory.Exists(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos))) libCount++;
+            if (Directory.Exists(pDesktop)) libCount++;
+            if (Directory.Exists(pDocs)) libCount++;
+            if (Directory.Exists(pDownloads)) libCount++;
+            if (Directory.Exists(pPictures)) libCount++;
+            if (Directory.Exists(pMusic)) libCount++;
+            if (Directory.Exists(pVideos)) libCount++;
 
             bool hasWp = false;
             try { hasWp = File.Exists(Path.Combine(roamApp, "Microsoft\\Windows\\Themes\\TranscodedWallpaper")); } catch { }
@@ -1211,6 +1424,7 @@ public partial class DiagGui
             customPanel.Controls.Clear();
             customBoxes.Clear();
             customPaths.Clear();
+            customSizes.Clear();
 
             try {
                 string[] sysBlack = new string[] {
@@ -1228,12 +1442,15 @@ public partial class DiagGui
                         if ((di.Attributes & FileAttributes.System) != 0) continue;
                         if ((di.Attributes & FileAttributes.Hidden) != 0) continue;
 
-                        CheckBox cb = Chk("Ordner C:\\" + di.Name, false);
+                        long cSize = SafeDirectorySize(di.FullName);
+                        string cSizeStr = FormatByteSize(cSize);
+                        CheckBox cb = Chk("Ordner C:\\" + di.Name + (cSize > 0 ? " (" + cSizeStr + ")" : ""), false);
                         cb.Tag = di.FullName;
-                        Tip(cb, "Sichert das Verzeichnis C:\\" + di.Name + " in den Unterordner C_Laufwerk_Zusatz.");
+                        Tip(cb, "Sichert das Verzeichnis C:\\" + di.Name + " (" + cSizeStr + ") in den Unterordner C_Laufwerk_Zusatz.");
                         cb.CheckedChanged += delegate { updateCalc(); };
                         customBoxes.Add(cb);
                         customPaths.Add(di.FullName);
+                        customSizes.Add(cSize);
                     }
                 }
             } catch { }
@@ -1295,7 +1512,12 @@ public partial class DiagGui
             string targetPath = destPaths[selIdx];
 
             List<string> scopes = new List<string>();
-            if (chkLibs.Checked) scopes.Add("Bibliotheken");
+            if (chkLibDesktop.Checked) scopes.Add("Lib_Desktop");
+            if (chkLibDocs.Checked) scopes.Add("Lib_Dokumente");
+            if (chkLibDownloads.Checked) scopes.Add("Lib_Downloads");
+            if (chkLibPictures.Checked) scopes.Add("Lib_Bilder");
+            if (chkLibMusic.Checked) scopes.Add("Lib_Musik");
+            if (chkLibVideos.Checked) scopes.Add("Lib_Videos");
             if (chkLayout.Checked) scopes.Add("Layout");
             if (chkSoftware.Checked) scopes.Add("Programme");
             if (chkProfiles.Checked)
@@ -1335,7 +1557,14 @@ public partial class DiagGui
             btnStartScan.Enabled = false;
             btnBrowse.Enabled = false;
             cmbDest.Enabled = false;
-            chkLibs.Enabled = false;
+            lnkLibsAll.Enabled = false;
+            lnkLibsNone.Enabled = false;
+            chkLibDesktop.Enabled = false;
+            chkLibDocs.Enabled = false;
+            chkLibDownloads.Enabled = false;
+            chkLibPictures.Enabled = false;
+            chkLibMusic.Enabled = false;
+            chkLibVideos.Enabled = false;
             chkLayout.Enabled = false;
             chkSoftware.Enabled = false;
             chkProfiles.Enabled = false;
@@ -1467,7 +1696,14 @@ public partial class DiagGui
                         btnStartScan.Enabled = true;
                         btnBrowse.Enabled = true;
                         cmbDest.Enabled = true;
-                        chkLibs.Enabled = true;
+                        lnkLibsAll.Enabled = true;
+                        lnkLibsNone.Enabled = true;
+                        chkLibDesktop.Enabled = true;
+                        chkLibDocs.Enabled = true;
+                        chkLibDownloads.Enabled = true;
+                        chkLibPictures.Enabled = true;
+                        chkLibMusic.Enabled = true;
+                        chkLibVideos.Enabled = true;
                         chkLayout.Enabled = true;
                         chkSoftware.Enabled = true;
                         chkProfiles.Enabled = true;
@@ -1517,6 +1753,7 @@ public partial class DiagGui
 
         return f;
     }
+
     Control BuildStartPage()
     {
         Panel f = new Panel(); f.Dock = DockStyle.Fill; f.BackColor = UI.Panel; f.AutoScroll = true;

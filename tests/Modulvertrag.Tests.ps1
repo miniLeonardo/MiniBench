@@ -282,4 +282,12 @@ Describe 'Modul System-Umzug (Invoke-SystemBackup)' {
         }
         $script:lastWarn | Should -Match 'FAT32'
     }
+
+    It 'unterstützt granulare Bibliotheken (Lib_Desktop, Lib_Dokumente etc.)' {
+        $customDest = Join-Path $testTemp 'GranularTest'
+        [System.IO.Directory]::CreateDirectory($customDest) | Out-Null
+        $res = Invoke-SystemBackup -Ziel $customDest -Umfang 'Lib_Videos'
+        $res.Ok | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $res.Pfad 'Benutzerprofil') | Should -BeTrue
+    }
 }

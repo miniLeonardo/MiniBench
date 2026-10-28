@@ -973,7 +973,7 @@ public partial class DiagGui : Form
         lnkAblage.Text = AblageKurz(this.dataDir); lnkAblage.Margin = new Padding(0, UI.S(7), UI.S(UI.Abstand4), 0); lnkAblage.AutoEllipsis = true; lnkAblage.LinkBehavior = LinkBehavior.HoverUnderline;
         lnkAblage.LinkClicked += delegate { if (this.dataDir.Length > 0) { try { Directory.CreateDirectory(this.dataDir); } catch { } OpenShell(this.dataDir); } };
         fo.Controls.Add(lnkAblage);
-        chkAnon = Chk("Personenbezogene Daten für die KI-Auswertung entfernen", true); chkAnon.Margin = new Padding(0, UI.S(5), 0, 0);
+        chkAnon = Chk("Personenbezogene Daten entfernen", true); chkAnon.Margin = new Padding(0, UI.S(5), 0, 0);
         fo.Controls.Add(chkAnon);
         btnStart = UI.Primary("Ablauf wählen"); btnStart.Enabled = false; btnStart.Margin = new Padding(UI.S(UI.Abstand5), 0, 0, 0); btnStart.MinimumSize = new Size(UI.S(150), UI.S(44)); btnStart.Anchor = AnchorStyles.Right;
         Tip(btnStart, "Erst eine Aufgabe wählen oder links ein Modul anhaken.");
@@ -989,7 +989,7 @@ public partial class DiagGui : Form
             lblSel.MaximumSize = new Size(avail, UI.S(24));
             int rest = avail - lp.Width - lp.Margin.Horizontal - cmbPreset.Width - cmbPreset.Margin.Horizontal - btnPresetSave.Width - btnPresetSave.Margin.Horizontal - btnPresetDel.Width - btnPresetDel.Margin.Horizontal;
             int anonW = TextRenderer.MeasureText(chkAnon.Text, chkAnon.Font).Width + UI.S(24);
-            // wird es eng, zuerst die Ablage kürzen, dann den Text der KI-Option
+            // wird es eng, zuerst die Ablage kürzen, dann den Text der Anonymisierungs-Option
             int ablW = Math.Max(UI.S(60), Math.Min(TextRenderer.MeasureText(lnkAblage.Text, lnkAblage.Font).Width + UI.S(4), rest - anonW - lnkAblage.Margin.Horizontal));
             lnkAblage.AutoSize = false; lnkAblage.Size = new Size(ablW, UI.S(20));
             chkAnon.AutoSize = false; chkAnon.Size = new Size(Math.Max(UI.S(60), Math.Min(anonW, rest - ablW - lnkAblage.Margin.Horizontal)), UI.S(22)); chkAnon.AutoEllipsis = true;
@@ -1093,7 +1093,7 @@ public partial class DiagGui : Form
         Tip(btnDbClean, "Datenpflege: verschiebt Lasttests vor v2.67 (andere Last, nicht vergleichbar), abgebrochene Läufe ohne Bericht und kurze Läufe (Funktionstest, Lasttest nach wenigen Sekunden beendet, Lauf ohne Messwert) sowie ungenutzte Teile von smartmontools nach Minibench-Daten\\Archiv. Gelöscht werden nur ältere Übersetzungen im Cache und Reste der Live-Ansicht; das Protokoll steht in Archiv\\Datenpflege.log.");
         Tip(btnUndo, "Nimmt die angehakten Änderungen zurück (nur Stufe Ändern und nur auf dem PC, auf dem sie entstanden sind).");
         Tip(lnkAblage, "Öffnet den Datenordner mit Berichten, Datenbank, Werkzeugen und Voreinstellungen: " + (dataDir.Length > 0 ? dataDir : "kein Datenordner"));
-        Tip(chkAnon, "Ersetzt in der KI-Datei Benutzernamen, Seriennummern, Domäne und ähnliche persönliche Angaben durch Platzhalter, bevor sie an ein KI-Modell geht.");
+        Tip(chkAnon, "Ersetzt Benutzernamen, Computernamen, Seriennummern und Domäne in Berichten und Exportdateien durch neutrale Platzhalter.");
         // Optimierung
         Tip(chkOptRestore, "Legt vor der Optimierung einen Systemwiederherstellungspunkt an. Er ist der Weg zurück für Eingriffe wie entfernte Apps und Zusatzfeatures.");
         Tip(btnOptCheck, "Liest für jeden Eintrag, ob er auf diesem PC schon so eingestellt ist (aktiv, teilweise, offen). Verändert nichts, dauert bis zu einer Minute.");
@@ -2655,13 +2655,17 @@ public partial class DiagGui : Form
     // Treiberrest eines abgebrochenen Arbeitsprozesses sofort entfernen statt erst beim nächsten Start
     void CleanupDriver()
     {
+        if (running) return;
         if (!PawnMarkerExists) return;
         List<string> lines;
         string ok = RunHelperPumped("-SensorAufraeumen", out lines, 300);
         string t = lines.Count > 0 ? String.Join(" ", lines.ToArray()) : "PawnIO-Treiber: keine Rückmeldung";
         if (lblSensInfo != null) lblSensInfo.Text = t;
         if (running || done) { lblCounter.Text = ok == "1" ? "PawnIO-Treiber wieder entfernt" : "PawnIO-Treiber noch installiert"; }
-        if (ok != "1") MessageBox.Show(this, "Der vorübergehend installierte PawnIO-Treiber konnte nicht entfernt werden:\r\n\r\n" + t + "\r\n\r\nDer nächste Start von Leos Minibench versucht es erneut.", "Leos Minibench", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        if (ok != "1" && txtLog != null)
+        {
+            try { txtLog.AppendText("\r\n[Sensoren] Warnung: PawnIO-Treiber konnte nicht entfernt werden: " + t + "\r\n"); } catch { }
+        }
     }
 
     string RunHelper(string args, out List<string> lines)

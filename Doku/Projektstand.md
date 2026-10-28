@@ -2,7 +2,18 @@
 
 Gemeinsamer Stand fÃƒÂ¼r alle Agenten (Claude, Antigravity). Wird am Ende jeder Version aktualisiert (siehe AGENTS.md).
 
-## Stand: Version 3.83 (23.10.2026)
+## Stand: Version 3.84 (28.10.2026)
+Release auf https://github.com/miniLeonardo/MiniBench (Zweig main).
+Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.
+
+Inhalt von 3.84 (Einzelheiten in Doku\Änderungen_v3.84.txt):
+1. GitHub-Härtung & Git-Disziplin: Striktes Verbot von Binärdateien (*.zip, *.7z, *.tar, *.rar, *.exe, *.dll, *.sys) im Git-Tracking; vollständige .gitignore-Absicherung verhindert automatisierte Missbrauchs- und Account-Sperren dauerhaft.
+2. Granulare Umzugs-Bibliotheken: Einzelauswahl aller Benutzerbibliotheken (Desktop, Dokumente, Downloads, Bilder, Musik, Videos) mit Schnellauswahl (Alle / Keine); Downloads standardmäßig abgewählt.
+3. Echte Größenmessung beim Schnell-Scan: Beseitigung statischer 2-GB-Pauschalen; exakte Ordnergrößenermittlung in Bytes für alle Bibliotheken und C:\-Zusatzordner mit dynamischer Größenbeschriftung und Speicherplatzkalkulation.
+4. Lautloser Sensoren-Lifecycle: Unterdrückung interaktiver Deinstallationsdialoge von PawnIO via /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /S -uninstall -silent; Treiber bleibt während des gesamten Mehrfachlaufs im Speicher und wird ausschließlich am Gesamtlaufende freigegeben; Protokollierung ohne modale Fehlerdialoge.
+5. Text- & Oberflächen-Feinschliff: Checkbox chkAnon als „Personenbezogene Daten entfernen“ beschriftet; Seite Versionen vollständig von Mojibake befreit und auf übersichtliche Stichpunkte (•) umgestellt.
+
+## Vorher: Version 3.83 (23.10.2026)
 Release-Commit "Initial commit: Leos Minibench v3.83" (Commit b7ee742) auf https://github.com/miniLeonardo/MiniBench.
 Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.
 

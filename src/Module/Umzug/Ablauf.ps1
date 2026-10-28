@@ -1,4 +1,4 @@
-#region ---------- System-Umzug & Neuinstallation (ab v3.8, Hotfix v3.81) ----------
+﻿#region ---------- System-Umzug & Neuinstallation (ab v3.8, Hotfix v3.81) ----------
 # Modul für die transparente Sicherung persönlicher Daten, Bibliotheken, Desktop-Layout,
 # Profil-Konfigurationen und Programme vor einer Windows-Neuinstallation inklusive
 # autarkem 1-Klick-Restore.
@@ -176,7 +176,8 @@ function Invoke-SystemBackup {
     Send-GuiEvent 'LOG' '' ('Zielordner initialisiert: {0}' -f $backupFolder)
 
     # 1. Benutzerdaten & Bibliotheken
-    if ($uList -contains 'Bibliotheken') {
+    $hasLibScope = ($uList -contains 'Bibliotheken' -or ($uList | Where-Object { $_ -like 'Lib_*' }))
+    if ($hasLibScope) {
         Send-GuiEvent 'UMZUG' '10' 'Sichere Benutzer-Bibliotheken ...' ''
         Send-GuiEvent 'LOG' '' 'Sichere Standardbibliotheken des aktuellen Benutzers ...'
         $profDest = Join-Path $backupFolder 'Benutzerprofil'
@@ -193,15 +194,20 @@ function Invoke-SystemBackup {
         $videoPath    = if ($reg -and $reg.'My Video') { [Environment]::ExpandEnvironmentVariables($reg.'My Video') } else { [Environment]::GetFolderPath('MyVideos') }
 
         $libs = @(
-            @{ Name = 'Desktop';   Path = $desktopPath; Step = 12 },
-            @{ Name = 'Dokumente'; Path = $docPath;     Step = 16 },
-            @{ Name = 'Downloads'; Path = $downPath;    Step = 20 },
-            @{ Name = 'Bilder';    Path = $picPath;     Step = 24 },
-            @{ Name = 'Musik';     Path = $musicPath;   Step = 28 },
-            @{ Name = 'Videos';    Path = $videoPath;   Step = 32 }
+            @{ Name = 'Desktop';   Path = $desktopPath; Step = 12; Key = 'Lib_Desktop' },
+            @{ Name = 'Dokumente'; Path = $docPath;     Step = 16; Key = 'Lib_Dokumente' },
+            @{ Name = 'Downloads'; Path = $downPath;    Step = 20; Key = 'Lib_Downloads' },
+            @{ Name = 'Bilder';    Path = $picPath;     Step = 24; Key = 'Lib_Bilder' },
+            @{ Name = 'Musik';     Path = $musicPath;   Step = 28; Key = 'Lib_Musik' },
+            @{ Name = 'Videos';    Path = $videoPath;   Step = 32; Key = 'Lib_Videos' }
         )
 
+        $hasGranularLib = [bool]($uList | Where-Object { $_ -like 'Lib_*' })
+
         foreach ($lib in $libs) {
+            if ($hasGranularLib -and -not ($uList -contains $lib.Key)) {
+                continue
+            }
             if ($lib.Path -and (Test-Path -LiteralPath $lib.Path)) {
                 $libSize = Get-FolderSize $lib.Path
                 $sizeTxt = if ($libSize -ge 1GB) { '{0:N1} GB' -f ($libSize / 1GB) } else { '{0:N0} MB' -f ($libSize / 1MB) }

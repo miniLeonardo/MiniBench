@@ -6,7 +6,7 @@
 
 **Portable Diagnose-, Benchmark-, Stresstest-, Reparatur- und Optimierungs-Suite für Windows 10 & 11.**
 
-[![Version](https://img.shields.io/badge/Version-3.83-0284c7.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-3.84-0284c7.svg)](CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/Changelog-MD-6366f1.svg)](CHANGELOG.md)
 [![Lizenz](https://img.shields.io/badge/Lizenz-MIT-blue.svg)](LICENSE)
 [![Plattform](https://img.shields.io/badge/Windows-10%20%7C%2011%20(x64)-0078d4.svg)]()
@@ -22,12 +22,12 @@
 <br/>
 
 <a href="https://github.com/miniLeonardo/MiniBench/releases">
-  <img src="https://img.shields.io/badge/%E2%AC%87%EF%B8%8F%20Download-LMB.exe%20(v3.83)-2563eb?style=for-the-badge&logo=windows&logoColor=white" alt="Download LMB.exe" />
+  <img src="https://img.shields.io/badge/%E2%AC%87%EF%B8%8F%20Download-LMB.exe%20(v3.84)-2563eb?style=for-the-badge&logo=windows&logoColor=white" alt="Download LMB.exe" />
 </a>
 
 <br/><br/>
 
-<img src="Doku/Screenshots/Startseite_Neu.png" alt="Leos Minibench 3.83 Oberfläche" width="850" />
+<img src="Doku/Screenshots/Startseite_Neu.png" alt="Leos Minibench 3.84 Oberfläche" width="850" />
 
 <br/><br/>
 

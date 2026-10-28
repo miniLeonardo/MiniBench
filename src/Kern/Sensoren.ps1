@@ -221,7 +221,9 @@ function Uninstall-PawnIo {
     if ($un -and (Test-Path -LiteralPath $un)) { $file = $un }
     else { $file = (Get-SensorToolState).PawnIoSetup }
     if (-not $file) { return [pscustomobject]@{ Ok = $false; Text = 'PawnIO konnte nicht entfernt werden: weder uninstall.exe noch PawnIO-Setup gefunden' } }
-    $r = Invoke-External -File $file -Arguments '-uninstall -silent' -TimeoutSec 180 -Progress 'PawnIO-Treiber wird entfernt'
+    # Unterstützt InnoSetup (/VERYSILENT), NSIS (/S) und PawnIO-Parameter (-uninstall -silent)
+    $uninstArgs = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /S -uninstall -silent'
+    $r = Invoke-External -File $file -Arguments $uninstArgs -TimeoutSec 180 -Progress 'PawnIO-Treiber wird entfernt'
     $st = Get-PawnIoState
     if ($st.Installiert) { return [pscustomobject]@{ Ok = $false; Text = ('PawnIO ist noch installiert (Rückgabecode {0}). Von Hand entfernen: "{1}" -uninstall' -f $r.ExitCode, $file) } }
     if ($hasMarker) { Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue }
