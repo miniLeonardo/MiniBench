@@ -576,11 +576,11 @@
 
     const subTitleEl = document.querySelector('.dash-card .card-head p');
     if (subTitleEl) {
-      subTitleEl.textContent = 'Zeitlicher Verlauf der Messwerte fÃ¼r diesen Rechner Ã¼ber alle vorliegenden LÃ¤ufe.';
+      subTitleEl.textContent = 'Zeitlicher Verlauf der Messwerte für diesen Rechner über alle vorliegenden Läufe.';
     }
 
     if (comparedSystems.length < 2) {
-      chartLegend.innerHTML = '<div style="font-size:0.85rem; color:var(--text-muted); font-style:italic;">Noch kein Verlauf verfÃ¼gbar â€“ mindestens zwei LÃ¤ufe fÃ¼r diesen PC erforderlich.</div>';
+      chartLegend.innerHTML = '<div style="font-size:0.85rem; color:var(--text-muted); font-style:italic;">Noch kein Verlauf verfügbar – mindestens zwei Läufe für diesen PC erforderlich.</div>';
       return;
     }
 
@@ -602,16 +602,16 @@
       html = '<div class="legend-item"><div class="legend-color" style="background:' + col + ';"></div><span>SSD 4K Random Read (MB/s)</span></div>';
     } else if (m === 'ssdwear') {
       const col = isDark ? '#FF5A5A' : '#E81123';
-      html = '<div class="legend-item"><div class="legend-color" style="background:' + col + ';"></div><span>SSD-VerschleiÃŸ (Percentage Used %)</span></div>';
+      html = '<div class="legend-item"><div class="legend-color" style="background:' + col + ';"></div><span>SSD-Verschleiß (Percentage Used %)</span></div>';
     } else if (m === 'batwear') {
       const col = isDark ? '#26A69A' : '#009688';
-      html = '<div class="legend-item"><div class="legend-color" style="background:' + col + ';"></div><span>Akku-Gesundheit (% der DesignkapazitÃ¤t)</span></div>';
+      html = '<div class="legend-item"><div class="legend-color" style="background:' + col + ';"></div><span>Akku-Gesundheit (% der Designkapazität)</span></div>';
     } else if (m === 'temp') {
       const cCpu = isDark ? '#FF5A5A' : '#E81123';
       const cGpu = isDark ? '#FFA057' : '#F7630C';
-      html = '<div class="legend-item"><div class="legend-color" style="background:' + cCpu + ';"></div><span>CPU HÃ¶chsttemperatur (Â°C)</span></div>' +
-             '<div class="legend-item"><div class="legend-color" style="background:' + cGpu + ';"></div><span>GPU HÃ¶chsttemperatur (Â°C)</span></div>' +
-             '<div class="legend-item" style="margin-left:auto; font-size:0.8rem; color:var(--text-muted);"><span>Nur vergleichbare LÃ¤ufe (â‰¥ 60s, ab v2.67)</span></div>';
+      html = '<div class="legend-item"><div class="legend-color" style="background:' + cCpu + ';"></div><span>CPU Höchsttemperatur (°C)</span></div>' +
+             '<div class="legend-item"><div class="legend-color" style="background:' + cGpu + ';"></div><span>GPU Höchsttemperatur (°C)</span></div>' +
+             '<div class="legend-item" style="margin-left:auto; font-size:0.8rem; color:var(--text-muted);"><span>Nur vergleichbare Läufe (≥ 60s, ab v2.67)</span></div>';
     }
 
     chartLegend.innerHTML = html;
@@ -640,7 +640,7 @@
       ctx.font = '14px Segoe UI, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('Noch kein Verlauf verfÃ¼gbar â€“ mindestens zwei LÃ¤ufe fÃ¼r diesen PC erforderlich.', width / 2, height / 2);
+      ctx.fillText('Noch kein Verlauf verfügbar – mindestens zwei Läufe für diesen PC erforderlich.', width / 2, height / 2);
       canvas.onmousemove = null;
       canvas.onmouseleave = null;
       return;
@@ -663,13 +663,13 @@
     } else if (m === 'disk') {
       series = [{ name: 'SSD 4K Random Read', unit: 'MB/s', color: isDark ? '#B388FF' : '#8E44AD', getVal: s => (s.Metrics?.DISK_R1 != null ? s.Metrics.DISK_R1 : (s.Metrics?.FastestDisk?.R1 != null ? s.Metrics.FastestDisk.R1 : null)) }];
     } else if (m === 'ssdwear') {
-      series = [{ name: 'SSD-VerschleiÃŸ', unit: '%', color: isDark ? '#FF5A5A' : '#E81123', getVal: s => s.Metrics?.SsdWearPct }];
+      series = [{ name: 'SSD-Verschleiß', unit: '%', color: isDark ? '#FF5A5A' : '#E81123', getVal: s => s.Metrics?.SsdWearPct }];
     } else if (m === 'batwear') {
       series = [{ name: 'Akku-Gesundheit', unit: '%', color: isDark ? '#26A69A' : '#009688', getVal: s => s.Metrics?.BatteryWearPct }];
     } else if (m === 'temp') {
       series = [
-        { name: 'CPU Max', unit: 'Â°C', color: isDark ? '#FF5A5A' : '#E81123', getVal: s => (isTempComparable(s, runs[0]) ? (s.Metrics?.LAST_CpuTemp != null ? s.Metrics.LAST_CpuTemp : s.Telemetry?.CpuTempMax) : null) },
-        { name: 'GPU Max', unit: 'Â°C', color: isDark ? '#FFA057' : '#F7630C', getVal: s => (isTempComparable(s, runs[0]) ? (s.Metrics?.LAST_GpuTemp != null ? s.Metrics.LAST_GpuTemp : s.Telemetry?.GpuTempMax) : null) }
+        { name: 'CPU Max', unit: '°C', color: isDark ? '#FF5A5A' : '#E81123', getVal: s => (isTempComparable(s, runs[0]) ? (s.Metrics?.LAST_CpuTemp != null ? s.Metrics.LAST_CpuTemp : s.Telemetry?.CpuTempMax) : null) },
+        { name: 'GPU Max', unit: '°C', color: isDark ? '#FFA057' : '#F7630C', getVal: s => (isTempComparable(s, runs[0]) ? (s.Metrics?.LAST_GpuTemp != null ? s.Metrics.LAST_GpuTemp : s.Telemetry?.GpuTempMax) : null) }
       ];
     }
 
@@ -688,7 +688,7 @@
       ctx.font = '14px Segoe UI, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('Keine Messwerte fÃ¼r diese Metrik in den LÃ¤ufen vorhanden.', width / 2, height / 2);
+      ctx.fillText('Keine Messwerte für diese Metrik in den Läufen vorhanden.', width / 2, height / 2);
       canvas.onmousemove = null;
       canvas.onmouseleave = null;
       return;

@@ -1,0 +1,80 @@
+﻿LEOS MINIBENCH 3.88: ÄNDERUNGEN
+===============================
+
+Version 3.88 optimiert die Benutzeroberfläche und die Stabilität nach dem Praxistest von Version 3.87:
+Einklappbare Gerätegruppen in der Datenbank mit Windows-Chevrons, hoher Kontrast im Dark Mode für Gruppenköpfe,
+ein überarbeitetes Layout der Startseiten-Kachel „Letzter Lauf“ ohne Textumbruch, automatische Bevorzugung der
+physischen dedizierten Grafikkarte (Ausschluss virtueller Display-Treiber) sowie eine vollständige Bereinigung
+aller verbliebenen UTF-8-Doppelkodierungen (Mojibake).
+
+
+1. DATENBANK: EINKLAPPBARE GRUPPEN (WIN32 COLLAPSIBLE GROUPS)
+  Native Collapsible Groups   Die Datenbank-ListView (lvDb) aktiviert über die Win32-Nachricht LVM_SETGROUPINFO
+                              und die Maske LVGS_COLLAPSIBLE native einklappbare Gruppen. Windows rendert automatisch
+                              den System-Chevron zum Auf- und Zuklappen.
+  Standardzustand beim Laden  Systeme mit mehreren Läufen und alle Fremdsysteme starten standardmäßig eingeklappt
+                              (LVGS_COLLAPSED). Der Nutzer sieht sofort eine saubere Ein-Zeilen-Übersicht je Gerät und
+                              klappt gezielt nur die gewünschten Messreihen auf. Die Referenz-Gruppe startet ebenfalls kompakt.
+  Steuerung                   Neue Toolbar-Schaltfläche „Alle aufklappen / Alle einklappen“ und entsprechende
+                              Kontextmenü-Befehle ermöglichen das blitzschnelle Umschalten des gesamten Baumes.
+
+
+2. OBERFLÄCHE: KONTRAST IM DARK MODE & THEME-KONSISTENZ
+  Gruppenkopf-Kontrast        Im Windows-Dunkelmodus (DarkMode_Explorer) zeichnete ComCtl32 Gruppenüberschriften
+                              bisher in tiefem Dunkelblau (#005599) auf schwarzem Grund. Ein gezielter Paint-Hook
+                              in WndProc (WM_PAINT) übermalt das Textlabel im Dark Mode mit exzellentem Kontrast
+                              (>= 7:1) in UI.Accent (#4CC2FF) bzw. UI.Text (#E0E0E0) auf UI.Panel-Hintergrund.
+  Hellmodus unberührt         Im Hellmodus greift weiterhin das unmodifizierte, saubere Aero-Rendering von Windows.
+
+
+3. STARTSEITE: KACHEL-LAYOUT & HARDWARE-STECKBRIEF
+  Layout „Letzter Lauf“       In der Kachel „Letzter Lauf“ wurde die Zeile der Schnellaktionen neu strukturiert:
+                              Die mittlere Schaltfläche heißt prägnant „Dashboard“ (vorher „Im Dashboard vergleichen“).
+                              Die Schaltflächen wurden kompakt ausgerichtet, und der Befundstatus (lblBef)
+                              erhielt eine reservierte Mindestbreite von 120 px. Ein buchstabenweiser vertikaler
+                              Textumbruch ist damit technisch ausgeschlossen.
+  Grafikkarten-Filter         Im Kopf-Steckbrief (PillLabel) und der Systemübersicht werden virtuelle Display-Adapter
+                              (Virtual Desktop Monitor, Parsec, spacedesk, IddSampleDriver, Remote Desktop) ignoriert.
+                              Es wird verlässlich die primäre dedizierte Grafikkarte (dGPU, z. B. Radeon RX 6800)
+                              bzw. der reale Grafikbeschleuniger ausgewiesen.
+
+
+4. BENCHMARK-STABILITÄT & HINTERGRUNDLAST
+  Vorab-Grundlastprüfung      Vor dem Mehrkern-Benchmark prüft Test-HintergrundlastVorMessung auf störende Hintergrundlast.
+  Sachliche Befund-Einstufung Bei erkannter Grundlast (> 15 % CPU oder aktive Hintergrunddienste) wird ein Abfall der
+                              Mehrkern-Skalierung sachlich als INFO eingestuft. Fehlalarme und irreführende Warnungen
+                              bei bekannten Hintergrundaktivitäten (z. B. VR-Server, Defender) werden vermieden.
+
+
+5. ZEICHENSATZ & KODIERUNG (MOJIBAKE-BEREINIGUNG)
+  HTML-Bericht                In Add-BenchResult (Grundgeruest.ps1) wurden verbliebene ANSI-Fragmente durch saubere
+                              UTF-8-Strings ersetzt („Läufen“, „früheren Läufen“ statt fehlerhafter Fragmente).
+  Systemvergleich & Dashboard Sämtliche doppelten UTF-8-Kodierungen in Bausteine_Systemvergleich.ps1 und
+                              diagramme.js wurden auf sauberes UTF-8 mit BOM korrigiert.
+  Startseiten-KPIs            Die Delta-Badges der Startseite (Gesamt, CPU, RAM, GPU) nutzen standardisierte C#-Unicode-
+                              Escape-Sequenzen (\u2191 für ↑, \u2193 für ↓, \u2192 für →) zur Vermeidung von Kodierungsartefakten.
+
+
+GEFUNDEN UND BEHOBEN
+  - Mojibake im HTML-Bericht: In Add-BenchResult stand fehlerhaftes „LA ufen“ statt „Läufen“.
+  - Mojibake auf der Startseite: Raw-Zeichen in DiagGui_Seiten.cs erzeugten „â†’“ statt Unicode-Pfeilen.
+  - Mojibake im Systemvergleich: Doppelt UTF-8-kodierte Fragmente in Bausteine_Systemvergleich.ps1 und diagramme.js bereinigt.
+  - Layout-Crash in Kachel „Letzter Lauf“: AutoSize-Verhalten der Buttons quetschte lblBef auf ca. 15 px zusammen.
+  - Virtuelle Grafikkarte im Steckbrief: Virtual Desktop Monitor verdrängte die Radeon RX 6800 auf TORRENT.
+  - Unlesbare Gruppenköpfe im Dark Mode: SysListView32 dunkelblaues Theme-Rendering durch kontrastreiches Label-Repainting behoben.
+  - Fehlalarm bei Mehrkern-Skalierung: Warnung bei paralleler Hintergrundlast auf INFO herabgestuft.
+
+
+GRENZEN UND OFFENE PUNKTE
+  - Win32-ListViewGroup Chevrons erfordern Windows Vista oder neuer mit aktivierten visuellen Stilen (unter Windows 10/11 Standard).
+
+
+UMSTIEG
+  - Vollständig abwärtskompatibel. Keine Änderungen an Datenbankstruktur oder Konfigurationsdateien erforderlich.
+
+
+QUELLEN
+  - Eigene Implementierung in src\Kern\Version.ps1, src\Kern\Grundgeruest.ps1, src\Module\Benchmark\Ablauf.ps1,
+    src\Oberflaeche\Versionen.cs, src\Oberflaeche\DiagGui.cs, src\Oberflaeche\DiagGui_Seiten.cs,
+    src\Oberflaeche\DiagGui_Steuerelemente.cs, src\Oberflaeche\DiagGui_Vergleich.cs, src\Bericht\Bausteine_Systemvergleich.ps1,
+    src\Bericht\Dashboard\diagramme.js, tests\Daten\Oberflaeche\GuiSelbsttest.cs und tests\Oberflaeche.Tests.ps1.

@@ -378,7 +378,7 @@ public partial class DiagGui : Form
         badgeUpdate.Margin = new Padding(UI.S(6), UI.S(5), 0, 0);
         badgeUpdate.Cursor = Cursors.Hand;
         badgeUpdate.Click += delegate { TriggerUpdateDownload(); };
-        Tip(badgeUpdate, "Ein Update fÃ¼r Leos Minibench ist verfÃ¼gbar. Klicken zum Herunterladen und Aktualisieren.");
+        Tip(badgeUpdate, "Ein Update für Leos Minibench ist verfügbar. Klicken zum Herunterladen und Aktualisieren.");
         hr.Controls.Add(badgeUpdate);
         head.Controls.Add(hr);
 
@@ -677,7 +677,7 @@ public partial class DiagGui : Form
     {
         if (badgeUpdate != null)
         {
-            badgeUpdate.Text = "Update verfÃ¼gbar (" + newVer + ")";
+            badgeUpdate.Text = "Update verfügbar (" + newVer + ")";
             badgeUpdate.Visible = true;
         }
     }
@@ -819,12 +819,12 @@ public partial class DiagGui : Form
     {
         if (String.IsNullOrEmpty(AvailableUpdateUrl))
         {
-            MessageBox.Show(this, "Keine Download-Adresse fÃ¼r das Update gefunden.", "Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "Keine Download-Adresse für das Update gefunden.", "Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
-        string msg = "MÃ¶chten Sie das Update auf Version " + AvailableUpdateVersion + " jetzt herunterladen und LMB.exe automatisch austauschen?\r\n\r\n" +
-                     "Die bisherige Programmdatei wird im Archiv gesichert und die Anwendung anschlieÃŸend neu gestartet.";
+        string msg = "Möchten Sie das Update auf Version " + AvailableUpdateVersion + " jetzt herunterladen und LMB.exe automatisch austauschen?\r\n\r\n" +
+                     "Die bisherige Programmdatei wird im Archiv gesichert und die Anwendung anschlie\u00DFend neu gestartet.";
         if (MessageBox.Show(this, msg, "Minibench Update", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
             return;
 
@@ -860,11 +860,11 @@ public partial class DiagGui : Form
                     {
                         try { File.Delete(targetExe); } catch { }
                         MessageBox.Show(this,
-                            "SicherheitsprÃ¼fung fehlgeschlagen:\r\n\r\n" +
-                            "Die SHA-256-PrÃ¼fsumme der heruntergeladenen Datei stimmt nicht mit der Vorgabe des Releases Ã¼berein:\r\n\r\n" +
+                            "Sicherheitsprüfung fehlgeschlagen:\r\n\r\n" +
+                            "Die SHA-256-Prüfsumme der heruntergeladenen Datei stimmt nicht mit der Vorgabe des Releases überein:\r\n\r\n" +
                             "Erwartet: " + AvailableUpdateSha256 + "\r\n" +
                             "Berechnet: " + hash + "\r\n\r\n" +
-                            "Die Datei wurde aus SicherheitsgrÃ¼nden verworfen.",
+                            "Die Datei wurde aus Sicherheitsgründen verworfen.",
                             "Update-Sicherheitsfehler",
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Error);
@@ -3413,7 +3413,7 @@ public partial class DiagGui : Form
     {
         n = (n ?? "").Trim();
         if (n.Length == 0) return "";
-        if (System.Text.RegularExpressions.Regex.IsMatch(n, "Virtual|Remote|Indirect|Parsec|spacedesk|Basic Display|Basic Render|Standard-VGA|Hyper-V|VMware|VirtualBox|Citrix|DisplayLink", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) return "virtuell";
+        if (System.Text.RegularExpressions.Regex.IsMatch(n, "Virtual|Remote|Indirect|Parsec|spacedesk|IddSampleDriver|Basic Display|Basic Render|Standard-VGA|Hyper-V|VMware|VirtualBox|Citrix|DisplayLink", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) return "virtuell";
         if (System.Text.RegularExpressions.Regex.IsMatch(n, "NVIDIA|GeForce|Quadro|Tesla|\\bRTX\\b|\\bGTX\\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) return "dGPU";
         if (n.IndexOf("Intel", StringComparison.OrdinalIgnoreCase) >= 0) return System.Text.RegularExpressions.Regex.IsMatch(n, "Arc(\\(TM\\))?\\s+(Pro\\s+)?[AB]\\d{2,3}", System.Text.RegularExpressions.RegexOptions.IgnoreCase) ? "dGPU" : "iGPU";
         if (System.Text.RegularExpressions.Regex.IsMatch(n, "AMD|ATI|Radeon|FirePro", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
@@ -3422,6 +3422,33 @@ public partial class DiagGui : Form
     }
 
     // Einträge der Auswahl: alle, nur Grafikkarte, nur Prozessorgrafik (wenn vorhanden), dann jede Einheit einzeln
+    public static string GetPrimaryGpuName()
+    {
+        if (GpuNames == null || GpuNames.Length == 0) return "";
+        string dGpu = "";
+        string iGpu = "";
+        string other = "";
+        foreach (string g in GpuNames)
+        {
+            string n = (g ?? "").Trim();
+            if (n.Length == 0) continue;
+            string kind = GpuKind(n);
+            if (kind == "virtuell") continue;
+            if (kind == "dGPU" && dGpu.Length == 0) dGpu = n;
+            else if (kind == "iGPU" && iGpu.Length == 0) iGpu = n;
+            else if (other.Length == 0) other = n;
+        }
+        if (dGpu.Length > 0) return dGpu;
+        if (iGpu.Length > 0) return iGpu;
+        if (other.Length > 0) return other;
+        foreach (string g in GpuNames)
+        {
+            string n = (g ?? "").Trim();
+            if (n.Length > 0) return n;
+        }
+        return "";
+    }
+
     string[] GpuChoiceTexts()
     {
         List<string> t = new List<string>(); gpuSelValues.Clear();

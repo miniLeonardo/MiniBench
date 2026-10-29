@@ -9,7 +9,7 @@ public partial class DiagGui
         top.AutoSize = true;
         top.Padding = new Padding(0, 0, 0, UI.S(10));
         CheckBox chkAutoUpdate = Chk("Beim Programmstart automatisch nach Minibench-Updates suchen", LoadUpdateCheckPreference());
-        Tip(chkAutoUpdate, "PrÃ¼ft beim Start leise im Hintergrund Ã¼ber GitHub Releases, ob eine neuere Version verfÃ¼gbar ist (ohne Telemetrie).");
+        Tip(chkAutoUpdate, "Pr\u00FCft beim Start leise im Hintergrund \u00FCber GitHub Releases, ob eine neuere Version verf\u00FCgbar ist (ohne Telemetrie).");
         chkAutoUpdate.Margin = new Padding(UI.S(4), UI.S(4), UI.S(4), UI.S(8));
         chkAutoUpdate.CheckedChanged += delegate {
             SaveUpdateCheckPreference(chkAutoUpdate.Checked);
@@ -1960,7 +1960,7 @@ public partial class DiagGui
 
         string cleanCpu = DbEntry.CleanCpuName(HwCpu);
         string cpuSpec = cleanCpu.Length > 0 ? (cleanCpu + (HwCores > 0 ? " · " + HwCores + " Kerne / " + HwThreads + " Threads" : "")) : "Standard-Prozessor";
-        string gpuSpec = GpuNames.Length > 0 ? GpuNames[0] : "Grafikeinheit";
+        string primaryGpu = GetPrimaryGpuName(); string gpuSpec = primaryGpu.Length > 0 ? primaryGpu : "Grafikeinheit";
         string ramSpec = HwRam.Length > 0 ? HwRam : "Arbeitsspeicher";
         string diskSpec = GetDisksSummary();
         string boardSpec = HwBoard.Length > 0 ? HwBoard : "Standard-Mainboard";
@@ -2179,7 +2179,7 @@ public partial class DiagGui
 
         string cleanCpu = DbEntry.CleanCpuName(HwCpu);
         if (cleanCpu.Length > 0) { PillLabel pill = new PillLabel(cleanCpu); Tip(pill, "Prozessor: " + cleanCpu); pillsRow.Controls.Add(pill); }
-        if (GpuNames.Length > 0 && GpuNames[0].Length > 0) { PillLabel pill = new PillLabel(GpuNames[0]); Tip(pill, "Grafikkarte: " + GpuNames[0]); pillsRow.Controls.Add(pill); }
+        string dispGpu = GetPrimaryGpuName(); if (dispGpu.Length > 0) { PillLabel pill = new PillLabel(dispGpu); Tip(pill, "Grafikkarte: " + dispGpu); pillsRow.Controls.Add(pill); }
         if (HwRam.Length > 0) { PillLabel pill = new PillLabel(HwRam); Tip(pill, "Arbeitsspeicher: " + HwRam); pillsRow.Controls.Add(pill); }
         string disksSummary = GetDisksSummary();
         if (disksSummary.Length > 0) { PillLabel pill = new PillLabel(disksSummary); Tip(pill, "Laufwerke: " + disksSummary); pillsRow.Controls.Add(pill); }
@@ -2334,14 +2334,14 @@ public partial class DiagGui
             if (prevRun.OverallScore > 0 && lastRun.OverallScore > 0)
             {
                 double d = Math.Round(((lastRun.OverallScore - prevRun.OverallScore) / (double)prevRun.OverallScore) * 100.0, 0);
-                dGesamt = (d >= 0 ? "â†‘ +" : "â†“ ") + d.ToString("0", CultureInfo.CurrentCulture) + " %";
+                dGesamt = d > 0 ? ("\u2191 +" + d.ToString("0", CultureInfo.CurrentCulture) + " %") : (d < 0 ? ("\u2193 " + d.ToString("0", CultureInfo.CurrentCulture) + " %") : "\u2192 0 %");
             }
             double prevCpu = prevRun.Get("CPU|MT");
             double curCpu = lastRun.Get("CPU|MT");
             if (prevCpu > 0 && curCpu > 0)
             {
                 double d = Math.Round(((curCpu - prevCpu) / prevCpu) * 100.0, 0);
-                dCpu = (d >= 0 ? "â†‘ +" : "â†“ ") + d.ToString("0", CultureInfo.CurrentCulture) + " %";
+                dCpu = d > 0 ? ("\u2191 +" + d.ToString("0", CultureInfo.CurrentCulture) + " %") : (d < 0 ? ("\u2193 " + d.ToString("0", CultureInfo.CurrentCulture) + " %") : "\u2192 0 %");
             }
             double prevRam = prevRun.Get("RAM|Lesen");
             if (prevRam <= 0) prevRam = prevRun.Get("RAM|Read");
@@ -2350,7 +2350,7 @@ public partial class DiagGui
             if (prevRam > 0 && curRam > 0)
             {
                 double d = Math.Round(((curRam - prevRam) / prevRam) * 100.0, 0);
-                dRam = (d >= 0 ? "â†‘ +" : "â†“ ") + d.ToString("0", CultureInfo.CurrentCulture) + " %";
+                dRam = d > 0 ? ("\u2191 +" + d.ToString("0", CultureInfo.CurrentCulture) + " %") : (d < 0 ? ("\u2193 " + d.ToString("0", CultureInfo.CurrentCulture) + " %") : "\u2192 0 %");
             }
             double prevGpu = prevRun.Get("GPU|REND");
             if (prevGpu <= 0) prevGpu = prevRun.Get("GPU|FPS");
@@ -2359,7 +2359,7 @@ public partial class DiagGui
             if (prevGpu > 0 && curGpu > 0)
             {
                 double d = Math.Round(((curGpu - prevGpu) / prevGpu) * 100.0, 0);
-                dGpu = (d >= 0 ? "â†‘ +" : "â†“ ") + d.ToString("0", CultureInfo.CurrentCulture) + " %";
+                dGpu = d > 0 ? ("\u2191 +" + d.ToString("0", CultureInfo.CurrentCulture) + " %") : (d < 0 ? ("\u2193 " + d.ToString("0", CultureInfo.CurrentCulture) + " %") : "\u2192 0 %");
             }
         }
 
@@ -2380,8 +2380,8 @@ public partial class DiagGui
         actGrid.ColumnCount = 2;
         actGrid.RowCount = 1;
         actGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-        actGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         actGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+        actGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         actGrid.Margin = new Padding(0);
 
         FlowLayoutPanel pnlButtons = new FlowLayoutPanel();
@@ -2400,7 +2400,7 @@ public partial class DiagGui
         btnOpenRep.FlatAppearance.MouseOverBackColor = UI.AccentHover;
         btnOpenRep.FlatAppearance.MouseDownBackColor = UI.AccentActive;
         btnOpenRep.Font = new Font("Segoe UI Semibold", 8.5f);
-        btnOpenRep.Padding = new Padding(UI.S(10), UI.S(3), UI.S(10), UI.S(3));
+        btnOpenRep.Padding = new Padding(UI.S(8), UI.S(3), UI.S(8), UI.S(3));
         btnOpenRep.Margin = new Padding(0, UI.S(2), UI.S(6), 0);
         btnOpenRep.AutoSize = true;
         btnOpenRep.Cursor = Cursors.Hand;
@@ -2412,7 +2412,7 @@ public partial class DiagGui
         pnlButtons.Controls.Add(btnOpenRep);
 
         Button btnDash = new Button();
-        btnDash.Text = "Im Dashboard vergleichen";
+        btnDash.Text = "Dashboard";
         btnDash.FlatStyle = FlatStyle.Flat;
         btnDash.FlatAppearance.BorderColor = UI.Accent;
         btnDash.FlatAppearance.BorderSize = 1;
@@ -2421,7 +2421,7 @@ public partial class DiagGui
         btnDash.FlatAppearance.MouseOverBackColor = UI.Accent;
         btnDash.FlatAppearance.MouseDownBackColor = UI.AccentActive;
         btnDash.Font = new Font("Segoe UI Semibold", 8.5f);
-        btnDash.Padding = new Padding(UI.S(10), UI.S(3), UI.S(10), UI.S(3));
+        btnDash.Padding = new Padding(UI.S(8), UI.S(3), UI.S(8), UI.S(3));
         btnDash.Margin = new Padding(0, UI.S(2), 0, 0);
         btnDash.AutoSize = true;
         btnDash.Cursor = Cursors.Hand;
@@ -2441,14 +2441,14 @@ public partial class DiagGui
         btnVerlauf.FlatAppearance.MouseOverBackColor = UI.Accent;
         btnVerlauf.FlatAppearance.MouseDownBackColor = UI.AccentActive;
         btnVerlauf.Font = new Font("Segoe UI Semibold", 8.5f);
-        btnVerlauf.Padding = new Padding(UI.S(10), UI.S(3), UI.S(10), UI.S(3));
+        btnVerlauf.Padding = new Padding(UI.S(8), UI.S(3), UI.S(8), UI.S(3));
         btnVerlauf.Margin = new Padding(UI.S(6), UI.S(2), 0, 0);
         btnVerlauf.AutoSize = true;
         btnVerlauf.Cursor = Cursors.Hand;
         btnVerlauf.UseVisualStyleBackColor = false;
         btnVerlauf.MouseEnter += delegate { btnVerlauf.ForeColor = UI.OnAccent; };
         btnVerlauf.MouseLeave += delegate { btnVerlauf.ForeColor = UI.IsDark ? Color.FromArgb(100, 180, 246) : Color.FromArgb(0, 100, 190); };
-        Tip(btnVerlauf, "Ã–ffnet das interaktive Dashboard im Verlaufsmodus fÃ¼r diesen PC.");
+        Tip(btnVerlauf, "\u00D6ffnet das interaktive Dashboard im Verlaufsmodus f\u00FCr diesen PC.");
         DbEntry devHistoryTarget = lastRun;
         btnVerlauf.Click += delegate { if (devHistoryTarget != null) OpenDeviceHistory(devHistoryTarget); };
         pnlButtons.Controls.Add(btnVerlauf);
@@ -2462,9 +2462,10 @@ public partial class DiagGui
             befundeColor = UI.Warn;
         }
         Label lblBef = Lbl(befundeText, 8.25f, true, befundeColor);
-        lblBef.Dock = DockStyle.Fill;
+        lblBef.AutoSize = true;
+        lblBef.MinimumSize = new Size(UI.S(120), UI.S(22));
         lblBef.TextAlign = ContentAlignment.MiddleRight;
-        lblBef.AutoSize = false;
+        lblBef.Anchor = AnchorStyles.Right | AnchorStyles.Top;
         lblBef.Margin = new Padding(UI.S(6), UI.S(4), 0, 0);
         Tip(lblBef, "Befundzusammenfassung (Kritisch / Warnungen / Hinweise) des letzten Laufs.");
         actGrid.Controls.Add(lblBef, 1, 0);
@@ -3051,7 +3052,7 @@ public partial class DiagGui
             catch { }
 
             
-            // 5. Minibench Update verfÃ¼gbar
+            // 5. Minibench Update verfügbar
             try
             {
                 if (HasUpdateAvailable && !String.IsNullOrEmpty(AvailableUpdateVersion))
@@ -3059,11 +3060,11 @@ public partial class DiagGui
                     QuickFixItem it = new QuickFixItem();
                     it.Level = "info";
                     it.Badge = "Update";
-                    it.Title = "Minibench-Update verfÃ¼gbar (" + AvailableUpdateVersion + ")";
-                    it.Desc = "Eine neuere Version von Leos Minibench ist auf GitHub bereitgestellt. Klicke auf 'Herunterladen' fÃ¼r den automatischen Austausch.";
+                    it.Title = "Minibench-Update verfügbar (" + AvailableUpdateVersion + ")";
+                    it.Desc = "Eine neuere Version von Leos Minibench ist auf GitHub bereitgestellt. Klicke auf 'Herunterladen' für den automatischen Austausch.";
                     it.ButtonText = "Herunterladen";
                     it.Action = delegate { TriggerUpdateDownload(); };
-                    it.Tip = "LÃ¤dt die neue LMB.exe herunter, validiert die SHA-256-PrÃ¼fsumme und startet die Anwendung neu.";
+                    it.Tip = "Lädt die neue LMB.exe herunter, validiert die SHA-256-Prüfsumme und startet die Anwendung neu.";
                     items.Add(it);
                 }
             }
@@ -3123,14 +3124,14 @@ public partial class DiagGui
                                                 it.Level = "warn";
                                                 it.Badge = "Treiber";
                                                 it.Title = "Grafiktreiber veraltet (" + desc + ")";
-                                                it.Desc = "Der installierte Grafiktreiber ist Ã¼ber 18 Monate alt (" + dtDriver.ToString("dd.MM.yyyy") + ")." +
-                                                          (HwIsLaptop ? " FÃ¼r Notebooks wird vorrangig die Treiberseite des Notebook-Herstellers empfohlen." : "");
+                                                it.Desc = "Der installierte Grafiktreiber ist über 18 Monate alt (" + dtDriver.ToString("dd.MM.yyyy") + ")." +
+                                                          (HwIsLaptop ? " Für Notebooks wird vorrangig die Treiberseite des Notebook-Herstellers empfohlen." : "");
                                                 it.ButtonText = "Treiber laden";
                                                 string targetUrl = dlUrl;
                                                 it.Action = delegate {
                                                     try { System.Diagnostics.Process.Start(targetUrl); } catch { }
                                                 };
-                                                it.Tip = "Ã–ffnet die offizielle Treiber-Downloadseite von " + vendor + " im Webbrowser.";
+                                                it.Tip = "\u00D6ffnet die offizielle Treiber-Downloadseite von " + vendor + " im Webbrowser.";
                                                 items.Add(it);
                                                 break;
                                             }
@@ -3153,10 +3154,10 @@ public partial class DiagGui
                     it.Level = "warn";
                     it.Badge = "Leistung";
                     it.Title = "Resizable BAR / SAM inaktiv";
-                    it.Desc = "Resizable BAR wird von Grafikkarte und Plattform unterstÃ¼tzt, ist aber im BIOS nicht aktiviert (verschenkt 5 bis 15 % Leistung).";
+                    it.Desc = "Resizable BAR wird von Grafikkarte und Plattform unterstützt, ist aber im BIOS nicht aktiviert (verschenkt 5 bis 15 % Leistung).";
                     it.ButtonText = "Anleitung";
                     it.Action = delegate { ShowRebarInstructionsDialog(); };
-                    it.Tip = "Ã–ffnet eine Schritt-fÃ¼r-Schritt-Anleitung zur Aktivierung von Resizable BAR / SAM im BIOS/UEFI.";
+                    it.Tip = "\u00D6ffnet eine Schritt-f\u00FCr-Schritt-Anleitung zur Aktivierung von Resizable BAR / SAM im BIOS/UEFI.";
                     items.Add(it);
                 }
             }
@@ -3446,11 +3447,11 @@ e.Result = items;
             Font fh = new Font("Segoe UI Semibold", 10f); Font fb = new Font("Segoe UI", 9f);
 
             string[][] steps = new string[][] {
-                new string[] { "Was ist Resizable BAR / SAM?", "Resizable BAR (bei AMD Smart Access Memory) erlaubt der CPU den vollen, ungedrosselten Zugriff auf den gesamten Grafikspeicher (VRAM) auf einmal anstatt in winzigen 256-MB-HÃ¤ppchen. Dies bringt je nach Spiel 5 bis 15 % Mehrleistung." },
+                new string[] { "Was ist Resizable BAR / SAM?", "Resizable BAR (bei AMD Smart Access Memory) erlaubt der CPU den vollen, ungedrosselten Zugriff auf den gesamten Grafikspeicher (VRAM) auf einmal anstatt in winzigen 256-MB-Häppchen. Dies bringt je nach Spiel 5 bis 15 % Mehrleistung." },
                 new string[] { "Schritt 1: Above 4G Decoding aktivieren", "Starte den PC ins UEFI/BIOS (Taste Entf oder F2). Navigiere zu den PCIe-/Grafik-Optionen (oft unter 'Erweitert' bzw. 'PCI Subsystem') und schalte 'Above 4G Decoding' auf 'Aktiviert' (Enabled)." },
                 new string[] { "Schritt 2: Re-Size BAR Support aktivieren", "Sobald Above 4G Decoding aktiv ist, erscheint die Option 'Re-Size BAR Support'. Stelle diese auf 'Auto' oder 'Aktiviert' (Enabled)." },
-                new string[] { "Schritt 3: CSM deaktivieren (reines UEFI)", "Resizable BAR erfordert zwingend den nativen UEFI-Modus mit GPT-Partitionstabelle. Deaktiviere das CSM (Compatibility Support Module) im Boot-MenÃ¼ des BIOS." },
-                new string[] { "Schritt 4: Speichern und neu starten", "DrÃ¼cke Taste F10 zum Speichern und Neustarten. Windows initialisiert die Grafikkarte nun mit vollem BAR1-Adressfenster." }
+                new string[] { "Schritt 3: CSM deaktivieren (reines UEFI)", "Resizable BAR erfordert zwingend den nativen UEFI-Modus mit GPT-Partitionstabelle. Deaktiviere das CSM (Compatibility Support Module) im Boot-Menü des BIOS." },
+                new string[] { "Schritt 4: Speichern und neu starten", "Drücke Taste F10 zum Speichern und Neustarten. Windows initialisiert die Grafikkarte nun mit vollem BAR1-Adressfenster." }
             };
 
             foreach (string[] st in steps)
@@ -3463,8 +3464,8 @@ e.Result = items;
             rt.SelectionStart = 0; rt.ScrollToCaret();
 
             FlowLayoutPanel bf = new FlowLayoutPanel(); bf.Dock = DockStyle.Bottom; bf.Height = UI.S(44); bf.FlowDirection = FlowDirection.RightToLeft;
-            Button btnClose = UI.Primary("SchlieÃŸen"); btnClose.DialogResult = DialogResult.OK;
-            Tip(btnClose, "SchlieÃŸt die Anleitung.");
+            Button btnClose = UI.Primary("Schlie\u00DFen"); btnClose.DialogResult = DialogResult.OK;
+            Tip(btnClose, "Schlie\u00DFt die Anleitung.");
             bf.Controls.Add(btnClose);
 
             p.Controls.Add(rt);

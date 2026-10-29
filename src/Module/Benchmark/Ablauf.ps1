@@ -90,6 +90,7 @@ function Initialize-Bench {
     Test-HintergrundlastVorMessung -Phase 'Benchmark'
     $idle = Get-CpuSample
     $script:BenchStartLoad = [int]$idle.Last
+    if ($script:AblaufHintergrundlast -and $script:BenchStartLoad -le 15) { $script:BenchStartLoad = 16 }
     if ($idle.Last -gt 15) { Add-Finding INFO 'Leistung' ('Beim Benchmark-Start lag bereits {0} % CPU-Last an, die Werte können niedriger ausfallen.' -f $idle.Last) }
     # ab v2.7: Sensoren laufen in den Wartepausen der Messungen mit (Temperatur, Takt, Leistung je Abschnitt im Bericht).
     # Sensoren sind Beiwerk: Fehler dürfen den Benchmark nie verhindern.
@@ -219,7 +220,10 @@ if ($script:BenchSel['CPU']) {
             Add-BenchResult -Gruppe 'CPU' -Komponente 'CPU' -Messung 'Mehrkern' -Wert $ptsMT -Einheit 'Punkte' -Anzeige ('{0:N0} Punkte' -f $ptsMT) -Key ($keyCpu + '|MT') -RefKey 'CPU|MT' -Hinweis ('{0} Threads' -f $threads)
             $mtStat = $(if ($scalIdx -lt 55) { 'Warnung' } elseif ($scalIdx -lt 75) { 'Info' } else { 'OK' })
             Add-BenchResult -Gruppe 'CPU' -Komponente 'CPU' -Messung 'Mehrkern-Skalierung' -Wert ([math]::Round($scal, 2)) -Einheit 'x' -Anzeige ('{0:N1}x' -f $scal) -Index $scalIdx -Status $mtStat -Hinweis ('erwartet ca. {0:N1}x bei {1} Kernen und {2} Threads' -f $expScal, $cores, $threads)
-            if ($mtStat -eq 'Warnung') { Add-Finding WARNUNG 'Leistung' ('Die CPU skaliert schlecht über alle Kerne ({0:N1}x statt ca. {1:N1}x): Power-Limit, Drosselung, Energiesparplan oder Hintergrundlast.' -f $scal, $expScal) }
+            if ($mtStat -eq 'Warnung') {
+                $scalLevel = if ($script:BenchStartLoad -gt 15 -or $script:AblaufHintergrundlast) { 'INFO' } else { 'WARNUNG' }
+                Add-Finding $scalLevel 'Leistung' ('Die CPU skaliert schlecht {0}ber alle Kerne ({1:N1}x statt ca. {2:N1}x): Power-Limit, Drosselung, Energiesparplan oder Hintergrundlast.' -f [char]0xFC, $scal, $expScal)
+            }
             if ($mtPerf) {
                 $mtcStat = $(if ($mtPerf -lt 80) { 'Warnung' } else { 'OK' })
                 Add-BenchResult -Gruppe 'CPU' -Komponente 'CPU' -Messung 'Takt Mehrkern' -Wert ($baseMHz * $mtPerf / 100) -Einheit 'MHz' -Anzeige ('{0:N0} MHz' -f ($baseMHz * $mtPerf / 100)) -Index ([int]$mtPerf) -Status $mtcStat -Hinweis ('{0} % vom Basistakt' -f $mtPerf)

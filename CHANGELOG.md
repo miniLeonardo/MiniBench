@@ -2,6 +2,16 @@
 
 Alle wesentlichen Ã„nderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v3.88 (29.10.2026)
+
+### Neu
+* **Einklappbare GerÃ¤tegruppen in der Datenbank:** Native Win32-UnterstÃ¼tzung (LVGS_COLLAPSIBLE) mit Windows-Chevrons fÃ¼r lvDb. Systeme mit mehreren LÃ¤ufen und Referenzsysteme starten standardmÃ¤ÃŸig kompakt eingeklappt; neue Toolbar- und KontextmenÃ¼-Aktionen â€žAlle aufklappen / Alle einklappenâ€œ ermÃ¶glichen schnelles Umschalten zwischen kompakter GerÃ¤teÃ¼bersicht und voller Laufshistorie.
+* **Dark-Mode-Kontrast fÃ¼r GruppenkÃ¶pfe:** Die GruppenÃ¼berschriften der Datenbank-ListView werden im Dark Mode mit hohem Kontrast (>= 7:1) in Akzentfarbe (UI.Accent / #4CC2FF) und TextweiÃŸ (UI.Text) gezeichnet. Dadurch wird das unlesbare Dunkelblau (#005599) des Windows-Aero-Themes auf dunklem Grund eliminiert.
+* **Startseiten-Layout der Kachel â€žLetzter Laufâ€œ:** Die Zeile der Schnellaktionen wurde gegen Textumbruch gehÃ¤rtet. Der Befundstatus (lblBef, z. B. Befunde: 0 / 2 / 7) erhÃ¤lt eine gesicherte Mindestbreite und bricht niemals mehrzeilig oder zeichenweise um. Die SchaltflÃ¤che â€žIm Dashboard vergleichenâ€œ wurde auf â€žDashboardâ€œ gekÃ¼rzt und alle Buttons kompakt ausgerichtet.
+* **Robuste Grafikkarten-Erkennung:** Kopf-Steckbrief und SystemÃ¼bersicht filtern virtuelle Display-Treiber (Virtual Desktop Monitor, Parsec, spacedesk, IddSampleDriver, Remote Desktop) aus und bevorzugen automatisch reale dedizierte Grafikkarten (dGPU, z. B. Radeon RX 6800) bzw. reale Hardware-Beschleuniger vor virtuellen Adaptern.
+* **Benchmark-StabilitÃ¤t & Hintergrundlast:** Der Mehrkern-Skalierungsbefund stuft LeistungsabfÃ¤lle bei erkannter Grundlast (> 15 % CPU oder aktive Hintergrunddienste) sachlich als INFO statt als Warnung ein.
+* **Zeichensatz- und Mojibake-Bereinigung:** Beseitigung sÃ¤mtlicher doppelter UTF-8-Kodierungen in HTML-Berichten (Add-BenchResult: LÃ¤ufen, rÃ¼heren LÃ¤ufen), Systemvergleichs-Bausteinen und Dashboard-Diagrammen. Robuste Unicode-Escape-Sequenzen fÃ¼r KPI-Delta-Pfeile (â†‘, â†“, â†’).
+
 ## v3.87 (2026-10-29)
 
 ### Neu

@@ -1,4 +1,4 @@
-﻿#region ---------- GrundgerÃ¼st und Auswahl ----------
+﻿#region ---------- Grundgerüst und Auswahl ----------
 $ErrorActionPreference = 'Continue'
 $StartTime = Get-Date
 $script:Inv = [Globalization.CultureInfo]::InvariantCulture
@@ -26,11 +26,11 @@ $script:PsuRating  = $activePsuRating
 
 function Split-List([string]$Text) { @(([string]$Text) -split '[,;]+' | ForEach-Object { $_.Trim() } | Where-Object { $_ }) }
 
-# Module laut Modulvertrag; unbekannte Namen werden gemeldet und Ã¼bergangen
+# Module laut Modulvertrag; unbekannte Namen werden gemeldet und übergangen
 $modRes   = Resolve-ModuleList $Module
 $modList  = @($modRes.Module | ForEach-Object { $_.ToLowerInvariant() })
 if (-not $modList.Count) { $modList = @('diagnose') }
-foreach ($u in $modRes.Unbekannt) { Write-Warning ('Unbekanntes Modul wird Ã¼bergangen: {0}' -f $u) }
+foreach ($u in $modRes.Unbekannt) { Write-Warning ('Unbekanntes Modul wird übergangen: {0}' -f $u) }
 $ModDiag  = $modList -contains 'diagnose'
 $ModBench = $modList -contains 'benchmark'
 $ModLast  = $modList -contains 'lasttest'
@@ -41,7 +41,7 @@ if ($modList -contains 'sensoren') { $SensorLive = $true }
 if ($AnalyzeLastRun) { $ModDiag = $true; $ModBench = $false; $ModLast = $false; $ModRep = $false; $ModOpt = $false }
 if ($Umzug) { $ModDiag = $false; $ModBench = $false; $ModLast = $false; $ModRep = $false; $ModOpt = $false }
 
-# Diagnose: Profil und PrÃ¼fungen
+# Diagnose: Profil und Prüfungen
 $profKey  = ([string]$DiagProfil).ToLowerInvariant()
 $Kurztest = $profKey -like 'funktion*'
 $Quick    = $Kurztest -or $profKey -like 'schnell*'
@@ -82,16 +82,16 @@ $repList = @(Split-List $(if ($Wartung) { $Wartung } else { $Reparaturen }))
 $script:RepSel = @($script:RepOrder | Where-Object { $repList -contains $_ })
 if ($ModRep -and -not $script:RepSel.Count) { $ModRep = $false }
 
-# Optimierung (ab v2.8): EintrÃ¤ge aus dem Katalog in Katalogreihenfolge
+# Optimierung (ab v2.8): Einträge aus dem Katalog in Katalogreihenfolge
 $script:OptSelIds = @(); $script:OptUnknown = @()
 if ($ModOpt) {
     $optRes = Resolve-OptSelection $Optimierungen
     $script:OptSelIds = @($optRes.Ids); $script:OptUnknown = @($optRes.Unbekannt)
-    foreach ($u in $optRes.Unbekannt) { Write-Warning ('Unbekannter Eintrag der Optimierung wird Ã¼bergangen: {0}' -f $u) }
+    foreach ($u in $optRes.Unbekannt) { Write-Warning ('Unbekannter Eintrag der Optimierung wird übergangen: {0}' -f $u) }
     if (-not $script:OptSelIds.Count) { $ModOpt = $false }
 }
 
-# HÃ¶chste Risikostufe dieses Laufs (steht im Bericht); Benchmark und Lasttest verÃ¤ndern nichts, der PawnIO-Treiber ist ein Eingriff
+# Höchste Risikostufe dieses Laufs (steht im Bericht); Benchmark und Lasttest verändern nichts, der PawnIO-Treiber ist ein Eingriff
 function Get-RunRisk {
     $lv = @('Lesen')
     if ($ModDiag -and -not $AnalyzeLastRun) {
@@ -100,13 +100,13 @@ function Get-RunRisk {
     }
     if ($ModRep) { $lv += @($script:RepSel | ForEach-Object { $script:RepRisk[$_] }) }
     if ($ModOpt) { $lv += @($script:OptSelIds | ForEach-Object { (Get-OptEntry $_).Risiko }) }
-    # PawnIO zÃ¤hlt nur, wenn der Treiber in diesem Lauf tatsÃ¤chlich installiert wurde
+    # PawnIO zählt nur, wenn der Treiber in diesem Lauf tatsächlich installiert wurde
     if ($script:PawnIoInstalledRun) { $lv += (Get-ModuleStep 'Sensoren' 'Treiber').Risiko }
     if ($script:GpuPrefChanged) { $lv += (Get-ModuleStep 'Benchmark' 'GpuWahl').Risiko }
     return (Get-MaxRisk $lv)
 }
 
-# Abschnitte abschalten, z. B. wenn der letzte Lauf dabei abgestÃ¼rzt ist
+# Abschnitte abschalten, z. B. wenn der letzte Lauf dabei abgestürzt ist
 function Disable-Step([string]$Key) {
     $p = $Key -split ':', 2
     switch ($p[0]) {
@@ -117,7 +117,7 @@ function Disable-Step([string]$Key) {
         'Opt8'  { $script:OptSelIds = @($script:OptSelIds | Where-Object { (Get-OptEntry $_).Kat -ne $p[1] }) }
     }
 }
-# Zahl der Schritte, die dieser Lauf ausfÃ¼hren soll (PrÃ¼fungen, Messungen, Lasttest, Reparaturen)
+# Zahl der Schritte, die dieser Lauf ausführen soll (Prüfungen, Messungen, Lasttest, Reparaturen)
 function Get-EnabledStepCount {
     $n = 0
     if ($ModDiag) { $n += @($script:Opt.Keys | Where-Object { $script:Opt[$_] }).Count; if (-not $n) { $n = 1 } }
@@ -141,7 +141,7 @@ function Test-StepEnabled([string]$Key) {
 }
 
 if (-not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $SensorLive -and -not $SensorWerkzeugeHolen -and -not $SensorAufraeumen -and -not $OptimierungZustand -and -not $OptWerkzeugeHolen -and -not $SoftwareInstallieren -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardModus -and -not $DashboardSysteme -and -not $MedianAktualisieren -and -not $Umzug) {
-    # Berichte landen ausschlieÃŸlich im Datenordner neben dem Programm (z. B. auf dem USB-Stick)
+    # Berichte landen ausschließlich im Datenordner neben dem Programm (z. B. auf dem USB-Stick)
     if (-not $OutputDir) {
         $base = $(if ($script:DataDir) { Join-Path $script:DataDir 'Berichte' } else { Join-Path $env:TEMP 'LeosMinibench-Berichte' })
         $OutputDir = Join-Path $base ('{0}_{1}' -f $env:COMPUTERNAME, (Get-Date -Format 'yyyyMMdd_HHmm'))
@@ -155,13 +155,13 @@ if (-not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $S
     New-Item -ItemType Directory -Path $RawDir -Force | Out-Null
     try { $script:GuiLog = New-Object IO.StreamWriter((Join-Path $RawDir 'Konsole.log'), $false, (New-Object Text.UTF8Encoding($true))); $script:GuiLog.AutoFlush = $true } catch { }
     # @@ORDNER|Berichtsordner|Arbeitsordner (ab v2.65): Endet der Lauf ohne Bericht oder wird er abgebrochen, legt die
-    # OberflÃ¤che ihr Protokoll und die Rohdaten aus dem Arbeitsordner in den Berichtsordner (sonst bleibt er leer)
+    # Oberfläche ihr Protokoll und die Rohdaten aus dem Arbeitsordner in den Berichtsordner (sonst bleibt er leer)
     Send-GuiEvent 'ORDNER' $OutputDir $(if ($script:WorkDir) { $script:WorkDir } else { '' })
 }
 
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
 
-# Konsolenprogramme schreiben in der OEM-Codepage (850), unabhÃ¤ngig von der Konsole des Arbeitsprozesses
+# Konsolenprogramme schreiben in der OEM-Codepage (850), unabhängig von der Konsole des Arbeitsprozesses
 try   { $script:OemEnc = [Text.Encoding]::GetEncoding([Globalization.CultureInfo]::CurrentCulture.TextInfo.OEMCodePage) } catch { $script:OemEnc = [Text.Encoding]::Default }
 
 
@@ -178,7 +178,7 @@ $script:BenchResults  = [System.Collections.Generic.List[object]]::new()
 $script:BenchNew      = New-Object System.Collections.ArrayList
 $script:BenchHistory  = @()
 $script:LoadSeries    = @()
-# ab v2.7: Sensoren wÃ¤hrend des Benchmarks (Messpunkte und Kennzahlen je Abschnitt)
+# ab v2.7: Sensoren während des Benchmarks (Messpunkte und Kennzahlen je Abschnitt)
 $script:BenchSeries     = @()
 $script:BenchSensorRows = @()
 $script:LoadSummary   = ''
@@ -220,11 +220,11 @@ function Add-Private([string]$Value, [string]$Kind) {
 function Get-ModeLabel {
     if ($AnalyzeLastRun) { return 'Nur Absturzanalyse' }
     $p = @()
-    if ($ModDiag) { $p += ('Diagnose ({0})' -f $(if ($Kurztest) { 'Funktionstest' } elseif ($DiagOptionen -and $profKey -like 'benutzer*') { 'benutzerdefiniert' } elseif ($Quick) { 'schnell' } else { 'vollstÃ¤ndig' })) }
+    if ($ModDiag) { $p += ('Diagnose ({0})' -f $(if ($Kurztest) { 'Funktionstest' } elseif ($DiagOptionen -and $profKey -like 'benutzer*') { 'benutzerdefiniert' } elseif ($Quick) { 'schnell' } else { 'vollständig' })) }
     if ($ModBench) { $p += ('Benchmark ({0}{1})' -f ((@($script:BenchSel.Keys | Where-Object { $script:BenchSel[$_] } | Sort-Object) -join ', ')), $(if ($BenchmarkKurz) { ', kurz' } else { '' })) }
     if ($ModLast) { $p += ('Lasttest ({0})' -f ((@($script:LastPlan.Keys | Where-Object { $script:LastPlan[$_] -gt 0 } | ForEach-Object { '{0} {1} Min.' -f $_, $script:LastPlan[$_] }) -join ', '))) }
     if ($ModRep) { $p += ('Reparatur ({0})' -f ($script:RepSel -join ', ')) }
-    if ($ModOpt) { $p += ('Optimierung ({0} EintrÃ¤ge)' -f $script:OptSelIds.Count) }
+    if ($ModOpt) { $p += ('Optimierung ({0} Einträge)' -f $script:OptSelIds.Count) }
     $t = ($p -join ' + ')
     if ($SchnellerModus -and $ModDiag) { $t += ', schneller Modus' }
     return $t
@@ -257,7 +257,7 @@ function Show-Overall([string]$Status) {
 
 function Show-Sub([string]$Activity, [string]$Status = ' ', [int]$Percent = -1) {
     if (-not $Status) { $Status = ' ' }
-    # schneller Modus: fertige HintergrundprÃ¼fungen abholen und wartende starten (hÃ¶chstens alle 500 ms)
+    # schneller Modus: fertige Hintergrundprüfungen abholen und wartende starten (höchstens alle 500 ms)
     if ($script:BgJobs -and $script:BgJobs.Count) { try { Update-BgJobs } catch { } }
     Write-Heartbeat ('{0} | {1}' -f $Activity, $Status.Trim())
     Send-GuiEvent 'SUB' $Percent $Activity $Status
@@ -293,7 +293,7 @@ function Get-Median($Values) {
 }
 
 # CPU-Messpunkt: Takt wie im Task-Manager (Nenntakt x % Prozessorleistung / 100), Last, Frequenzgrenze, ACPI-Temperatur.
-# Bevorzugt Ã¼ber PDH (DiagPdh, Mittel seit dem letzten Aufruf wie im Task-Manager), sonst Ã¼ber die WMI-Leistungsdaten.
+# Bevorzugt über PDH (DiagPdh, Mittel seit dem letzten Aufruf wie im Task-Manager), sonst über die WMI-Leistungsdaten.
 function Get-CpuSample {
     $tz = @(Get-CimInstance Win32_PerfFormattedData_Counters_ThermalZoneInformation -ErrorAction SilentlyContinue)
     $temp = $null
@@ -335,7 +335,7 @@ function Wait-TaskProgress($Task, [string]$Activity, [string]$Status, [int]$Expe
         Show-Sub $Activity $Status ([int][math]::Min(99.0, [double]$sw.ElapsedMilliseconds * 100.0 / [math]::Max(1.0, [double]$ExpectedMs)))
         $cs = $null
         if ($Sample -and $sw.ElapsedMilliseconds -gt 800) { $cs = Get-CpuSample; [void]$samples.Add($cs) }
-        # ab v2.7: Sensoren des Benchmarks in der Wartepause (nur wenn Start-BenchSensors lief, hÃ¶chstens alle 2 s)
+        # ab v2.7: Sensoren des Benchmarks in der Wartepause (nur wenn Start-BenchSensors lief, höchstens alle 2 s)
         if ($script:BenchSens -and $script:BenchSens.On -and $sw.ElapsedMilliseconds -gt 800) { Add-BenchSensorSample $cs }
         Start-Sleep -Milliseconds 300
     }
@@ -374,7 +374,7 @@ function Write-BenchError([string]$Part, $Err) {
     $msg = $(if ($Err.Exception) { $Err.Exception.Message } else { [string]$Err })
     $line = $(if ($Err.InvocationInfo) { $Err.InvocationInfo.ScriptLineNumber } else { '?' })
     Add-Line ('  {0}: Messung fehlgeschlagen (Zeile {1}): {2}' -f $Part, $line, $msg)
-    Add-Finding INFO 'Leistung' ('Benchmark {0} konnte nicht ausgefÃ¼hrt werden: {1}' -f $Part, $msg)
+    Add-Finding INFO 'Leistung' ('Benchmark {0} konnte nicht ausgeführt werden: {1}' -f $Part, $msg)
     Write-Checkpoint 'FEHLER' ('Benchmark {0}: {1} (Zeile {2})' -f $Part, $msg, $line)
 }
 
@@ -382,7 +382,7 @@ function Add-BenchResult {
     param([string]$Komponente, [string]$Messung, [double]$Wert, [string]$Einheit, [string]$Anzeige, $Index = $null,
           [string]$Status = 'OK', [string]$Hinweis = '', [string]$Key = '', [switch]$LowerBetter,
           [string]$Gruppe = '', [string]$RefKey = '', [switch]$NoGui, [switch]$PassThru)
-    if (-not $Gruppe) { $Gruppe = $(if ($Komponente -eq 'DatentrÃ¤ger') { 'Laufwerke' } else { $Komponente }) }
+    if (-not $Gruppe) { $Gruppe = $(if ($Komponente -eq 'Datenträger') { 'Laufwerke' } else { $Komponente }) }
     $cmp = ''
     if ($Key) {
         $prev = @($script:BenchHistory | ForEach-Object { if ([bool]$_.Kurz -eq [bool]$BenchmarkKurz) { $_.Werte } } |
@@ -392,14 +392,14 @@ function Add-BenchResult {
             if ($med -gt 0) {
                 $d = ($Wert - $med) / $med * 100
                 if ($LowerBetter) { $d = -$d }
-                $cmp = $(if ($prev.Count -eq 1) { '{0:+0;-0;0} % zum letzten Lauf' -f $d } else { '{0:+0;-0;0} % zu {1} LÃ¤ufen' -f $d, $prev.Count })
+                $cmp = $(if ($prev.Count -eq 1) { '{0:+0;-0;0} % zum letzten Lauf' -f $d } else { '{0:+0;-0;0} % zu {1} Läufen' -f $d, $prev.Count })
                 if ($d -le -15) {
                     # Lag beim Start schon Grundlast an, ist die Abweichung wahrscheinlich daher: nur Hinweis
-                    if ($script:BenchStartLoad -gt 15) {
-                        Add-Finding INFO 'Leistung' ('{0} {1}: {2:N0} % schlechter als bei frÃ¼heren LÃ¤ufen auf diesem PC ({3} statt Median {4:N1} {5}), vermutlich wegen {6} % Grundlast beim Start. Messung ohne laufende Programme wiederholen.' -f $Komponente, $Messung, [math]::Abs($d), $Anzeige, $med, $Einheit, $script:BenchStartLoad)
+                    if ($script:BenchStartLoad -gt 15 -or $script:AblaufHintergrundlast) {
+                        Add-Finding INFO 'Leistung' ('{0} {1}: {2:N0} % schlechter als bei früheren Läufen auf diesem PC ({3} statt Median {4:N1} {5}), vermutlich wegen {6} % Grundlast beim Start. Messung ohne laufende Programme wiederholen.' -f $Komponente, $Messung, [math]::Abs($d), $Anzeige, $med, $Einheit, [math]::Max(16, $script:BenchStartLoad))
                         if ($Status -eq 'OK') { $Status = 'Info' }
                     } else {
-                        Add-Finding WARNUNG 'Leistung' ('{0} {1}: {2:N0} % schlechter als bei frÃ¼heren LÃ¤ufen auf diesem PC ({3} statt Median {4:N1} {5}).' -f $Komponente, $Messung, [math]::Abs($d), $Anzeige, $med, $Einheit)
+                        Add-Finding WARNUNG 'Leistung' ('{0} {1}: {2:N0} % schlechter als bei früheren Läufen auf diesem PC ({3} statt Median {4:N1} {5}).' -f $Komponente, $Messung, [math]::Abs($d), $Anzeige, $med, $Einheit)
                         if ($Status -eq 'OK' -or $Status -eq 'Info') { $Status = 'Warnung' }
                     }
                 }
@@ -412,7 +412,7 @@ function Add-BenchResult {
     $o = [pscustomobject][ordered]@{ Gruppe = $Gruppe; Komponente = $Komponente; Messung = $Messung; Wert = $Wert; Einheit = $Einheit; Anzeige = $Anzeige; Index = $Index
         Status = $Status; Referenz = $refTxt; RefPct = $refPct; RefKey = $RefKey; Vergleich = $cmp; Hinweis = $Hinweis }
     $script:BenchResults.Add($o)
-    # WinSAT-Werte zeichnet die OberflÃ¤che auf der Skala 1,0 bis 9,9 (Kennung W)
+    # WinSAT-Werte zeichnet die Oberfläche auf der Skala 1,0 bis 9,9 (Kennung W)
     $guiIdx = $(if ($Gruppe -eq 'WinSAT' -and $Wert -gt 0) { 'W' + $Wert.ToString('0.0', $script:Inv) } elseif ($null -ne $Index) { $Index } else { '' })
     if (-not $NoGui) { Send-GuiEvent 'BENCH' $Status $Komponente $Messung $Anzeige $guiIdx $cmp $Hinweis $refTxt $Gruppe }
     if ($PassThru) { return $o }

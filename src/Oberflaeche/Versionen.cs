@@ -11,6 +11,13 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("3.88", "29.10.2026", "Einklappbare Datenbank-Gruppen, Dark-Mode-Kontrast, Startseiten-Layout & Zeichensatz-Korrektur",
+            "â€¢ Einklappbare GerÃ¤tegruppen in der Datenbank: Native Win32-UnterstÃ¼tzung (LVGS_COLLAPSIBLE) mit Windows-Chevrons; Systeme mit mehreren LÃ¤ufen und Referenzsysteme starten standardmÃ¤ÃŸig kompakt eingeklappt; neue Aktionen 'Alle aufklappen / Alle einklappen' in Toolbar und KontextmenÃ¼.\r\n" +
+            "â€¢ Dark-Mode-Kontrast fÃ¼r Gruppen: GruppenkÃ¶pfe der Datenbank-ListView werden im Dark Mode mit hohem Kontrast (>= 7:1) in UI.Accent/UI.Text gerendert (beseitigt unlesbares Windows-Theme-Dunkelblau auf schwarzem Grund).\r\n" +
+            "â€¢ Startseiten-Layout: Kachel 'Letzter Lauf' gegen Textumbruch abgesichert; Befundstatus (lblBef) bricht niemals vertikal oder zeichenweise um; Aktions-SchaltflÃ¤che prÃ¤gnant als 'Dashboard' benannt und Buttons kompakt ausgerichtet.\r\n" +
+            "â€¢ Robuste Hardware-Erkennung: Kopf-Steckbrief und SystemÃ¼bersicht filtern virtuelle Display-Adapter (Virtual Desktop, Parsec, spacedesk, IddSampleDriver, Remote Desktop) aus und zeigen bevorzugt die reale dedizierte Grafikkarte (dGPU, z. B. Radeon RX 6800) bzw. den physischen Grafikbeschleuniger.\r\n" +
+            "â€¢ StabilitÃ¤t des Mehrkern-Benchmarks: Mehrkern-Skalierungsbefund stuft LeistungsabfÃ¤lle bei erkannter Hintergrundlast (> 15 % CPU oder Hintergrunddienste) sachlich als INFO statt als irrefÃ¼hrende Warnung ein.\r\n" +
+            "â€¢ VollstÃ¤ndige Zeichensatz-Bereinigung: Beseitigung aller UTF-8-Doppelkodierungen (Mojibake) in HTML-Diagnoseberichten, Dashboard-Diagrammen und Vergleichsbausteinen; Unicode-Escape-Sequenzen fÃ¼r Pfeilsymbole der Startseiten-KPIs."),
         new Eintrag("3.87", "29.10.2026", "Läufe je Gerät bündeln (Verlauf ohne eigene Seite)",
             "• ListViewGroup-Gruppierung in der Datenbank: Die Datenbank-ListView gruppiert alle Messungen automatisch nach Geräten (Hardware-Signatur über Geraet.Id oder Computername) mit Angabe von Gerätename, Laufanzahl und jüngstem Messdatum. Referenzprofile sind am Listenende in einer geschlossenen Gruppe gebündelt. Volle Farbschema-Unterstützung (Hell/Dunkel) ohne Kontrastfehler.\r\n" +
             "• Verlauf-Aktionen in Datenbank & Startseite: Neue Schaltfläche 'Verlauf' sowie Kontextmenüeintrag 'Geräte-Verlauf im Dashboard öffnen' in der Datenbankansicht; Kachel 'Letzter Lauf' auf der Startseite mit 'Verlauf'-Button und kompakten Trend-Pfeilen (↑ +X %, ↓ -X %) für die 4 Kern-KPIs (Gesamt, CPU Mehrkern, RAM Lesen, Grafik) gegen den direkten Vorläufer desselben PCs.\r\n" +

@@ -63,10 +63,217 @@ public partial class DiagGui
         }
     }
 
+    class DbListView : ListView
+    {
+        [StructLayout(LayoutKind.Sequential)]
+        public struct LVGROUP
+        {
+            public uint cbSize;
+            public uint mask;
+            [MarshalAs(UnmanagedType.LPWStr)] public string pszHeader;
+            public int cchHeader;
+            [MarshalAs(UnmanagedType.LPWStr)] public string pszFooter;
+            public int cchFooter;
+            public int iGroupId;
+            public uint stateMask;
+            public uint state;
+            public uint uAlign;
+            [MarshalAs(UnmanagedType.LPWStr)] public string pszSubtitle;
+            public uint cchSubtitle;
+            [MarshalAs(UnmanagedType.LPWStr)] public string pszTask;
+            public uint cchTask;
+            [MarshalAs(UnmanagedType.LPWStr)] public string pszDescriptionTop;
+            public uint cchDescriptionTop;
+            [MarshalAs(UnmanagedType.LPWStr)] public string pszDescriptionBottom;
+            public uint cchDescriptionBottom;
+            public int iTitleImage;
+            public int iExtendedImage;
+            public int iFirstItem;
+            public uint cItems;
+            [MarshalAs(UnmanagedType.LPWStr)] public string pszSubsetTitle;
+            public uint cchSubsetTitle;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct RECT { public int left, top, right, bottom; }
+
+        public const int LVM_FIRST = 0x1000;
+        public const int LVM_SETGROUPINFO = LVM_FIRST + 147;
+        public const int LVM_GETGROUPRECT = LVM_FIRST + 98;
+        public const int LVM_GETGROUPSTATE = LVM_FIRST + 92;
+        public const uint LVGF_STATE = 0x00000004;
+        public const uint LVGS_COLLAPSED = 0x00000001;
+        public const uint LVGS_COLLAPSIBLE = 0x00000008;
+        public const int LVGGR_LABEL = 2;
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        public static extern int SendMessage(IntPtr hWnd, int msg, int wParam, ref LVGROUP lParam);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        public static extern int SendMessage(IntPtr hWnd, int msg, int wParam, ref RECT lParam);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        public static extern int SendMessage(IntPtr hWnd, int msg, int wParam, int lParam);
+
+        static PropertyInfo groupPropId = typeof(ListViewGroup).GetProperty("ID", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        public event EventHandler GroupStateChanged;
+
+        public DbListView()
+        {
+            DoubleBuffered = true;
+        }
+
+        public static int GetGroupId(ListViewGroup g)
+        {
+            if (g == null || groupPropId == null) return -1;
+            try { return (int)groupPropId.GetValue(g, null); } catch { return -1; }
+        }
+
+        public void SetGroupState(ListViewGroup g, bool collapsible, bool collapsed)
+        {
+            if (Environment.OSVersion.Platform != PlatformID.Win32NT) return;
+            if (!IsHandleCreated) { IntPtr h = Handle; }
+            int id = GetGroupId(g);
+            if (id < 0) return;
+            try
+            {
+                LVGROUP grp = new LVGROUP();
+                grp.cbSize = (uint)Marshal.SizeOf(typeof(LVGROUP));
+                grp.mask = LVGF_STATE;
+                grp.stateMask = LVGS_COLLAPSIBLE | LVGS_COLLAPSED;
+                uint state = 0;
+                if (collapsible) state |= LVGS_COLLAPSIBLE;
+                if (collapsed) state |= LVGS_COLLAPSED;
+                grp.state = state;
+                SendMessage(Handle, LVM_SETGROUPINFO, id, ref grp);
+            }
+            catch { }
+        }
+
+        public bool IsGroupCollapsed(ListViewGroup g)
+        {
+            if (Environment.OSVersion.Platform != PlatformID.Win32NT) return false;
+            if (!IsHandleCreated) return false;
+            int id = GetGroupId(g);
+            if (id < 0) return false;
+            try
+            {
+                int state = SendMessage(Handle, LVM_GETGROUPSTATE, id, (int)LVGS_COLLAPSED);
+                return (state & (int)LVGS_COLLAPSED) != 0;
+            }
+            catch { return false; }
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            base.OnMouseUp(e);
+            if (GroupStateChanged != null) GroupStateChanged(this, EventArgs.Empty);
+        }
+
+        protected override void OnKeyUp(KeyEventArgs e)
+        {
+            base.OnKeyUp(e);
+            if (GroupStateChanged != null) GroupStateChanged(this, EventArgs.Empty);
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            base.WndProc(ref m);
+            // Repaint group headers in Dark Mode with high contrast
+            if (m.Msg == 0x000F && UI.IsDark && Groups.Count > 0 && Environment.OSVersion.Platform == PlatformID.Win32NT)
+            {
+                PaintGroupHeadersDark();
+            }
+        }
+
+        void PaintGroupHeadersDark()
+        {
+            try
+            {
+                Rectangle client = ClientRectangle;
+                using (Graphics g = Graphics.FromHwnd(Handle))
+                using (SolidBrush bgBrush = new SolidBrush(BackColor))
+                using (Font f = new Font("Segoe UI Semibold", 9.25f))
+                {
+                    foreach (ListViewGroup grp in Groups)
+                    {
+                        int id = GetGroupId(grp);
+                        if (id < 0) continue;
+                        RECT rc = new RECT();
+                        rc.top = LVGGR_LABEL;
+                        if (SendMessage(Handle, LVM_GETGROUPRECT, id, ref rc) != 0)
+                        {
+                            if (rc.right > rc.left && rc.bottom > rc.top)
+                            {
+                                if (rc.bottom <= client.Top || rc.top >= client.Bottom) continue;
+                                Rectangle r = new Rectangle(rc.left - 2, rc.top, (rc.right - rc.left) + 6, (rc.bottom - rc.top) + 2);
+                                r.Intersect(client);
+                                if (r.Width > 0 && r.Height > 0)
+                                {
+                                    g.FillRectangle(bgBrush, r);
+                                    Color textCol = (grp.Name == "REF") ? UI.Text : UI.Accent;
+                                    TextRenderer.DrawText(g, grp.Header, f, r, textCol, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+    }
+
+    void SetAllGroupsCollapsed(bool collapse)
+    {
+        DbListView dlv = lvDb as DbListView;
+        if (dlv == null || lvDb == null) return;
+        lvDb.BeginUpdate();
+        foreach (ListViewGroup g in lvDb.Groups)
+        {
+            dlv.SetGroupState(g, true, collapse);
+        }
+        lvDb.EndUpdate();
+        UpdateToggleGroupsButton();
+    }
+
+    void ToggleAllGroups()
+    {
+        DbListView dlv = lvDb as DbListView;
+        if (dlv == null || lvDb == null) return;
+        bool anyCollapsed = false;
+        foreach (ListViewGroup g in lvDb.Groups)
+        {
+            if (dlv.IsGroupCollapsed(g)) { anyCollapsed = true; break; }
+        }
+        SetAllGroupsCollapsed(!anyCollapsed);
+    }
+
+    void UpdateToggleGroupsButton()
+    {
+        if (btnToggleGroups == null) return;
+        DbListView dlv = lvDb as DbListView;
+        if (dlv == null || lvDb == null || lvDb.Groups.Count == 0)
+        {
+            btnToggleGroups.Enabled = false;
+            btnToggleGroups.Text = "Alle aufklappen";
+            Tip(btnToggleGroups, "Klappt alle Gerätegruppen in der Datenbank ein oder aus.");
+            return;
+        }
+        btnToggleGroups.Enabled = true;
+        bool anyCollapsed = false;
+        foreach (ListViewGroup g in lvDb.Groups)
+        {
+            if (dlv.IsGroupCollapsed(g)) { anyCollapsed = true; break; }
+        }
+        btnToggleGroups.Text = anyCollapsed ? "Alle aufklappen" : "Alle einklappen";
+        Tip(btnToggleGroups, anyCollapsed ? "Klappt alle Gerätegruppen in der Datenbank auf." : "Klappt alle Gerätegruppen in der Datenbank ein.");
+    }
+
     int dbSortCol = -1;
     bool dbSortAsc = true;
     Button btnRename;
-    Button btnCompare, btnDashboard, btnVerlauf, btnDelete, btnOpenReport, btnExport, btnSetRef;
+    Button btnCompare, btnDashboard, btnVerlauf, btnDelete, btnOpenReport, btnExport, btnSetRef, btnToggleGroups;
 
     void OnDbColumnClick(object sender, ColumnClickEventArgs e)
     {
@@ -167,7 +374,9 @@ public partial class DiagGui
         Tip(open, "Öffnet den Datenordner (Berichte, Datenbank, Tools, Archiv).");
         Button btnNas = UI.Secondary("Netzlaufwerk ..."); btnNas.Margin = new Padding(UI.S(8), 0, 0, 0); btnNas.Click += delegate { ShowConnectNasDialog(); };
         Tip(btnNas, "Richtet ein Netzlaufwerk (NAS) als Spiegel der Berichte und der Datenbank ein oder entfernt es. Gearbeitet wird immer auf dem Stick.");
-        topTools.Controls.Add(imp); topTools.Controls.Add(btnDbClean); topTools.Controls.Add(rel); topTools.Controls.Add(open); topTools.Controls.Add(btnNas);
+        btnToggleGroups = UI.Secondary("Alle aufklappen"); btnToggleGroups.Margin = new Padding(UI.S(8), 0, 0, 0); btnToggleGroups.Click += delegate { ToggleAllGroups(); };
+        Tip(btnToggleGroups, "Klappt alle GerÃ¤tegruppen in der Datenbank ein oder aus.");
+        topTools.Controls.Add(imp); topTools.Controls.Add(btnToggleGroups); topTools.Controls.Add(btnDbClean); topTools.Controls.Add(rel); topTools.Controls.Add(open); topTools.Controls.Add(btnNas);
         top.Controls.Add(topTools);
 
         FlowLayoutPanel bottom = new FlowLayoutPanel(); bottom.FlowDirection = FlowDirection.TopDown; bottom.WrapContents = false; bottom.AutoSize = true; bottom.BackColor = UI.Panel; bottom.Dock = DockStyle.Bottom;
@@ -209,7 +418,9 @@ public partial class DiagGui
         lblDbClean.Margin = new Padding(UI.S(4), UI.S(8), UI.S(4), 0); bottom.Controls.Add(lblDbClean);
         bottom.Resize += delegate { lblDbClean.MaximumSize = new Size(Math.Max(UI.S(200), bottom.ClientSize.Width - UI.S(10)), 0); };
 
-        lvDb = new ListView(); lvDb.View = View.Details; lvDb.FullRowSelect = true; lvDb.CheckBoxes = true; lvDb.Dock = DockStyle.Fill; lvDb.BorderStyle = BorderStyle.FixedSingle; lvDb.HideSelection = false; lvDb.ShowItemToolTips = true;
+        DbListView dlv = new DbListView();
+        dlv.GroupStateChanged += delegate { UpdateToggleGroupsButton(); };
+        lvDb = dlv; lvDb.View = View.Details; lvDb.FullRowSelect = true; lvDb.CheckBoxes = true; lvDb.Dock = DockStyle.Fill; lvDb.BorderStyle = BorderStyle.FixedSingle; lvDb.HideSelection = false; lvDb.ShowItemToolTips = true;
         EnableDarkListView(lvDb);
         string[] cols = new string[] { "System", "Datum", "Gesamt", "Prozessor", "Grafik", "Arbeitsspeicher", "CPU Mehrkern", "RAM Lesen", "GPU", "Befunde K/W/I" };
         int[] w = new int[] { UI.S(135), UI.S(95), UI.S(65), UI.S(125), UI.S(115), UI.S(105), UI.S(80), UI.S(70), UI.S(70), UI.S(62) };
@@ -231,6 +442,9 @@ public partial class DiagGui
         MenuItem miSetRef = new MenuItem("Als Referenz festlegen (persistent)", delegate { SetSelectedAsReference(); });
         MenuItem miDashboardBase = new MenuItem("Als Basis im Dashboard öffnen (temporär)", delegate { OpenDashboardWithBase(); });
         MenuItem miSep1 = new MenuItem("-");
+        MenuItem miExpandAll = new MenuItem("Alle aufklappen", delegate { SetAllGroupsCollapsed(false); });
+        MenuItem miCollapseAll = new MenuItem("Alle einklappen", delegate { SetAllGroupsCollapsed(true); });
+        MenuItem miSep3 = new MenuItem("-");
         MenuItem miRename = new MenuItem("Name ändern ...", delegate { RenameSelectedEntry(); });
         MenuItem miOpen = new MenuItem("Bericht öffnen", delegate { if (lvDb.SelectedItems.Count > 0) OpenEntry((DbEntry)lvDb.SelectedItems[0].Tag); });
         MenuItem miExport = new MenuItem("Lauf exportieren ...", delegate { ExportSelected(); });
@@ -241,12 +455,17 @@ public partial class DiagGui
         cm.MenuItems.Add(miSetRef);
         cm.MenuItems.Add(miDashboardBase);
         cm.MenuItems.Add(miSep1);
+        cm.MenuItems.Add(miExpandAll);
+        cm.MenuItems.Add(miCollapseAll);
+        cm.MenuItems.Add(miSep3);
         cm.MenuItems.Add(miRename);
         cm.MenuItems.Add(miOpen);
         cm.MenuItems.Add(miExport);
         cm.MenuItems.Add(miSep2);
         cm.MenuItems.Add(miDelete);
         cm.Popup += delegate {
+            miExpandAll.Enabled = lvDb.Groups.Count > 0;
+            miCollapseAll.Enabled = lvDb.Groups.Count > 0;
             int selN = lvDb.SelectedItems.Count;
             int chkN = CheckedEntries().Count;
             miDashboard.Enabled = chkN >= 1 || selN >= 1;
@@ -375,6 +594,35 @@ public partial class DiagGui
         }
         if (lvDb.ListViewItemSorter != null) lvDb.Sort();
         lvDb.EndUpdate();
+
+        DbListView dlv = lvDb as DbListView;
+        if (dlv != null)
+        {
+            string curPc = Environment.MachineName;
+            foreach (string k in orderedKeys)
+            {
+                if (!lvGroups.ContainsKey(k)) continue;
+                ListViewGroup g = lvGroups[k];
+                List<DbEntry> entries = grpMap[k];
+                bool isRef = (k == "REF");
+                bool isCurrentPc = false;
+                if (!isRef)
+                {
+                    foreach (DbEntry e in entries)
+                    {
+                        if (String.Equals(e.Computer, curPc, StringComparison.OrdinalIgnoreCase))
+                        {
+                            isCurrentPc = true;
+                            break;
+                        }
+                    }
+                }
+                bool collapse = isRef || (entries.Count > 1) || (!isCurrentPc);
+                dlv.SetGroupState(g, true, collapse);
+            }
+            UpdateToggleGroupsButton();
+        }
+
         if (navDb != null) { navDb.Desc = db.Count + " Systeme, vergleichen und verwalten"; navDb.Invalidate(); }
         UpdateDbButtons();
     }

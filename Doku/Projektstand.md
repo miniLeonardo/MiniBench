@@ -2,7 +2,19 @@
 
 Gemeinsamer Stand fÃƒÂ¼r alle Agenten (Claude, Antigravity). Wird am Ende jeder Version aktualisiert (siehe AGENTS.md).
 
-## Stand: Version 3.87 (29.10.2026)
+## Stand: Version 3.88 (29.10.2026)
+Release-Commit "Release v3.88: Einklappbare Datenbank-Gruppen, Dark-Mode-Kontrast, Startseiten-Layout & Zeichensatz-Korrektur" auf https://github.com/miniLeonardo/MiniBench (Zweig main).
+Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.
+
+Inhalt von 3.88 (Einzelheiten in Doku\Ã„nderungen_v3.88.txt):
+1. Einklappbare GerÃ¤tegruppen in der Datenbank: Native Win32-UnterstÃ¼tzung (LVGS_COLLAPSIBLE) mit Windows-Chevrons; Systeme mit mehreren LÃ¤ufen und Referenzsysteme starten standardmÃ¤ÃŸig kompakt eingeklappt; neue Aktionen 'Alle aufklappen / Alle einklappen' in Toolbar und KontextmenÃ¼.
+2. Dark-Mode-Kontrast fÃ¼r GruppenkÃ¶pfe: GruppenkÃ¶pfe der Datenbank-ListView werden im Dark Mode mit hohem Kontrast (>= 7:1) in UI.Accent/UI.Text gerendert (beseitigt unlesbares Windows-Theme-Dunkelblau auf schwarzem Grund).
+3. Startseiten-Layout: Kachel 'Letzter Lauf' gegen Textumbruch abgesichert; Befundstatus (lblBef) bricht niemals vertikal oder zeichenweise um; Aktions-SchaltflÃ¤che prÃ¤gnant als 'Dashboard' benannt und Buttons kompakt ausgerichtet.
+4. Robuste Hardware-Erkennung: Kopf-Steckbrief und SystemÃ¼bersicht filtern virtuelle Display-Adapter (Virtual Desktop, Parsec, spacedesk, IddSampleDriver, Remote Desktop) aus und zeigen bevorzugt die reale dedizierte Grafikkarte (dGPU, z. B. Radeon RX 6800) bzw. den physischen Grafikbeschleuniger.
+5. StabilitÃ¤t des Mehrkern-Benchmarks: Mehrkern-Skalierungsbefund stuft LeistungsabfÃ¤lle bei erkannter Hintergrundlast (> 15 % CPU oder Hintergrunddienste) sachlich als INFO statt als irrefÃ¼hrende Warnung ein.
+6. VollstÃ¤ndige Zeichensatz-Bereinigung: Beseitigung aller UTF-8-Doppelkodierungen (Mojibake) in HTML-Diagnoseberichten, Dashboard-Diagrammen und Vergleichsbausteinen; Unicode-Escape-Sequenzen fÃ¼r Pfeilsymbole der Startseiten-KPIs.
+
+## Vorher: Version 3.87 (29.10.2026)
 Release-Commit "Release v3.87: Läufe je Gerät bündeln (Verlauf ohne eigene Seite)" (Commit a08b906) auf https://github.com/miniLeonardo/MiniBench (Zweig main).
 Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.
 
@@ -168,4 +180,4 @@ Inhalt von 3.64 (Einzelheiten in Doku\Ãƒâ€žnderungen_v3.64.txt):
 Keine offenen Befunde.
 
 ## Letzter Commit
-Release-Commit v3.87 (Commit a08b906)
+Release-Commit v3.88: Einklappbare Datenbank-Gruppen, Dark-Mode-Kontrast, Startseiten-Layout & Zeichensatz-Korrektur

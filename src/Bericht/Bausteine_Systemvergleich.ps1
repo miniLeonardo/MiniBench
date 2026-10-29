@@ -344,7 +344,7 @@ function New-CompareReport([string[]]$Paths) {
     return $file
 }
 
-# Ermittelt Verlaufsdaten fÃ¼r dasselbe GerÃ¤t aus frÃ¼heren Läufen der Datenbank
+# Ermittelt Verlaufsdaten für dasselbe Gerät aus früheren Läufen der Datenbank
 function Get-DeviceRunComparison {
     param(
         [object[]]$Entries = @(),
@@ -393,7 +393,7 @@ function Get-DeviceRunComparison {
         $days = [math]::Max(0.0, [math]::Round(($cDt - $pDt).TotalDays, 1))
     } catch { }
 
-    # 1. Inventar-Ã„nderungen ermitteln
+    # 1. Inventar-Änderungen ermitteln
     $diffs = [System.Collections.Generic.List[object]]::new()
     $curBios = $(if ($script:Facts -and $script:Facts.Contains('BIOS/UEFI')) { [string]$script:Facts['BIOS/UEFI'] } else { '' })
     $prevBios = $(if ($prev.Hardware -and $prev.Hardware.BiosVersion) { [string]$prev.Hardware.BiosVersion } elseif ($prev.Hardware -and $prev.Hardware.BIOS) { [string]$prev.Hardware.BIOS } else { '' })
@@ -541,7 +541,7 @@ function Get-DeviceRunComparison {
                 $fObj = [pscustomobject]@{
                     Level = 'WARNUNG'
                     Area  = 'Kühlung'
-                    Text  = ('CPU unter gleicher Last {0:N0} K wärmer als im vorherigen Verlauf: Kühlung/WÃ¤rmeleitpaste prüfen' -f [math]::Round($deltaT))
+                    Text  = ('CPU unter gleicher Last {0:N0} K wärmer als im vorherigen Verlauf: Kühlung/Wärmeleitpaste prüfen' -f [math]::Round($deltaT))
                 }
                 $trendFindings.Add($fObj)
                 if (Get-Command 'Add-Finding' -ErrorAction SilentlyContinue) {
@@ -565,7 +565,7 @@ function Get-DeviceRunComparison {
     }
 }
 
-# HTML-Abschnitt "Seit dem letzten Lauf" fÃ¼r den Diagnosebericht
+# HTML-Abschnitt "Seit dem letzten Lauf" für den Diagnosebericht
 function New-RunHistoryHtml {
     $comp = Get-DeviceRunComparison
     if (-not $comp -or -not $comp.HasHistory) { return '' }

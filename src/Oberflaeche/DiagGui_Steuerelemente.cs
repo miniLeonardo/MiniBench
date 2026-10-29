@@ -727,7 +727,7 @@ public class KpiBox : Control
 
         if (!String.IsNullOrEmpty(delta))
         {
-            Color dCol = delta.Contains("â†‘") ? UI.Ok : (delta.Contains("â†“") ? UI.Crit : UI.Muted);
+            Color dCol = delta.IndexOf("\u2191") >= 0 ? UI.Ok : (delta.IndexOf("\u2193") >= 0 ? UI.Crit : UI.Muted);
             using (Font fDelta = new Font("Segoe UI", 7.5f, FontStyle.Bold))
             {
                 Rectangle rDelta = new Rectangle(UI.S(6), Height - UI.S(18), Width - UI.S(12), UI.S(14));

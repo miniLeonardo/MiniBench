@@ -507,5 +507,17 @@ public static class GuiSelbsttest
             Ist(kpi.Width >= UI.S(90), "KpiBox vergrößert");
         }
         Ist(UI.StartGruppenbreite >= 860, "StartGruppenbreite mindestens 860");
+        string[] origGpu = DiagGui.GpuNames;
+        try
+        {
+            DiagGui.GpuNames = new string[] { "Virtual Desktop Monitor", "AMD Radeon RX 6800" };
+            Ist(DiagGui.GetPrimaryGpuName() == "AMD Radeon RX 6800", "GetPrimaryGpuName bevorzugt dGPU vor virtueller GPU");
+            DiagGui.GpuNames = new string[] { "Parsec Virtual Display Adapter", "Intel(R) UHD Graphics 770" };
+            Ist(DiagGui.GetPrimaryGpuName() == "Intel(R) UHD Graphics 770", "GetPrimaryGpuName bevorzugt iGPU vor virtueller GPU");
+        }
+        finally
+        {
+            DiagGui.GpuNames = origGpu;
+        }
     }
 }
