@@ -106,3 +106,4 @@ git log seit dem in Doku\Projektstand.md genannten Commit lesen.
    Keine Testmatrix.
 4. Doku\Projektstand.md aktualisieren (Stand, offene Befunde, Fallstricke, letzter Commit).
 5. Bauen.cmd ausführen (oder Leonardo darum bitten), committet und pusht bei bestandenen Tests automatisch.
+6. GitHub-Release erstellen und LMB.exe hochladen: Nach dem Tagging (vX.Y) das Release auf GitHub via API erstellen und Aktueller Build\LMB.exe als Release-Asset hochladen. Unbedingt auf saubere UTF-8-Kodierung des Releasetextes achten: UTF-8-Bytes explizit per [System.Text.Encoding]::UTF8.GetBytes(...) übertragen, damit Umlaute (ä, ö, ü, ß) und Anführungszeichen auf GitHub fehlerfrei ohne Mojibake (wie Ã¼) dargestellt werden.
