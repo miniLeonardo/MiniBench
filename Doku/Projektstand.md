@@ -180,4 +180,4 @@ Inhalt von 3.64 (Einzelheiten in Doku\Ãƒâ€žnderungen_v3.64.txt):
 Keine offenen Befunde.
 
 ## Letzter Commit
-Release-Commit v3.88: Einklappbare Datenbank-Gruppen, Dark-Mode-Kontrast, Startseiten-Layout & Zeichensatz-Korrektur
+Release-Commit v3.88: Einklappbare Datenbank-Gruppen, Dark-Mode-Kontrast, Startseiten-Layout & Zeichensatz-Korrektur (Commit 16a08c2)
