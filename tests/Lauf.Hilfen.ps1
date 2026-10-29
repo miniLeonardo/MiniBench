@@ -1,4 +1,4 @@
-﻿# Gesamtlauf des Arbeitsprozesses unter PowerShell 7 (auch Linux) mit Attrappen für Windows-Befehle.
+# Gesamtlauf des Arbeitsprozesses unter PowerShell 7 (auch Linux) mit Attrappen für Windows-Befehle.
 #
 # Das Skript wird wie von Bauen.cmd zusammengebaut. Drei Teile werden für den Test ersetzt:
 #   Kern\Adminrechte.ps1   immer Administrator
@@ -12,7 +12,7 @@
 $global:MinibenchLaufVorspann = @'
 #region ---------- TESTVORSPANN (nur im Testlauf) ----------
 $global:__Warp = [TimeSpan]::Zero
-function Start-Sleep { param([Parameter(Position = 0)][double]$Seconds = 0, [int]$Milliseconds = 0) $global:__Warp = $global:__Warp + [TimeSpan]::FromMilliseconds($Seconds * 1000 + $Milliseconds + 5) }
+function Start-Sleep { param([Parameter(Position = 0)][double]$Seconds = 0, [int]$Milliseconds = 0) [Threading.Thread]::Sleep(10); $global:__Warp = $global:__Warp + [TimeSpan]::FromMilliseconds($Seconds * 1000 + $Milliseconds + 5) }
 function Get-Date {
     param([Parameter(Position = 0)]$Date, [string]$Format, [string]$UFormat, [int]$Year, [int]$Month, [int]$Day, [int]$Hour, [int]$Minute, [int]$Second)
     $p = @{}
@@ -91,6 +91,28 @@ function New-MinibenchLaufSkript([string]$Ziel) {
     # Windows-Aufrufe der Testroutinen durch Attrappen ersetzen (SetThreadExecutionState zählt nur mit)
     $cs = $cs -replace '(?s)public static class DiagPower \{.*?\n\}', (Get-Content -Raw (Join-Path $PSScriptRoot 'Daten/Lauf/DiagPower_Attrappe.cs') -Encoding UTF8)
     $cs = $cs -replace 'if \(!GlobalMemoryStatusEx\(ref m\)\) return 0;', 'if (m.dwLength > 0) return 40;'
+    $diagRamAttrappe = @'
+public static class DiagRam {
+    public static volatile int Percent = 100;
+    public static volatile string Phase = "fertig";
+    public static volatile bool Stop = false;
+    public static long Errors = 0;
+    public static long BytesTested = 1048576;
+    public static int MaxThreads = 0;
+    public static bool LowPriority = false;
+    public static Task<string> RunAsync(long targetBytes, int passes) {
+        Percent = 100; Phase = "fertig"; Errors = 0; BytesTested = 1048576;
+        var tcs = new TaskCompletionSource<string>();
+        tcs.SetResult("Getesteter Speicher : 1 MB (1 Block)\r\nUmfang : 1 Durchlaeufe x 7 Muster\r\nDauer : 00:00:00\r\nFehler : 0\r\n");
+        return tcs.Task;
+    }
+    public static string Run(long targetBytes, int passes) {
+        Percent = 100; Phase = "fertig"; Errors = 0; BytesTested = 1048576;
+        return "Getesteter Speicher : 1 MB (1 Block)\r\nUmfang : 1 Durchlaeufe x 7 Muster\r\nDauer : 00:00:00\r\nFehler : 0\r\n";
+    }
+}
+'@
+    $cs = $cs -replace '(?s)public static class DiagRam \{.*?\n\}', $diagRamAttrappe
     # GPU-Rendertest: Klassen GpuAdapter und GpuRun aus Grafiktest.cs, DiagGpu als Attrappe (ohne Direct3D und WinForms)
     $gt = [IO.File]::ReadAllText((Join-Path $global:MinibenchSrcRoot 'Kern/Grafiktest.cs'))
     $cls = $gt.Substring($gt.IndexOf('public class GpuAdapter'), $gt.IndexOf('public static class DiagGpu') - $gt.IndexOf('public class GpuAdapter'))
@@ -110,7 +132,11 @@ function New-MinibenchLaufSkript([string]$Ziel) {
         if ($d -eq 'Kern\Adminrechte.ps1') { if ($prev -ne $d) { $out.Add('$isAdmin = $true') }; $prev = $d; continue }
         if ($isTr) { if ($prev -ne 'TR') { foreach ($l in ($tr -split "`r?`n")) { $out.Add($l) } }; $prev = 'TR'; continue }
         if ($prev -eq '00_Kopf.ps1' -and $d -ne '00_Kopf.ps1') { foreach ($l in ($global:MinibenchLaufVorspann -split "`r?`n")) { $out.Add($l) } }
-        $out.Add(($lines[$i] -replace '\[(System\.)?Management\.ManagementDateTimeConverter\]::ToDmtfDateTime\(', 'ConvertTo-TestDmtf(')); $prev = $d
+        $line = $lines[$i] -replace '\[(System\.)?Management\.ManagementDateTimeConverter\]::ToDmtfDateTime\(', 'ConvertTo-TestDmtf('
+        $line = $line -replace '\$s\s*=\s*New-Object -ComObject Microsoft\.Update\.Session.*', 'return @([pscustomobject]@{ Titel = "Test-Update KB123456"; KB = "123456"; Pflicht = $false; Neustart = $false })'
+        $line = $line -replace 'powercfg\.exe'', \(''/energy /output "\{0\}" /duration 60'' -f \$Html\)', 'cmd.exe'', ''/c echo 0 Fehler, 0 Warnungen, 0 Informationsereignisse'''
+        $line = $line -replace 'powercfg\.exe'', \(''/energy /output "\{0\}" /duration 60'' -f \(Join-Path \$RawDir ''Energiebericht\.html''\)\)', 'cmd.exe'', ''/c echo 0 Fehler, 0 Warnungen, 0 Informationsereignisse'''
+        $out.Add($line); $prev = $d
     }
     [IO.File]::WriteAllText($Ziel, ($out -join "`r`n"), (New-Object Text.UTF8Encoding($true)))
 }
@@ -144,7 +170,7 @@ function Invoke-MinibenchLauf {
     $bericht = ''; $html = ''; $ordner = ''
     if ($done) {
         $parts = $done.Substring(2).Split('|')
-        if ($parts.Count -gt 1 -and (Test-Path -LiteralPath $parts[1])) { $bericht = [IO.File]::ReadAllText($parts[1]) }
+        if ($parts.Count -gt 1 -and $parts[1] -and (Test-Path -LiteralPath $parts[1])) { $bericht = [IO.File]::ReadAllText($parts[1]) }
         if ($parts.Count -gt 2 -and $parts[2] -and (Test-Path -LiteralPath $parts[2])) { $html = [IO.File]::ReadAllText($parts[2]) }
         if ($parts.Count -gt 3) { $ordner = $parts[3] }
     }

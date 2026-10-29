@@ -2,7 +2,19 @@
 
 Gemeinsamer Stand fÃƒÂ¼r alle Agenten (Claude, Antigravity). Wird am Ende jeder Version aktualisiert (siehe AGENTS.md).
 
-## Stand: Version 3.85 (29.10.2026)
+## Stand: Version 3.86 (29.10.2026)
+Release-Commit "Release v3.86: Update-Prüfung, Grafiktreiber-Links, Resizable BAR, geprüfter System-Umzug mit WLAN & Gesamtläufe" (Commit af875cb) auf https://github.com/miniLeonardo/MiniBench (Zweig main).
+Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.
+
+Inhalt von 3.86 (Einzelheiten in Doku\Änderungen_v3.86.txt):
+1. Asynchrone Update-Prüfung & Self-Replace: Lautlose GitHub-Versionsprüfung im Hintergrund mit 24h-Cache; dezenter Badge in der Kopfzeile und Update-Kachel auf der Startseite; Download von LMB.exe nach Minibench-Daten\Update\, SHA-256-Validierung und nahtloser Austausch mit Archivierung nach Minibench-Daten\Archiv\v<alteVersion>\ über Update.cmd; abschaltbar über Einstellungen.
+2. Offizielle Grafiktreiber-Links & Laptop-Hinweis: Direkte Hersteller-Downloadlinks für NVIDIA, AMD und Intel; dedizierte Schnell-behebbar-Karte mit 'Treiber laden'-Schaltfläche bei Treibern älter als 18 Monate; klarer OEM-Hinweis bei Hybridgrafik auf Notebooks; zusätzliche Treiberversions-Gegenprüfung via nvidia-smi.
+3. Resizable BAR / Smart Access Memory Erkennung: Hardwareseitige Erkennung für NVIDIA (BAR1-Speichergröße), AMD und Intel (64-Bit PCI-Speicherfenster über 256 MB); Verifizierung der Plattformunterstützung (RTX 3000+, RX 6000+, Arc / Ryzen 3000+, Intel 10th Gen+); gelbe Diagnosewarnung und interaktiver BIOS-Leitfaden nur bei inaktivem ReBAR auf unterstützter Hardware.
+4. System-Umzug mit WLAN-Profilen: Lautloser Export von WLAN-Profilen per netsh wlan; Klartext-Export von Kennwörtern (key=clear) ausschließlich nach expliziter Bestätigung eines Sicherheitsdialogs; vollautomatischer Import bei Wiederherstellung; strikter Ausschluss bei Anonymisierung und Git-Schutz für Umzugsordner.
+5. Geprüfte Sicherung & Trockenlauf: Robocopy-Differenzabgleich (/L) und SHA-256-Stichprobenprüfung für ca. 20 Dateien je Bibliothek mit detailliertem Pruefprotokoll.txt und Berichtsausweis; interaktiver Trockenlauf (-Trockenlauf) in Wiederherstellen.cmd und Wiederherstellen.ps1 listet alle Aktionen ohne Änderungen auf.
+6. Gesamtläufe in Bauprozess integriert: Veraltete Parameter bereinigt, neue Integrationsfälle für Wartung, Diagnose und System-Umzug ergänzt; verbindliche Ausführung aller Gesamtläufe in Bauen.cmd vor dem Release mit Laufzeitdokumentation in Stand.txt; Reduzierung der Skips von 99 auf 4.
+
+## Vorher: Version 3.85 (29.10.2026)
 Release-Commit "Release v3.85: Sensor-Manifest-Selbstreparatur, lautloser Smartctl-Lifecycle, RTX 5080 Referenz & UI-Standards" (Commit f21b8ad) auf https://github.com/miniLeonardo/MiniBench (Zweig main).
 Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.
 

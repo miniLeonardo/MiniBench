@@ -1,0 +1,92 @@
+﻿LEOS MINIBENCH 3.86: ÄNDERUNGEN
+===============================
+
+Version 3.86 integriert eine lautlose Hintergrund-Updateprüfung mit SHA-256-validiertem Self-Replace
+für LMB.exe, ergänzt direkte Hersteller-Downloadlinks und Notebook-Hinweise für Grafiktreiber, führt eine
+verlässliche Hardware-Erkennung für Resizable BAR (SAM) samt BIOS-Leitfaden ein, sichert beim System-Umzug
+WLAN-Profile und validiert Sicherungen nachweisbar mittels Robocopy-Differenzabgleich, SHA-256-Stichproben
+sowie Restore-Trockenlauf und bindet die Gesamtläufe verbindlich in den Bauprozess ein.
+
+
+1. ASYNCHRONE UPDATE-PRÜFUNG UND SELF-REPLACE
+  Lautlose Prüfung           Beim Start prüft Minibench im Hintergrund asynchron die neueste Version auf
+                             GitHub (api.github.com/repos/miniLeonardo/MiniBench/releases/latest) über TLS 1.2
+                             mit 3 Sekunden Timeout und 24-Stunden-Cache (Cache\UpdateCheck.json).
+                             Keine Telemetrie, bei Verbindungsfehlern völlig still, abschaltbar über Einstellungen.
+  Dezente Signalisierung     Ist eine neuere Version verfügbar, erscheint in der Kopfzeile ein dezenter Badge
+                             „Update verfügbar (vX.Y)“ und auf der Startseite eine Aktionskarte unter „Schnell behebbar“.
+  SHA-256-Validierung        Klick auf „Herunterladen“ lädt LMB.exe nach Minibench-Daten\Update\ und prüft
+                             den SHA-256-Hash gegen die Prüfsummentabelle des Releases. Abweichende Hashes werden
+                             sofort verworfen.
+  Sicherer Austausch         Da die laufende LMB.exe unter Windows gesperrt ist, generiert Minibench ein Skript
+                             Update.cmd: Es wartet auf das Prozessende, verschiebt die bisherige Datei nach
+                             Minibench-Daten\Archiv\v<alteVersion>\LMB.exe, platziert die neue LMB.exe und startet sie neu.
+
+
+2. GRAFIKTREIBER MIT HERSTELLER-LINKS UND NOTEBOOK-HINWEIS
+  Hersteller-Verlinkung      Bei veralteten Grafiktreibern (älter als 18 Monate) verlinken Diagnosebericht und
+                             „Schnell behebbar“ direkt auf die offiziellen Treiberseiten von NVIDIA, AMD bzw. Intel.
+                             Kein unzuverlässiges Web-Scraping.
+  Laptop-Hybridgrafik        Auf Mobilgeräten (Notebooks mit Hybridgrafik) weist Minibench sachlich darauf hin,
+                             dass vorrangig die vom Notebook-Hersteller (OEM) angepassten Treiber empfohlen werden.
+  Versions-Gegenprüfung      Bei NVIDIA-Karten gleicht Minibench die Treiberversion zusätzlich über nvidia-smi ab.
+
+
+3. RESIZABLE BAR / SMART ACCESS MEMORY (SAM) ERKENNUNG
+  Hardware-Erkennung         Erkennung des ReBAR-Status über nvidia-smi (BAR1-Speichergröße im Verhältnis zum
+                             Gesamt-VRAM) sowie für AMD und Intel über 64-Bit PCI-Speicherfenster (> 256 MB).
+  Plattformunterstützung     Warnbefunde erscheinen nur, wenn sowohl GPU (RTX 3000+, RX 6000+, Arc) als auch
+                             CPU/Plattform (AMD Ryzen 3000+ ab 400er-Chipsatz, Intel Core 10th Gen+ ab 400er-Chipsatz)
+                             ReBAR technisch unterstützen. Ältere Plattformen erhalten keinen Fehlalarm.
+  BIOS-Hilfestellung         Ist ReBAR unterstützt, aber deaktiviert, liefert Minibench eine genaue 3-Punkte-Anleitung:
+                             1. Above 4G Decoding aktivieren, 2. Re-Size BAR Support auf Auto/Enabled, 3. CSM deaktivieren.
+
+
+4. SYSTEM-UMZUG MIT WLAN-PROFILEN
+  Export per netsh           Sicherung aller konfigurierten WLAN-Profile über netsh wlan nach Netzwerk\WlanProfile\.
+  Passwort-Schutz            Klartext-Exporte (key=clear) erfolgen ausschließlich nach ausdrücklicher Bestätigung
+                             eines modalen Sicherheitsdialogs mit Warnung vor unverschlüsselter Speicherung.
+  Lautloser Restore          Wiederherstellen.ps1 importiert vorhandene XML-Profile auf dem Zielsystem vollautomatisch.
+  Datenschutz & Git          Strikter Ausschluss bei Anonymisierung („Personenbezogene Daten entfernen“) und
+                             globale .gitignore-Absicherung für Umzugsordner (Minibench-Umzug_*/).
+
+
+5. GEPRÜFTE SICHERUNG UND TROCKENLAUF
+  Vollständigkeitsabgleich   Nach dem Kopieren jeder Bibliothek erfolgt ein Robocopy-Differenzabgleich (/L /E ...),
+                             um fehlende oder abweichende Dateien sofort zu erkennen.
+  SHA-256-Stichproben        Vergleich der Prüfsummen von ca. 20 stichprobenartig ausgewählten Dateien (kleine Konfigurationen
+                             und große Binärdateien) zwischen Quelle und Ziel.
+  Prüfprotokoll              Erzeugung von Pruefprotokoll.txt im Wurzelverzeichnis der Sicherung und Ausweis im Diagnosebericht.
+  Trockenlauf                Wiederherstellen.ps1 (-Trockenlauf) und Wiederherstellen.cmd (Menüpunkt [1]) simulieren
+                             die Wiederherstellung vollständig ohne Schreibzugriffe auf System oder Registrierung.
+
+
+6. GESAMTLÄUFE IM BAUPROZESS
+  Integration in Bauen.cmd   Bauen.cmd führt vor dem Release-Commit die Gesamtläufe (tests\Lauf.Tests.ps1) verbindlich
+                             aus und dokumentiert die Laufzeit in Stand.txt.
+  Bereinigung & neue Fälle   Veraltete Parameter (-BenchmarkKurz) entfernt; neue vollständige Testfälle für Wartung,
+                             Diagnose und System-Umzug ergänzt. Die Zahl der übersprungenen Tests sank von 99 auf 4.
+
+
+GEFUNDEN UND BEHOBEN
+  - Here-String-Kollision in Oberflaeche\DiagGui.cs durch Zeilenanfang "@echo off" behoben.
+  - Fehlende Testattrappen und Importe für Test-RebarStatus und Get-GpuVendorLink in tests\Auswertung.Tests.ps1 ergänzt.
+  - Endlosschleife und Timeout in Diagnose im schnellen Modus durch Ersatz von COM-Windows-Update, 60s powercfg-Trace
+    und gigabyteweitem RAM-Mustertest durch leichtgewichtige Testattrappen in tests\Lauf.Hilfen.ps1 behoben.
+  - Absturz in Wartung bei fehlender rundll32.exe durch Test-Path-Prüfung in Ablauf.ps1 abgesichert.
+
+
+GRENZEN UND OFFENE PUNKTE
+  - Die Hintergrund-Updateprüfung erfordert eine funktionierende Internetverbindung und TLS 1.2; bei Offline-Nutzung
+    bleibt Minibench ohne Verzögerung oder Fehlermeldung betriebsbereit.
+
+
+UMSTIEG
+  - Vollständig abwärtskompatibel. Bestehende Sicherungsordner und Konfigurationen werden nahtlos unterstützt.
+
+
+QUELLEN
+  - Eigene Implementierung in src\Kern\Version.ps1, src\Oberflaeche\DiagGui.cs, src\Oberflaeche\DiagGui_Seiten.cs,
+    src\Oberflaeche\Versionen.cs, src\Diagnose\Hilfsfunktionen.ps1, src\Module\Diagnose\Ablauf.ps1,
+    src\Module\Umzug\Ablauf.ps1, src\Module\Wartung\Ablauf.ps1, tests\Lauf.Tests.ps1, tests\Lauf.Hilfen.ps1,
+    tests\Diagnose.Tests.ps1, tests\Oberflaeche.Tests.ps1, tests\Auswertung.Tests.ps1 und Bauen.cmd.

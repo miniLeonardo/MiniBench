@@ -166,3 +166,85 @@ Describe 'LAN-Verhandlungsrate' {
         $findings[0].Stufe | Should -Be 'WARNUNG'
     }
 }
+
+Describe 'Grafiktreiber-Herstellerlinks (Get-GpuVendorLink)' {
+    BeforeAll {
+        . (Join-Path $PSScriptRoot '..\src\Diagnose\Hilfsfunktionen.ps1')
+    }
+
+    It 'liefert korrekten Herstellerlink fuer NVIDIA' {
+        $link = Get-GpuVendorLink 'NVIDIA GeForce RTX 4070' $false
+        $link.Hersteller | Should -Be 'NVIDIA'
+        $link.Link | Should -Be 'https://www.nvidia.de/Download/index.aspx'
+        $link.LaptopHinweis | Should -BeNullOrEmpty
+    }
+
+    It 'liefert korrekten Herstellerlink fuer AMD mit Laptop-Hinweis' {
+        $link = Get-GpuVendorLink 'AMD Radeon RX 7800 XT' $true
+        $link.Hersteller | Should -Be 'AMD'
+        $link.Link | Should -Be 'https://www.amd.com/de/support'
+        $link.LaptopHinweis | Should -Not -BeNullOrEmpty
+    }
+
+    It 'liefert korrekten Herstellerlink fuer Intel' {
+        $link = Get-GpuVendorLink 'Intel(R) Arc(TM) A770 Graphics' $false
+        $link.Hersteller | Should -Be 'Intel'
+        $link.Link | Should -Be 'https://www.intel.de/content/www/de/de/download-center/home.html'
+    }
+}
+
+Describe 'Resizable BAR / SAM Erkennung (Test-RebarStatus)' {
+    BeforeAll {
+        . (Join-Path $PSScriptRoot '..\src\Diagnose\Hilfsfunktionen.ps1')
+        if (-not (Get-Command Find-NvidiaSmi -ErrorAction SilentlyContinue)) {
+            function global:Find-NvidiaSmi { '' }
+        }
+        if (-not (Get-Command Invoke-External -ErrorAction SilentlyContinue)) {
+            function global:Invoke-External { $null }
+        }
+    }
+
+    It 'erkennt inaktives ReBAR trotz Hardware-Unterstuetzung (NVIDIA BAR1 <= 512 MiB)' {
+        $gpu = [pscustomobject]@{ Name = 'NVIDIA GeForce RTX 3080'; DriverVersion = '31.0.15.4601' }
+        $cpu = [pscustomobject]@{ Name = 'AMD Ryzen 7 5800X 8-Core Processor' }
+        $bb  = [pscustomobject]@{ Product = 'B550 TOMAHAWK' }
+
+        Mock Find-NvidiaSmi { 'C:\mock\nvidia-smi.exe' }
+        Mock Invoke-External {
+            [pscustomobject]@{ Output = "BAR1 Memory Usage`n    Total : 256 MiB`n    Used : 5 MiB"; ExitCode = 0 }
+        }
+
+        $res = Test-RebarStatus -GpuAdapter $gpu -CpuObj $cpu -BaseBoard $bb
+        $res.Supported | Should -BeTrue
+        $res.GpuSupported | Should -BeTrue
+        $res.CpuSupported | Should -BeTrue
+        $res.Active | Should -BeFalse
+    }
+
+    It 'erkennt aktives ReBAR bei Hardware-Unterstuetzung (NVIDIA BAR1 > 512 MiB)' {
+        $gpu = [pscustomobject]@{ Name = 'NVIDIA GeForce RTX 4080'; DriverVersion = '31.0.15.5123' }
+        $cpu = [pscustomobject]@{ Name = 'AMD Ryzen 9 7900X 12-Core Processor' }
+        $bb  = [pscustomobject]@{ Product = 'X670E HERO' }
+
+        Mock Find-NvidiaSmi { 'C:\mock\nvidia-smi.exe' }
+        Mock Invoke-External {
+            [pscustomobject]@{ Output = "BAR1 Memory Usage`n    Total : 16384 MiB`n    Used : 120 MiB"; ExitCode = 0 }
+        }
+
+        $res = Test-RebarStatus -GpuAdapter $gpu -CpuObj $cpu -BaseBoard $bb
+        $res.Supported | Should -BeTrue
+        $res.Active | Should -BeTrue
+    }
+
+    It 'meldet Nicht unterstuetzt bei aelterer Hardware (z.B. GTX 1080 + Core i7 7th Gen)' {
+        $gpu = [pscustomobject]@{ Name = 'NVIDIA GeForce GTX 1080'; DriverVersion = '30.0.14.7111' }
+        $cpu = [pscustomobject]@{ Name = 'Intel(R) Core(TM) i7-7700K CPU @ 4.20GHz' }
+        $bb  = [pscustomobject]@{ Product = 'Z270 GAMING PRO' }
+
+        $res = Test-RebarStatus -GpuAdapter $gpu -CpuObj $cpu -BaseBoard $bb
+        $res.Supported | Should -BeFalse
+        $res.GpuSupported | Should -BeFalse
+        $res.CpuSupported | Should -BeFalse
+        $res.Active | Should -BeFalse
+    }
+}

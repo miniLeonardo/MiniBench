@@ -310,8 +310,8 @@ Describe 'Absturzabbilder (Minidump)' {
 
 Describe 'Grafiktreiber-Gesundheitscheck' {
     BeforeAll {
-        Import-MinibenchTestModule -Functions 'Add-Finding', 'Send-GuiEvent', 'Get-GpuKind', 'Get-GpuAdapters', 'Format-Size', 'Get-CimCached', 'Get-TdrEvents', 'Get-Ev', 'Out-Report', 'Add-Sub', 'Add-Line', 'Get-MainGpu', 'Get-GpuFactText', 'Get-ShortGpuName', 'Add-Private', 'Test-OnBattery', 'Test-LaptopGpu', 'Get-DisplayDiagnostics' `
-            -Setup '$script:Facts = [ordered]@{}; $script:BenchShort = @{}; $script:CimCache = @{}; $script:Report = New-Object System.Text.StringBuilder; $script:FindKeys = $null; $script:IsLaptop = $false; function Test-OnBattery { $false }; function Test-LaptopGpu { $false }'
+        Import-MinibenchTestModule -Functions 'Add-Finding', 'Send-GuiEvent', 'Get-GpuKind', 'Get-GpuAdapters', 'Format-Size', 'Get-CimCached', 'Get-TdrEvents', 'Get-Ev', 'Out-Report', 'Add-Sub', 'Add-Line', 'Get-MainGpu', 'Get-GpuFactText', 'Get-ShortGpuName', 'Add-Private', 'Test-OnBattery', 'Test-LaptopGpu', 'Get-DisplayDiagnostics', 'Get-GpuVendorLink', 'Test-RebarStatus' `
+            -Setup '$script:Facts = [ordered]@{}; $script:BenchShort = @{}; $script:CimCache = @{}; $script:Report = New-Object System.Text.StringBuilder; $script:FindKeys = $null; $script:IsLaptop = $false; function Test-OnBattery { $false }; function Test-LaptopGpu { $false }; function Find-NvidiaSmi { $null }'
         # Abschnitt "Grafik und Monitore" der Diagnose, so wie er im zusammengebauten Skript steht
         $cmd = (Get-MinibenchAst).Find({ param($a) $a -is [System.Management.Automation.Language.CommandAst] -and $a.GetCommandName() -eq 'Invoke-Section' -and $a.CommandElements.Count -ge 3 -and $a.CommandElements[1].Extent.Text -eq "'Grafik und Monitore'" }, $true)
         $sbe = @($cmd.CommandElements | Where-Object { $_ -is [System.Management.Automation.Language.ScriptBlockExpressionAst] })[0]
@@ -323,6 +323,8 @@ Describe 'Grafiktreiber-Gesundheitscheck' {
         Mock -ModuleName MinibenchTest Get-MainGpu { }
         Mock -ModuleName MinibenchTest Get-GpuFactText { 'Testgrafik' }
         Mock -ModuleName MinibenchTest Get-DisplayDiagnostics { [pscustomobject]@{ WrongPortDetected = $false; HzBremseDetected = $false } }
+        Mock -ModuleName MinibenchTest Test-RebarStatus { [pscustomobject]@{ Supported = $false; Active = $false; Detail = '' } }
+        Mock -ModuleName MinibenchTest Find-NvidiaSmi { $null }
         Mock -ModuleName MinibenchTest Write-Host { }
         function New-Gpu([string]$Name, [datetime]$Datum) { [pscustomobject]@{ Name = $Name; DriverDate = $Datum; DriverVersion = '31.0.1'; AdapterRAM = 4GB; CurrentHorizontalResolution = 1920; CurrentVerticalResolution = 1080; CurrentRefreshRate = 60; Status = 'OK' } }
         function Invoke-GrafikAbschnitt($Gpus, [int]$Tdr = 0) {

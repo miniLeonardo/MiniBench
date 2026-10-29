@@ -6,6 +6,8 @@
 Minibench-Daten/
 Aktueller Build/Minibench-Daten/
 Archiv/Minibench-Daten/
+Minibench-Umzug_*/
+**/Minibench-Umzug_*/
 
 # Temporäre Log- und Testdateien
 *.log

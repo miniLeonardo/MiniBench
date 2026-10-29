@@ -26,11 +26,13 @@ function Get-ShortCpuName([string]$Name) { ((($Name -as [string]) -replace '\s+'
 function Get-ShortGpuName([string]$Name) { (([string]$Name) -replace '^(AMD|NVIDIA|Intel\(R\))\s*', '').Trim() }
 # Grafikeinheiten mit Art (dGPU, iGPU) und ob sie den Desktop ausgibt (aktive Auflösung); virtuelle Adapter fehlen
 function Get-GpuAdapters {
-    $raw = @(Get-CimCached Win32_VideoController | Where-Object { $_ -and (Get-GpuKind ([string]$_.Name)) -ne 'virtuell' })
-    $hasIgpu = [bool](@($raw | Where-Object { (Get-GpuKind ([string]$_.Name)) -eq 'iGPU' }).Count)
-    $isLaptop = ($script:IsLaptop -or (Test-OnBattery) -or (@($raw | Where-Object { Test-LaptopGpu $_.Name }).Count -gt 0))
+    $getCim = if (Get-Command Get-CimCached -ErrorAction SilentlyContinue) { { param($c) @(Get-CimCached $c) } } else { { param($c) @(Get-CimInstance $c -ErrorAction SilentlyContinue) } }
+    $raw = @(& $getCim Win32_VideoController | Where-Object { $_ -and $(if (Get-Command Get-GpuKind -ErrorAction SilentlyContinue) { (Get-GpuKind ([string]$_.Name)) -ne 'virtuell' } else { $true }) })
+    $hasIgpu = [bool](@($raw | Where-Object { $(if (Get-Command Get-GpuKind -ErrorAction SilentlyContinue) { (Get-GpuKind ([string]$_.Name)) -eq 'iGPU' } else { $false }) }).Count)
+    $onBat = if (Get-Command Test-OnBattery -ErrorAction SilentlyContinue) { Test-OnBattery } else { $false }
+    $isLaptop = ($script:IsLaptop -or $onBat -or (@($raw | Where-Object { if (Get-Command Test-LaptopGpu -ErrorAction SilentlyContinue) { Test-LaptopGpu $_.Name } else { $false } }).Count -gt 0))
     @(foreach ($a in $raw) {
-        $k = Get-GpuKind ([string]$a.Name)
+        $k = if (Get-Command Get-GpuKind -ErrorAction SilentlyContinue) { Get-GpuKind ([string]$a.Name) } else { 'dGPU' }
         $isDesktopOut = [bool]$a.CurrentHorizontalResolution
         if ($hasIgpu -and $isLaptop -and $k -eq 'dGPU') {
             $isDesktopOut = $false
@@ -52,6 +54,114 @@ function Get-GpuFactText {
     $all = @(Get-GpuAdapters | Sort-Object { if ($_.Art -eq 'dGPU') { 0 } else { 1 } })
     if ($all.Count -le 1) { return (@($all | ForEach-Object { $_.Name }) -join '') }
     return ((@($all | ForEach-Object { '{0} ({1}{2})' -f $_.Name, $_.Bezeichnung, $(if ($_.Desktop) { ', Desktop' } else { '' }) })) -join '; ')
+}
+
+# Hersteller-Downloadlink und Notebook-Hinweis fuer Grafikeinheiten
+function Get-GpuVendorLink([string]$GpuName, [bool]$IsLaptop = $false) {
+    $vendor = 'Unbekannt'
+    $link = ''
+    if ($GpuName -match 'NVIDIA|GeForce|RTX|GTX|Quadro|Tesla') {
+        $vendor = 'NVIDIA'
+        $link = 'https://www.nvidia.de/Download/index.aspx'
+    } elseif ($GpuName -match 'AMD|Radeon|ATI') {
+        $vendor = 'AMD'
+        $link = 'https://www.amd.com/de/support'
+    } elseif ($GpuName -match 'Intel|Arc|Iris|UHD|HD Graphics') {
+        $vendor = 'Intel'
+        $link = 'https://www.intel.de/content/www/de/de/download-center/home.html'
+    }
+    $note = if ($IsLaptop) { 'Auf Notebooks mit Hybridgrafik wird vorrangig die Treiberseite des Notebook-Herstellers empfohlen.' } else { '' }
+    return [pscustomobject]@{
+        Hersteller    = $vendor
+        Link          = $link
+        LaptopHinweis = $note
+    }
+}
+
+# Resizable BAR / Smart Access Memory (SAM) Erkennung
+function Test-RebarStatus($GpuAdapter = $null, $CpuObj = $null, $BaseBoard = $null) {
+    $getCim = {
+        param($cls)
+        if (Get-Command Get-CimCached -ErrorAction SilentlyContinue) { @(Get-CimCached $cls) }
+        else { @(Get-CimInstance $cls -ErrorAction SilentlyContinue) }
+    }
+    if (-not $GpuAdapter) {
+        if (Get-Command Get-MainGpu -ErrorAction SilentlyContinue) { $GpuAdapter = Get-MainGpu }
+    }
+    if (-not $GpuAdapter) {
+        $gpus = & $getCim Win32_VideoController
+        $GpuAdapter = @($gpus | Where-Object { if (Get-Command Get-GpuKind -ErrorAction SilentlyContinue) { (Get-GpuKind $_.Name) -eq 'dGPU' } else { $true } }) | Select-Object -First 1
+        if (-not $GpuAdapter) { $GpuAdapter = $gpus | Select-Object -First 1 }
+    }
+    if (-not $CpuObj) { $CpuObj = & $getCim Win32_Processor | Select-Object -First 1 }
+    if (-not $BaseBoard) { $BaseBoard = & $getCim Win32_BaseBoard | Select-Object -First 1 }
+
+    $gpuName = if ($GpuAdapter) { [string]$GpuAdapter.Name } else { '' }
+    $cpuName = if ($CpuObj) { [string]$CpuObj.Name } else { '' }
+    $bbProd  = if ($BaseBoard) { [string]$BaseBoard.Product } else { '' }
+
+    # GPU Support: NVIDIA RTX 3000+, 4000+, 5000+; AMD RX 6000+, 7000+, 8000+; Intel Arc
+    $nvMatch = ($gpuName -match 'RTX\s+(30\d\d|40\d\d|50\d\d)' -or $gpuName -match 'RTX\s+[345]0\d\d' -or $gpuName -match 'RTX\s+A[2-6]\d{3}')
+    $amdMatch = ($gpuName -match 'Radeon\s+RX\s+[6789]\d{3}')
+    $intelMatch = ($gpuName -match 'Intel\(R\)\s+Arc|Arc\(TM\)')
+    $gpuSupported = ($nvMatch -or $amdMatch -or $intelMatch)
+
+    # CPU/Plattform Support: AMD Ryzen 3000+ (außer 3200G/3400G), 5000+, 7000+; Intel Core 10th Gen+, Core Ultra
+    $amdCpuMatch = ($cpuName -match 'Ryzen\s+[3579]\s+(?!3[24]00G)[3-9]\d{3}' -or $cpuName -match 'Ryzen\s+Threadripper\s+[3-9]\d{3}')
+    $intelCpuMatch = ($cpuName -match 'Core\(TM\)\s+i[3579]-(1[0-4]\d{3}|[2-9]\d{4})' -or $cpuName -match 'Core\(TM\)\s+Ultra')
+
+    $cpuSupported = ($amdCpuMatch -or $intelCpuMatch)
+    $supported = ($gpuSupported -and $cpuSupported)
+
+    $active = $false
+    $details = ''
+
+    if ($supported) {
+        if ($nvMatch) {
+            $nvsmi = if (Get-Command Find-NvidiaSmi -ErrorAction SilentlyContinue) { Find-NvidiaSmi } else { '' }
+            if ($nvsmi) {
+                try {
+                    $memOut = Invoke-External -File $nvsmi -Arguments '-q -d MEMORY' -TimeoutSec 5
+                    if ($memOut.Output -match 'BAR1 Memory Usage[\s\S]*?Total\s*:\s*(\d+)\s*MiB') {
+                        $bar1Mb = [int]$Matches[1]
+                        if ($bar1Mb -gt 512) {
+                            $active = $true
+                            $details = ('BAR1-Größe: {0} MiB' -f $bar1Mb)
+                        } else {
+                            $active = $false
+                            $details = ('BAR1-Größe: {0} MiB (limitiert auf 256 MiB)' -f $bar1Mb)
+                        }
+                    }
+                } catch { }
+            }
+        } else {
+            try {
+                $memAddrs = @(Get-CimAssociatedInstance -InputObject $GpuAdapter -ResultClassName Win32_DeviceMemoryAddress -ErrorAction SilentlyContinue)
+                $maxBarBytes = 0L
+                foreach ($ma in $memAddrs) {
+                    $sz = [int64]$ma.EndingAddress - [int64]$ma.StartingAddress + 1
+                    if ($sz -gt $maxBarBytes) { $maxBarBytes = $sz }
+                }
+                if ($maxBarBytes -gt 268435456) {
+                    $active = $true
+                    $details = ('PCI-Adressfenster: {0:N0} MB' -f ($maxBarBytes / 1MB))
+                } else {
+                    $active = $false
+                    $details = ('Max. PCI-Adressfenster: {0:N0} MB (<= 256 MB)' -f ($maxBarBytes / 1MB))
+                }
+            } catch { }
+        }
+    }
+
+    return [pscustomobject]@{
+        Supported     = $supported
+        GpuSupported  = $gpuSupported
+        CpuSupported  = $cpuSupported
+        Active        = $active
+        Details       = $details
+        GpuName       = $gpuName
+        CpuName       = $cpuName
+    }
 }
 
 # WinSAT speichert die Treiberversion des gemessenen Adapters als 64-Bit-Zahl (4 x 16 Bit): 9007199261367216 = 32.0.101.7088

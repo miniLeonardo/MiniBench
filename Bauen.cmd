@@ -301,6 +301,7 @@ try {
 
     # 2. Tests
     $testInfo = ''
+    $gesamtDuration = ''
     $testsOk = $false   # nur nach bestandenen Tests wird committet (Schritt 6)
     if ($ohneTests) {
         $testInfo = 'nicht ausgeführt (Bauen.cmd ohnetests)'
@@ -308,12 +309,15 @@ try {
     } else {
         $runner = Join-Path $Here 'tests\Testen.ps1'
         $sumFile = Join-Path $env:TEMP ('LeosMinibench-Tests-' + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.txt')
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $runner -Kurz -Zusammenfassung $sumFile
+        $gesamtSw = [System.Diagnostics.Stopwatch]::StartNew()
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $runner -Kurz -Zusammenfassung $sumFile -Gesamtlauf
         $tc = $LASTEXITCODE
+        $gesamtSw.Stop()
+        $gesamtDuration = '{0:mm\:ss}' -f $gesamtSw.Elapsed
         $sum = ''; if (Test-Path -LiteralPath $sumFile) { $sum = ([IO.File]::ReadAllText($sumFile)).Trim(); Remove-Item -LiteralPath $sumFile -Force -ErrorAction SilentlyContinue }
         if ($tc -eq 99) { $testInfo = 'nicht ausgeführt (Pester 5 fehlt)'; Write-Host '  Tests    : Pester 5 fehlt, Tests übersprungen (siehe oben)' -ForegroundColor Yellow }
         elseif ($tc -ne 0) { throw ('{0} Tests sind fehlgeschlagen. Der Aktuelle Build bleibt unverändert (Bauen.cmd ohnetests erzwingt den Bau).' -f $tc) }
-        else { $testsOk = $true; $testInfo = $(if ($sum) { $sum } else { 'alle bestanden' }); Write-Host ('  Tests    : {0}' -f $testInfo) -ForegroundColor Green }
+        else { $testsOk = $true; $testInfo = $(if ($sum) { $sum } else { 'alle bestanden' }); Write-Host ('  Tests    : {0} (GesamtlÃ¤ufe: {1})' -f $testInfo, $gesamtDuration) -ForegroundColor Green }
     }
 
     # 3. exe in einem Arbeitsordner bauen
@@ -381,7 +385,7 @@ try {
     [void]$st.AppendLine('===============================')
     [void]$st.AppendLine(('Version   : {0} (Dateiversion {1})' -f $ver, $asmVer))
     [void]$st.AppendLine(('Gebaut    : {0:dd.MM.yyyy HH:mm} auf {1}' -f (Get-Date), $env:COMPUTERNAME))
-    [void]$st.AppendLine(('Tests     : {0}' -f $testInfo))
+    [void]$st.AppendLine(('Tests     : {0} (Laufzeit: {1})' -f $testInfo, $(if ($gesamtDuration) { $gesamtDuration } else { '--' })))
     [void]$st.AppendLine(('Quelltext : {0} Teile aus src, {1:N0} Zeilen' -f $r.Teile.Count, $r.Zeilen))
     [void]$st.AppendLine('')
     function Get-Sha256Hex([string]$Path) {
@@ -396,9 +400,15 @@ try {
         } finally { $fs.Dispose(); $sha.Dispose() }
     }
     [void]$st.AppendLine('Dateien (SHA-256 zur Kontrolle auf dem Stick: Get-FileHash <Datei>)')
+    $lmbSha = ''
     foreach ($f in $files) {
         $fi = Get-Item -LiteralPath (Join-Path $build $f)
-        [void]$st.AppendLine(('  {0,-22} {1,8:N0} KB  {2}' -f $f, [math]::Ceiling($fi.Length / 1KB), (Get-Sha256Hex $fi.FullName)))
+        $hex = Get-Sha256Hex $fi.FullName
+        if ($f -eq 'LMB.exe') { $lmbSha = $hex }
+        [void]$st.AppendLine(('  {0,-22} {1,8:N0} KB  {2}' -f $f, [math]::Ceiling($fi.Length / 1KB), $hex))
+    }
+    if ($lmbSha) {
+        Write-Host ('  SHA-256 (LMB.exe): {0}' -f $lmbSha) -ForegroundColor Cyan
     }
     [void]$st.AppendLine('')
     [void]$st.AppendLine('Für den USB-Stick: den Inhalt dieses Ordners auf den Stick kopieren und vorhandene Dateien ersetzen.')

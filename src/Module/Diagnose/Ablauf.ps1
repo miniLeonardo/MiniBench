@@ -1,4 +1,4 @@
-﻿# =====================================================================================
+# =====================================================================================
 #                                     DIAGNOSE
 # =====================================================================================
 if ($ModDiag -and -not $AnalyzeLastRun) {
@@ -283,6 +283,14 @@ Invoke-Section 'Grafik und Monitore' {
     $adapters = @(Get-GpuAdapters)
     $adapterMap = @{}
     foreach ($a in $adapters) { $adapterMap[$a.Name] = $a }
+    $nvSmiDriver = ''
+    $nvsmi = if (Get-Command Find-NvidiaSmi -ErrorAction SilentlyContinue) { Find-NvidiaSmi } else { '' }
+    if ($nvsmi) {
+        try {
+            $smiOut = Invoke-External -File $nvsmi -Arguments '--query-gpu=driver_version --format=csv,noheader,nounits' -TimeoutSec 3
+            if ($smiOut.Output) { $nvSmiDriver = ($smiOut.Output.Trim() -split "`r?`n")[0].Trim() }
+        } catch { }
+    }
     Get-CimCached Win32_VideoController | ForEach-Object {
         $ad = if ($adapterMap.ContainsKey(([string]$_.Name).Trim())) { $adapterMap[([string]$_.Name).Trim()] } else { $null }
         $isDesk = if ($ad) { [bool]$ad.Desktop } else { [bool]$_.CurrentHorizontalResolution }
@@ -290,7 +298,7 @@ Invoke-Section 'Grafik und Monitore' {
             'Name'          = $_.Name
             'Art'           = $(switch (Get-GpuKind ([string]$_.Name)) { 'dGPU' { 'dedizierte Grafikkarte' } 'iGPU' { 'Prozessorgrafik (integriert)' } 'virtuell' { 'virtueller Adapter' } default { 'unbekannt' } }) + $(if ($isDesk) { ', gibt den Desktop aus' } else { '' })
             'VRAM'          = $(if ($vram.ContainsKey($_.Name)) { Format-Size $vram[$_.Name] } else { Format-Size $_.AdapterRAM })
-            'Treiber'       = $_.DriverVersion
+            'Treiber'       = $(if ($_.Name -match 'NVIDIA' -and $nvSmiDriver) { '{0} (nvidia-smi: {1})' -f $_.DriverVersion, $nvSmiDriver } else { $_.DriverVersion })
             'Treiberdatum'  = $(if ($_.DriverDate) { $_.DriverDate.ToString('dd.MM.yyyy') })
             'Auflösung'     = $(if ($isDesk -and $_.CurrentHorizontalResolution) { '{0}x{1} @ {2} Hz' -f $_.CurrentHorizontalResolution, $_.CurrentVerticalResolution, $_.CurrentRefreshRate })
             'Status'        = $_.Status
@@ -302,13 +310,28 @@ Invoke-Section 'Grafik und Monitore' {
         Add-Finding WARNUNG 'Grafik' 'Nur der Microsoft Basic Display Adapter ist aktiv. Eine Installation des Herstellertreibers (AMD, Intel, NVIDIA) wird dringend empfohlen.'
     }
     $gpus | Where-Object { $_.DriverDate -and $_.DriverDate -lt (Get-Date).AddMonths(-18) -and $_.Name -notmatch 'Virtual|Remote|Indirect|Parsec|spacedesk|Basic Display|Microsoft Basic' } | ForEach-Object {
-        Add-Finding INFO 'Grafik' ('Grafiktreiber für {0} ist älter als 18 Monate ({1:dd.MM.yyyy}), ein Update wird empfohlen.' -f $_.Name, $_.DriverDate)
+        $vInfo = Get-GpuVendorLink $_.Name $script:IsLaptop
+        $msg = 'Grafiktreiber für {0} ist älter als 18 Monate ({1:dd.MM.yyyy}), ein Update wird empfohlen.' -f $_.Name, $_.DriverDate
+        if ($vInfo.Link) { $msg += ' Download: ' + $vInfo.Link }
+        if ($vInfo.LaptopHinweis) { $msg += ' (' + $vInfo.LaptopHinweis + ')' }
+        Add-Finding INFO 'Grafik' $msg
     }
     $tdr30 = @(Get-TdrEvents (Get-Date).AddDays(-30))
     if ($tdr30.Count) {
         Add-Finding WARNUNG 'Grafik' ('Treiberabsturz festgestellt: Ereignis 4101 (Display driver stopped responding) trat in den letzten 30 Tagen {0}x auf. Eine saubere Neuinstallation des Grafiktreibers per DDU wird empfohlen.' -f $tdr30.Count)
     }
     $script:Facts['Grafik'] = Get-GpuFactText
+    $rebar = Test-RebarStatus
+    if ($rebar.Supported) {
+        if ($rebar.Active) {
+            Add-Line ('  Resizable BAR / SAM : aktiv ({0})' -f $rebar.Details)
+        } else {
+            Add-Line ('  Resizable BAR / SAM : inaktiv ({0})' -f $rebar.Details)
+            Add-Finding WARNUNG 'Grafik' 'Resizable BAR / SAM inaktiv: Grafikkarte und Prozessor unterstützen Resizable BAR, die Funktion ist jedoch im BIOS nicht aktiviert. Zur Aktivierung im BIOS: 1. Im BIOS "Above 4G Decoding" aktivieren, 2. "Re-Size BAR Support" auf Auto oder Enabled stellen, 3. CSM (Compatibility Support Module) deaktivieren (UEFI-Modus erforderlich).'
+        }
+    } else {
+        Add-Line '  Resizable BAR / SAM : nicht unterstützt'
+    }
     $gMain = Get-MainGpu; if ($gMain) { $script:BenchShort.GPU = Get-ShortGpuName $gMain.Name }
     Add-Sub 'Monitore'
     $dec = { param($a) if ($a) { -join ($a | Where-Object { $_ -ne 0 } | ForEach-Object { [char]$_ }) } }

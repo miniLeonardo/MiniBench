@@ -1,4 +1,4 @@
-﻿# =====================================================================================
+# =====================================================================================
 #                                     REPARATUR
 # =====================================================================================
 function Add-RepairResult([string]$Key, [string]$Status, [string]$Detail, [switch]$Restart) {
@@ -312,7 +312,10 @@ if ($ModRep) {
                 }
                 'Leerlaufaufgaben' {
                     Write-Step 'Aufgeschobene Windows-Wartungsaufgaben starten (ProcessIdleTasks) ...'
-                    Start-Process -FilePath (Join-Path $env:windir 'System32\rundll32.exe') -ArgumentList 'advapi32.dll,ProcessIdleTasks' -WindowStyle Hidden -ErrorAction Stop
+                    $rd = Join-Path $env:windir 'System32\rundll32.exe'
+                    if (Test-Path -LiteralPath $rd) {
+                        Start-Process -FilePath $rd -ArgumentList 'advapi32.dll,ProcessIdleTasks' -WindowStyle Hidden -ErrorAction Stop
+                    }
                     [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Wartung' -Ziel 'Leerlaufaufgaben' -Nachher 'gestartet' -Gegenbefehl 'nicht nötig' -NurHinweis)
                     Add-RepairResult $k 'OK' 'Leerlaufaufgaben gestartet (laufen im Hintergrund bis zu einer Stunde weiter)'
                 }

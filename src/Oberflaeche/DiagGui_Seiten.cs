@@ -1,4 +1,4 @@
-// Seiten der grafischen Oberfläche: Versionen und Änderungen (Teilklasse DiagGui)
+﻿// Seiten der grafischen Oberfläche: Versionen und Änderungen (Teilklasse DiagGui)
 public partial class DiagGui
 {
     Control BuildVersionPage()
@@ -8,6 +8,13 @@ public partial class DiagGui
         top.Dock = DockStyle.Top;
         top.AutoSize = true;
         top.Padding = new Padding(0, 0, 0, UI.S(10));
+        CheckBox chkAutoUpdate = Chk("Beim Programmstart automatisch nach Minibench-Updates suchen", LoadUpdateCheckPreference());
+        Tip(chkAutoUpdate, "PrÃ¼ft beim Start leise im Hintergrund Ã¼ber GitHub Releases, ob eine neuere Version verfÃ¼gbar ist (ohne Telemetrie).");
+        chkAutoUpdate.Margin = new Padding(UI.S(4), UI.S(4), UI.S(4), UI.S(8));
+        chkAutoUpdate.CheckedChanged += delegate {
+            SaveUpdateCheckPreference(chkAutoUpdate.Checked);
+        };
+        top.Controls.Add(chkAutoUpdate);
         RichTextBox rt = new RichTextBox(); rt.ReadOnly = true; rt.BorderStyle = BorderStyle.FixedSingle; rt.BackColor = UI.Panel; rt.ForeColor = UI.Text;
         rt.Dock = DockStyle.Fill; rt.DetectUrls = false; rt.ScrollBars = RichTextBoxScrollBars.Vertical; rt.Font = new Font("Segoe UI", 9.75f);
         Font fh = new Font("Segoe UI Semibold", 11f), fd = new Font("Segoe UI", 9f), fb = new Font("Segoe UI", 9.75f);
@@ -1062,6 +1069,44 @@ public partial class DiagGui
         profSubFlow.Controls.Add(lblScanHint);
 
         scopePanel.Controls.Add(profSubFlow);
+        CheckBox chkWlan = Chk("WLAN-Profile (gespeicherte Netzwerke)", true);
+        Tip(chkWlan, "Sichert gespeicherte WLAN-Netzwerke zur automatischen Wiederherstellung.");
+        scopePanel.Controls.Add(chkWlan);
+
+        FlowLayoutPanel wlanSubFlow = new FlowLayoutPanel();
+        wlanSubFlow.FlowDirection = FlowDirection.TopDown;
+        wlanSubFlow.WrapContents = false;
+        wlanSubFlow.AutoSize = true;
+        wlanSubFlow.Margin = new Padding(UI.S(24), 0, 0, UI.S(4));
+        wlanSubFlow.BackColor = UI.Panel;
+
+        CheckBox chkWlanClear = Chk("WLAN-Passw\u00F6rter im Klartext mitsichern", false);
+        Tip(chkWlanClear, "Achtung: Sichert Netzwerkschl\u00FCssel unverschl\u00FCsselt in XML-Dateien auf dem Zielmedium.");
+        wlanSubFlow.Controls.Add(chkWlanClear);
+        scopePanel.Controls.Add(wlanSubFlow);
+
+        chkWlan.CheckedChanged += delegate {
+            chkWlanClear.Enabled = chkWlan.Checked;
+            if (!chkWlan.Checked) chkWlanClear.Checked = false;
+        };
+
+        chkWlanClear.Click += delegate {
+            if (chkWlanClear.Checked)
+            {
+                DialogResult dr = MessageBox.Show(this,
+                    "Sicherheits-Warnung:\r\n\r\n" +
+                    "Wenn Sie diese Option aktivieren, werden alle gespeicherten WLAN-Passw\u00F6rter unverschl\u00FCsselt im Klartext in den exportierten XML-Dateien auf dem Zielmedium gespeichert.\r\n\r\n" +
+                    "Jeder mit Zugriff auf das Zielmedium kann diese Passw\u00F6rter einsehen.\r\n\r\n" +
+                    "M\u00F6chten Sie WLAN-Passw\u00F6rter wirklich im Klartext sichern?",
+                    "WLAN-Passw\u00F6rter im Klartext sichern",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning);
+                if (dr != DialogResult.Yes)
+                {
+                    chkWlanClear.Checked = false;
+                }
+            }
+        };
 
         FlowLayoutPanel customPanel = new FlowLayoutPanel();
         customPanel.FlowDirection = FlowDirection.TopDown;
@@ -1234,6 +1279,7 @@ public partial class DiagGui
                 if (chkProfTools != null && chkProfTools.Checked) totalBytes += sizeProfTools;
                 if (chkProfTerm != null && chkProfTerm.Checked) totalBytes += sizeProfTerm;
             }
+
 
             for (int i = 0; i < customBoxes.Count; i++)
             {
@@ -1530,6 +1576,12 @@ public partial class DiagGui
                 if (chkProfTerm != null && chkProfTerm.Checked) scopes.Add("Profile_Terminal");
             }
 
+            if (chkWlan.Checked)
+            {
+                scopes.Add("Wlan");
+                if (chkWlanClear.Checked) scopes.Add("Wlan_Klartext");
+            }
+
             if (scopes.Count == 0 && customBoxes.Count == 0)
             {
                 MessageBox.Show(this, "Bitte w\u00E4hlen Sie mindestens eine Sicherungskomponente aus.", "System-Umzug", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1568,6 +1620,8 @@ public partial class DiagGui
             chkLayout.Enabled = false;
             chkSoftware.Enabled = false;
             chkProfiles.Enabled = false;
+            chkWlan.Enabled = false;
+            chkWlanClear.Enabled = false;
             if (chkProfBrowser != null) chkProfBrowser.Enabled = false;
             if (chkProfMail != null) chkProfMail.Enabled = false;
             if (chkProfDev != null) chkProfDev.Enabled = false;
@@ -1707,6 +1761,8 @@ public partial class DiagGui
                         chkLayout.Enabled = true;
                         chkSoftware.Enabled = true;
                         chkProfiles.Enabled = true;
+                        chkWlan.Enabled = true;
+                        chkWlanClear.Enabled = chkWlan.Checked;
                         if (chkProfBrowser != null) chkProfBrowser.Enabled = true;
                         if (chkProfMail != null) chkProfMail.Enabled = true;
                         if (chkProfDev != null) chkProfDev.Enabled = true;
@@ -2910,7 +2966,118 @@ public partial class DiagGui
             }
             catch { }
 
-            e.Result = items;
+            
+            // 5. Minibench Update verfÃ¼gbar
+            try
+            {
+                if (HasUpdateAvailable && !String.IsNullOrEmpty(AvailableUpdateVersion))
+                {
+                    QuickFixItem it = new QuickFixItem();
+                    it.Level = "info";
+                    it.Badge = "Update";
+                    it.Title = "Minibench-Update verfÃ¼gbar (" + AvailableUpdateVersion + ")";
+                    it.Desc = "Eine neuere Version von Leos Minibench ist auf GitHub bereitgestellt. Klicke auf 'Herunterladen' fÃ¼r den automatischen Austausch.";
+                    it.ButtonText = "Herunterladen";
+                    it.Action = delegate { TriggerUpdateDownload(); };
+                    it.Tip = "LÃ¤dt die neue LMB.exe herunter, validiert die SHA-256-PrÃ¼fsumme und startet die Anwendung neu.";
+                    items.Add(it);
+                }
+            }
+            catch { }
+
+            // 6. Grafiktreiber-Alter (> 18 Monate / 548 Tage)
+            try
+            {
+                using (Microsoft.Win32.RegistryKey videoKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"))
+                {
+                    if (videoKey != null)
+                    {
+                        foreach (string subName in videoKey.GetSubKeyNames())
+                        {
+                            if (subName.StartsWith("0"))
+                            {
+                                using (Microsoft.Win32.RegistryKey subKey = videoKey.OpenSubKey(subName))
+                                {
+                                    if (subKey == null) continue;
+                                    object descObj = subKey.GetValue("DriverDesc");
+                                    object dateObj = subKey.GetValue("DriverDate");
+                                    object provObj = subKey.GetValue("ProviderName");
+                                    string desc = descObj != null ? descObj.ToString().Trim() : "";
+                                    string dateStr = dateObj != null ? dateObj.ToString().Trim() : "";
+                                    string prov = provObj != null ? provObj.ToString().Trim() : "";
+
+                                    if (String.IsNullOrEmpty(desc) || desc.IndexOf("Remote", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                        desc.IndexOf("Basic Display", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+
+                                    DateTime dtDriver;
+                                    if (DateTime.TryParse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.None, out dtDriver) ||
+                                        DateTime.TryParse(dateStr, CultureInfo.CurrentCulture, DateTimeStyles.None, out dtDriver))
+                                    {
+                                        if (DateTime.Now.Subtract(dtDriver).TotalDays > 548)
+                                        {
+                                            string vendor = "Unbekannt";
+                                            string dlUrl = "";
+                                            if (desc.IndexOf("NVIDIA", StringComparison.OrdinalIgnoreCase) >= 0 || prov.IndexOf("NVIDIA", StringComparison.OrdinalIgnoreCase) >= 0)
+                                            {
+                                                vendor = "NVIDIA";
+                                                dlUrl = "https://www.nvidia.de/Download/index.aspx";
+                                            }
+                                            else if (desc.IndexOf("AMD", StringComparison.OrdinalIgnoreCase) >= 0 || desc.IndexOf("Radeon", StringComparison.OrdinalIgnoreCase) >= 0 || prov.IndexOf("Advanced Micro Devices", StringComparison.OrdinalIgnoreCase) >= 0)
+                                            {
+                                                vendor = "AMD";
+                                                dlUrl = "https://www.amd.com/de/support";
+                                            }
+                                            else if (desc.IndexOf("Intel", StringComparison.OrdinalIgnoreCase) >= 0 || prov.IndexOf("Intel", StringComparison.OrdinalIgnoreCase) >= 0)
+                                            {
+                                                vendor = "Intel";
+                                                dlUrl = "https://www.intel.de/content/www/de/de/download-center/home.html";
+                                            }
+
+                                            if (!String.IsNullOrEmpty(dlUrl))
+                                            {
+                                                QuickFixItem it = new QuickFixItem();
+                                                it.Level = "warn";
+                                                it.Badge = "Treiber";
+                                                it.Title = "Grafiktreiber veraltet (" + desc + ")";
+                                                it.Desc = "Der installierte Grafiktreiber ist Ã¼ber 18 Monate alt (" + dtDriver.ToString("dd.MM.yyyy") + ")." +
+                                                          (HwIsLaptop ? " FÃ¼r Notebooks wird vorrangig die Treiberseite des Notebook-Herstellers empfohlen." : "");
+                                                it.ButtonText = "Treiber laden";
+                                                string targetUrl = dlUrl;
+                                                it.Action = delegate {
+                                                    try { System.Diagnostics.Process.Start(targetUrl); } catch { }
+                                                };
+                                                it.Tip = "Ã–ffnet die offizielle Treiber-Downloadseite von " + vendor + " im Webbrowser.";
+                                                items.Add(it);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            // 7. Resizable BAR / SAM Inaktiv
+            try
+            {
+                if (HwRebarSupported && !HwRebarActive)
+                {
+                    QuickFixItem it = new QuickFixItem();
+                    it.Level = "warn";
+                    it.Badge = "Leistung";
+                    it.Title = "Resizable BAR / SAM inaktiv";
+                    it.Desc = "Resizable BAR wird von Grafikkarte und Plattform unterstÃ¼tzt, ist aber im BIOS nicht aktiviert (verschenkt 5 bis 15 % Leistung).";
+                    it.ButtonText = "Anleitung";
+                    it.Action = delegate { ShowRebarInstructionsDialog(); };
+                    it.Tip = "Ã–ffnet eine Schritt-fÃ¼r-Schritt-Anleitung zur Aktivierung von Resizable BAR / SAM im BIOS/UEFI.";
+                    items.Add(it);
+                }
+            }
+            catch { }
+e.Result = items;
         };
 
         bw.RunWorkerCompleted += delegate(object sender, System.ComponentModel.RunWorkerCompletedEventArgs e)
@@ -3174,5 +3341,55 @@ public partial class DiagGui
             dlg.ShowDialog(this);
         }
     }
-}
 
+    void ShowRebarInstructionsDialog()
+    {
+        using (Form dlg = new Form())
+        {
+            dlg.Text = "Resizable BAR / Smart Access Memory aktivieren";
+            dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+            dlg.MaximizeBox = false; dlg.MinimizeBox = false;
+            dlg.StartPosition = FormStartPosition.CenterParent;
+            dlg.ClientSize = new Size(UI.S(560), UI.S(440));
+            dlg.BackColor = UI.Bg; dlg.Font = new Font("Segoe UI", 9.5f);
+
+            Panel p = new Panel(); p.Dock = DockStyle.Fill; p.Padding = new Padding(UI.S(16)); p.BackColor = UI.Bg;
+            Label lt = Lbl("Grafikleistung durch direkten VRAM-Zugriff steigern", 12f, true, UI.Text);
+            lt.Dock = DockStyle.Top; lt.Height = UI.S(32); p.Controls.Add(lt);
+
+            RichTextBox rt = new RichTextBox(); rt.ReadOnly = true; rt.BorderStyle = BorderStyle.None; rt.BackColor = UI.Bg; rt.ForeColor = UI.Text;
+            rt.Dock = DockStyle.Fill; rt.Font = new Font("Segoe UI", 9.5f);
+            Font fh = new Font("Segoe UI Semibold", 10f); Font fb = new Font("Segoe UI", 9f);
+
+            string[][] steps = new string[][] {
+                new string[] { "Was ist Resizable BAR / SAM?", "Resizable BAR (bei AMD Smart Access Memory) erlaubt der CPU den vollen, ungedrosselten Zugriff auf den gesamten Grafikspeicher (VRAM) auf einmal anstatt in winzigen 256-MB-HÃ¤ppchen. Dies bringt je nach Spiel 5 bis 15 % Mehrleistung." },
+                new string[] { "Schritt 1: Above 4G Decoding aktivieren", "Starte den PC ins UEFI/BIOS (Taste Entf oder F2). Navigiere zu den PCIe-/Grafik-Optionen (oft unter 'Erweitert' bzw. 'PCI Subsystem') und schalte 'Above 4G Decoding' auf 'Aktiviert' (Enabled)." },
+                new string[] { "Schritt 2: Re-Size BAR Support aktivieren", "Sobald Above 4G Decoding aktiv ist, erscheint die Option 'Re-Size BAR Support'. Stelle diese auf 'Auto' oder 'Aktiviert' (Enabled)." },
+                new string[] { "Schritt 3: CSM deaktivieren (reines UEFI)", "Resizable BAR erfordert zwingend den nativen UEFI-Modus mit GPT-Partitionstabelle. Deaktiviere das CSM (Compatibility Support Module) im Boot-MenÃ¼ des BIOS." },
+                new string[] { "Schritt 4: Speichern und neu starten", "DrÃ¼cke Taste F10 zum Speichern und Neustarten. Windows initialisiert die Grafikkarte nun mit vollem BAR1-Adressfenster." }
+            };
+
+            foreach (string[] st in steps)
+            {
+                rt.SelectionFont = fh; rt.SelectionColor = UI.Text;
+                rt.AppendText(st[0] + "\r\n");
+                rt.SelectionFont = fb; rt.SelectionColor = UI.Muted;
+                rt.AppendText(st[1] + "\r\n\r\n");
+            }
+            rt.SelectionStart = 0; rt.ScrollToCaret();
+
+            FlowLayoutPanel bf = new FlowLayoutPanel(); bf.Dock = DockStyle.Bottom; bf.Height = UI.S(44); bf.FlowDirection = FlowDirection.RightToLeft;
+            Button btnClose = UI.Primary("SchlieÃŸen"); btnClose.DialogResult = DialogResult.OK;
+            Tip(btnClose, "SchlieÃŸt die Anleitung.");
+            bf.Controls.Add(btnClose);
+
+            p.Controls.Add(rt);
+            rt.BringToFront();
+            p.Controls.Add(bf);
+            dlg.Controls.Add(p);
+            dlg.AcceptButton = btnClose;
+            UI.ThemeDialog(dlg);
+            dlg.ShowDialog(this);
+        }
+    }
+}

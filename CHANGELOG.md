@@ -2,6 +2,17 @@
 
 Alle wesentlichen Ã„nderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v3.86 (29.10.2026)
+
+### Neu
+* **Asynchrone Update-Prüfung & Self-Replace:** Automatische, lautlose GitHub-Versionsprüfung im Hintergrund mit 24-Stunden-Cache; dezente Badge-Anzeige in der Kopfzeile und Update-Kachel auf der Startseite. Vollautomatischer Download von LMB.exe nach Minibench-Daten\Update\, SHA-256-Prüfsummenvalidierung und sicherer Dateiaustausch bei Programmende über Update.cmd inklusive automatischer Archivierung der Vorgängerversion nach Minibench-Daten\Archiv\v<alteVersion>\.
+* **Offizielle Grafiktreiber-Links & Laptop-Hinweis:** Direkte Verlinkung der offiziellen Download-Seiten von NVIDIA, AMD und Intel in Bericht und Benutzeroberfläche; dedizierte Kachel unter „Schnell behebbar“ mit Button „Treiber laden“ bei Treibern älter als 18 Monate. Auf Notebooks weist ein deutlicher Hinweis darauf hin, für Hybridgrafik vorrangig die Treiberseite des Notebook-Herstellers zu nutzen.
+* **Resizable BAR / Smart Access Memory Erkennung:** Hardwareseitige Erkennung für NVIDIA (BAR1-Speichergröße via nvidia-smi) sowie AMD und Intel (64-Bit PCI-Speicherfenster über 256 MB) inklusive Validierung der Hardware-Plattformunterstützung (RTX 3000+, RX 6000+, Arc / Ryzen 3000+, Intel 10th Gen+). Bei inaktivem ReBAR erscheint eine sachliche Warnung samt interaktivem 3-Schritte-BIOS-Leitfaden.
+* **System-Umzug mit WLAN-Profilen:** Lautlose Sicherung aller WLAN-Verbindungsprofile per netsh wlan. Klartext-Export von Netzwerkschlüsseln (key=clear) erfolgt strikt nur nach expliziter Bestätigung eines modalen Sicherheitsdialogs. Vollautomatischer, lautloser Import bei der Wiederherstellung auf dem Neugerät.
+* **Geprüfte Sicherung & Trockenlauf für Umzug:** Verifizierter Kopiervorgang durch abschließenden Robocopy-Differenzabgleich (/L) und SHA-256-Stichprobenprüfung für ca. 20 Dateien je Bibliothek mit Prüfprotokoll (Pruefprotokoll.txt). Interaktiver Trockenlauf in Wiederherstellen.cmd [1] und Wiederherstellen.ps1 (-Trockenlauf) zeigt alle geplanten Importe tabellarisch an, ohne Dateien oder Registry-Einträge anzurühren.
+
+### Verbessert
+* **Gesamtläufe in Bauen.cmd integriert:** Die Testfälle in tests\Lauf.Tests.ps1 wurden aktualisiert (veraltetes -BenchmarkKurz restlos bereinigt, neue Integrationsfälle für Wartung, Diagnose und System-Umzug ergänzt) und verbindlich in Bauen.cmd eingebunden. Die Zahl der Test-Skips sank drastisch von 99 auf 4, die Ausführungszeit der Gesamtläufe wird in Stand.txt protokolliert.
 ## v3.85 (29.10.2026)
 
 ### Neu

@@ -1,4 +1,4 @@
-﻿# =====================================================================================
+# =====================================================================================
 #                                    ABSCHLUSS
 # =====================================================================================
 
@@ -243,13 +243,15 @@ Remove-Item (Join-Path $OutputDir 'Diagnosebericht_teilweise.txt') -Force -Error
 
 $kiName = $(if ($KiOhneAnonymisierung) { 'KI-Analyse_{0}_{1}.txt' -f $env:COMPUTERNAME, (Get-Date -Format 'yyyyMMdd_HHmm') } else { 'KI-Analyse_{0}.txt' -f (Get-Date -Format 'yyyyMMdd_HHmm') })
 $kiFile = Join-Path $OutputDir $kiName
+$reportFile = Join-Path $OutputDir 'Diagnosebericht.txt'
+[IO.File]::WriteAllText($reportFile, ($head.ToString() + $script:Report.ToString()), (New-Object Text.UTF8Encoding($true)))
 $htmlFile = Join-Path $OutputDir 'Diagnosebericht.html'
 try { New-HtmlReport -Path $htmlFile -Sorted $sorted -NK $nK -NW $nW -NI $nI -Start $StartTime -End $EndTime }
 catch {
     Write-Warning ('HTML-Bericht konnte nicht erstellt werden: {0}' -f $_.Exception.Message)
     $htmlFile = ''
-    $reportFile = Join-Path $OutputDir 'Diagnosebericht.txt'
-    [IO.File]::WriteAllText($reportFile, ($head.ToString() + $script:Report.ToString()), (New-Object Text.UTF8Encoding($true)))
+    # HTML fehlgeschlagen, Diagnosebericht.txt liegt bereits vor
+
 }
 
 if ($script:GuiLog) { try { $script:GuiLog.Close(); $script:GuiLog = $null } catch { } }

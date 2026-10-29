@@ -105,6 +105,16 @@ public partial class DiagGui : Form
     public static int HwCores = 0, HwThreads = 0;
     public static string HwRam = "", HwBoard = "";
     public static bool HwIsLaptop = false;
+    // ab v3.86: Resizable BAR / SAM Status
+    public static bool HwRebarSupported = false;
+    public static bool HwRebarActive = false;
+    // ab v3.86: Update-Status
+    public static bool HasUpdateAvailable = false;
+    public static string AvailableUpdateVersion = "";
+    public static string AvailableUpdateUrl = "";
+    public static string AvailableUpdateSha256 = "";
+    public static string AvailableUpdateBody = "";
+    Badge badgeUpdate;
     ComboBox cmbGpuSel, cmbLGpuSel;
     List<string> gpuSelValues = new List<string>();
     // Schneller Modus (ab v2.6): parallele Prüfungen der Diagnose
@@ -363,6 +373,13 @@ public partial class DiagGui : Form
         badgeSensStatus.Margin = new Padding(UI.S(6), UI.S(5), 0, 0);
         Tip(badgeSensStatus, "Aktiver Sensormodus für Hardware-Telemetrie und Systemwerte.");
         hr.Controls.Add(badgeSensStatus);
+        badgeUpdate = new Badge("", "warn");
+        badgeUpdate.Visible = false;
+        badgeUpdate.Margin = new Padding(UI.S(6), UI.S(5), 0, 0);
+        badgeUpdate.Cursor = Cursors.Hand;
+        badgeUpdate.Click += delegate { TriggerUpdateDownload(); };
+        Tip(badgeUpdate, "Ein Update fÃ¼r Leos Minibench ist verfÃ¼gbar. Klicken zum Herunterladen und Aktualisieren.");
+        hr.Controls.Add(badgeUpdate);
         head.Controls.Add(hr);
 
         body = new Panel(); body.Dock = DockStyle.Fill; body.Padding = new Padding(UI.S(20), UI.S(16), UI.S(20), UI.S(14)); body.BackColor = UI.Bg;
@@ -372,6 +389,7 @@ public partial class DiagGui : Form
         if (LoadStartPagePreference()) ShowPage(0);
         else if (curPage == 0) ShowPage(1);
         UpdateSensStatusBadge();
+        StartUpdateCheck();
         setupView.Dock = DockStyle.Fill; runView.Dock = DockStyle.Fill; runView.Visible = false;
         body.Controls.Add(runView); body.Controls.Add(setupView);
         Controls.Add(body); Controls.Add(head);
@@ -616,6 +634,301 @@ public partial class DiagGui : Form
             File.WriteAllText(SettingsFile, js.Serialize(d), Encoding.UTF8);
         }
         catch { }
+    }
+
+    bool LoadUpdateCheckPreference()
+    {
+        try
+        {
+            if (SettingsFile.Length > 0 && File.Exists(SettingsFile))
+            {
+                System.Web.Script.Serialization.JavaScriptSerializer js = new System.Web.Script.Serialization.JavaScriptSerializer();
+                Dictionary<string, object> d = js.DeserializeObject(File.ReadAllText(SettingsFile, Encoding.UTF8)) as Dictionary<string, object>;
+                if (d != null && d.ContainsKey("UpdatePruefung"))
+                {
+                    return Convert.ToBoolean(d["UpdatePruefung"]);
+                }
+            }
+        }
+        catch { }
+        return true;
+    }
+
+    void SaveUpdateCheckPreference(bool enabled)
+    {
+        try
+        {
+            if (SettingsFile.Length == 0) return;
+            Dictionary<string, object> d = null;
+            System.Web.Script.Serialization.JavaScriptSerializer js = new System.Web.Script.Serialization.JavaScriptSerializer();
+            if (File.Exists(SettingsFile))
+            {
+                try { d = js.DeserializeObject(File.ReadAllText(SettingsFile, Encoding.UTF8)) as Dictionary<string, object>; } catch { }
+            }
+            if (d == null) d = new Dictionary<string, object>();
+            d["UpdatePruefung"] = enabled;
+            File.WriteAllText(SettingsFile, js.Serialize(d), Encoding.UTF8);
+        }
+        catch { }
+    }
+
+    void ApplyUpdateBadge(string newVer)
+    {
+        if (badgeUpdate != null)
+        {
+            badgeUpdate.Text = "Update verfÃ¼gbar (" + newVer + ")";
+            badgeUpdate.Visible = true;
+        }
+    }
+
+    void StartUpdateCheck()
+    {
+        if (!LoadUpdateCheckPreference()) return;
+
+        System.Threading.Thread t = new System.Threading.Thread(delegate() {
+            try
+            {
+                string cacheDir = Path.Combine(dataDir, "Cache");
+                string cacheFile = Path.Combine(cacheDir, "UpdateCheck.json");
+                string tag = "";
+                string body = "";
+                string dlUrl = "";
+                string sha = "";
+                bool useCache = false;
+
+                if (File.Exists(cacheFile))
+                {
+                    FileInfo fi = new FileInfo(cacheFile);
+                    if (DateTime.UtcNow.Subtract(fi.LastWriteTimeUtc).TotalHours < 24)
+                    {
+                        try
+                        {
+                            System.Web.Script.Serialization.JavaScriptSerializer js = new System.Web.Script.Serialization.JavaScriptSerializer();
+                            Dictionary<string, object> cd = js.DeserializeObject(File.ReadAllText(cacheFile, Encoding.UTF8)) as Dictionary<string, object>;
+                            if (cd != null)
+                            {
+                                if (cd.ContainsKey("Tag") && cd["Tag"] != null) tag = cd["Tag"].ToString();
+                                if (cd.ContainsKey("DownloadUrl") && cd["DownloadUrl"] != null) dlUrl = cd["DownloadUrl"].ToString();
+                                if (cd.ContainsKey("Sha256") && cd["Sha256"] != null) sha = cd["Sha256"].ToString();
+                                if (cd.ContainsKey("Body") && cd["Body"] != null) body = cd["Body"].ToString();
+                                useCache = true;
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                if (!useCache)
+                {
+                    System.Net.ServicePointManager.SecurityProtocol = (System.Net.SecurityProtocolType)3072; // Tls12
+                    System.Net.HttpWebRequest req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create("https://api.github.com/repos/miniLeonardo/MiniBench/releases/latest");
+                    req.Timeout = 3000;
+                    req.ReadWriteTimeout = 3000;
+                    req.UserAgent = "LeosMinibench";
+                    req.Method = "GET";
+
+                    using (System.Net.HttpWebResponse resp = (System.Net.HttpWebResponse)req.GetResponse())
+                    using (StreamReader sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                    {
+                        string json = sr.ReadToEnd();
+                        System.Web.Script.Serialization.JavaScriptSerializer js = new System.Web.Script.Serialization.JavaScriptSerializer();
+                        Dictionary<string, object> dict = js.DeserializeObject(json) as Dictionary<string, object>;
+                        if (dict != null)
+                        {
+                            if (dict.ContainsKey("tag_name") && dict["tag_name"] != null) tag = dict["tag_name"].ToString().Trim();
+                            if (dict.ContainsKey("body") && dict["body"] != null) body = dict["body"].ToString();
+                            if (dict.ContainsKey("assets") && dict["assets"] is object[])
+                            {
+                                object[] assets = (object[])dict["assets"];
+                                foreach (object a in assets)
+                                {
+                                    if (a is Dictionary<string, object>)
+                                    {
+                                        Dictionary<string, object> ad = (Dictionary<string, object>)a;
+                                        if (ad.ContainsKey("name") && ad["name"] != null && ad["name"].ToString().Equals("LMB.exe", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            if (ad.ContainsKey("browser_download_url")) dlUrl = ad["browser_download_url"].ToString();
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            System.Text.RegularExpressions.Match mSha = System.Text.RegularExpressions.Regex.Match(body, @"(?:SHA-?256(?:\s*\(LMB\.exe\))?[:\s]+)([a-fA-F0-9]{64})");
+                            if (mSha.Success) sha = mSha.Groups[1].Value.ToLowerInvariant();
+
+                            try
+                            {
+                                if (!Directory.Exists(cacheDir)) Directory.CreateDirectory(cacheDir);
+                                Dictionary<string, string> cDict = new Dictionary<string, string>();
+                                cDict["CheckedAt"] = DateTime.UtcNow.ToString("o");
+                                cDict["Tag"] = tag;
+                                cDict["DownloadUrl"] = dlUrl;
+                                cDict["Sha256"] = sha;
+                                cDict["Body"] = body;
+                                File.WriteAllText(cacheFile, js.Serialize(cDict), Encoding.UTF8);
+                            }
+                            catch { }
+                        }
+                    }
+                }
+
+                if (!String.IsNullOrEmpty(tag))
+                {
+                    string cleanRemote = tag.TrimStart('v', 'V', ' ');
+                    string cleanLocal = this.version.TrimStart('v', 'V', ' ');
+                    System.Version vRem, vLoc;
+                    bool isNewer = false;
+                    if (System.Version.TryParse(cleanRemote, out vRem) && System.Version.TryParse(cleanLocal, out vLoc))
+                    {
+                        isNewer = vRem > vLoc;
+                    }
+                    else
+                    {
+                        isNewer = String.Compare(cleanRemote, cleanLocal, StringComparison.OrdinalIgnoreCase) > 0;
+                    }
+
+                    if (isNewer)
+                    {
+                        AvailableUpdateVersion = tag;
+                        AvailableUpdateUrl = dlUrl;
+                        AvailableUpdateSha256 = sha;
+                        AvailableUpdateBody = body;
+                        HasUpdateAvailable = true;
+
+                        try
+                        {
+                            BeginInvoke(new MethodInvoker(delegate() {
+                                ApplyUpdateBadge(tag);
+                            }));
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch
+            {
+                // Silent fail
+            }
+        });
+        t.IsBackground = true;
+        t.Start();
+    }
+
+    void TriggerUpdateDownload()
+    {
+        if (String.IsNullOrEmpty(AvailableUpdateUrl))
+        {
+            MessageBox.Show(this, "Keine Download-Adresse fÃ¼r das Update gefunden.", "Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        string msg = "MÃ¶chten Sie das Update auf Version " + AvailableUpdateVersion + " jetzt herunterladen und LMB.exe automatisch austauschen?\r\n\r\n" +
+                     "Die bisherige Programmdatei wird im Archiv gesichert und die Anwendung anschlieÃŸend neu gestartet.";
+        if (MessageBox.Show(this, msg, "Minibench Update", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            return;
+
+        try
+        {
+            string updateDir = Path.Combine(dataDir, "Update");
+            if (!Directory.Exists(updateDir)) Directory.CreateDirectory(updateDir);
+            string targetExe = Path.Combine(updateDir, "LMB.exe");
+
+            Cursor.Current = Cursors.WaitCursor;
+
+            using (System.Net.WebClient wc = new System.Net.WebClient())
+            {
+                wc.Headers["User-Agent"] = "LeosMinibench";
+                wc.DownloadFile(AvailableUpdateUrl, targetExe);
+            }
+
+            if (File.Exists(targetExe))
+            {
+                string hash = "";
+                using (System.Security.Cryptography.SHA256 sha = System.Security.Cryptography.SHA256.Create())
+                using (FileStream fs = File.OpenRead(targetExe))
+                {
+                    byte[] bytes = sha.ComputeHash(fs);
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 0; i < bytes.Length; i++) sb.Append(bytes[i].ToString("x2"));
+                    hash = sb.ToString();
+                }
+
+                if (!String.IsNullOrEmpty(AvailableUpdateSha256))
+                {
+                    if (!hash.Equals(AvailableUpdateSha256, StringComparison.OrdinalIgnoreCase))
+                    {
+                        try { File.Delete(targetExe); } catch { }
+                        MessageBox.Show(this,
+                            "SicherheitsprÃ¼fung fehlgeschlagen:\r\n\r\n" +
+                            "Die SHA-256-PrÃ¼fsumme der heruntergeladenen Datei stimmt nicht mit der Vorgabe des Releases Ã¼berein:\r\n\r\n" +
+                            "Erwartet: " + AvailableUpdateSha256 + "\r\n" +
+                            "Berechnet: " + hash + "\r\n\r\n" +
+                            "Die Datei wurde aus SicherheitsgrÃ¼nden verworfen.",
+                            "Update-Sicherheitsfehler",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error);
+                        return;
+                    }
+                }
+
+                ExecuteSelfReplace(targetExe);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "Fehler beim Herunterladen des Updates:\r\n\r\n" + ex.Message, "Update Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            Cursor.Current = Cursors.Default;
+        }
+    }
+
+    void ExecuteSelfReplace(string newExePath)
+    {
+        try
+        {
+            string updateDir = Path.GetDirectoryName(newExePath);
+            string updateCmd = Path.Combine(updateDir, "Update.cmd");
+            string currentExe = this.psExe;
+            if (String.IsNullOrEmpty(currentExe) || !File.Exists(currentExe))
+            {
+                currentExe = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
+            }
+            int myPid = System.Diagnostics.Process.GetCurrentProcess().Id;
+
+            string archivDir = Path.Combine(dataDir, "Archiv", "v" + this.version);
+
+            string[] cmdLines = new string[] {
+                string.Format("{0}echo off", "@"),
+                "setlocal",
+                "title Minibench Update",
+                ":waitloop",
+                "timeout /t 1 /nobreak >nul",
+                "tasklist /fi \"PID eq " + myPid + "\" 2>nul | find \"" + myPid + "\" >nul",
+                "if %errorlevel% equ 0 goto waitloop",
+                "if not exist \"" + archivDir + "\" mkdir \"" + archivDir + "\"",
+                "move /y \"" + currentExe + "\" \"" + Path.Combine(archivDir, "LMB.exe") + "\" >nul",
+                "copy /y \"" + newExePath + "\" \"" + currentExe + "\" >nul",
+                "start \"\" \"" + currentExe + "\"",
+                "del \"%~f0\""
+            };
+
+            File.WriteAllText(updateCmd, String.Join("\r\n", cmdLines), Encoding.ASCII);
+
+            ProcessStartInfo psi = new ProcessStartInfo();
+            psi.FileName = "cmd.exe";
+            psi.Arguments = "/c \"" + updateCmd + "\"";
+            psi.CreateNoWindow = true;
+            psi.UseShellExecute = false;
+            Process.Start(psi);
+
+            Application.Exit();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "Fehler beim Vorbereiten des Programmaustauschs:\r\n\r\n" + ex.Message, "Update Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 
     void ToggleTheme()
@@ -2509,6 +2822,7 @@ public partial class DiagGui : Form
         lblSensTools.ForeColor = LhmPresent ? UI.Muted : UI.Warn;
         btnSensTools.Text = LhmPresent && PawnSetupPresent ? "Sensorwerkzeuge erneut holen" : "Sensorwerkzeuge holen";
         UpdateSensStatusBadge();
+        StartUpdateCheck();
     }
 
     Control BuildSensorPage()

@@ -110,6 +110,102 @@ function Copy-UmzugTree([string]$Source, [string]$Destination, [string[]]$Exclud
     }
 }
 
+function Test-UmzugTreeDiff([string]$Source, [string]$Destination, [string[]]$ExcludeDirs = @(), [string[]]$ExcludeFiles = @()) {
+    if (-not (Test-Path -LiteralPath $Source) -or -not (Test-Path -LiteralPath $Destination)) {
+        return @('Quelle oder Ziel existiert nicht')
+    }
+    $xdList = @('Temp', 'Cache', 'Code Cache', 'GPUCache', 'Service Worker', 'CrashDumps', 'node_modules', 'backup', 'workspaceStorage') + $ExcludeDirs
+    $roboArgs = @(
+        ('"{0}"' -f $Source.TrimEnd('\')),
+        ('"{0}"' -f $Destination.TrimEnd('\')),
+        '*.*',
+        '/E',
+        '/XJ',
+        '/L',
+        '/NJH',
+        '/NJS',
+        '/NDL',
+        '/NC',
+        '/NS',
+        '/NP'
+    )
+    if ($xdList.Count -gt 0) {
+        $roboArgs += '/XD'
+        foreach ($xd in $xdList) { $roboArgs += ('"{0}"' -f $xd) }
+    }
+    if ($ExcludeFiles -and $ExcludeFiles.Count -gt 0) {
+        $roboArgs += '/XF'
+        foreach ($xf in $ExcludeFiles) { $roboArgs += ('"{0}"' -f $xf) }
+    }
+    $pinfo = New-Object System.Diagnostics.ProcessStartInfo
+    $pinfo.FileName = 'robocopy.exe'
+    $pinfo.Arguments = $roboArgs -join ' '
+    $pinfo.UseShellExecute = $false
+    $pinfo.CreateNoWindow = $true
+    $pinfo.RedirectStandardOutput = $true
+    $diffs = @()
+    try {
+        $p = [System.Diagnostics.Process]::Start($pinfo)
+        while (-not $p.StandardOutput.EndOfStream) {
+            $l = $p.StandardOutput.ReadLine()
+            if ($l -and $l.Trim()) {
+                $diffs += $l.Trim()
+            }
+        }
+        $p.WaitForExit()
+    } catch { }
+    return @($diffs)
+}
+
+function Test-UmzugSha256Samples([string]$Source, [string]$Destination, [int]$SampleCount = 20) {
+    if (-not (Test-Path -LiteralPath $Source) -or -not (Test-Path -LiteralPath $Destination)) {
+        return @()
+    }
+    $dstFiles = @(Get-ChildItem -LiteralPath $Destination -File -Recurse -Force -ErrorAction SilentlyContinue)
+    if ($dstFiles.Count -eq 0) { return @() }
+
+    $chosen = @()
+    if ($dstFiles.Count -le $SampleCount) {
+        $chosen = $dstFiles
+    } else {
+        $sorted = @($dstFiles | Sort-Object Length)
+        $small = @($sorted | Select-Object -First 5)
+        $large = @($sorted | Select-Object -Last 5)
+        $midPool = @($sorted[5..($sorted.Count - 6)])
+        $step = [math]::Max(1, [math]::Floor($midPool.Count / 10))
+        $mid = @(for ($i = 0; $i -lt $midPool.Count -and $chosen.Count -lt 10; $i += $step) { $midPool[$i] })
+        $chosen = @($small + $mid + $large) | Select-Object -Unique -First $SampleCount
+    }
+
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    function Get-FileSha([string]$fPath) {
+        try {
+            $fs = [System.IO.File]::OpenRead($fPath)
+            try {
+                $b = $sha.ComputeHash($fs)
+                return (($b | ForEach-Object { $_.ToString('x2') }) -join '')
+            } finally { $fs.Dispose() }
+        } catch { return '' }
+    }
+
+    $results = @()
+    $dstBaseLen = $Destination.TrimEnd('\').Length
+    foreach ($df in $chosen) {
+        $rel = $df.FullName.Substring($dstBaseLen).TrimStart('\')
+        $sf = Join-Path $Source $rel
+        $srcHash = Get-FileSha $sf
+        $dstHash = Get-FileSha $df.FullName
+        $ok = ($srcHash -and $dstHash -and ($srcHash -eq $dstHash))
+        $results += [pscustomobject]@{
+            Datei     = $rel
+            QuellHash = $srcHash
+            ZielHash  = $dstHash
+            Ok        = $ok
+        }
+    }
+    return @($results)
+}
+
 function Invoke-SystemBackup {
     [CmdletBinding()]
     param(
@@ -203,6 +299,8 @@ function Invoke-SystemBackup {
         )
 
         $hasGranularLib = [bool]($uList | Where-Object { $_ -like 'Lib_*' })
+        $diffReports = @()
+        $shaReports = @()
 
         foreach ($lib in $libs) {
             if ($hasGranularLib -and -not ($uList -contains $lib.Key)) {
@@ -214,7 +312,12 @@ function Invoke-SystemBackup {
                 $stepMsg = ('Kopiere Bibliothek {0} ({1}) ...' -f $lib.Name, $sizeTxt)
                 Send-GuiEvent 'UMZUG' ([string]$lib.Step) $stepMsg ''
                 Send-GuiEvent 'LOG' '' ('Spiegele {0} ({1}) -> Benutzerprofil\{2}' -f $lib.Path, $sizeTxt, $lib.Name)
-                Copy-UmzugTree $lib.Path (Join-Path $profDest $lib.Name) @() $lib.Step $stepMsg | Out-Null
+                $destLib = Join-Path $profDest $lib.Name
+                Copy-UmzugTree $lib.Path $destLib @() $lib.Step $stepMsg | Out-Null
+                $diffs = @(Test-UmzugTreeDiff $lib.Path $destLib)
+                $diffReports += [pscustomobject]@{ Name = $lib.Name; Diffs = $diffs; Count = $diffs.Count }
+                $samples = @(Test-UmzugSha256Samples $lib.Path $destLib 20)
+                $shaReports += [pscustomobject]@{ Name = $lib.Name; Samples = $samples }
             }
         }
     }
@@ -554,6 +657,118 @@ function Invoke-SystemBackup {
         [System.IO.File]::WriteAllText($reportFile, $sb.ToString(), [System.Text.Encoding]::UTF8)
     }
 
+    # 5b. WLAN-Netzwerkprofile (ab v3.86)
+    if ($uList -contains 'Wlan') {
+        if ($script:Anonymisieren -or $Anonymisieren) {
+            Send-GuiEvent 'LOG' 'Gelb' 'WLAN-Profile werden aufgrund aktiver Anonymisierung nicht exportiert.'
+        } else {
+            Send-GuiEvent 'UMZUG' '88' 'Sichere WLAN-Netzwerkprofile ...' ''
+            Send-GuiEvent 'LOG' '' 'Exportiere WLAN-Profile ...'
+            $wlanDest = Join-Path $backupFolder 'WLAN-Profile'
+            try {
+                [System.IO.Directory]::CreateDirectory($wlanDest) | Out-Null
+                $exportClear = ($uList -contains 'Wlan_Klartext')
+                $clearArg = if ($exportClear) { ' key=clear' } else { '' }
+                $pinfo = New-Object System.Diagnostics.ProcessStartInfo
+                $pinfo.FileName = 'netsh.exe'
+                $pinfo.Arguments = ('wlan export profile folder="{0}"{1}' -f $wlanDest, $clearArg)
+                $pinfo.UseShellExecute = $false
+                $pinfo.CreateNoWindow = $true
+                $p = [System.Diagnostics.Process]::Start($pinfo)
+                if (-not $p.WaitForExit(30000)) { try { $p.Kill() } catch { } }
+                $exportedProfiles = @(Get-ChildItem -LiteralPath $wlanDest -Filter '*.xml' -File -ErrorAction SilentlyContinue)
+                $secNote = if ($exportClear) { 'mit Klartext-Schluesseln' } else { 'ohne Schluessel (Standard)' }
+                Send-GuiEvent 'LOG' '' ('WLAN-Profile exportiert: {0} Profile ({1})' -f $exportedProfiles.Count, $secNote)
+            } catch {
+                Send-GuiEvent 'LOG' 'Gelb' ('Fehler beim Export der WLAN-Profile: {0}' -f $_.Exception.Message)
+            }
+        }
+    }
+
+    # 5c. Verifikationsauswertung & Pruefprotokoll.txt (ab v3.86)
+    Send-GuiEvent 'UMZUG' '92' 'Pruefe Sicherungsvollstaendigkeit (Diff & SHA-256) ...' ''
+    $allDiffsOk = $true
+    $allShaOk = $true
+    $totalDiffs = 0
+    $totalSamples = 0
+    $failedSamples = 0
+
+    $protoPath = Join-Path $backupFolder 'Pruefprotokoll.txt'
+    $psb = New-Object System.Text.StringBuilder
+    $psb.AppendLine('LEOS MINIBENCH: SICHERUNGS-PRUEFPROTOKOLL') | Out-Null
+    $psb.AppendLine('=========================================') | Out-Null
+    $psb.AppendLine(('Datum:            {0}' -f (Get-Date).ToString('dd.MM.yyyy HH:mm:ss'))) | Out-Null
+    $psb.AppendLine(('Computer:         {0}' -f $env:COMPUTERNAME)) | Out-Null
+    $psb.AppendLine(('Sicherungsordner: {0}' -f $backupFolder)) | Out-Null
+    $psb.AppendLine() | Out-Null
+
+    $psb.AppendLine('1. ROBOCOPY-DIFFERENZABGLEICH') | Out-Null
+    $psb.AppendLine('----------------------------') | Out-Null
+    if ($diffReports -and $diffReports.Count -gt 0) {
+        foreach ($dr in $diffReports) {
+            $psb.AppendLine(('Bibliothek: {0} - Abweichungen: {1}' -f $dr.Name, $dr.Count)) | Out-Null
+            if ($dr.Count -gt 0) {
+                $allDiffsOk = $false
+                $totalDiffs += $dr.Count
+                foreach ($d in $dr.Diffs) {
+                    $psb.AppendLine(('  [ABWEICHUNG] {0}' -f $d)) | Out-Null
+                }
+            } else {
+                $psb.AppendLine('  Keine Differenzen festgestellt (vollstaendig synchron).') | Out-Null
+            }
+        }
+    } else {
+        $psb.AppendLine('Keine Bibliotheken fuer Differenzabgleich ausgewaehlt.') | Out-Null
+    }
+    $psb.AppendLine() | Out-Null
+
+    $psb.AppendLine('2. SHA-256-STICHPROBENPRUEFUNG (ca. 20 Dateien je Bibliothek)') | Out-Null
+    $psb.AppendLine('-------------------------------------------------------------') | Out-Null
+    if ($shaReports -and $shaReports.Count -gt 0) {
+        foreach ($sr in $shaReports) {
+            $psb.AppendLine(('Bibliothek: {0} ({1} Stichproben geprueft)' -f $sr.Name, $sr.Samples.Count)) | Out-Null
+            foreach ($s in $sr.Samples) {
+                $totalSamples++
+                if (-not $s.Ok) {
+                    $allShaOk = $false
+                    $failedSamples++
+                    $psb.AppendLine(('  [FEHLER] {0}' -f $s.Datei)) | Out-Null
+                    $psb.AppendLine(('           Quelle: {0}' -f $s.QuellHash)) | Out-Null
+                    $psb.AppendLine(('           Ziel:   {0}' -f $s.ZielHash)) | Out-Null
+                } else {
+                    $subHash = if ($s.ZielHash.Length -ge 16) { $s.ZielHash.Substring(0, 16) } else { $s.ZielHash }
+                    $psb.AppendLine(('  [OK]     {0} (SHA: {1}...)' -f $s.Datei, $subHash)) | Out-Null
+                }
+            }
+        }
+    } else {
+        $psb.AppendLine('Keine Dateien fuer SHA-256-Stichproben ausgewaehlt.') | Out-Null
+    }
+    $psb.AppendLine() | Out-Null
+
+    $sicherungVollstaendig = ($allDiffsOk -and $allShaOk)
+    $psb.AppendLine('GESAMTERGEBNIS') | Out-Null
+    $psb.AppendLine('==============') | Out-Null
+    $psb.AppendLine(('Sicherung vollstaendig: {0}' -f $(if ($sicherungVollstaendig) { 'Ja' } else { 'Nein' }))) | Out-Null
+    if (-not $sicherungVollstaendig) {
+        $psb.AppendLine(('Details: {0} Dateidifferenzen, {1} fehlerhafte Pruefsummen von {2} Stichproben.' -f $totalDiffs, $failedSamples, $totalSamples)) | Out-Null
+    }
+    [System.IO.File]::WriteAllText($protoPath, $psb.ToString(), [System.Text.Encoding]::UTF8)
+
+    if ($sicherungVollstaendig) {
+        Send-GuiEvent 'LOG' 'Gruen' ('Sicherung vollstaendig: Ja (0 Differenzen, {0} Stichproben OK)' -f $totalSamples)
+    } else {
+        Send-GuiEvent 'LOG' 'Rot' ('Sicherung unvollstaendig: Nein ({0} Differenzen, {1} fehlerhafte Pruefsummen)' -f $totalDiffs, $failedSamples)
+    }
+
+    if (Get-Command Add-Finding -ErrorAction SilentlyContinue) {
+        if ($sicherungVollstaendig) {
+            Add-Finding 'Info' 'System-Umzug' ('Sicherung vollstaendig: Ja ({0} Stichproben geprueft, keine Differenzen).' -f $totalSamples)
+        } else {
+            Add-Finding 'Warnung' 'System-Umzug' ('Sicherung unvollstaendig: Nein ({0} Differenzen, {1} fehlerhafte Pruefsummen).' -f $totalDiffs, $failedSamples)
+        }
+    }
+
     # 6. Autarkes Wiederherstellungs-Paket (Wiederherstellen.cmd & Wiederherstellen.ps1)
     Send-GuiEvent 'UMZUG' '95' 'Erstelle autarkes Wiederherstellungspaket ...' ''
     Send-GuiEvent 'LOG' '' 'Erzeuge Wiederherstellen.cmd und Wiederherstellen.ps1 ...'
@@ -570,7 +785,23 @@ function Invoke-SystemBackup {
         '    powershell.exe -NoProfile -Command "Start-Process cmd -ArgumentList ''/c \"\"%~f0\"\"'' -Verb RunAs"',
         '    exit /b',
         ')',
-        'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Wiederherstellen.ps1"',
+        'echo ========================================================================',
+        'echo           LEOS MINIBENCH: SYSTEM-WIEDERHERSTELLUNG',
+        'echo ========================================================================',
+        'echo.',
+        'echo Bitte waehlen Sie eine Option:',
+        'echo   [1] Trockenlauf (Pruefen, was getan wuerde)',
+        'echo   [2] Vollstaendige Wiederherstellung durchfuehren',
+        'echo   [3] Abbrechen',
+        'echo.',
+        'set /p opt="Auswahl (1-3): "',
+        'if "%opt%"=="1" (',
+        '    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Wiederherstellen.ps1" -Trockenlauf',
+        ') else if "%opt%"=="2" (',
+        '    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Wiederherstellen.ps1"',
+        ') else (',
+        '    echo Vorgang abgebrochen.',
+        ')',
         'pause'
     )
     [System.IO.File]::WriteAllText($cmdPath, ($cmdLines -join "`r`n"), [System.Text.Encoding]::ASCII)
@@ -585,7 +816,9 @@ function Invoke-SystemBackup {
         '    Erstellt von Leos Minibench (System-Umzug).',
         '#>',
         '[CmdletBinding()]',
-        'param()',
+        'param(',
+        '    [switch]$Trockenlauf',
+        ')',
         '',
         '$Host.UI.RawUI.WindowTitle = ''Leos Minibench: System-Wiederherstellung''',
         'Clear-Host',
@@ -593,6 +826,10 @@ function Invoke-SystemBackup {
         'Write-Host ''          LEOS MINIBENCH: SYSTEM-WIEDERHERSTELLUNG'' -ForegroundColor White',
         'Write-Host ''========================================================================'' -ForegroundColor Cyan',
         'Write-Host ''''',
+        'if ($Trockenlauf) {',
+        '    Write-Host ''*** MODUS: TROCKENLAUF (Es werden keine Aenderungen vorgenommen) ***'' -ForegroundColor Magenta',
+        '    Write-Host ''''',
+        '}',
         'Write-Host (''Ziel-Benutzerprofil:   {0}'' -f $env:USERPROFILE) -ForegroundColor Yellow',
         'Write-Host (''Aktueller Computer:    {0}'' -f $env:COMPUTERNAME) -ForegroundColor Yellow',
         'Write-Host (''Sicherungsverzeichnis: {0}'' -f $PSScriptRoot) -ForegroundColor Yellow',
@@ -609,19 +846,27 @@ function Invoke-SystemBackup {
         '# 1. Benutzerprofil, Bibliotheken & Konfigurationen',
         '$profSrc = Join-Path $PSScriptRoot ''Benutzerprofil''',
         'if (Test-Path -LiteralPath $profSrc) {',
-        '    Write-Host ''[1/5] Benutzer-Bibliotheken und Anwendungsdaten zurueckspielen ...'' -ForegroundColor Green',
+        '    Write-Host ''[1/6] Benutzer-Bibliotheken und Anwendungsdaten zurueckspielen ...'' -ForegroundColor Green',
         '    $dirs = Get-ChildItem -LiteralPath $profSrc -Directory -ErrorAction SilentlyContinue',
         '    foreach ($d in $dirs) {',
         '        if ($d.Name -eq ''AppData'') {',
         '            $appDataSrc = Join-Path $profSrc ''AppData''',
         '            $appDataDst = Join-Path $env:USERPROFILE ''AppData''',
-        '            Write-Host ''      Kopiere Profile und Programm-Konfigurationen ...''',
-        '            & robocopy.exe "$appDataSrc" "$appDataDst" /E /XJ /R:1 /W:1 /COPY:DAT /MT:16 /NP /NFL /NDL | Out-Null',
+        '            if ($Trockenlauf) {',
+        '                Write-Host ''      [TROCKENLAUF] Wuerde Profile und Konfigurationen spiegeln: AppData ->'' $appDataDst',
+        '            } else {',
+        '                Write-Host ''      Kopiere Profile und Programm-Konfigurationen ...''',
+        '                & robocopy.exe "$appDataSrc" "$appDataDst" /E /XJ /R:1 /W:1 /COPY:DAT /MT:16 /NP /NFL /NDL | Out-Null',
+        '            }',
         '        } elseif ($d.Name -eq ''PowerShellProfiles'') {',
         '            $psDst = Join-Path $env:USERPROFILE ''Documents\WindowsPowerShell''',
-        '            try { [System.IO.Directory]::CreateDirectory($psDst) | Out-Null } catch { }',
-        '            Write-Host ''      Kopiere PowerShell-Profile ...''',
-        '            & robocopy.exe "$($d.FullName)" "$psDst" /E /XJ /R:1 /W:1 /COPY:DAT /MT:16 /NP /NFL /NDL | Out-Null',
+        '            if ($Trockenlauf) {',
+        '                Write-Host ''      [TROCKENLAUF] Wuerde PowerShell-Profile kopieren nach:'' $psDst',
+        '            } else {',
+        '                try { [System.IO.Directory]::CreateDirectory($psDst) | Out-Null } catch { }',
+        '                Write-Host ''      Kopiere PowerShell-Profile ...''',
+        '                & robocopy.exe "$($d.FullName)" "$psDst" /E /XJ /R:1 /W:1 /COPY:DAT /MT:16 /NP /NFL /NDL | Out-Null',
+        '            }',
         '        } elseif ($d.Name -eq ''WindowsTerminal'') {',
         '            if ($env:LOCALAPPDATA) {',
         '                $wtPkg = Get-ChildItem -LiteralPath (Join-Path $env:LOCALAPPDATA ''Packages'') -Filter ''Microsoft.WindowsTerminal_*'' -Directory -ErrorAction SilentlyContinue | Select-Object -First 1',
@@ -629,8 +874,12 @@ function Invoke-SystemBackup {
         '                    $wtTarget = Join-Path $wtPkg.FullName ''LocalState\settings.json''',
         '                    $wtSrc = Join-Path $d.FullName ''settings.json''',
         '                    if (Test-Path $wtSrc) {',
-        '                        Write-Host ''      Aktualisiere Windows Terminal Konfiguration ...''',
-        '                        try { Copy-Item -LiteralPath $wtSrc -Destination $wtTarget -Force } catch { }',
+        '                        if ($Trockenlauf) {',
+        '                            Write-Host ''      [TROCKENLAUF] Wuerde Windows Terminal Konfiguration kopieren nach:'' $wtTarget',
+        '                        } else {',
+        '                            Write-Host ''      Aktualisiere Windows Terminal Konfiguration ...''',
+        '                            try { Copy-Item -LiteralPath $wtSrc -Destination $wtTarget -Force } catch { }',
+        '                        }',
         '                    }',
         '                }',
         '            }',
@@ -642,71 +891,114 @@ function Invoke-SystemBackup {
         '                ''Musik''     { if (-not (Test-Path $targetPath) -and (Test-Path "$env:USERPROFILE\Music"))     { $targetPath = "$env:USERPROFILE\Music" } }',
         '                ''Videos''    { if (-not (Test-Path $targetPath) -and (Test-Path "$env:USERPROFILE\Videos"))    { $targetPath = "$env:USERPROFILE\Videos" } }',
         '            }',
-        '            Write-Host (''      Spiegele {0} -> {1} ...'' -f $d.Name, $targetPath)',
-        '            try { [System.IO.Directory]::CreateDirectory($targetPath) | Out-Null } catch { }',
-        '            & robocopy.exe "$($d.FullName)" "$targetPath" /E /XJ /R:1 /W:1 /COPY:DAT /MT:16 /NP /NFL /NDL | Out-Null',
+        '            if ($Trockenlauf) {',
+        '                Write-Host (''      [TROCKENLAUF] Wuerde spiegeln: {0} -> {1}'' -f $d.Name, $targetPath)',
+        '            } else {',
+        '                Write-Host (''      Spiegele {0} -> {1} ...'' -f $d.Name, $targetPath)',
+        '                try { [System.IO.Directory]::CreateDirectory($targetPath) | Out-Null } catch { }',
+        '                & robocopy.exe "$($d.FullName)" "$targetPath" /E /XJ /R:1 /W:1 /COPY:DAT /MT:16 /NP /NFL /NDL | Out-Null',
+        '            }',
         '        }',
         '    }',
         '    # Einzeldateien im Profil',
         '    $gitCfgSrc = Join-Path $profSrc ''.gitconfig''',
         '    if (Test-Path -LiteralPath $gitCfgSrc) {',
-        '        try { Copy-Item -LiteralPath $gitCfgSrc -Destination (Join-Path $env:USERPROFILE ''.gitconfig'') -Force } catch { }',
+        '        if ($Trockenlauf) {',
+        '            Write-Host ''      [TROCKENLAUF] Wuerde .gitconfig kopieren''',
+        '        } else {',
+        '            try { Copy-Item -LiteralPath $gitCfgSrc -Destination (Join-Path $env:USERPROFILE ''.gitconfig'') -Force } catch { }',
+        '        }',
         '    }',
         '    $gitIgnoreSrc = Join-Path $profSrc ''.gitignore_global''',
         '    if (Test-Path -LiteralPath $gitIgnoreSrc) {',
-        '        try { Copy-Item -LiteralPath $gitIgnoreSrc -Destination (Join-Path $env:USERPROFILE ''.gitignore_global'') -Force } catch { }',
+        '        if ($Trockenlauf) {',
+        '            Write-Host ''      [TROCKENLAUF] Wuerde .gitignore_global kopieren''',
+        '        } else {',
+        '            try { Copy-Item -LiteralPath $gitIgnoreSrc -Destination (Join-Path $env:USERPROFILE ''.gitignore_global'') -Force } catch { }',
+        '        }',
         '    }',
         '    $puttyJson = Join-Path $profSrc ''PuTTY_Sessions.json''',
         '    if (Test-Path -LiteralPath $puttyJson) {',
-        '        Write-Host ''      Stelle PuTTY-Verbindungsprofile wieder her ...''',
-        '        try {',
-        '            $pData = Get-Content -LiteralPath $puttyJson -Raw -Encoding UTF8 | ConvertFrom-Json',
-        '            foreach ($item in $pData) {',
-        '                $targetKey = "HKCU:\Software\SimonTatham\PuTTY\Sessions\$($item.Session)"',
-        '                if (-not (Test-Path -LiteralPath $targetKey)) { New-Item -Path $targetKey -Force | Out-Null }',
-        '                foreach ($prop in $item.Einstellungen.PSObject.Properties) {',
-        '                    Set-ItemProperty -Path $targetKey -Name $prop.Name -Value $prop.Value -Force -ErrorAction SilentlyContinue',
+        '        if ($Trockenlauf) {',
+        '            Write-Host ''      [TROCKENLAUF] Wuerde PuTTY-Verbindungsprofile wiederherstellen''',
+        '        } else {',
+        '            Write-Host ''      Stelle PuTTY-Verbindungsprofile wieder her ...''',
+        '            try {',
+        '                $pData = Get-Content -LiteralPath $puttyJson -Raw -Encoding UTF8 | ConvertFrom-Json',
+        '                foreach ($item in $pData) {',
+        '                    $targetKey = "HKCU:\Software\SimonTatham\PuTTY\Sessions\$($item.Session)"',
+        '                    if (-not (Test-Path -LiteralPath $targetKey)) { New-Item -Path $targetKey -Force | Out-Null }',
+        '                    foreach ($prop in $item.Einstellungen.PSObject.Properties) {',
+        '                        Set-ItemProperty -Path $targetKey -Name $prop.Name -Value $prop.Value -Force -ErrorAction SilentlyContinue',
+        '                    }',
         '                }',
-        '            }',
-        '        } catch { }',
+        '            } catch { }',
+        '        }',
         '    }',
         '    $puttyReg = Join-Path $profSrc ''PuTTY_Sessions.reg''',
         '    if (Test-Path -LiteralPath $puttyReg) {',
-        '        Write-Host ''      Importiere PuTTY-Sessions ...''',
-        '        & reg.exe import "$puttyReg" 2>$null | Out-Null',
+        '        if ($Trockenlauf) {',
+        '            Write-Host ''      [TROCKENLAUF] Wuerde PuTTY-Sessions Registry importieren''',
+        '        } else {',
+        '            Write-Host ''      Importiere PuTTY-Sessions ...''',
+        '            & reg.exe import "$puttyReg" 2>$null | Out-Null',
+        '        }',
         '    }',
         '} else {',
-        '    Write-Host ''[1/5] Keine Benutzerprofil-Sicherung vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
+        '    Write-Host ''[1/6] Keine Benutzerprofil-Sicherung vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
         '}',
         '',
-        '# 2. C:\-Zusatzordner zuruecklegen',
+        '# 2. WLAN-Profile',
+        '$wlanSrc = Join-Path $PSScriptRoot ''WLAN-Profile''',
+        'if (Test-Path -LiteralPath $wlanSrc) {',
+        '    Write-Host ''[2/6] WLAN-Profile wiederherstellen ...'' -ForegroundColor Green',
+        '    $xmlProfiles = @(Get-ChildItem -LiteralPath $wlanSrc -Filter ''*.xml'' -File -ErrorAction SilentlyContinue)',
+        '    foreach ($xp in $xmlProfiles) {',
+        '        if ($Trockenlauf) {',
+        '            Write-Host (''      [TROCKENLAUF] Wuerde WLAN-Profil importieren: {0}'' -f $xp.Name)',
+        '        } else {',
+        '            Write-Host (''      Importiere WLAN-Profil: {0} ...'' -f $xp.Name)',
+        '            & netsh.exe wlan add profile filename="$($xp.FullName)" user=all 2>$null | Out-Null',
+        '        }',
+        '    }',
+        '} else {',
+        '    Write-Host ''[2/6] Keine WLAN-Profile gesichert (uebersprungen).'' -ForegroundColor DarkGray',
+        '}',
+        '',
+        '# 3. C:\-Zusatzordner zuruecklegen',
         '$zusatzSrc = Join-Path $PSScriptRoot ''C_Laufwerk_Zusatz''',
         'if (Test-Path -LiteralPath $zusatzSrc) {',
-        '    Write-Host ''[2/5] Zusaetzliche C:\-Ordner zuruecklegen ...'' -ForegroundColor Green',
+        '    Write-Host ''[3/6] Zusaetzliche C:\-Ordner zuruecklegen ...'' -ForegroundColor Green',
         '    $cDirs = Get-ChildItem -LiteralPath $zusatzSrc -Directory -ErrorAction SilentlyContinue',
         '    foreach ($cd in $cDirs) {',
         '        $cDest = Join-Path ''C:\'' $cd.Name',
-        '        Write-Host (''      Kopiere {0} -> {1} ...'' -f $cd.FullName, $cDest)',
-        '        try { [System.IO.Directory]::CreateDirectory($cDest) | Out-Null } catch { }',
-        '        & robocopy.exe "$($cd.FullName)" "$cDest" /E /XJ /R:1 /W:1 /COPY:DAT /MT:16 /NP /NFL /NDL | Out-Null',
+        '        if ($Trockenlauf) {',
+        '            Write-Host (''      [TROCKENLAUF] Wuerde Ordner spiegeln: {0} -> {1}'' -f $cd.FullName, $cDest)',
+        '        } else {',
+        '            Write-Host (''      Kopiere {0} -> {1} ...'' -f $cd.FullName, $cDest)',
+        '            try { [System.IO.Directory]::CreateDirectory($cDest) | Out-Null } catch { }',
+        '            & robocopy.exe "$($cd.FullName)" "$cDest" /E /XJ /R:1 /W:1 /COPY:DAT /MT:16 /NP /NFL /NDL | Out-Null',
+        '        }',
         '    }',
         '} else {',
-        '    Write-Host ''[2/5] Keine C:\-Zusatzordner vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
+        '    Write-Host ''[3/6] Keine C:\-Zusatzordner vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
         '}',
         '',
-        '# 3. Desktop-Optik anwenden',
+        '# 4. Desktop-Optik anwenden',
         '$layoutSrc = Join-Path $PSScriptRoot ''Desktop-Layout''',
         'if (Test-Path -LiteralPath $layoutSrc) {',
-        '    Write-Host ''[3/5] Desktop-Optik und Layout anwenden ...'' -ForegroundColor Green',
-        '',
-        '    $wpSrc = Join-Path $layoutSrc ''Wallpaper.jpg''',
-        '    if (Test-Path -LiteralPath $wpSrc) {',
-        '        $wpLocal = Join-Path $env:APPDATA ''Microsoft\Windows\Themes\TranscodedWallpaper''',
-        '        try {',
-        '            $wpDir = Split-Path $wpLocal',
-        '            if (-not (Test-Path $wpDir)) { [System.IO.Directory]::CreateDirectory($wpDir) | Out-Null }',
-        '            Copy-Item -LiteralPath $wpSrc -Destination $wpLocal -Force',
-        '            Add-Type -TypeDefinition @"',
+        '    Write-Host ''[4/6] Desktop-Optik und Layout anwenden ...'' -ForegroundColor Green',
+        '    if ($Trockenlauf) {',
+        '        Write-Host ''      [TROCKENLAUF] Wuerde Desktop-Hintergrundbild und Icon-Layout aktivieren''',
+        '    } else {',
+        '        $wpSrc = Join-Path $layoutSrc ''Wallpaper.jpg''',
+        '        if (Test-Path -LiteralPath $wpSrc) {',
+        '            $wpLocal = Join-Path $env:APPDATA ''Microsoft\Windows\Themes\TranscodedWallpaper''',
+        '            try {',
+        '                $wpDir = Split-Path $wpLocal',
+        '                if (-not (Test-Path $wpDir)) { [System.IO.Directory]::CreateDirectory($wpDir) | Out-Null }',
+        '                Copy-Item -LiteralPath $wpSrc -Destination $wpLocal -Force',
+        '                Add-Type -TypeDefinition @"',
         'using System;',
         'using System.Runtime.InteropServices;',
         'public class DiagWallpaperHelper {',
@@ -714,64 +1006,77 @@ function Invoke-SystemBackup {
         '    public static extern int SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);',
         '}',
         '"@ -ErrorAction SilentlyContinue',
-        '            [DiagWallpaperHelper]::SystemParametersInfo(20, 0, $wpLocal, 3) | Out-Null',
-        '            Write-Host ''      Hintergrundbild erfolgreich aktiviert.''',
-        '        } catch { }',
-        '    }',
+        '                [DiagWallpaperHelper]::SystemParametersInfo(20, 0, $wpLocal, 3) | Out-Null',
+        '                Write-Host ''      Hintergrundbild erfolgreich aktiviert.''',
+        '            } catch { }',
+        '        }',
         '',
-        '    $layoutJsonFile = Join-Path $layoutSrc ''Layout.json''',
-        '    if (Test-Path -LiteralPath $layoutJsonFile) {',
-        '        try {',
-        '            $lj = Get-Content -LiteralPath $layoutJsonFile -Raw -Encoding UTF8 | ConvertFrom-Json',
-        '            if ($lj.WallpaperStyle) {',
-        '                Set-ItemProperty -Path ''HKCU:\Control Panel\Desktop'' -Name ''WallpaperStyle'' -Value ([string]$lj.WallpaperStyle) -Force',
-        '            }',
-        '            if ($lj.TileWallpaper) {',
-        '                Set-ItemProperty -Path ''HKCU:\Control Panel\Desktop'' -Name ''TileWallpaper'' -Value ([string]$lj.TileWallpaper) -Force',
-        '            }',
-        '        } catch { }',
-        '    }',
+        '        $layoutJsonFile = Join-Path $layoutSrc ''Layout.json''',
+        '        if (Test-Path -LiteralPath $layoutJsonFile) {',
+        '            try {',
+        '                $lj = Get-Content -LiteralPath $layoutJsonFile -Raw -Encoding UTF8 | ConvertFrom-Json',
+        '                if ($lj.WallpaperStyle) {',
+        '                    Set-ItemProperty -Path ''HKCU:\Control Panel\Desktop'' -Name ''WallpaperStyle'' -Value ([string]$lj.WallpaperStyle) -Force',
+        '                }',
+        '                if ($lj.TileWallpaper) {',
+        '                    Set-ItemProperty -Path ''HKCU:\Control Panel\Desktop'' -Name ''TileWallpaper'' -Value ([string]$lj.TileWallpaper) -Force',
+        '                }',
+        '            } catch { }',
+        '        }',
         '',
-        '    $iconReg = Join-Path $layoutSrc ''IconPositionen.reg''',
-        '    if (Test-Path -LiteralPath $iconReg) {',
-        '        Write-Host ''      Icon-Koordinaten werden in Registry importiert ...''',
-        '        & reg.exe import "$iconReg" 2>$null | Out-Null',
-        '    }',
+        '        $iconReg = Join-Path $layoutSrc ''IconPositionen.reg''',
+        '        if (Test-Path -LiteralPath $iconReg) {',
+        '            Write-Host ''      Icon-Koordinaten werden in Registry importiert ...''',
+        '            & reg.exe import "$iconReg" 2>$null | Out-Null',
+        '        }',
         '',
-        '    Write-Host ''      Windows Explorer neu starten, um Layout zu uebernehmen ...''',
-        '    Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue',
-        '    Start-Sleep -Seconds 1',
+        '        Write-Host ''      Windows Explorer neu starten, um Layout zu uebernehmen ...''',
+        '        Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue',
+        '        Start-Sleep -Seconds 1',
+        '    }',
         '} else {',
-        '    Write-Host ''[3/5] Kein Desktop-Layout vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
+        '    Write-Host ''[4/6] Kein Desktop-Layout vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
         '}',
         '',
-        '# 4. Programme per winget einspielen',
+        '# 5. Programme per winget einspielen',
         '$wingetFile = Join-Path $PSScriptRoot ''Programme\winget-pakete.json''',
         'if (Test-Path -LiteralPath $wingetFile) {',
-        '    Write-Host ''[4/5] Installiere Programme ueber Winget-Paketliste ...'' -ForegroundColor Green',
-        '    $wgCmd = Get-Command winget.exe -ErrorAction SilentlyContinue | Select-Object -First 1',
-        '    if ($wgCmd) {',
-        '        Write-Host ''      winget import wird ausgefuehrt ...''',
-        '        & $wgCmd.Source import -i "$wingetFile" --accept-package-agreements --accept-source-agreements',
+        '    Write-Host ''[5/6] Installiere Programme ueber Winget-Paketliste ...'' -ForegroundColor Green',
+        '    if ($Trockenlauf) {',
+        '        Write-Host (''      [TROCKENLAUF] Wuerde winget import ausfuehren: {0}'' -f $wingetFile)',
         '    } else {',
-        '        Write-Warning ''winget ist auf diesem System nicht verfuegbar.''',
+        '        $wgCmd = Get-Command winget.exe -ErrorAction SilentlyContinue | Select-Object -First 1',
+        '        if ($wgCmd) {',
+        '            Write-Host ''      winget import wird ausgefuehrt ...''',
+        '            & $wgCmd.Source import -i "$wingetFile" --accept-package-agreements --accept-source-agreements',
+        '        } else {',
+        '            Write-Warning ''winget ist auf diesem System nicht verfuegbar.''',
+        '        }',
         '    }',
         '} else {',
-        '    Write-Host ''[4/5] Keine Winget-Paketliste vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
+        '    Write-Host ''[5/6] Keine Winget-Paketliste vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
         '}',
         '',
-        '# 5. Manuelle Installationen oeffnen',
+        '# 6. Manuelle Installationen oeffnen',
         '$nwFile = Join-Path $PSScriptRoot ''Programme\Nicht-Winget-Programme.txt''',
         'if (Test-Path -LiteralPath $nwFile) {',
-        '    Write-Host ''[5/5] Liste manuell zu installierender Programme anzeigen ...'' -ForegroundColor Green',
-        '    try { Start-Process notepad.exe -ArgumentList "`"$nwFile`"" } catch { }',
+        '    Write-Host ''[6/6] Liste manuell zu installierender Programme anzeigen ...'' -ForegroundColor Green',
+        '    if ($Trockenlauf) {',
+        '        Write-Host (''      [TROCKENLAUF] Wuerde Datei in Notepad anzeigen: {0}'' -f $nwFile)',
+        '    } else {',
+        '        try { Start-Process notepad.exe -ArgumentList "`"$nwFile`"" } catch { }',
+        '    }',
         '} else {',
-        '    Write-Host ''[5/5] Keine Liste manueller Programme vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
+        '    Write-Host ''[6/6] Keine Liste manueller Programme vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
         '}',
         '',
         'Write-Host ''''',
         'Write-Host ''========================================================================'' -ForegroundColor Cyan',
-        'Write-Host ''      Wiederherstellung abgeschlossen!'' -ForegroundColor Green',
+        'if ($Trockenlauf) {',
+        '    Write-Host ''      Trockenlauf abgeschlossen (keine Aenderungen vorgenommen)!'' -ForegroundColor Magenta',
+        '} else {',
+        '    Write-Host ''      Wiederherstellung abgeschlossen!'' -ForegroundColor Green',
+        '}',
         'Write-Host ''========================================================================'' -ForegroundColor Cyan',
         'Write-Host '''''
     )
@@ -782,13 +1087,13 @@ function Invoke-SystemBackup {
     Send-GuiEvent 'LOG' 'Gruen' ('Sicherung erfolgreich abgeschlossen: {0} ({1:N2} GB)' -f $backupFolder, ($finalSize / 1GB))
 
     return [pscustomobject]@{
-        Ok      = $true
-        Pfad    = $backupFolder
-        Groesse = $finalSize
-        Fehler  = ''
+        Ok           = $true
+        Pfad         = $backupFolder
+        Groesse      = $finalSize
+        Vollstaendig = $sicherungVollstaendig
+        Fehler       = ''
     }
 }
-
 if ($Umzug) {
     $r = Invoke-SystemBackup -Ziel $UmzugZiel -Umfang $UmzugUmfang -Zusatz $UmzugZusatz
     Send-GuiEvent 'RESULT' $(if ($r.Ok) { '1' } else { '0' }) $r.Pfad $r.Groesse $r.Fehler

@@ -245,7 +245,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
 }
 #endregion
 
-$ScriptVersion = '3.85'
+$ScriptVersion = '3.86'
 $AppName       = 'Leos Minibench'
 # Eingebettete Referenzprofile für Leos Minibench (v3.0)
 $script:EmbeddedReferences = @{
@@ -6154,6 +6154,16 @@ public partial class DiagGui : Form
     public static int HwCores = 0, HwThreads = 0;
     public static string HwRam = "", HwBoard = "";
     public static bool HwIsLaptop = false;
+    // ab v3.86: Resizable BAR / SAM Status
+    public static bool HwRebarSupported = false;
+    public static bool HwRebarActive = false;
+    // ab v3.86: Update-Status
+    public static bool HasUpdateAvailable = false;
+    public static string AvailableUpdateVersion = "";
+    public static string AvailableUpdateUrl = "";
+    public static string AvailableUpdateSha256 = "";
+    public static string AvailableUpdateBody = "";
+    Badge badgeUpdate;
     ComboBox cmbGpuSel, cmbLGpuSel;
     List<string> gpuSelValues = new List<string>();
     // Schneller Modus (ab v2.6): parallele Prüfungen der Diagnose
@@ -6412,6 +6422,13 @@ public partial class DiagGui : Form
         badgeSensStatus.Margin = new Padding(UI.S(6), UI.S(5), 0, 0);
         Tip(badgeSensStatus, "Aktiver Sensormodus für Hardware-Telemetrie und Systemwerte.");
         hr.Controls.Add(badgeSensStatus);
+        badgeUpdate = new Badge("", "warn");
+        badgeUpdate.Visible = false;
+        badgeUpdate.Margin = new Padding(UI.S(6), UI.S(5), 0, 0);
+        badgeUpdate.Cursor = Cursors.Hand;
+        badgeUpdate.Click += delegate { TriggerUpdateDownload(); };
+        Tip(badgeUpdate, "Ein Update fÃ¼r Leos Minibench ist verfÃ¼gbar. Klicken zum Herunterladen und Aktualisieren.");
+        hr.Controls.Add(badgeUpdate);
         head.Controls.Add(hr);
 
         body = new Panel(); body.Dock = DockStyle.Fill; body.Padding = new Padding(UI.S(20), UI.S(16), UI.S(20), UI.S(14)); body.BackColor = UI.Bg;
@@ -6421,6 +6438,7 @@ public partial class DiagGui : Form
         if (LoadStartPagePreference()) ShowPage(0);
         else if (curPage == 0) ShowPage(1);
         UpdateSensStatusBadge();
+        StartUpdateCheck();
         setupView.Dock = DockStyle.Fill; runView.Dock = DockStyle.Fill; runView.Visible = false;
         body.Controls.Add(runView); body.Controls.Add(setupView);
         Controls.Add(body); Controls.Add(head);
@@ -6665,6 +6683,301 @@ public partial class DiagGui : Form
             File.WriteAllText(SettingsFile, js.Serialize(d), Encoding.UTF8);
         }
         catch { }
+    }
+
+    bool LoadUpdateCheckPreference()
+    {
+        try
+        {
+            if (SettingsFile.Length > 0 && File.Exists(SettingsFile))
+            {
+                System.Web.Script.Serialization.JavaScriptSerializer js = new System.Web.Script.Serialization.JavaScriptSerializer();
+                Dictionary<string, object> d = js.DeserializeObject(File.ReadAllText(SettingsFile, Encoding.UTF8)) as Dictionary<string, object>;
+                if (d != null && d.ContainsKey("UpdatePruefung"))
+                {
+                    return Convert.ToBoolean(d["UpdatePruefung"]);
+                }
+            }
+        }
+        catch { }
+        return true;
+    }
+
+    void SaveUpdateCheckPreference(bool enabled)
+    {
+        try
+        {
+            if (SettingsFile.Length == 0) return;
+            Dictionary<string, object> d = null;
+            System.Web.Script.Serialization.JavaScriptSerializer js = new System.Web.Script.Serialization.JavaScriptSerializer();
+            if (File.Exists(SettingsFile))
+            {
+                try { d = js.DeserializeObject(File.ReadAllText(SettingsFile, Encoding.UTF8)) as Dictionary<string, object>; } catch { }
+            }
+            if (d == null) d = new Dictionary<string, object>();
+            d["UpdatePruefung"] = enabled;
+            File.WriteAllText(SettingsFile, js.Serialize(d), Encoding.UTF8);
+        }
+        catch { }
+    }
+
+    void ApplyUpdateBadge(string newVer)
+    {
+        if (badgeUpdate != null)
+        {
+            badgeUpdate.Text = "Update verfÃ¼gbar (" + newVer + ")";
+            badgeUpdate.Visible = true;
+        }
+    }
+
+    void StartUpdateCheck()
+    {
+        if (!LoadUpdateCheckPreference()) return;
+
+        System.Threading.Thread t = new System.Threading.Thread(delegate() {
+            try
+            {
+                string cacheDir = Path.Combine(dataDir, "Cache");
+                string cacheFile = Path.Combine(cacheDir, "UpdateCheck.json");
+                string tag = "";
+                string body = "";
+                string dlUrl = "";
+                string sha = "";
+                bool useCache = false;
+
+                if (File.Exists(cacheFile))
+                {
+                    FileInfo fi = new FileInfo(cacheFile);
+                    if (DateTime.UtcNow.Subtract(fi.LastWriteTimeUtc).TotalHours < 24)
+                    {
+                        try
+                        {
+                            System.Web.Script.Serialization.JavaScriptSerializer js = new System.Web.Script.Serialization.JavaScriptSerializer();
+                            Dictionary<string, object> cd = js.DeserializeObject(File.ReadAllText(cacheFile, Encoding.UTF8)) as Dictionary<string, object>;
+                            if (cd != null)
+                            {
+                                if (cd.ContainsKey("Tag") && cd["Tag"] != null) tag = cd["Tag"].ToString();
+                                if (cd.ContainsKey("DownloadUrl") && cd["DownloadUrl"] != null) dlUrl = cd["DownloadUrl"].ToString();
+                                if (cd.ContainsKey("Sha256") && cd["Sha256"] != null) sha = cd["Sha256"].ToString();
+                                if (cd.ContainsKey("Body") && cd["Body"] != null) body = cd["Body"].ToString();
+                                useCache = true;
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                if (!useCache)
+                {
+                    System.Net.ServicePointManager.SecurityProtocol = (System.Net.SecurityProtocolType)3072; // Tls12
+                    System.Net.HttpWebRequest req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create("https://api.github.com/repos/miniLeonardo/MiniBench/releases/latest");
+                    req.Timeout = 3000;
+                    req.ReadWriteTimeout = 3000;
+                    req.UserAgent = "LeosMinibench";
+                    req.Method = "GET";
+
+                    using (System.Net.HttpWebResponse resp = (System.Net.HttpWebResponse)req.GetResponse())
+                    using (StreamReader sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                    {
+                        string json = sr.ReadToEnd();
+                        System.Web.Script.Serialization.JavaScriptSerializer js = new System.Web.Script.Serialization.JavaScriptSerializer();
+                        Dictionary<string, object> dict = js.DeserializeObject(json) as Dictionary<string, object>;
+                        if (dict != null)
+                        {
+                            if (dict.ContainsKey("tag_name") && dict["tag_name"] != null) tag = dict["tag_name"].ToString().Trim();
+                            if (dict.ContainsKey("body") && dict["body"] != null) body = dict["body"].ToString();
+                            if (dict.ContainsKey("assets") && dict["assets"] is object[])
+                            {
+                                object[] assets = (object[])dict["assets"];
+                                foreach (object a in assets)
+                                {
+                                    if (a is Dictionary<string, object>)
+                                    {
+                                        Dictionary<string, object> ad = (Dictionary<string, object>)a;
+                                        if (ad.ContainsKey("name") && ad["name"] != null && ad["name"].ToString().Equals("LMB.exe", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            if (ad.ContainsKey("browser_download_url")) dlUrl = ad["browser_download_url"].ToString();
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            System.Text.RegularExpressions.Match mSha = System.Text.RegularExpressions.Regex.Match(body, @"(?:SHA-?256(?:\s*\(LMB\.exe\))?[:\s]+)([a-fA-F0-9]{64})");
+                            if (mSha.Success) sha = mSha.Groups[1].Value.ToLowerInvariant();
+
+                            try
+                            {
+                                if (!Directory.Exists(cacheDir)) Directory.CreateDirectory(cacheDir);
+                                Dictionary<string, string> cDict = new Dictionary<string, string>();
+                                cDict["CheckedAt"] = DateTime.UtcNow.ToString("o");
+                                cDict["Tag"] = tag;
+                                cDict["DownloadUrl"] = dlUrl;
+                                cDict["Sha256"] = sha;
+                                cDict["Body"] = body;
+                                File.WriteAllText(cacheFile, js.Serialize(cDict), Encoding.UTF8);
+                            }
+                            catch { }
+                        }
+                    }
+                }
+
+                if (!String.IsNullOrEmpty(tag))
+                {
+                    string cleanRemote = tag.TrimStart('v', 'V', ' ');
+                    string cleanLocal = this.version.TrimStart('v', 'V', ' ');
+                    System.Version vRem, vLoc;
+                    bool isNewer = false;
+                    if (System.Version.TryParse(cleanRemote, out vRem) && System.Version.TryParse(cleanLocal, out vLoc))
+                    {
+                        isNewer = vRem > vLoc;
+                    }
+                    else
+                    {
+                        isNewer = String.Compare(cleanRemote, cleanLocal, StringComparison.OrdinalIgnoreCase) > 0;
+                    }
+
+                    if (isNewer)
+                    {
+                        AvailableUpdateVersion = tag;
+                        AvailableUpdateUrl = dlUrl;
+                        AvailableUpdateSha256 = sha;
+                        AvailableUpdateBody = body;
+                        HasUpdateAvailable = true;
+
+                        try
+                        {
+                            BeginInvoke(new MethodInvoker(delegate() {
+                                ApplyUpdateBadge(tag);
+                            }));
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch
+            {
+                // Silent fail
+            }
+        });
+        t.IsBackground = true;
+        t.Start();
+    }
+
+    void TriggerUpdateDownload()
+    {
+        if (String.IsNullOrEmpty(AvailableUpdateUrl))
+        {
+            MessageBox.Show(this, "Keine Download-Adresse fÃ¼r das Update gefunden.", "Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        string msg = "MÃ¶chten Sie das Update auf Version " + AvailableUpdateVersion + " jetzt herunterladen und LMB.exe automatisch austauschen?\r\n\r\n" +
+                     "Die bisherige Programmdatei wird im Archiv gesichert und die Anwendung anschlieÃŸend neu gestartet.";
+        if (MessageBox.Show(this, msg, "Minibench Update", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            return;
+
+        try
+        {
+            string updateDir = Path.Combine(dataDir, "Update");
+            if (!Directory.Exists(updateDir)) Directory.CreateDirectory(updateDir);
+            string targetExe = Path.Combine(updateDir, "LMB.exe");
+
+            Cursor.Current = Cursors.WaitCursor;
+
+            using (System.Net.WebClient wc = new System.Net.WebClient())
+            {
+                wc.Headers["User-Agent"] = "LeosMinibench";
+                wc.DownloadFile(AvailableUpdateUrl, targetExe);
+            }
+
+            if (File.Exists(targetExe))
+            {
+                string hash = "";
+                using (System.Security.Cryptography.SHA256 sha = System.Security.Cryptography.SHA256.Create())
+                using (FileStream fs = File.OpenRead(targetExe))
+                {
+                    byte[] bytes = sha.ComputeHash(fs);
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 0; i < bytes.Length; i++) sb.Append(bytes[i].ToString("x2"));
+                    hash = sb.ToString();
+                }
+
+                if (!String.IsNullOrEmpty(AvailableUpdateSha256))
+                {
+                    if (!hash.Equals(AvailableUpdateSha256, StringComparison.OrdinalIgnoreCase))
+                    {
+                        try { File.Delete(targetExe); } catch { }
+                        MessageBox.Show(this,
+                            "SicherheitsprÃ¼fung fehlgeschlagen:\r\n\r\n" +
+                            "Die SHA-256-PrÃ¼fsumme der heruntergeladenen Datei stimmt nicht mit der Vorgabe des Releases Ã¼berein:\r\n\r\n" +
+                            "Erwartet: " + AvailableUpdateSha256 + "\r\n" +
+                            "Berechnet: " + hash + "\r\n\r\n" +
+                            "Die Datei wurde aus SicherheitsgrÃ¼nden verworfen.",
+                            "Update-Sicherheitsfehler",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error);
+                        return;
+                    }
+                }
+
+                ExecuteSelfReplace(targetExe);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "Fehler beim Herunterladen des Updates:\r\n\r\n" + ex.Message, "Update Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            Cursor.Current = Cursors.Default;
+        }
+    }
+
+    void ExecuteSelfReplace(string newExePath)
+    {
+        try
+        {
+            string updateDir = Path.GetDirectoryName(newExePath);
+            string updateCmd = Path.Combine(updateDir, "Update.cmd");
+            string currentExe = this.psExe;
+            if (String.IsNullOrEmpty(currentExe) || !File.Exists(currentExe))
+            {
+                currentExe = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
+            }
+            int myPid = System.Diagnostics.Process.GetCurrentProcess().Id;
+
+            string archivDir = Path.Combine(dataDir, "Archiv", "v" + this.version);
+
+            string[] cmdLines = new string[] {
+                string.Format("{0}echo off", "@"),
+                "setlocal",
+                "title Minibench Update",
+                ":waitloop",
+                "timeout /t 1 /nobreak >nul",
+                "tasklist /fi \"PID eq " + myPid + "\" 2>nul | find \"" + myPid + "\" >nul",
+                "if %errorlevel% equ 0 goto waitloop",
+                "if not exist \"" + archivDir + "\" mkdir \"" + archivDir + "\"",
+                "move /y \"" + currentExe + "\" \"" + Path.Combine(archivDir, "LMB.exe") + "\" >nul",
+                "copy /y \"" + newExePath + "\" \"" + currentExe + "\" >nul",
+                "start \"\" \"" + currentExe + "\"",
+                "del \"%~f0\""
+            };
+
+            File.WriteAllText(updateCmd, String.Join("\r\n", cmdLines), Encoding.ASCII);
+
+            ProcessStartInfo psi = new ProcessStartInfo();
+            psi.FileName = "cmd.exe";
+            psi.Arguments = "/c \"" + updateCmd + "\"";
+            psi.CreateNoWindow = true;
+            psi.UseShellExecute = false;
+            Process.Start(psi);
+
+            Application.Exit();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "Fehler beim Vorbereiten des Programmaustauschs:\r\n\r\n" + ex.Message, "Update Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 
     void ToggleTheme()
@@ -8558,6 +8871,7 @@ public partial class DiagGui : Form
         lblSensTools.ForeColor = LhmPresent ? UI.Muted : UI.Warn;
         btnSensTools.Text = LhmPresent && PawnSetupPresent ? "Sensorwerkzeuge erneut holen" : "Sensorwerkzeuge holen";
         UpdateSensStatusBadge();
+        StartUpdateCheck();
     }
 
     Control BuildSensorPage()
@@ -12746,6 +13060,13 @@ public partial class DiagGui
         top.Dock = DockStyle.Top;
         top.AutoSize = true;
         top.Padding = new Padding(0, 0, 0, UI.S(10));
+        CheckBox chkAutoUpdate = Chk("Beim Programmstart automatisch nach Minibench-Updates suchen", LoadUpdateCheckPreference());
+        Tip(chkAutoUpdate, "PrÃ¼ft beim Start leise im Hintergrund Ã¼ber GitHub Releases, ob eine neuere Version verfÃ¼gbar ist (ohne Telemetrie).");
+        chkAutoUpdate.Margin = new Padding(UI.S(4), UI.S(4), UI.S(4), UI.S(8));
+        chkAutoUpdate.CheckedChanged += delegate {
+            SaveUpdateCheckPreference(chkAutoUpdate.Checked);
+        };
+        top.Controls.Add(chkAutoUpdate);
         RichTextBox rt = new RichTextBox(); rt.ReadOnly = true; rt.BorderStyle = BorderStyle.FixedSingle; rt.BackColor = UI.Panel; rt.ForeColor = UI.Text;
         rt.Dock = DockStyle.Fill; rt.DetectUrls = false; rt.ScrollBars = RichTextBoxScrollBars.Vertical; rt.Font = new Font("Segoe UI", 9.75f);
         Font fh = new Font("Segoe UI Semibold", 11f), fd = new Font("Segoe UI", 9f), fb = new Font("Segoe UI", 9.75f);
@@ -13800,6 +14121,44 @@ public partial class DiagGui
         profSubFlow.Controls.Add(lblScanHint);
 
         scopePanel.Controls.Add(profSubFlow);
+        CheckBox chkWlan = Chk("WLAN-Profile (gespeicherte Netzwerke)", true);
+        Tip(chkWlan, "Sichert gespeicherte WLAN-Netzwerke zur automatischen Wiederherstellung.");
+        scopePanel.Controls.Add(chkWlan);
+
+        FlowLayoutPanel wlanSubFlow = new FlowLayoutPanel();
+        wlanSubFlow.FlowDirection = FlowDirection.TopDown;
+        wlanSubFlow.WrapContents = false;
+        wlanSubFlow.AutoSize = true;
+        wlanSubFlow.Margin = new Padding(UI.S(24), 0, 0, UI.S(4));
+        wlanSubFlow.BackColor = UI.Panel;
+
+        CheckBox chkWlanClear = Chk("WLAN-Passw\u00F6rter im Klartext mitsichern", false);
+        Tip(chkWlanClear, "Achtung: Sichert Netzwerkschl\u00FCssel unverschl\u00FCsselt in XML-Dateien auf dem Zielmedium.");
+        wlanSubFlow.Controls.Add(chkWlanClear);
+        scopePanel.Controls.Add(wlanSubFlow);
+
+        chkWlan.CheckedChanged += delegate {
+            chkWlanClear.Enabled = chkWlan.Checked;
+            if (!chkWlan.Checked) chkWlanClear.Checked = false;
+        };
+
+        chkWlanClear.Click += delegate {
+            if (chkWlanClear.Checked)
+            {
+                DialogResult dr = MessageBox.Show(this,
+                    "Sicherheits-Warnung:\r\n\r\n" +
+                    "Wenn Sie diese Option aktivieren, werden alle gespeicherten WLAN-Passw\u00F6rter unverschl\u00FCsselt im Klartext in den exportierten XML-Dateien auf dem Zielmedium gespeichert.\r\n\r\n" +
+                    "Jeder mit Zugriff auf das Zielmedium kann diese Passw\u00F6rter einsehen.\r\n\r\n" +
+                    "M\u00F6chten Sie WLAN-Passw\u00F6rter wirklich im Klartext sichern?",
+                    "WLAN-Passw\u00F6rter im Klartext sichern",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning);
+                if (dr != DialogResult.Yes)
+                {
+                    chkWlanClear.Checked = false;
+                }
+            }
+        };
 
         FlowLayoutPanel customPanel = new FlowLayoutPanel();
         customPanel.FlowDirection = FlowDirection.TopDown;
@@ -13972,6 +14331,7 @@ public partial class DiagGui
                 if (chkProfTools != null && chkProfTools.Checked) totalBytes += sizeProfTools;
                 if (chkProfTerm != null && chkProfTerm.Checked) totalBytes += sizeProfTerm;
             }
+
 
             for (int i = 0; i < customBoxes.Count; i++)
             {
@@ -14268,6 +14628,12 @@ public partial class DiagGui
                 if (chkProfTerm != null && chkProfTerm.Checked) scopes.Add("Profile_Terminal");
             }
 
+            if (chkWlan.Checked)
+            {
+                scopes.Add("Wlan");
+                if (chkWlanClear.Checked) scopes.Add("Wlan_Klartext");
+            }
+
             if (scopes.Count == 0 && customBoxes.Count == 0)
             {
                 MessageBox.Show(this, "Bitte w\u00E4hlen Sie mindestens eine Sicherungskomponente aus.", "System-Umzug", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -14306,6 +14672,8 @@ public partial class DiagGui
             chkLayout.Enabled = false;
             chkSoftware.Enabled = false;
             chkProfiles.Enabled = false;
+            chkWlan.Enabled = false;
+            chkWlanClear.Enabled = false;
             if (chkProfBrowser != null) chkProfBrowser.Enabled = false;
             if (chkProfMail != null) chkProfMail.Enabled = false;
             if (chkProfDev != null) chkProfDev.Enabled = false;
@@ -14445,6 +14813,8 @@ public partial class DiagGui
                         chkLayout.Enabled = true;
                         chkSoftware.Enabled = true;
                         chkProfiles.Enabled = true;
+                        chkWlan.Enabled = true;
+                        chkWlanClear.Enabled = chkWlan.Checked;
                         if (chkProfBrowser != null) chkProfBrowser.Enabled = true;
                         if (chkProfMail != null) chkProfMail.Enabled = true;
                         if (chkProfDev != null) chkProfDev.Enabled = true;
@@ -15648,7 +16018,118 @@ public partial class DiagGui
             }
             catch { }
 
-            e.Result = items;
+            
+            // 5. Minibench Update verfÃ¼gbar
+            try
+            {
+                if (HasUpdateAvailable && !String.IsNullOrEmpty(AvailableUpdateVersion))
+                {
+                    QuickFixItem it = new QuickFixItem();
+                    it.Level = "info";
+                    it.Badge = "Update";
+                    it.Title = "Minibench-Update verfÃ¼gbar (" + AvailableUpdateVersion + ")";
+                    it.Desc = "Eine neuere Version von Leos Minibench ist auf GitHub bereitgestellt. Klicke auf 'Herunterladen' fÃ¼r den automatischen Austausch.";
+                    it.ButtonText = "Herunterladen";
+                    it.Action = delegate { TriggerUpdateDownload(); };
+                    it.Tip = "LÃ¤dt die neue LMB.exe herunter, validiert die SHA-256-PrÃ¼fsumme und startet die Anwendung neu.";
+                    items.Add(it);
+                }
+            }
+            catch { }
+
+            // 6. Grafiktreiber-Alter (> 18 Monate / 548 Tage)
+            try
+            {
+                using (Microsoft.Win32.RegistryKey videoKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"))
+                {
+                    if (videoKey != null)
+                    {
+                        foreach (string subName in videoKey.GetSubKeyNames())
+                        {
+                            if (subName.StartsWith("0"))
+                            {
+                                using (Microsoft.Win32.RegistryKey subKey = videoKey.OpenSubKey(subName))
+                                {
+                                    if (subKey == null) continue;
+                                    object descObj = subKey.GetValue("DriverDesc");
+                                    object dateObj = subKey.GetValue("DriverDate");
+                                    object provObj = subKey.GetValue("ProviderName");
+                                    string desc = descObj != null ? descObj.ToString().Trim() : "";
+                                    string dateStr = dateObj != null ? dateObj.ToString().Trim() : "";
+                                    string prov = provObj != null ? provObj.ToString().Trim() : "";
+
+                                    if (String.IsNullOrEmpty(desc) || desc.IndexOf("Remote", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                        desc.IndexOf("Basic Display", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+
+                                    DateTime dtDriver;
+                                    if (DateTime.TryParse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.None, out dtDriver) ||
+                                        DateTime.TryParse(dateStr, CultureInfo.CurrentCulture, DateTimeStyles.None, out dtDriver))
+                                    {
+                                        if (DateTime.Now.Subtract(dtDriver).TotalDays > 548)
+                                        {
+                                            string vendor = "Unbekannt";
+                                            string dlUrl = "";
+                                            if (desc.IndexOf("NVIDIA", StringComparison.OrdinalIgnoreCase) >= 0 || prov.IndexOf("NVIDIA", StringComparison.OrdinalIgnoreCase) >= 0)
+                                            {
+                                                vendor = "NVIDIA";
+                                                dlUrl = "https://www.nvidia.de/Download/index.aspx";
+                                            }
+                                            else if (desc.IndexOf("AMD", StringComparison.OrdinalIgnoreCase) >= 0 || desc.IndexOf("Radeon", StringComparison.OrdinalIgnoreCase) >= 0 || prov.IndexOf("Advanced Micro Devices", StringComparison.OrdinalIgnoreCase) >= 0)
+                                            {
+                                                vendor = "AMD";
+                                                dlUrl = "https://www.amd.com/de/support";
+                                            }
+                                            else if (desc.IndexOf("Intel", StringComparison.OrdinalIgnoreCase) >= 0 || prov.IndexOf("Intel", StringComparison.OrdinalIgnoreCase) >= 0)
+                                            {
+                                                vendor = "Intel";
+                                                dlUrl = "https://www.intel.de/content/www/de/de/download-center/home.html";
+                                            }
+
+                                            if (!String.IsNullOrEmpty(dlUrl))
+                                            {
+                                                QuickFixItem it = new QuickFixItem();
+                                                it.Level = "warn";
+                                                it.Badge = "Treiber";
+                                                it.Title = "Grafiktreiber veraltet (" + desc + ")";
+                                                it.Desc = "Der installierte Grafiktreiber ist Ã¼ber 18 Monate alt (" + dtDriver.ToString("dd.MM.yyyy") + ")." +
+                                                          (HwIsLaptop ? " FÃ¼r Notebooks wird vorrangig die Treiberseite des Notebook-Herstellers empfohlen." : "");
+                                                it.ButtonText = "Treiber laden";
+                                                string targetUrl = dlUrl;
+                                                it.Action = delegate {
+                                                    try { System.Diagnostics.Process.Start(targetUrl); } catch { }
+                                                };
+                                                it.Tip = "Ã–ffnet die offizielle Treiber-Downloadseite von " + vendor + " im Webbrowser.";
+                                                items.Add(it);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            // 7. Resizable BAR / SAM Inaktiv
+            try
+            {
+                if (HwRebarSupported && !HwRebarActive)
+                {
+                    QuickFixItem it = new QuickFixItem();
+                    it.Level = "warn";
+                    it.Badge = "Leistung";
+                    it.Title = "Resizable BAR / SAM inaktiv";
+                    it.Desc = "Resizable BAR wird von Grafikkarte und Plattform unterstÃ¼tzt, ist aber im BIOS nicht aktiviert (verschenkt 5 bis 15 % Leistung).";
+                    it.ButtonText = "Anleitung";
+                    it.Action = delegate { ShowRebarInstructionsDialog(); };
+                    it.Tip = "Ã–ffnet eine Schritt-fÃ¼r-Schritt-Anleitung zur Aktivierung von Resizable BAR / SAM im BIOS/UEFI.";
+                    items.Add(it);
+                }
+            }
+            catch { }
+e.Result = items;
         };
 
         bw.RunWorkerCompleted += delegate(object sender, System.ComponentModel.RunWorkerCompletedEventArgs e)
@@ -15912,8 +16393,58 @@ public partial class DiagGui
             dlg.ShowDialog(this);
         }
     }
-}
 
+    void ShowRebarInstructionsDialog()
+    {
+        using (Form dlg = new Form())
+        {
+            dlg.Text = "Resizable BAR / Smart Access Memory aktivieren";
+            dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+            dlg.MaximizeBox = false; dlg.MinimizeBox = false;
+            dlg.StartPosition = FormStartPosition.CenterParent;
+            dlg.ClientSize = new Size(UI.S(560), UI.S(440));
+            dlg.BackColor = UI.Bg; dlg.Font = new Font("Segoe UI", 9.5f);
+
+            Panel p = new Panel(); p.Dock = DockStyle.Fill; p.Padding = new Padding(UI.S(16)); p.BackColor = UI.Bg;
+            Label lt = Lbl("Grafikleistung durch direkten VRAM-Zugriff steigern", 12f, true, UI.Text);
+            lt.Dock = DockStyle.Top; lt.Height = UI.S(32); p.Controls.Add(lt);
+
+            RichTextBox rt = new RichTextBox(); rt.ReadOnly = true; rt.BorderStyle = BorderStyle.None; rt.BackColor = UI.Bg; rt.ForeColor = UI.Text;
+            rt.Dock = DockStyle.Fill; rt.Font = new Font("Segoe UI", 9.5f);
+            Font fh = new Font("Segoe UI Semibold", 10f); Font fb = new Font("Segoe UI", 9f);
+
+            string[][] steps = new string[][] {
+                new string[] { "Was ist Resizable BAR / SAM?", "Resizable BAR (bei AMD Smart Access Memory) erlaubt der CPU den vollen, ungedrosselten Zugriff auf den gesamten Grafikspeicher (VRAM) auf einmal anstatt in winzigen 256-MB-HÃ¤ppchen. Dies bringt je nach Spiel 5 bis 15 % Mehrleistung." },
+                new string[] { "Schritt 1: Above 4G Decoding aktivieren", "Starte den PC ins UEFI/BIOS (Taste Entf oder F2). Navigiere zu den PCIe-/Grafik-Optionen (oft unter 'Erweitert' bzw. 'PCI Subsystem') und schalte 'Above 4G Decoding' auf 'Aktiviert' (Enabled)." },
+                new string[] { "Schritt 2: Re-Size BAR Support aktivieren", "Sobald Above 4G Decoding aktiv ist, erscheint die Option 'Re-Size BAR Support'. Stelle diese auf 'Auto' oder 'Aktiviert' (Enabled)." },
+                new string[] { "Schritt 3: CSM deaktivieren (reines UEFI)", "Resizable BAR erfordert zwingend den nativen UEFI-Modus mit GPT-Partitionstabelle. Deaktiviere das CSM (Compatibility Support Module) im Boot-MenÃ¼ des BIOS." },
+                new string[] { "Schritt 4: Speichern und neu starten", "DrÃ¼cke Taste F10 zum Speichern und Neustarten. Windows initialisiert die Grafikkarte nun mit vollem BAR1-Adressfenster." }
+            };
+
+            foreach (string[] st in steps)
+            {
+                rt.SelectionFont = fh; rt.SelectionColor = UI.Text;
+                rt.AppendText(st[0] + "\r\n");
+                rt.SelectionFont = fb; rt.SelectionColor = UI.Muted;
+                rt.AppendText(st[1] + "\r\n\r\n");
+            }
+            rt.SelectionStart = 0; rt.ScrollToCaret();
+
+            FlowLayoutPanel bf = new FlowLayoutPanel(); bf.Dock = DockStyle.Bottom; bf.Height = UI.S(44); bf.FlowDirection = FlowDirection.RightToLeft;
+            Button btnClose = UI.Primary("SchlieÃŸen"); btnClose.DialogResult = DialogResult.OK;
+            Tip(btnClose, "SchlieÃŸt die Anleitung.");
+            bf.Controls.Add(btnClose);
+
+            p.Controls.Add(rt);
+            rt.BringToFront();
+            p.Controls.Add(bf);
+            dlg.Controls.Add(p);
+            dlg.AcceptButton = btnClose;
+            UI.ThemeDialog(dlg);
+            dlg.ShowDialog(this);
+        }
+    }
+}
 // Programmsymbol und Startprotokoll der Oberfläche (ab v2.6, Roadmap v2.5)
 //
 // AppSymbol: blaues L als Rakete (Quelle: src\Oberflaeche\Symbol.ico, Entwürfe in Doku\Symbol). Startet die Oberfläche aus
@@ -16556,6 +17087,13 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("3.86", "29.10.2026", "Update-Prüfung, Grafiktreiber-Links, Resizable BAR, geprüfter System-Umzug mit WLAN & Gesamtläufe",
+            "• Asynchrone Update-Prüfung & Self-Replace: Lautlose Versionsprüfung im Hintergrund mit 24h-Cache; dezenter Badge in der Kopfzeile und Update-Kachel auf der Startseite; Download von LMB.exe nach Minibench-Daten\\Update\\, SHA-256-Validierung und nahtloser Austausch mit Archivierung nach Minibench-Daten\\Archiv\\v<alteVersion>\\ über Update.cmd; abschaltbar über Einstellungen.\r\n" +
+            "• Offizielle Grafiktreiber-Links & Laptop-Hinweis: Direkte Hersteller-Downloadlinks für NVIDIA, AMD und Intel; dedizierte Schnell-behebbar-Karte mit 'Treiber laden'-Schaltfläche bei Treibern älter als 18 Monate; klarer OEM-Hinweis bei Hybridgrafik auf Notebooks; zusätzliche Treiberversions-Gegenprüfung via nvidia-smi.\r\n" +
+            "• Resizable BAR / Smart Access Memory Erkennung: Hardwareseitige Erkennung für NVIDIA (BAR1-Speichergröße), AMD und Intel (64-Bit PCI-Speicherfenster über 256 MB); Verifizierung der Plattformunterstützung (RTX 3000+, RX 6000+, Arc / Ryzen 3000+, Intel 10th Gen+); gelbe Diagnosewarnung und interaktiver BIOS-Leitfaden nur bei inaktivem ReBAR auf unterstützter Hardware.\r\n" +
+            "• System-Umzug mit WLAN-Profilen: Lautloser Export von WLAN-Profilen per netsh wlan; Klartext-Export von Kennwörtern (key=clear) ausschließlich nach expliziter Bestätigung eines Sicherheitsdialogs; vollautomatischer Import bei Wiederherstellung; strikter Ausschluss bei Anonymisierung und Git-Schutz für Umzugsordner.\r\n" +
+            "• Geprüfte Sicherung & Trockenlauf: Robocopy-Differenzabgleich (/L) und SHA-256-Stichprobenprüfung für ca. 20 Dateien je Bibliothek mit detailliertem Pruefprotokoll.txt und Berichtsausweis; interaktiver Trockenlauf (-Trockenlauf) in Wiederherstellen.cmd und Wiederherstellen.ps1 listet alle Aktionen ohne Änderungen auf.\r\n" +
+            "• Gesamtläufe in Bauprozess integriert: Veraltete Parameter bereinigt, neue Integrationsfälle für Wartung, Diagnose und System-Umzug ergänzt; verbindliche Ausführung aller Gesamtläufe in Bauen.cmd vor dem Release mit Laufzeitdokumentation in Stand.txt; Reduzierung der Skips von 99 auf 4."),
         new Eintrag("3.85", "29.10.2026", "Sensor-Manifest-Selbstreparatur, lautloser Smartctl-Lifecycle, RTX 5080 Referenz & UI-Standards",
             "• Manifest-Selbstreparatur für Sensoren & Tools: Automatische Korrektur von leeren Prüfsummen im Manifest Tools.json für LibreHardwareMonitor und PawnIO; lautloser Abgleich gegen fest hinterlegte Release-Hashes verhindert Fehlalarme.\r\n" +
             "• Keine Werkzeug-Warnungen im Kundenbericht: Technische Prüfsummenabweichungen oder fehlende optionale Sensor-Treiber werden im internen Protokoll (Start.log) vermerkt und überfluten den Diagnosebericht nicht mehr mit Warnungen.\r\n" +
@@ -27619,11 +28157,13 @@ function Get-ShortCpuName([string]$Name) { ((($Name -as [string]) -replace '\s+'
 function Get-ShortGpuName([string]$Name) { (([string]$Name) -replace '^(AMD|NVIDIA|Intel\(R\))\s*', '').Trim() }
 # Grafikeinheiten mit Art (dGPU, iGPU) und ob sie den Desktop ausgibt (aktive Auflösung); virtuelle Adapter fehlen
 function Get-GpuAdapters {
-    $raw = @(Get-CimCached Win32_VideoController | Where-Object { $_ -and (Get-GpuKind ([string]$_.Name)) -ne 'virtuell' })
-    $hasIgpu = [bool](@($raw | Where-Object { (Get-GpuKind ([string]$_.Name)) -eq 'iGPU' }).Count)
-    $isLaptop = ($script:IsLaptop -or (Test-OnBattery) -or (@($raw | Where-Object { Test-LaptopGpu $_.Name }).Count -gt 0))
+    $getCim = if (Get-Command Get-CimCached -ErrorAction SilentlyContinue) { { param($c) @(Get-CimCached $c) } } else { { param($c) @(Get-CimInstance $c -ErrorAction SilentlyContinue) } }
+    $raw = @(& $getCim Win32_VideoController | Where-Object { $_ -and $(if (Get-Command Get-GpuKind -ErrorAction SilentlyContinue) { (Get-GpuKind ([string]$_.Name)) -ne 'virtuell' } else { $true }) })
+    $hasIgpu = [bool](@($raw | Where-Object { $(if (Get-Command Get-GpuKind -ErrorAction SilentlyContinue) { (Get-GpuKind ([string]$_.Name)) -eq 'iGPU' } else { $false }) }).Count)
+    $onBat = if (Get-Command Test-OnBattery -ErrorAction SilentlyContinue) { Test-OnBattery } else { $false }
+    $isLaptop = ($script:IsLaptop -or $onBat -or (@($raw | Where-Object { if (Get-Command Test-LaptopGpu -ErrorAction SilentlyContinue) { Test-LaptopGpu $_.Name } else { $false } }).Count -gt 0))
     @(foreach ($a in $raw) {
-        $k = Get-GpuKind ([string]$a.Name)
+        $k = if (Get-Command Get-GpuKind -ErrorAction SilentlyContinue) { Get-GpuKind ([string]$a.Name) } else { 'dGPU' }
         $isDesktopOut = [bool]$a.CurrentHorizontalResolution
         if ($hasIgpu -and $isLaptop -and $k -eq 'dGPU') {
             $isDesktopOut = $false
@@ -27645,6 +28185,114 @@ function Get-GpuFactText {
     $all = @(Get-GpuAdapters | Sort-Object { if ($_.Art -eq 'dGPU') { 0 } else { 1 } })
     if ($all.Count -le 1) { return (@($all | ForEach-Object { $_.Name }) -join '') }
     return ((@($all | ForEach-Object { '{0} ({1}{2})' -f $_.Name, $_.Bezeichnung, $(if ($_.Desktop) { ', Desktop' } else { '' }) })) -join '; ')
+}
+
+# Hersteller-Downloadlink und Notebook-Hinweis fuer Grafikeinheiten
+function Get-GpuVendorLink([string]$GpuName, [bool]$IsLaptop = $false) {
+    $vendor = 'Unbekannt'
+    $link = ''
+    if ($GpuName -match 'NVIDIA|GeForce|RTX|GTX|Quadro|Tesla') {
+        $vendor = 'NVIDIA'
+        $link = 'https://www.nvidia.de/Download/index.aspx'
+    } elseif ($GpuName -match 'AMD|Radeon|ATI') {
+        $vendor = 'AMD'
+        $link = 'https://www.amd.com/de/support'
+    } elseif ($GpuName -match 'Intel|Arc|Iris|UHD|HD Graphics') {
+        $vendor = 'Intel'
+        $link = 'https://www.intel.de/content/www/de/de/download-center/home.html'
+    }
+    $note = if ($IsLaptop) { 'Auf Notebooks mit Hybridgrafik wird vorrangig die Treiberseite des Notebook-Herstellers empfohlen.' } else { '' }
+    return [pscustomobject]@{
+        Hersteller    = $vendor
+        Link          = $link
+        LaptopHinweis = $note
+    }
+}
+
+# Resizable BAR / Smart Access Memory (SAM) Erkennung
+function Test-RebarStatus($GpuAdapter = $null, $CpuObj = $null, $BaseBoard = $null) {
+    $getCim = {
+        param($cls)
+        if (Get-Command Get-CimCached -ErrorAction SilentlyContinue) { @(Get-CimCached $cls) }
+        else { @(Get-CimInstance $cls -ErrorAction SilentlyContinue) }
+    }
+    if (-not $GpuAdapter) {
+        if (Get-Command Get-MainGpu -ErrorAction SilentlyContinue) { $GpuAdapter = Get-MainGpu }
+    }
+    if (-not $GpuAdapter) {
+        $gpus = & $getCim Win32_VideoController
+        $GpuAdapter = @($gpus | Where-Object { if (Get-Command Get-GpuKind -ErrorAction SilentlyContinue) { (Get-GpuKind $_.Name) -eq 'dGPU' } else { $true } }) | Select-Object -First 1
+        if (-not $GpuAdapter) { $GpuAdapter = $gpus | Select-Object -First 1 }
+    }
+    if (-not $CpuObj) { $CpuObj = & $getCim Win32_Processor | Select-Object -First 1 }
+    if (-not $BaseBoard) { $BaseBoard = & $getCim Win32_BaseBoard | Select-Object -First 1 }
+
+    $gpuName = if ($GpuAdapter) { [string]$GpuAdapter.Name } else { '' }
+    $cpuName = if ($CpuObj) { [string]$CpuObj.Name } else { '' }
+    $bbProd  = if ($BaseBoard) { [string]$BaseBoard.Product } else { '' }
+
+    # GPU Support: NVIDIA RTX 3000+, 4000+, 5000+; AMD RX 6000+, 7000+, 8000+; Intel Arc
+    $nvMatch = ($gpuName -match 'RTX\s+(30\d\d|40\d\d|50\d\d)' -or $gpuName -match 'RTX\s+[345]0\d\d' -or $gpuName -match 'RTX\s+A[2-6]\d{3}')
+    $amdMatch = ($gpuName -match 'Radeon\s+RX\s+[6789]\d{3}')
+    $intelMatch = ($gpuName -match 'Intel\(R\)\s+Arc|Arc\(TM\)')
+    $gpuSupported = ($nvMatch -or $amdMatch -or $intelMatch)
+
+    # CPU/Plattform Support: AMD Ryzen 3000+ (außer 3200G/3400G), 5000+, 7000+; Intel Core 10th Gen+, Core Ultra
+    $amdCpuMatch = ($cpuName -match 'Ryzen\s+[3579]\s+(?!3[24]00G)[3-9]\d{3}' -or $cpuName -match 'Ryzen\s+Threadripper\s+[3-9]\d{3}')
+    $intelCpuMatch = ($cpuName -match 'Core\(TM\)\s+i[3579]-(1[0-4]\d{3}|[2-9]\d{4})' -or $cpuName -match 'Core\(TM\)\s+Ultra')
+
+    $cpuSupported = ($amdCpuMatch -or $intelCpuMatch)
+    $supported = ($gpuSupported -and $cpuSupported)
+
+    $active = $false
+    $details = ''
+
+    if ($supported) {
+        if ($nvMatch) {
+            $nvsmi = if (Get-Command Find-NvidiaSmi -ErrorAction SilentlyContinue) { Find-NvidiaSmi } else { '' }
+            if ($nvsmi) {
+                try {
+                    $memOut = Invoke-External -File $nvsmi -Arguments '-q -d MEMORY' -TimeoutSec 5
+                    if ($memOut.Output -match 'BAR1 Memory Usage[\s\S]*?Total\s*:\s*(\d+)\s*MiB') {
+                        $bar1Mb = [int]$Matches[1]
+                        if ($bar1Mb -gt 512) {
+                            $active = $true
+                            $details = ('BAR1-Größe: {0} MiB' -f $bar1Mb)
+                        } else {
+                            $active = $false
+                            $details = ('BAR1-Größe: {0} MiB (limitiert auf 256 MiB)' -f $bar1Mb)
+                        }
+                    }
+                } catch { }
+            }
+        } else {
+            try {
+                $memAddrs = @(Get-CimAssociatedInstance -InputObject $GpuAdapter -ResultClassName Win32_DeviceMemoryAddress -ErrorAction SilentlyContinue)
+                $maxBarBytes = 0L
+                foreach ($ma in $memAddrs) {
+                    $sz = [int64]$ma.EndingAddress - [int64]$ma.StartingAddress + 1
+                    if ($sz -gt $maxBarBytes) { $maxBarBytes = $sz }
+                }
+                if ($maxBarBytes -gt 268435456) {
+                    $active = $true
+                    $details = ('PCI-Adressfenster: {0:N0} MB' -f ($maxBarBytes / 1MB))
+                } else {
+                    $active = $false
+                    $details = ('Max. PCI-Adressfenster: {0:N0} MB (<= 256 MB)' -f ($maxBarBytes / 1MB))
+                }
+            } catch { }
+        }
+    }
+
+    return [pscustomobject]@{
+        Supported     = $supported
+        GpuSupported  = $gpuSupported
+        CpuSupported  = $cpuSupported
+        Active        = $active
+        Details       = $details
+        GpuName       = $gpuName
+        CpuName       = $cpuName
+    }
 }
 
 # WinSAT speichert die Treiberversion des gemessenen Adapters als 64-Bit-Zahl (4 x 16 Bit): 9007199261367216 = 32.0.101.7088
@@ -30782,6 +31430,102 @@ function Copy-UmzugTree([string]$Source, [string]$Destination, [string[]]$Exclud
     }
 }
 
+function Test-UmzugTreeDiff([string]$Source, [string]$Destination, [string[]]$ExcludeDirs = @(), [string[]]$ExcludeFiles = @()) {
+    if (-not (Test-Path -LiteralPath $Source) -or -not (Test-Path -LiteralPath $Destination)) {
+        return @('Quelle oder Ziel existiert nicht')
+    }
+    $xdList = @('Temp', 'Cache', 'Code Cache', 'GPUCache', 'Service Worker', 'CrashDumps', 'node_modules', 'backup', 'workspaceStorage') + $ExcludeDirs
+    $roboArgs = @(
+        ('"{0}"' -f $Source.TrimEnd('\')),
+        ('"{0}"' -f $Destination.TrimEnd('\')),
+        '*.*',
+        '/E',
+        '/XJ',
+        '/L',
+        '/NJH',
+        '/NJS',
+        '/NDL',
+        '/NC',
+        '/NS',
+        '/NP'
+    )
+    if ($xdList.Count -gt 0) {
+        $roboArgs += '/XD'
+        foreach ($xd in $xdList) { $roboArgs += ('"{0}"' -f $xd) }
+    }
+    if ($ExcludeFiles -and $ExcludeFiles.Count -gt 0) {
+        $roboArgs += '/XF'
+        foreach ($xf in $ExcludeFiles) { $roboArgs += ('"{0}"' -f $xf) }
+    }
+    $pinfo = New-Object System.Diagnostics.ProcessStartInfo
+    $pinfo.FileName = 'robocopy.exe'
+    $pinfo.Arguments = $roboArgs -join ' '
+    $pinfo.UseShellExecute = $false
+    $pinfo.CreateNoWindow = $true
+    $pinfo.RedirectStandardOutput = $true
+    $diffs = @()
+    try {
+        $p = [System.Diagnostics.Process]::Start($pinfo)
+        while (-not $p.StandardOutput.EndOfStream) {
+            $l = $p.StandardOutput.ReadLine()
+            if ($l -and $l.Trim()) {
+                $diffs += $l.Trim()
+            }
+        }
+        $p.WaitForExit()
+    } catch { }
+    return @($diffs)
+}
+
+function Test-UmzugSha256Samples([string]$Source, [string]$Destination, [int]$SampleCount = 20) {
+    if (-not (Test-Path -LiteralPath $Source) -or -not (Test-Path -LiteralPath $Destination)) {
+        return @()
+    }
+    $dstFiles = @(Get-ChildItem -LiteralPath $Destination -File -Recurse -Force -ErrorAction SilentlyContinue)
+    if ($dstFiles.Count -eq 0) { return @() }
+
+    $chosen = @()
+    if ($dstFiles.Count -le $SampleCount) {
+        $chosen = $dstFiles
+    } else {
+        $sorted = @($dstFiles | Sort-Object Length)
+        $small = @($sorted | Select-Object -First 5)
+        $large = @($sorted | Select-Object -Last 5)
+        $midPool = @($sorted[5..($sorted.Count - 6)])
+        $step = [math]::Max(1, [math]::Floor($midPool.Count / 10))
+        $mid = @(for ($i = 0; $i -lt $midPool.Count -and $chosen.Count -lt 10; $i += $step) { $midPool[$i] })
+        $chosen = @($small + $mid + $large) | Select-Object -Unique -First $SampleCount
+    }
+
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    function Get-FileSha([string]$fPath) {
+        try {
+            $fs = [System.IO.File]::OpenRead($fPath)
+            try {
+                $b = $sha.ComputeHash($fs)
+                return (($b | ForEach-Object { $_.ToString('x2') }) -join '')
+            } finally { $fs.Dispose() }
+        } catch { return '' }
+    }
+
+    $results = @()
+    $dstBaseLen = $Destination.TrimEnd('\').Length
+    foreach ($df in $chosen) {
+        $rel = $df.FullName.Substring($dstBaseLen).TrimStart('\')
+        $sf = Join-Path $Source $rel
+        $srcHash = Get-FileSha $sf
+        $dstHash = Get-FileSha $df.FullName
+        $ok = ($srcHash -and $dstHash -and ($srcHash -eq $dstHash))
+        $results += [pscustomobject]@{
+            Datei     = $rel
+            QuellHash = $srcHash
+            ZielHash  = $dstHash
+            Ok        = $ok
+        }
+    }
+    return @($results)
+}
+
 function Invoke-SystemBackup {
     [CmdletBinding()]
     param(
@@ -30875,6 +31619,8 @@ function Invoke-SystemBackup {
         )
 
         $hasGranularLib = [bool]($uList | Where-Object { $_ -like 'Lib_*' })
+        $diffReports = @()
+        $shaReports = @()
 
         foreach ($lib in $libs) {
             if ($hasGranularLib -and -not ($uList -contains $lib.Key)) {
@@ -30886,7 +31632,12 @@ function Invoke-SystemBackup {
                 $stepMsg = ('Kopiere Bibliothek {0} ({1}) ...' -f $lib.Name, $sizeTxt)
                 Send-GuiEvent 'UMZUG' ([string]$lib.Step) $stepMsg ''
                 Send-GuiEvent 'LOG' '' ('Spiegele {0} ({1}) -> Benutzerprofil\{2}' -f $lib.Path, $sizeTxt, $lib.Name)
-                Copy-UmzugTree $lib.Path (Join-Path $profDest $lib.Name) @() $lib.Step $stepMsg | Out-Null
+                $destLib = Join-Path $profDest $lib.Name
+                Copy-UmzugTree $lib.Path $destLib @() $lib.Step $stepMsg | Out-Null
+                $diffs = @(Test-UmzugTreeDiff $lib.Path $destLib)
+                $diffReports += [pscustomobject]@{ Name = $lib.Name; Diffs = $diffs; Count = $diffs.Count }
+                $samples = @(Test-UmzugSha256Samples $lib.Path $destLib 20)
+                $shaReports += [pscustomobject]@{ Name = $lib.Name; Samples = $samples }
             }
         }
     }
@@ -31226,6 +31977,118 @@ function Invoke-SystemBackup {
         [System.IO.File]::WriteAllText($reportFile, $sb.ToString(), [System.Text.Encoding]::UTF8)
     }
 
+    # 5b. WLAN-Netzwerkprofile (ab v3.86)
+    if ($uList -contains 'Wlan') {
+        if ($script:Anonymisieren -or $Anonymisieren) {
+            Send-GuiEvent 'LOG' 'Gelb' 'WLAN-Profile werden aufgrund aktiver Anonymisierung nicht exportiert.'
+        } else {
+            Send-GuiEvent 'UMZUG' '88' 'Sichere WLAN-Netzwerkprofile ...' ''
+            Send-GuiEvent 'LOG' '' 'Exportiere WLAN-Profile ...'
+            $wlanDest = Join-Path $backupFolder 'WLAN-Profile'
+            try {
+                [System.IO.Directory]::CreateDirectory($wlanDest) | Out-Null
+                $exportClear = ($uList -contains 'Wlan_Klartext')
+                $clearArg = if ($exportClear) { ' key=clear' } else { '' }
+                $pinfo = New-Object System.Diagnostics.ProcessStartInfo
+                $pinfo.FileName = 'netsh.exe'
+                $pinfo.Arguments = ('wlan export profile folder="{0}"{1}' -f $wlanDest, $clearArg)
+                $pinfo.UseShellExecute = $false
+                $pinfo.CreateNoWindow = $true
+                $p = [System.Diagnostics.Process]::Start($pinfo)
+                if (-not $p.WaitForExit(30000)) { try { $p.Kill() } catch { } }
+                $exportedProfiles = @(Get-ChildItem -LiteralPath $wlanDest -Filter '*.xml' -File -ErrorAction SilentlyContinue)
+                $secNote = if ($exportClear) { 'mit Klartext-Schluesseln' } else { 'ohne Schluessel (Standard)' }
+                Send-GuiEvent 'LOG' '' ('WLAN-Profile exportiert: {0} Profile ({1})' -f $exportedProfiles.Count, $secNote)
+            } catch {
+                Send-GuiEvent 'LOG' 'Gelb' ('Fehler beim Export der WLAN-Profile: {0}' -f $_.Exception.Message)
+            }
+        }
+    }
+
+    # 5c. Verifikationsauswertung & Pruefprotokoll.txt (ab v3.86)
+    Send-GuiEvent 'UMZUG' '92' 'Pruefe Sicherungsvollstaendigkeit (Diff & SHA-256) ...' ''
+    $allDiffsOk = $true
+    $allShaOk = $true
+    $totalDiffs = 0
+    $totalSamples = 0
+    $failedSamples = 0
+
+    $protoPath = Join-Path $backupFolder 'Pruefprotokoll.txt'
+    $psb = New-Object System.Text.StringBuilder
+    $psb.AppendLine('LEOS MINIBENCH: SICHERUNGS-PRUEFPROTOKOLL') | Out-Null
+    $psb.AppendLine('=========================================') | Out-Null
+    $psb.AppendLine(('Datum:            {0}' -f (Get-Date).ToString('dd.MM.yyyy HH:mm:ss'))) | Out-Null
+    $psb.AppendLine(('Computer:         {0}' -f $env:COMPUTERNAME)) | Out-Null
+    $psb.AppendLine(('Sicherungsordner: {0}' -f $backupFolder)) | Out-Null
+    $psb.AppendLine() | Out-Null
+
+    $psb.AppendLine('1. ROBOCOPY-DIFFERENZABGLEICH') | Out-Null
+    $psb.AppendLine('----------------------------') | Out-Null
+    if ($diffReports -and $diffReports.Count -gt 0) {
+        foreach ($dr in $diffReports) {
+            $psb.AppendLine(('Bibliothek: {0} - Abweichungen: {1}' -f $dr.Name, $dr.Count)) | Out-Null
+            if ($dr.Count -gt 0) {
+                $allDiffsOk = $false
+                $totalDiffs += $dr.Count
+                foreach ($d in $dr.Diffs) {
+                    $psb.AppendLine(('  [ABWEICHUNG] {0}' -f $d)) | Out-Null
+                }
+            } else {
+                $psb.AppendLine('  Keine Differenzen festgestellt (vollstaendig synchron).') | Out-Null
+            }
+        }
+    } else {
+        $psb.AppendLine('Keine Bibliotheken fuer Differenzabgleich ausgewaehlt.') | Out-Null
+    }
+    $psb.AppendLine() | Out-Null
+
+    $psb.AppendLine('2. SHA-256-STICHPROBENPRUEFUNG (ca. 20 Dateien je Bibliothek)') | Out-Null
+    $psb.AppendLine('-------------------------------------------------------------') | Out-Null
+    if ($shaReports -and $shaReports.Count -gt 0) {
+        foreach ($sr in $shaReports) {
+            $psb.AppendLine(('Bibliothek: {0} ({1} Stichproben geprueft)' -f $sr.Name, $sr.Samples.Count)) | Out-Null
+            foreach ($s in $sr.Samples) {
+                $totalSamples++
+                if (-not $s.Ok) {
+                    $allShaOk = $false
+                    $failedSamples++
+                    $psb.AppendLine(('  [FEHLER] {0}' -f $s.Datei)) | Out-Null
+                    $psb.AppendLine(('           Quelle: {0}' -f $s.QuellHash)) | Out-Null
+                    $psb.AppendLine(('           Ziel:   {0}' -f $s.ZielHash)) | Out-Null
+                } else {
+                    $subHash = if ($s.ZielHash.Length -ge 16) { $s.ZielHash.Substring(0, 16) } else { $s.ZielHash }
+                    $psb.AppendLine(('  [OK]     {0} (SHA: {1}...)' -f $s.Datei, $subHash)) | Out-Null
+                }
+            }
+        }
+    } else {
+        $psb.AppendLine('Keine Dateien fuer SHA-256-Stichproben ausgewaehlt.') | Out-Null
+    }
+    $psb.AppendLine() | Out-Null
+
+    $sicherungVollstaendig = ($allDiffsOk -and $allShaOk)
+    $psb.AppendLine('GESAMTERGEBNIS') | Out-Null
+    $psb.AppendLine('==============') | Out-Null
+    $psb.AppendLine(('Sicherung vollstaendig: {0}' -f $(if ($sicherungVollstaendig) { 'Ja' } else { 'Nein' }))) | Out-Null
+    if (-not $sicherungVollstaendig) {
+        $psb.AppendLine(('Details: {0} Dateidifferenzen, {1} fehlerhafte Pruefsummen von {2} Stichproben.' -f $totalDiffs, $failedSamples, $totalSamples)) | Out-Null
+    }
+    [System.IO.File]::WriteAllText($protoPath, $psb.ToString(), [System.Text.Encoding]::UTF8)
+
+    if ($sicherungVollstaendig) {
+        Send-GuiEvent 'LOG' 'Gruen' ('Sicherung vollstaendig: Ja (0 Differenzen, {0} Stichproben OK)' -f $totalSamples)
+    } else {
+        Send-GuiEvent 'LOG' 'Rot' ('Sicherung unvollstaendig: Nein ({0} Differenzen, {1} fehlerhafte Pruefsummen)' -f $totalDiffs, $failedSamples)
+    }
+
+    if (Get-Command Add-Finding -ErrorAction SilentlyContinue) {
+        if ($sicherungVollstaendig) {
+            Add-Finding 'Info' 'System-Umzug' ('Sicherung vollstaendig: Ja ({0} Stichproben geprueft, keine Differenzen).' -f $totalSamples)
+        } else {
+            Add-Finding 'Warnung' 'System-Umzug' ('Sicherung unvollstaendig: Nein ({0} Differenzen, {1} fehlerhafte Pruefsummen).' -f $totalDiffs, $failedSamples)
+        }
+    }
+
     # 6. Autarkes Wiederherstellungs-Paket (Wiederherstellen.cmd & Wiederherstellen.ps1)
     Send-GuiEvent 'UMZUG' '95' 'Erstelle autarkes Wiederherstellungspaket ...' ''
     Send-GuiEvent 'LOG' '' 'Erzeuge Wiederherstellen.cmd und Wiederherstellen.ps1 ...'
@@ -31242,7 +32105,23 @@ function Invoke-SystemBackup {
         '    powershell.exe -NoProfile -Command "Start-Process cmd -ArgumentList ''/c \"\"%~f0\"\"'' -Verb RunAs"',
         '    exit /b',
         ')',
-        'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Wiederherstellen.ps1"',
+        'echo ========================================================================',
+        'echo           LEOS MINIBENCH: SYSTEM-WIEDERHERSTELLUNG',
+        'echo ========================================================================',
+        'echo.',
+        'echo Bitte waehlen Sie eine Option:',
+        'echo   [1] Trockenlauf (Pruefen, was getan wuerde)',
+        'echo   [2] Vollstaendige Wiederherstellung durchfuehren',
+        'echo   [3] Abbrechen',
+        'echo.',
+        'set /p opt="Auswahl (1-3): "',
+        'if "%opt%"=="1" (',
+        '    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Wiederherstellen.ps1" -Trockenlauf',
+        ') else if "%opt%"=="2" (',
+        '    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Wiederherstellen.ps1"',
+        ') else (',
+        '    echo Vorgang abgebrochen.',
+        ')',
         'pause'
     )
     [System.IO.File]::WriteAllText($cmdPath, ($cmdLines -join "`r`n"), [System.Text.Encoding]::ASCII)
@@ -31257,7 +32136,9 @@ function Invoke-SystemBackup {
         '    Erstellt von Leos Minibench (System-Umzug).',
         '#>',
         '[CmdletBinding()]',
-        'param()',
+        'param(',
+        '    [switch]$Trockenlauf',
+        ')',
         '',
         '$Host.UI.RawUI.WindowTitle = ''Leos Minibench: System-Wiederherstellung''',
         'Clear-Host',
@@ -31265,6 +32146,10 @@ function Invoke-SystemBackup {
         'Write-Host ''          LEOS MINIBENCH: SYSTEM-WIEDERHERSTELLUNG'' -ForegroundColor White',
         'Write-Host ''========================================================================'' -ForegroundColor Cyan',
         'Write-Host ''''',
+        'if ($Trockenlauf) {',
+        '    Write-Host ''*** MODUS: TROCKENLAUF (Es werden keine Aenderungen vorgenommen) ***'' -ForegroundColor Magenta',
+        '    Write-Host ''''',
+        '}',
         'Write-Host (''Ziel-Benutzerprofil:   {0}'' -f $env:USERPROFILE) -ForegroundColor Yellow',
         'Write-Host (''Aktueller Computer:    {0}'' -f $env:COMPUTERNAME) -ForegroundColor Yellow',
         'Write-Host (''Sicherungsverzeichnis: {0}'' -f $PSScriptRoot) -ForegroundColor Yellow',
@@ -31281,19 +32166,27 @@ function Invoke-SystemBackup {
         '# 1. Benutzerprofil, Bibliotheken & Konfigurationen',
         '$profSrc = Join-Path $PSScriptRoot ''Benutzerprofil''',
         'if (Test-Path -LiteralPath $profSrc) {',
-        '    Write-Host ''[1/5] Benutzer-Bibliotheken und Anwendungsdaten zurueckspielen ...'' -ForegroundColor Green',
+        '    Write-Host ''[1/6] Benutzer-Bibliotheken und Anwendungsdaten zurueckspielen ...'' -ForegroundColor Green',
         '    $dirs = Get-ChildItem -LiteralPath $profSrc -Directory -ErrorAction SilentlyContinue',
         '    foreach ($d in $dirs) {',
         '        if ($d.Name -eq ''AppData'') {',
         '            $appDataSrc = Join-Path $profSrc ''AppData''',
         '            $appDataDst = Join-Path $env:USERPROFILE ''AppData''',
-        '            Write-Host ''      Kopiere Profile und Programm-Konfigurationen ...''',
-        '            & robocopy.exe "$appDataSrc" "$appDataDst" /E /XJ /R:1 /W:1 /COPY:DAT /MT:16 /NP /NFL /NDL | Out-Null',
+        '            if ($Trockenlauf) {',
+        '                Write-Host ''      [TROCKENLAUF] Wuerde Profile und Konfigurationen spiegeln: AppData ->'' $appDataDst',
+        '            } else {',
+        '                Write-Host ''      Kopiere Profile und Programm-Konfigurationen ...''',
+        '                & robocopy.exe "$appDataSrc" "$appDataDst" /E /XJ /R:1 /W:1 /COPY:DAT /MT:16 /NP /NFL /NDL | Out-Null',
+        '            }',
         '        } elseif ($d.Name -eq ''PowerShellProfiles'') {',
         '            $psDst = Join-Path $env:USERPROFILE ''Documents\WindowsPowerShell''',
-        '            try { [System.IO.Directory]::CreateDirectory($psDst) | Out-Null } catch { }',
-        '            Write-Host ''      Kopiere PowerShell-Profile ...''',
-        '            & robocopy.exe "$($d.FullName)" "$psDst" /E /XJ /R:1 /W:1 /COPY:DAT /MT:16 /NP /NFL /NDL | Out-Null',
+        '            if ($Trockenlauf) {',
+        '                Write-Host ''      [TROCKENLAUF] Wuerde PowerShell-Profile kopieren nach:'' $psDst',
+        '            } else {',
+        '                try { [System.IO.Directory]::CreateDirectory($psDst) | Out-Null } catch { }',
+        '                Write-Host ''      Kopiere PowerShell-Profile ...''',
+        '                & robocopy.exe "$($d.FullName)" "$psDst" /E /XJ /R:1 /W:1 /COPY:DAT /MT:16 /NP /NFL /NDL | Out-Null',
+        '            }',
         '        } elseif ($d.Name -eq ''WindowsTerminal'') {',
         '            if ($env:LOCALAPPDATA) {',
         '                $wtPkg = Get-ChildItem -LiteralPath (Join-Path $env:LOCALAPPDATA ''Packages'') -Filter ''Microsoft.WindowsTerminal_*'' -Directory -ErrorAction SilentlyContinue | Select-Object -First 1',
@@ -31301,8 +32194,12 @@ function Invoke-SystemBackup {
         '                    $wtTarget = Join-Path $wtPkg.FullName ''LocalState\settings.json''',
         '                    $wtSrc = Join-Path $d.FullName ''settings.json''',
         '                    if (Test-Path $wtSrc) {',
-        '                        Write-Host ''      Aktualisiere Windows Terminal Konfiguration ...''',
-        '                        try { Copy-Item -LiteralPath $wtSrc -Destination $wtTarget -Force } catch { }',
+        '                        if ($Trockenlauf) {',
+        '                            Write-Host ''      [TROCKENLAUF] Wuerde Windows Terminal Konfiguration kopieren nach:'' $wtTarget',
+        '                        } else {',
+        '                            Write-Host ''      Aktualisiere Windows Terminal Konfiguration ...''',
+        '                            try { Copy-Item -LiteralPath $wtSrc -Destination $wtTarget -Force } catch { }',
+        '                        }',
         '                    }',
         '                }',
         '            }',
@@ -31314,71 +32211,114 @@ function Invoke-SystemBackup {
         '                ''Musik''     { if (-not (Test-Path $targetPath) -and (Test-Path "$env:USERPROFILE\Music"))     { $targetPath = "$env:USERPROFILE\Music" } }',
         '                ''Videos''    { if (-not (Test-Path $targetPath) -and (Test-Path "$env:USERPROFILE\Videos"))    { $targetPath = "$env:USERPROFILE\Videos" } }',
         '            }',
-        '            Write-Host (''      Spiegele {0} -> {1} ...'' -f $d.Name, $targetPath)',
-        '            try { [System.IO.Directory]::CreateDirectory($targetPath) | Out-Null } catch { }',
-        '            & robocopy.exe "$($d.FullName)" "$targetPath" /E /XJ /R:1 /W:1 /COPY:DAT /MT:16 /NP /NFL /NDL | Out-Null',
+        '            if ($Trockenlauf) {',
+        '                Write-Host (''      [TROCKENLAUF] Wuerde spiegeln: {0} -> {1}'' -f $d.Name, $targetPath)',
+        '            } else {',
+        '                Write-Host (''      Spiegele {0} -> {1} ...'' -f $d.Name, $targetPath)',
+        '                try { [System.IO.Directory]::CreateDirectory($targetPath) | Out-Null } catch { }',
+        '                & robocopy.exe "$($d.FullName)" "$targetPath" /E /XJ /R:1 /W:1 /COPY:DAT /MT:16 /NP /NFL /NDL | Out-Null',
+        '            }',
         '        }',
         '    }',
         '    # Einzeldateien im Profil',
         '    $gitCfgSrc = Join-Path $profSrc ''.gitconfig''',
         '    if (Test-Path -LiteralPath $gitCfgSrc) {',
-        '        try { Copy-Item -LiteralPath $gitCfgSrc -Destination (Join-Path $env:USERPROFILE ''.gitconfig'') -Force } catch { }',
+        '        if ($Trockenlauf) {',
+        '            Write-Host ''      [TROCKENLAUF] Wuerde .gitconfig kopieren''',
+        '        } else {',
+        '            try { Copy-Item -LiteralPath $gitCfgSrc -Destination (Join-Path $env:USERPROFILE ''.gitconfig'') -Force } catch { }',
+        '        }',
         '    }',
         '    $gitIgnoreSrc = Join-Path $profSrc ''.gitignore_global''',
         '    if (Test-Path -LiteralPath $gitIgnoreSrc) {',
-        '        try { Copy-Item -LiteralPath $gitIgnoreSrc -Destination (Join-Path $env:USERPROFILE ''.gitignore_global'') -Force } catch { }',
+        '        if ($Trockenlauf) {',
+        '            Write-Host ''      [TROCKENLAUF] Wuerde .gitignore_global kopieren''',
+        '        } else {',
+        '            try { Copy-Item -LiteralPath $gitIgnoreSrc -Destination (Join-Path $env:USERPROFILE ''.gitignore_global'') -Force } catch { }',
+        '        }',
         '    }',
         '    $puttyJson = Join-Path $profSrc ''PuTTY_Sessions.json''',
         '    if (Test-Path -LiteralPath $puttyJson) {',
-        '        Write-Host ''      Stelle PuTTY-Verbindungsprofile wieder her ...''',
-        '        try {',
-        '            $pData = Get-Content -LiteralPath $puttyJson -Raw -Encoding UTF8 | ConvertFrom-Json',
-        '            foreach ($item in $pData) {',
-        '                $targetKey = "HKCU:\Software\SimonTatham\PuTTY\Sessions\$($item.Session)"',
-        '                if (-not (Test-Path -LiteralPath $targetKey)) { New-Item -Path $targetKey -Force | Out-Null }',
-        '                foreach ($prop in $item.Einstellungen.PSObject.Properties) {',
-        '                    Set-ItemProperty -Path $targetKey -Name $prop.Name -Value $prop.Value -Force -ErrorAction SilentlyContinue',
+        '        if ($Trockenlauf) {',
+        '            Write-Host ''      [TROCKENLAUF] Wuerde PuTTY-Verbindungsprofile wiederherstellen''',
+        '        } else {',
+        '            Write-Host ''      Stelle PuTTY-Verbindungsprofile wieder her ...''',
+        '            try {',
+        '                $pData = Get-Content -LiteralPath $puttyJson -Raw -Encoding UTF8 | ConvertFrom-Json',
+        '                foreach ($item in $pData) {',
+        '                    $targetKey = "HKCU:\Software\SimonTatham\PuTTY\Sessions\$($item.Session)"',
+        '                    if (-not (Test-Path -LiteralPath $targetKey)) { New-Item -Path $targetKey -Force | Out-Null }',
+        '                    foreach ($prop in $item.Einstellungen.PSObject.Properties) {',
+        '                        Set-ItemProperty -Path $targetKey -Name $prop.Name -Value $prop.Value -Force -ErrorAction SilentlyContinue',
+        '                    }',
         '                }',
-        '            }',
-        '        } catch { }',
+        '            } catch { }',
+        '        }',
         '    }',
         '    $puttyReg = Join-Path $profSrc ''PuTTY_Sessions.reg''',
         '    if (Test-Path -LiteralPath $puttyReg) {',
-        '        Write-Host ''      Importiere PuTTY-Sessions ...''',
-        '        & reg.exe import "$puttyReg" 2>$null | Out-Null',
+        '        if ($Trockenlauf) {',
+        '            Write-Host ''      [TROCKENLAUF] Wuerde PuTTY-Sessions Registry importieren''',
+        '        } else {',
+        '            Write-Host ''      Importiere PuTTY-Sessions ...''',
+        '            & reg.exe import "$puttyReg" 2>$null | Out-Null',
+        '        }',
         '    }',
         '} else {',
-        '    Write-Host ''[1/5] Keine Benutzerprofil-Sicherung vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
+        '    Write-Host ''[1/6] Keine Benutzerprofil-Sicherung vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
         '}',
         '',
-        '# 2. C:\-Zusatzordner zuruecklegen',
+        '# 2. WLAN-Profile',
+        '$wlanSrc = Join-Path $PSScriptRoot ''WLAN-Profile''',
+        'if (Test-Path -LiteralPath $wlanSrc) {',
+        '    Write-Host ''[2/6] WLAN-Profile wiederherstellen ...'' -ForegroundColor Green',
+        '    $xmlProfiles = @(Get-ChildItem -LiteralPath $wlanSrc -Filter ''*.xml'' -File -ErrorAction SilentlyContinue)',
+        '    foreach ($xp in $xmlProfiles) {',
+        '        if ($Trockenlauf) {',
+        '            Write-Host (''      [TROCKENLAUF] Wuerde WLAN-Profil importieren: {0}'' -f $xp.Name)',
+        '        } else {',
+        '            Write-Host (''      Importiere WLAN-Profil: {0} ...'' -f $xp.Name)',
+        '            & netsh.exe wlan add profile filename="$($xp.FullName)" user=all 2>$null | Out-Null',
+        '        }',
+        '    }',
+        '} else {',
+        '    Write-Host ''[2/6] Keine WLAN-Profile gesichert (uebersprungen).'' -ForegroundColor DarkGray',
+        '}',
+        '',
+        '# 3. C:\-Zusatzordner zuruecklegen',
         '$zusatzSrc = Join-Path $PSScriptRoot ''C_Laufwerk_Zusatz''',
         'if (Test-Path -LiteralPath $zusatzSrc) {',
-        '    Write-Host ''[2/5] Zusaetzliche C:\-Ordner zuruecklegen ...'' -ForegroundColor Green',
+        '    Write-Host ''[3/6] Zusaetzliche C:\-Ordner zuruecklegen ...'' -ForegroundColor Green',
         '    $cDirs = Get-ChildItem -LiteralPath $zusatzSrc -Directory -ErrorAction SilentlyContinue',
         '    foreach ($cd in $cDirs) {',
         '        $cDest = Join-Path ''C:\'' $cd.Name',
-        '        Write-Host (''      Kopiere {0} -> {1} ...'' -f $cd.FullName, $cDest)',
-        '        try { [System.IO.Directory]::CreateDirectory($cDest) | Out-Null } catch { }',
-        '        & robocopy.exe "$($cd.FullName)" "$cDest" /E /XJ /R:1 /W:1 /COPY:DAT /MT:16 /NP /NFL /NDL | Out-Null',
+        '        if ($Trockenlauf) {',
+        '            Write-Host (''      [TROCKENLAUF] Wuerde Ordner spiegeln: {0} -> {1}'' -f $cd.FullName, $cDest)',
+        '        } else {',
+        '            Write-Host (''      Kopiere {0} -> {1} ...'' -f $cd.FullName, $cDest)',
+        '            try { [System.IO.Directory]::CreateDirectory($cDest) | Out-Null } catch { }',
+        '            & robocopy.exe "$($cd.FullName)" "$cDest" /E /XJ /R:1 /W:1 /COPY:DAT /MT:16 /NP /NFL /NDL | Out-Null',
+        '        }',
         '    }',
         '} else {',
-        '    Write-Host ''[2/5] Keine C:\-Zusatzordner vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
+        '    Write-Host ''[3/6] Keine C:\-Zusatzordner vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
         '}',
         '',
-        '# 3. Desktop-Optik anwenden',
+        '# 4. Desktop-Optik anwenden',
         '$layoutSrc = Join-Path $PSScriptRoot ''Desktop-Layout''',
         'if (Test-Path -LiteralPath $layoutSrc) {',
-        '    Write-Host ''[3/5] Desktop-Optik und Layout anwenden ...'' -ForegroundColor Green',
-        '',
-        '    $wpSrc = Join-Path $layoutSrc ''Wallpaper.jpg''',
-        '    if (Test-Path -LiteralPath $wpSrc) {',
-        '        $wpLocal = Join-Path $env:APPDATA ''Microsoft\Windows\Themes\TranscodedWallpaper''',
-        '        try {',
-        '            $wpDir = Split-Path $wpLocal',
-        '            if (-not (Test-Path $wpDir)) { [System.IO.Directory]::CreateDirectory($wpDir) | Out-Null }',
-        '            Copy-Item -LiteralPath $wpSrc -Destination $wpLocal -Force',
-        '            Add-Type -TypeDefinition @"',
+        '    Write-Host ''[4/6] Desktop-Optik und Layout anwenden ...'' -ForegroundColor Green',
+        '    if ($Trockenlauf) {',
+        '        Write-Host ''      [TROCKENLAUF] Wuerde Desktop-Hintergrundbild und Icon-Layout aktivieren''',
+        '    } else {',
+        '        $wpSrc = Join-Path $layoutSrc ''Wallpaper.jpg''',
+        '        if (Test-Path -LiteralPath $wpSrc) {',
+        '            $wpLocal = Join-Path $env:APPDATA ''Microsoft\Windows\Themes\TranscodedWallpaper''',
+        '            try {',
+        '                $wpDir = Split-Path $wpLocal',
+        '                if (-not (Test-Path $wpDir)) { [System.IO.Directory]::CreateDirectory($wpDir) | Out-Null }',
+        '                Copy-Item -LiteralPath $wpSrc -Destination $wpLocal -Force',
+        '                Add-Type -TypeDefinition @"',
         'using System;',
         'using System.Runtime.InteropServices;',
         'public class DiagWallpaperHelper {',
@@ -31386,64 +32326,77 @@ function Invoke-SystemBackup {
         '    public static extern int SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);',
         '}',
         '"@ -ErrorAction SilentlyContinue',
-        '            [DiagWallpaperHelper]::SystemParametersInfo(20, 0, $wpLocal, 3) | Out-Null',
-        '            Write-Host ''      Hintergrundbild erfolgreich aktiviert.''',
-        '        } catch { }',
-        '    }',
+        '                [DiagWallpaperHelper]::SystemParametersInfo(20, 0, $wpLocal, 3) | Out-Null',
+        '                Write-Host ''      Hintergrundbild erfolgreich aktiviert.''',
+        '            } catch { }',
+        '        }',
         '',
-        '    $layoutJsonFile = Join-Path $layoutSrc ''Layout.json''',
-        '    if (Test-Path -LiteralPath $layoutJsonFile) {',
-        '        try {',
-        '            $lj = Get-Content -LiteralPath $layoutJsonFile -Raw -Encoding UTF8 | ConvertFrom-Json',
-        '            if ($lj.WallpaperStyle) {',
-        '                Set-ItemProperty -Path ''HKCU:\Control Panel\Desktop'' -Name ''WallpaperStyle'' -Value ([string]$lj.WallpaperStyle) -Force',
-        '            }',
-        '            if ($lj.TileWallpaper) {',
-        '                Set-ItemProperty -Path ''HKCU:\Control Panel\Desktop'' -Name ''TileWallpaper'' -Value ([string]$lj.TileWallpaper) -Force',
-        '            }',
-        '        } catch { }',
-        '    }',
+        '        $layoutJsonFile = Join-Path $layoutSrc ''Layout.json''',
+        '        if (Test-Path -LiteralPath $layoutJsonFile) {',
+        '            try {',
+        '                $lj = Get-Content -LiteralPath $layoutJsonFile -Raw -Encoding UTF8 | ConvertFrom-Json',
+        '                if ($lj.WallpaperStyle) {',
+        '                    Set-ItemProperty -Path ''HKCU:\Control Panel\Desktop'' -Name ''WallpaperStyle'' -Value ([string]$lj.WallpaperStyle) -Force',
+        '                }',
+        '                if ($lj.TileWallpaper) {',
+        '                    Set-ItemProperty -Path ''HKCU:\Control Panel\Desktop'' -Name ''TileWallpaper'' -Value ([string]$lj.TileWallpaper) -Force',
+        '                }',
+        '            } catch { }',
+        '        }',
         '',
-        '    $iconReg = Join-Path $layoutSrc ''IconPositionen.reg''',
-        '    if (Test-Path -LiteralPath $iconReg) {',
-        '        Write-Host ''      Icon-Koordinaten werden in Registry importiert ...''',
-        '        & reg.exe import "$iconReg" 2>$null | Out-Null',
-        '    }',
+        '        $iconReg = Join-Path $layoutSrc ''IconPositionen.reg''',
+        '        if (Test-Path -LiteralPath $iconReg) {',
+        '            Write-Host ''      Icon-Koordinaten werden in Registry importiert ...''',
+        '            & reg.exe import "$iconReg" 2>$null | Out-Null',
+        '        }',
         '',
-        '    Write-Host ''      Windows Explorer neu starten, um Layout zu uebernehmen ...''',
-        '    Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue',
-        '    Start-Sleep -Seconds 1',
+        '        Write-Host ''      Windows Explorer neu starten, um Layout zu uebernehmen ...''',
+        '        Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue',
+        '        Start-Sleep -Seconds 1',
+        '    }',
         '} else {',
-        '    Write-Host ''[3/5] Kein Desktop-Layout vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
+        '    Write-Host ''[4/6] Kein Desktop-Layout vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
         '}',
         '',
-        '# 4. Programme per winget einspielen',
+        '# 5. Programme per winget einspielen',
         '$wingetFile = Join-Path $PSScriptRoot ''Programme\winget-pakete.json''',
         'if (Test-Path -LiteralPath $wingetFile) {',
-        '    Write-Host ''[4/5] Installiere Programme ueber Winget-Paketliste ...'' -ForegroundColor Green',
-        '    $wgCmd = Get-Command winget.exe -ErrorAction SilentlyContinue | Select-Object -First 1',
-        '    if ($wgCmd) {',
-        '        Write-Host ''      winget import wird ausgefuehrt ...''',
-        '        & $wgCmd.Source import -i "$wingetFile" --accept-package-agreements --accept-source-agreements',
+        '    Write-Host ''[5/6] Installiere Programme ueber Winget-Paketliste ...'' -ForegroundColor Green',
+        '    if ($Trockenlauf) {',
+        '        Write-Host (''      [TROCKENLAUF] Wuerde winget import ausfuehren: {0}'' -f $wingetFile)',
         '    } else {',
-        '        Write-Warning ''winget ist auf diesem System nicht verfuegbar.''',
+        '        $wgCmd = Get-Command winget.exe -ErrorAction SilentlyContinue | Select-Object -First 1',
+        '        if ($wgCmd) {',
+        '            Write-Host ''      winget import wird ausgefuehrt ...''',
+        '            & $wgCmd.Source import -i "$wingetFile" --accept-package-agreements --accept-source-agreements',
+        '        } else {',
+        '            Write-Warning ''winget ist auf diesem System nicht verfuegbar.''',
+        '        }',
         '    }',
         '} else {',
-        '    Write-Host ''[4/5] Keine Winget-Paketliste vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
+        '    Write-Host ''[5/6] Keine Winget-Paketliste vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
         '}',
         '',
-        '# 5. Manuelle Installationen oeffnen',
+        '# 6. Manuelle Installationen oeffnen',
         '$nwFile = Join-Path $PSScriptRoot ''Programme\Nicht-Winget-Programme.txt''',
         'if (Test-Path -LiteralPath $nwFile) {',
-        '    Write-Host ''[5/5] Liste manuell zu installierender Programme anzeigen ...'' -ForegroundColor Green',
-        '    try { Start-Process notepad.exe -ArgumentList "`"$nwFile`"" } catch { }',
+        '    Write-Host ''[6/6] Liste manuell zu installierender Programme anzeigen ...'' -ForegroundColor Green',
+        '    if ($Trockenlauf) {',
+        '        Write-Host (''      [TROCKENLAUF] Wuerde Datei in Notepad anzeigen: {0}'' -f $nwFile)',
+        '    } else {',
+        '        try { Start-Process notepad.exe -ArgumentList "`"$nwFile`"" } catch { }',
+        '    }',
         '} else {',
-        '    Write-Host ''[5/5] Keine Liste manueller Programme vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
+        '    Write-Host ''[6/6] Keine Liste manueller Programme vorhanden (uebersprungen).'' -ForegroundColor DarkGray',
         '}',
         '',
         'Write-Host ''''',
         'Write-Host ''========================================================================'' -ForegroundColor Cyan',
-        'Write-Host ''      Wiederherstellung abgeschlossen!'' -ForegroundColor Green',
+        'if ($Trockenlauf) {',
+        '    Write-Host ''      Trockenlauf abgeschlossen (keine Aenderungen vorgenommen)!'' -ForegroundColor Magenta',
+        '} else {',
+        '    Write-Host ''      Wiederherstellung abgeschlossen!'' -ForegroundColor Green',
+        '}',
         'Write-Host ''========================================================================'' -ForegroundColor Cyan',
         'Write-Host '''''
     )
@@ -31454,13 +32407,13 @@ function Invoke-SystemBackup {
     Send-GuiEvent 'LOG' 'Gruen' ('Sicherung erfolgreich abgeschlossen: {0} ({1:N2} GB)' -f $backupFolder, ($finalSize / 1GB))
 
     return [pscustomobject]@{
-        Ok      = $true
-        Pfad    = $backupFolder
-        Groesse = $finalSize
-        Fehler  = ''
+        Ok           = $true
+        Pfad         = $backupFolder
+        Groesse      = $finalSize
+        Vollstaendig = $sicherungVollstaendig
+        Fehler       = ''
     }
 }
-
 if ($Umzug) {
     $r = Invoke-SystemBackup -Ziel $UmzugZiel -Umfang $UmzugUmfang -Zusatz $UmzugZusatz
     Send-GuiEvent 'RESULT' $(if ($r.Ok) { '1' } else { '0' }) $r.Pfad $r.Groesse $r.Fehler
@@ -31893,6 +32846,14 @@ Invoke-Section 'Grafik und Monitore' {
     $adapters = @(Get-GpuAdapters)
     $adapterMap = @{}
     foreach ($a in $adapters) { $adapterMap[$a.Name] = $a }
+    $nvSmiDriver = ''
+    $nvsmi = if (Get-Command Find-NvidiaSmi -ErrorAction SilentlyContinue) { Find-NvidiaSmi } else { '' }
+    if ($nvsmi) {
+        try {
+            $smiOut = Invoke-External -File $nvsmi -Arguments '--query-gpu=driver_version --format=csv,noheader,nounits' -TimeoutSec 3
+            if ($smiOut.Output) { $nvSmiDriver = ($smiOut.Output.Trim() -split "`r?`n")[0].Trim() }
+        } catch { }
+    }
     Get-CimCached Win32_VideoController | ForEach-Object {
         $ad = if ($adapterMap.ContainsKey(([string]$_.Name).Trim())) { $adapterMap[([string]$_.Name).Trim()] } else { $null }
         $isDesk = if ($ad) { [bool]$ad.Desktop } else { [bool]$_.CurrentHorizontalResolution }
@@ -31900,7 +32861,7 @@ Invoke-Section 'Grafik und Monitore' {
             'Name'          = $_.Name
             'Art'           = $(switch (Get-GpuKind ([string]$_.Name)) { 'dGPU' { 'dedizierte Grafikkarte' } 'iGPU' { 'Prozessorgrafik (integriert)' } 'virtuell' { 'virtueller Adapter' } default { 'unbekannt' } }) + $(if ($isDesk) { ', gibt den Desktop aus' } else { '' })
             'VRAM'          = $(if ($vram.ContainsKey($_.Name)) { Format-Size $vram[$_.Name] } else { Format-Size $_.AdapterRAM })
-            'Treiber'       = $_.DriverVersion
+            'Treiber'       = $(if ($_.Name -match 'NVIDIA' -and $nvSmiDriver) { '{0} (nvidia-smi: {1})' -f $_.DriverVersion, $nvSmiDriver } else { $_.DriverVersion })
             'Treiberdatum'  = $(if ($_.DriverDate) { $_.DriverDate.ToString('dd.MM.yyyy') })
             'Auflösung'     = $(if ($isDesk -and $_.CurrentHorizontalResolution) { '{0}x{1} @ {2} Hz' -f $_.CurrentHorizontalResolution, $_.CurrentVerticalResolution, $_.CurrentRefreshRate })
             'Status'        = $_.Status
@@ -31912,13 +32873,28 @@ Invoke-Section 'Grafik und Monitore' {
         Add-Finding WARNUNG 'Grafik' 'Nur der Microsoft Basic Display Adapter ist aktiv. Eine Installation des Herstellertreibers (AMD, Intel, NVIDIA) wird dringend empfohlen.'
     }
     $gpus | Where-Object { $_.DriverDate -and $_.DriverDate -lt (Get-Date).AddMonths(-18) -and $_.Name -notmatch 'Virtual|Remote|Indirect|Parsec|spacedesk|Basic Display|Microsoft Basic' } | ForEach-Object {
-        Add-Finding INFO 'Grafik' ('Grafiktreiber für {0} ist älter als 18 Monate ({1:dd.MM.yyyy}), ein Update wird empfohlen.' -f $_.Name, $_.DriverDate)
+        $vInfo = Get-GpuVendorLink $_.Name $script:IsLaptop
+        $msg = 'Grafiktreiber für {0} ist älter als 18 Monate ({1:dd.MM.yyyy}), ein Update wird empfohlen.' -f $_.Name, $_.DriverDate
+        if ($vInfo.Link) { $msg += ' Download: ' + $vInfo.Link }
+        if ($vInfo.LaptopHinweis) { $msg += ' (' + $vInfo.LaptopHinweis + ')' }
+        Add-Finding INFO 'Grafik' $msg
     }
     $tdr30 = @(Get-TdrEvents (Get-Date).AddDays(-30))
     if ($tdr30.Count) {
         Add-Finding WARNUNG 'Grafik' ('Treiberabsturz festgestellt: Ereignis 4101 (Display driver stopped responding) trat in den letzten 30 Tagen {0}x auf. Eine saubere Neuinstallation des Grafiktreibers per DDU wird empfohlen.' -f $tdr30.Count)
     }
     $script:Facts['Grafik'] = Get-GpuFactText
+    $rebar = Test-RebarStatus
+    if ($rebar.Supported) {
+        if ($rebar.Active) {
+            Add-Line ('  Resizable BAR / SAM : aktiv ({0})' -f $rebar.Details)
+        } else {
+            Add-Line ('  Resizable BAR / SAM : inaktiv ({0})' -f $rebar.Details)
+            Add-Finding WARNUNG 'Grafik' 'Resizable BAR / SAM inaktiv: Grafikkarte und Prozessor unterstützen Resizable BAR, die Funktion ist jedoch im BIOS nicht aktiviert. Zur Aktivierung im BIOS: 1. Im BIOS "Above 4G Decoding" aktivieren, 2. "Re-Size BAR Support" auf Auto oder Enabled stellen, 3. CSM (Compatibility Support Module) deaktivieren (UEFI-Modus erforderlich).'
+        }
+    } else {
+        Add-Line '  Resizable BAR / SAM : nicht unterstützt'
+    }
     $gMain = Get-MainGpu; if ($gMain) { $script:BenchShort.GPU = Get-ShortGpuName $gMain.Name }
     Add-Sub 'Monitore'
     $dec = { param($a) if ($a) { -join ($a | Where-Object { $_ -ne 0 } | ForEach-Object { [char]$_ }) } }
@@ -34245,7 +35221,10 @@ if ($ModRep) {
                 }
                 'Leerlaufaufgaben' {
                     Write-Step 'Aufgeschobene Windows-Wartungsaufgaben starten (ProcessIdleTasks) ...'
-                    Start-Process -FilePath (Join-Path $env:windir 'System32\rundll32.exe') -ArgumentList 'advapi32.dll,ProcessIdleTasks' -WindowStyle Hidden -ErrorAction Stop
+                    $rd = Join-Path $env:windir 'System32\rundll32.exe'
+                    if (Test-Path -LiteralPath $rd) {
+                        Start-Process -FilePath $rd -ArgumentList 'advapi32.dll,ProcessIdleTasks' -WindowStyle Hidden -ErrorAction Stop
+                    }
                     [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Wartung' -Ziel 'Leerlaufaufgaben' -Nachher 'gestartet' -Gegenbefehl 'nicht nötig' -NurHinweis)
                     Add-RepairResult $k 'OK' 'Leerlaufaufgaben gestartet (laufen im Hintergrund bis zu einer Stunde weiter)'
                 }
@@ -34688,13 +35667,15 @@ Remove-Item (Join-Path $OutputDir 'Diagnosebericht_teilweise.txt') -Force -Error
 
 $kiName = $(if ($KiOhneAnonymisierung) { 'KI-Analyse_{0}_{1}.txt' -f $env:COMPUTERNAME, (Get-Date -Format 'yyyyMMdd_HHmm') } else { 'KI-Analyse_{0}.txt' -f (Get-Date -Format 'yyyyMMdd_HHmm') })
 $kiFile = Join-Path $OutputDir $kiName
+$reportFile = Join-Path $OutputDir 'Diagnosebericht.txt'
+[IO.File]::WriteAllText($reportFile, ($head.ToString() + $script:Report.ToString()), (New-Object Text.UTF8Encoding($true)))
 $htmlFile = Join-Path $OutputDir 'Diagnosebericht.html'
 try { New-HtmlReport -Path $htmlFile -Sorted $sorted -NK $nK -NW $nW -NI $nI -Start $StartTime -End $EndTime }
 catch {
     Write-Warning ('HTML-Bericht konnte nicht erstellt werden: {0}' -f $_.Exception.Message)
     $htmlFile = ''
-    $reportFile = Join-Path $OutputDir 'Diagnosebericht.txt'
-    [IO.File]::WriteAllText($reportFile, ($head.ToString() + $script:Report.ToString()), (New-Object Text.UTF8Encoding($true)))
+    # HTML fehlgeschlagen, Diagnosebericht.txt liegt bereits vor
+
 }
 
 if ($script:GuiLog) { try { $script:GuiLog.Close(); $script:GuiLog = $null } catch { } }

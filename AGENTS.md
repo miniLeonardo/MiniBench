@@ -1,4 +1,4 @@
-﻿# Leos Minibench: Arbeitsrahmen für jede neue Version
+# Leos Minibench: Arbeitsrahmen für jede neue Version
 
 Gilt für jeden Agenten, der an Leos Minibench arbeitet (Claude, Antigravity). Erst lesen, dann ändern.
 Den aktuellen Stand, offene Befunde und Fallstricke beschreibt Doku\Projektstand.md. Wer eine Version abschließt,
@@ -106,4 +106,4 @@ git log seit dem in Doku\Projektstand.md genannten Commit lesen.
    Keine Testmatrix.
 4. Doku\Projektstand.md aktualisieren (Stand, offene Befunde, Fallstricke, letzter Commit).
 5. Bauen.cmd ausführen (oder Leonardo darum bitten), committet und pusht bei bestandenen Tests automatisch.
-6. GitHub-Release erstellen und LMB.exe hochladen: Nach dem Tagging (vX.Y) das Release auf GitHub via API erstellen und Aktueller Build\LMB.exe als Release-Asset hochladen. Unbedingt auf saubere UTF-8-Kodierung des Releasetextes achten: UTF-8-Bytes explizit per [System.Text.Encoding]::UTF8.GetBytes(...) übertragen, damit Umlaute (ä, ö, ü, ß) und Anführungszeichen auf GitHub fehlerfrei ohne Mojibake (wie Ã¼) dargestellt werden.
+6. GitHub-Release erstellen und LMB.exe hochladen: Nach dem Tagging (vX.Y) das Release auf GitHub via API erstellen und Aktueller Build\LMB.exe als Release-Asset hochladen. Die SHA-256-Prüfsumme der gebauten LMB.exe wird dabei standardisiert im Release-Text ausgewiesen (`SHA-256 (LMB.exe): <hash>`), damit die integrierte Update-Prüfung und Prüfsummenvalidierung den Download verifizieren kann. Unbedingt auf saubere UTF-8-Kodierung des Releasetextes achten: UTF-8-Bytes explizit per [System.Text.Encoding]::UTF8.GetBytes(...) übertragen, damit Umlaute (ä, ö, ü, ß) und Anführungszeichen auf GitHub fehlerfrei ohne Mojibake (wie Ã¼) dargestellt werden.
