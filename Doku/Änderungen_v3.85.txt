@@ -62,6 +62,7 @@ sowie einen neu berechneten Desktop-Median ein.
 
 
 GEFUNDEN UND BEHOBEN
+  - Zeichensatzfehler (Mojibake) in der Live-Fortschrittsanzeige über dem Fortschrittsbalken ("läuft seit", "üblich:") behoben.
   - Selbstreparatur von Tools.json verhindert 10 ungerechtfertigte Werkzeug-Warnungen bei leeren Prüfsummen.
   - Interne Werkzeugwarnungen () aus dem Kunden- und Prüfbericht nach Start.log verlagert.
   - Interaktives NSIS-Deinstallationsfenster von smartmontools während des Starts durch Lebenszyklus-Anpassung
