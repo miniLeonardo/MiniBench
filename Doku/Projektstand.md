@@ -3,7 +3,7 @@
 Gemeinsamer Stand für alle Agenten (Claude, Antigravity). Wird am Ende jeder Version aktualisiert (siehe AGENTS.md).
 
 ## Stand: Version 3.881 (29.10.2026)
-Release-Commit "Release v3.881: Startseiten-Kachelrahmen & vollständige Datenbank-Systemdaten" auf https://github.com/miniLeonardo/MiniBench (Zweig main).
+Release-Commit "Release v3.881: Startseiten-Kachelrahmen & vollständige Datenbank-Systemdaten" (Commit c7358e0) auf https://github.com/miniLeonardo/MiniBench (Zweig main).
 Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.
 
 Inhalt von 3.881 (Einzelheiten in Doku\Änderungen_v3.881.txt):
