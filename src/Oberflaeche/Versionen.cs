@@ -11,6 +11,13 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("3.881", "29.10.2026", "Startseiten-Kachelrahmen & vollständige Datenbank-Systemdaten",
+            "• Startseiten-Kachelrahmen & Layout: Saubere, unbeschnittene Umrandung aller vier Kacheln ('Letzter Lauf', 'Aufgaben', 'Schnell behebbar', 'Werkzeuge') durch PenAlignment.Inset mit 1-px-Anti-Aliasing-Sicherheitsabstand; harmonisierte Margins im 2x2-Grid (oben/unten UI.S(12)) und vergrößerter unterer Innenabstand verhindern Anstoßen an die Fußleiste.\r\n" +
+            "• Vollständige Systemdaten im eingeklappten Zustand: Abkehr von nativen Win32-Gruppenköpfen (LVGS_COLLAPSED), die Datenzeilen versteckten; kompakte Master-Zeilen zeigen alle Hardware- und Benchmarkdaten des neuesten Laufs in den Spalten 2–10 (Datum, Gesamt, CPU, GPU, RAM, Mehrkern, RAM Lesen, GPU, Befunde).\r\n" +
+            "• Überlaufschutz in Spalte 1: Schlanke Formatierung '▶ Name (Anzahl)' bzw. '  Name' (12–18 Zeichen) passt perfekt ohne Textabschneiden in die 135 px breite erste Spalte; das Messdatum steht ausschließlich in Spalte 2.\r\n" +
+            "• Sofortige Interaktion & Aktionsknöpfe: Einzelsysteme und kompakte Gruppenköpfe sind echte Tabellenzeilen mit Tag = neuester Lauf; ein Klick aktiviert sofort alle Fußleisten-Aktionen ('Bericht öffnen', 'Verlauf', 'Im Dashboard vergleichen', 'Als Referenz'); Doppelklick öffnet den Bericht.\r\n" +
+            "• Intuitive Aufklapp-Mechanik: Klick auf den Pfeil oder Doppelklick klappt das System auf ('▼ Name (Anzahl)') und listet alle Einzelläufe eingerückt darunter auf; Toolbar-Schaltfläche und Kontextmenü ('Alle aufklappen' / 'Alle einklappen') sowie Pfeiltasten (Rechts/Links) schalten synchron um.\r\n" +
+            "• Hoher Dark-Mode-Kontrast: Text in Spalte 1 und allen Datenfeldern behält mindestens 7:1-Kontrast im Hell- und Dunkelmodus; Pfeilsymbole in beiden Farbschemata klar sichtbar."),
         new Eintrag("3.88", "29.10.2026", "Einklappbare Datenbank-Gruppen, Dark-Mode-Kontrast, Startseiten-Layout & Zeichensatz-Korrektur",
             "â€¢ Einklappbare GerÃ¤tegruppen in der Datenbank: Native Win32-UnterstÃ¼tzung (LVGS_COLLAPSIBLE) mit Windows-Chevrons; Systeme mit mehreren LÃ¤ufen und Referenzsysteme starten standardmÃ¤ÃŸig kompakt eingeklappt; neue Aktionen 'Alle aufklappen / Alle einklappen' in Toolbar und KontextmenÃ¼.\r\n" +
             "â€¢ Dark-Mode-Kontrast fÃ¼r Gruppen: GruppenkÃ¶pfe der Datenbank-ListView werden im Dark Mode mit hohem Kontrast (>= 7:1) in UI.Accent/UI.Text gerendert (beseitigt unlesbares Windows-Theme-Dunkelblau auf schwarzem Grund).\r\n" +

@@ -2161,7 +2161,7 @@ public partial class DiagGui
         p.AutoSize = true;
         p.BackColor = UI.Panel;
         p.Margin = new Padding(0);
-        p.Padding = new Padding(0);
+        p.Padding = new Padding(0, 0, 0, UI.S(20));
 
         // 1. Kopfzeile (ohne redundanten Inventar-Link)
         Label lblWelcome = Lbl("Willkommen zurück", 15.5f, true, UI.Text);
@@ -2215,10 +2215,10 @@ public partial class DiagGui
             }
         }
 
-        // 2x2 Grid (Breite StartGruppenbreite, Höhe 448)
+        // 2x2 Grid (Breite StartGruppenbreite, Höhe 458)
         TableLayoutPanel grid2x2 = new TableLayoutPanel();
         grid2x2.Width = UI.S(UI.StartGruppenbreite);
-        grid2x2.Height = UI.S(448);
+        grid2x2.Height = UI.S(458);
         grid2x2.ColumnCount = 2;
         grid2x2.RowCount = 2;
         grid2x2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52f));
@@ -2235,8 +2235,12 @@ public partial class DiagGui
         cardLast.Padding = new Padding(UI.S(14), UI.S(12), UI.S(14), UI.S(12));
         cardLast.Paint += delegate(object sender, PaintEventArgs pe) {
             pe.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using (GraphicsPath path = UI.Round(new RectangleF(0.5f, 0.5f, cardLast.Width - 1.5f, cardLast.Height - 1.5f), UI.SF(8)))
-            using (Pen pen = new Pen(UI.Line)) pe.Graphics.DrawPath(pen, path);
+            using (GraphicsPath path = UI.Round(new RectangleF(1f, 1f, cardLast.Width - 2f, cardLast.Height - 2f), UI.SF(8)))
+            using (Pen pen = new Pen(UI.Line))
+            {
+                pen.Alignment = PenAlignment.Inset;
+                pe.Graphics.DrawPath(pen, path);
+            }
         };
 
         TableLayoutPanel lastLayout = new TableLayoutPanel();
@@ -2482,8 +2486,12 @@ public partial class DiagGui
         cardTasks.Padding = new Padding(UI.S(14), UI.S(12), UI.S(14), UI.S(10));
         cardTasks.Paint += delegate(object sender, PaintEventArgs pe) {
             pe.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using (GraphicsPath path = UI.Round(new RectangleF(0.5f, 0.5f, cardTasks.Width - 1.5f, cardTasks.Height - 1.5f), UI.SF(8)))
-            using (Pen pen = new Pen(UI.Line)) pe.Graphics.DrawPath(pen, path);
+            using (GraphicsPath path = UI.Round(new RectangleF(1f, 1f, cardTasks.Width - 2f, cardTasks.Height - 2f), UI.SF(8)))
+            using (Pen pen = new Pen(UI.Line))
+            {
+                pen.Alignment = PenAlignment.Inset;
+                pe.Graphics.DrawPath(pen, path);
+            }
         };
 
         TableLayoutPanel tasksLayout = new TableLayoutPanel();
@@ -2542,12 +2550,16 @@ public partial class DiagGui
         Panel cardQuick = new Panel();
         cardQuick.Dock = DockStyle.Fill;
         cardQuick.BackColor = UI.Panel;
-        cardQuick.Margin = new Padding(0, 0, UI.S(12), 0);
+        cardQuick.Margin = new Padding(0, 0, UI.S(12), UI.S(12));
         cardQuick.Padding = new Padding(UI.S(14), UI.S(12), UI.S(14), UI.S(10));
         cardQuick.Paint += delegate(object sender, PaintEventArgs pe) {
             pe.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using (GraphicsPath path = UI.Round(new RectangleF(0.5f, 0.5f, cardQuick.Width - 1.5f, cardQuick.Height - 1.5f), UI.SF(8)))
-            using (Pen pen = new Pen(UI.Line)) pe.Graphics.DrawPath(pen, path);
+            using (GraphicsPath path = UI.Round(new RectangleF(1f, 1f, cardQuick.Width - 2f, cardQuick.Height - 2f), UI.SF(8)))
+            using (Pen pen = new Pen(UI.Line))
+            {
+                pen.Alignment = PenAlignment.Inset;
+                pe.Graphics.DrawPath(pen, path);
+            }
         };
 
         TableLayoutPanel quickLayout = new TableLayoutPanel();
@@ -2592,12 +2604,16 @@ public partial class DiagGui
         Panel cardToolsB = new Panel();
         cardToolsB.Dock = DockStyle.Fill;
         cardToolsB.BackColor = UI.Panel;
-        cardToolsB.Margin = new Padding(0);
+        cardToolsB.Margin = new Padding(0, 0, 0, UI.S(12));
         cardToolsB.Padding = new Padding(UI.S(14), UI.S(12), UI.S(14), UI.S(10));
         cardToolsB.Paint += delegate(object sender, PaintEventArgs pe) {
             pe.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using (GraphicsPath path = UI.Round(new RectangleF(0.5f, 0.5f, cardToolsB.Width - 1.5f, cardToolsB.Height - 1.5f), UI.SF(8)))
-            using (Pen pen = new Pen(UI.Line)) pe.Graphics.DrawPath(pen, path);
+            using (GraphicsPath path = UI.Round(new RectangleF(1f, 1f, cardToolsB.Width - 2f, cardToolsB.Height - 2f), UI.SF(8)))
+            using (Pen pen = new Pen(UI.Line))
+            {
+                pen.Alignment = PenAlignment.Inset;
+                pe.Graphics.DrawPath(pen, path);
+            }
         };
 
         TableLayoutPanel toolsLayoutB = new TableLayoutPanel();

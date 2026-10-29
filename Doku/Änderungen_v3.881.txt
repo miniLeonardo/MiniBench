@@ -1,0 +1,69 @@
+﻿LEOS MINIBENCH 3.881: ÄNDERUNGEN
+================================
+
+Version 3.881 behebt Befunde aus dem Praxistest von Version 3.88:
+Abgeschnittene Kachelumrandungen auf der Startseite, leere Datenspalten im eingeklappten Zustand der
+Datenbankansicht sowie Textüberläufe in der Spalte „System“ werden vollständig bereinigt.
+
+
+1. STARTSEITE: KACHELRAHMEN & LAYOUT-PADDINGS
+  Anti-Aliasing Inset         In den Paint-Handlern aller vier Hauptkacheln („Letzter Lauf“, „Aufgaben“,
+                              „Schnell behebbar“, „Werkzeuge“) in BuildStartPageB wird das Zeichenrechteck
+                              nun mit 1-px-Sicherheitsabstand definiert und PenAlignment.Inset gesetzt:
+                              new RectangleF(1f, 1f, c.Width - 2f, c.Height - 2f). Dadurch ist der
+                              1-Pixel-Rahmen rundherum an allen 4 Kanten und Ecken vollständig sichtbar,
+                              ohne durch Steuerelementgrenzen geclippt zu werden.
+  Harmonisierte Margins       Die Margins der Kacheln im 2x2-Grid wurden vereinheitlicht (oben und unten
+                              UI.S(12)), und die Grid-Höhe wurde exakt auf UI.S(458) bemessen.
+  Unterer Innenabstand        Der Hauptcontainer erhält einen vergrößerten Innenabstand (Padding unten
+                              UI.S(20)), sodass Kacheln und die Startseiten-Fußleiste nicht an den unteren
+                              Fensterrand stoßen.
+
+
+2. DATENBANK: SYSTEMDATEN IM EINGEKLAPPTEN ZUSTAND & ÜBERLAUFSCHUTZ
+  Vollständige Daten          Abkehr von nativen Win32-Gruppenköpfen (LVGS_COLLAPSED), die unter Windows
+                              sämtliche Datenzeilen versteckten und Spalten 2–10 leerten. Eingeklappte
+                              Rechner werden als vollwertige Master-Zeilen dargestellt, die die Daten des
+                              neuesten Laufs in allen Spalten (Datum, Gesamt, CPU, GPU, RAM, Mehrkern,
+                              RAM Lesen, GPU, Befunde) vollständig abbilden.
+  Überlaufschutz in Spalte 1  Spalte 1 („System“) formatiert schlank als „▶ Name (Anzahl)“ bzw. „  Name“
+                              (12–18 Zeichen) und passt garantiert ohne Abschneiden in die 135 px
+                              Spaltenbreite. Das Messdatum steht strikt in Spalte 2 („Datum“).
+  Sofortige Interaktion       Eingeklappte Rechner sind echte ListViewItems mit Tag = neuester Lauf.
+                              Ein Klick aktiviert sofort alle Fußleisten-Aktionen („Bericht öffnen“,
+                              „Verlauf“, „Im Dashboard vergleichen“, „Als Referenz“); Doppelklick öffnet
+                              direkt den HTML-Bericht.
+  Intuitive Aufklapp-Mechanik Klick auf den Pfeil oder Doppelklick klappt das System auf („▼ Name (Anzahl)“)
+                              und listet alle Einzelläufe eingerückt („    “ + DisplayName) mit ihren
+                              spezifischen Messdaten darunter auf. Toolbar-Knopf btnToggleGroups
+                              („Alle aufklappen“ / „Alle einklappen“) und Kontextmenü schalten synchron um.
+  Tastaturnavigation          Pfeiltaste rechts klappt ein System auf, Pfeiltaste links klappt es zu,
+                              Eingabetaste öffnet den Bericht.
+
+
+3. FARBSCHEMA & KONTRASTSICHERHEIT
+  Dark-Mode-Kontrast          Text in Spalte 1 und allen weiteren Spalten nutzt UI.Text und UI.SubText
+                              mit mindestens 7:1-Kontrast zum Hintergrund im Dark Mode.
+  Pfeil-Sichtbarkeit          Pfeilsymbole „▶“ und „▼“ sind sowohl im Hell- als auch im Dunkelmodus
+                              klar lesbar.
+
+
+GEFUNDEN UND BEHOBEN
+  - Kachelrahmen auf Startseite beschnitten: 0-Margin der unteren Kachelzeile und Anti-Aliasing-Clipping des 1-px-Pens behoben.
+  - Leere Tabellenspalten bei eingeklappten Gruppen: Durch vollwertige Master-Zeilen mit Tag = newest für alle 10 Spalten ersetzt.
+  - Textüberlauf in Spalte 1: „devName • 1 Lauf • zuletzt 04.10.202“ beseitigt; Name/Zähler kompakt formatiert, Datum in Spalte 2 verlagert.
+  - Deaktivierte Aktionsknöpfe: Fußleisten-Knöpfe blieben bei Klick auf eingeklappte Systeme inaktiv; durch echte ListViewItems gelöst.
+  - Unlesbare Chevrons/Header im Dark Mode: Native ListViewGroup-Köpfe eliminiert; ListViewItem-Zeilen bieten 100 % Theme-Kontrast.
+
+
+GRENZEN UND OFFENE PUNKTE
+  - Keine. Die Lösung läuft autark unter .NET Framework 4.x / Windows Forms ohne externe Abhängigkeiten.
+
+
+UMSTIEG
+  - Vollständig abwärtskompatibel. Keine Änderungen an der Datenbankstruktur erforderlich.
+
+
+QUELLEN
+  - Eigene Implementierung in src\Kern\Version.ps1, src\Oberflaeche\Versionen.cs,
+    src\Oberflaeche\DiagGui_Seiten.cs, src\Oberflaeche\DiagGui_Vergleich.cs und Doku.

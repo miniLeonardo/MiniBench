@@ -246,7 +246,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
 }
 #endregion
 
-$ScriptVersion = '3.88'
+$ScriptVersion = '3.881'
 $AppName       = 'Leos Minibench'
 # Eingebettete Referenzprofile für Leos Minibench (v3.0)
 $script:EmbeddedReferences = @{
@@ -12548,47 +12548,7 @@ public partial class DiagGui
             DbEntry dy = itemY.Tag as DbEntry;
             if (dx == null || dy == null) return 0;
 
-            int res = 0;
-            switch (col)
-            {
-                case 0:
-                    res = String.Compare(dx.DisplayName, dy.DisplayName, StringComparison.CurrentCultureIgnoreCase);
-                    break;
-                case 1:
-                    res = String.Compare(dx.Datum, dy.Datum, StringComparison.Ordinal);
-                    break;
-                case 2:
-                    res = dx.OverallScore.CompareTo(dy.OverallScore);
-                    break;
-                case 3:
-                    res = String.Compare(dx.Cpu, dy.Cpu, StringComparison.CurrentCultureIgnoreCase);
-                    break;
-                case 4:
-                    res = String.Compare(dx.Gpu, dy.Gpu, StringComparison.CurrentCultureIgnoreCase);
-                    break;
-                case 5:
-                    res = String.Compare(dx.Ram, dy.Ram, StringComparison.CurrentCultureIgnoreCase);
-                    break;
-                case 6:
-                    res = dx.Get("CPU|MT").CompareTo(dy.Get("CPU|MT"));
-                    break;
-                case 7:
-                    res = dx.Get("RAM|Lesen").CompareTo(dy.Get("RAM|Lesen"));
-                    break;
-                case 8:
-                    double gx = dx.Get("GPU|REND") > 0 ? dx.Get("GPU|REND") : dx.Get("GPU|VMB");
-                    double gy = dy.Get("GPU|REND") > 0 ? dy.Get("GPU|REND") : dy.Get("GPU|VMB");
-                    res = gx.CompareTo(gy);
-                    break;
-                case 9:
-                    res = String.Compare(dx.Befunde, dy.Befunde, StringComparison.OrdinalIgnoreCase);
-                    break;
-                default:
-                    string tx = itemX.SubItems.Count > col ? itemX.SubItems[col].Text : "";
-                    string ty = itemY.SubItems.Count > col ? itemY.SubItems[col].Text : "";
-                    res = String.Compare(tx, ty, StringComparison.CurrentCultureIgnoreCase);
-                    break;
-            }
+            int res = CompareDbEntries(dx, dy, col);
             return asc ? res : -res;
         }
     }
@@ -12754,48 +12714,70 @@ public partial class DiagGui
         }
     }
 
+    HashSet<string> expandedGroups = new HashSet<string>();
+
+    List<string> GetExpandableKeys()
+    {
+        List<string> keys = new List<string>();
+        Dictionary<string, int> counts = new Dictionary<string, int>();
+        foreach (DbEntry e in db)
+        {
+            string k = e.IsReference ? "REF" : (String.IsNullOrEmpty(e.GeraetKey) ? "PC:" + (e.Computer ?? "").ToUpperInvariant() : e.GeraetKey);
+            if (!counts.ContainsKey(k)) counts[k] = 0;
+            counts[k]++;
+        }
+        foreach (KeyValuePair<string, int> kv in counts)
+        {
+            if (kv.Value > 1) keys.Add(kv.Key);
+        }
+        return keys;
+    }
+
     void SetAllGroupsCollapsed(bool collapse)
     {
-        DbListView dlv = lvDb as DbListView;
-        if (dlv == null || lvDb == null) return;
-        lvDb.BeginUpdate();
-        foreach (ListViewGroup g in lvDb.Groups)
+        if (collapse)
         {
-            dlv.SetGroupState(g, true, collapse);
+            expandedGroups.Clear();
         }
-        lvDb.EndUpdate();
-        UpdateToggleGroupsButton();
+        else
+        {
+            foreach (string k in GetExpandableKeys())
+            {
+                expandedGroups.Add(k);
+            }
+        }
+        FillDbList();
     }
 
     void ToggleAllGroups()
     {
-        DbListView dlv = lvDb as DbListView;
-        if (dlv == null || lvDb == null) return;
-        bool anyCollapsed = false;
-        foreach (ListViewGroup g in lvDb.Groups)
-        {
-            if (dlv.IsGroupCollapsed(g)) { anyCollapsed = true; break; }
-        }
+        List<string> expandable = GetExpandableKeys();
+        bool anyCollapsed = (expandedGroups.Count < expandable.Count);
         SetAllGroupsCollapsed(!anyCollapsed);
+    }
+
+    void ToggleGroup(string k)
+    {
+        if (expandedGroups.Contains(k))
+            expandedGroups.Remove(k);
+        else
+            expandedGroups.Add(k);
+        FillDbList();
     }
 
     void UpdateToggleGroupsButton()
     {
         if (btnToggleGroups == null) return;
-        DbListView dlv = lvDb as DbListView;
-        if (dlv == null || lvDb == null || lvDb.Groups.Count == 0)
+        List<string> expandable = GetExpandableKeys();
+        if (expandable.Count == 0)
         {
             btnToggleGroups.Enabled = false;
             btnToggleGroups.Text = "Alle aufklappen";
-            Tip(btnToggleGroups, "Klappt alle Gerätegruppen in der Datenbank ein oder aus.");
+            Tip(btnToggleGroups, "Keine Gerätegruppen mit mehreren Läufen vorhanden.");
             return;
         }
         btnToggleGroups.Enabled = true;
-        bool anyCollapsed = false;
-        foreach (ListViewGroup g in lvDb.Groups)
-        {
-            if (dlv.IsGroupCollapsed(g)) { anyCollapsed = true; break; }
-        }
+        bool anyCollapsed = (expandedGroups.Count < expandable.Count);
         btnToggleGroups.Text = anyCollapsed ? "Alle aufklappen" : "Alle einklappen";
         Tip(btnToggleGroups, anyCollapsed ? "Klappt alle Gerätegruppen in der Datenbank auf." : "Klappt alle Gerätegruppen in der Datenbank ein.");
     }
@@ -12816,8 +12798,7 @@ public partial class DiagGui
             dbSortCol = e.Column;
             dbSortAsc = (e.Column == 0 || e.Column == 3 || e.Column == 4 || e.Column == 5);
         }
-        lvDb.ListViewItemSorter = new DbItemComparer(dbSortCol, dbSortAsc);
-        lvDb.Sort();
+        FillDbList();
     }
 
     string PromptInput(string prompt, string title, string defaultValue)
@@ -12960,7 +12941,57 @@ public partial class DiagGui
             for (int i = 0; i < lvDb.Columns.Count - 1; i++) rem -= lvDb.Columns[i].Width;
             if (rem > UI.S(60)) lvDb.Columns[lvDb.Columns.Count - 1].Width = rem - 2;
         };
-        lvDb.DoubleClick += delegate { if (lvDb.SelectedItems.Count > 0) OpenEntry((DbEntry)lvDb.SelectedItems[0].Tag); };
+        lvDb.DoubleClick += delegate {
+            if (lvDb.SelectedItems.Count == 0) return;
+            ListViewItem selIt = lvDb.SelectedItems[0];
+            Point pt = lvDb.PointToClient(Cursor.Position);
+            ListViewHitTestInfo hit = lvDb.HitTest(pt);
+            if (hit.Item != null && (hit.Item.Text.StartsWith("\u25B6 ") || hit.Item.Text.StartsWith("\u25BC ")) && pt.X <= hit.Item.Bounds.Left + UI.S(45))
+            {
+                DbEntry target = hit.Item.Tag as DbEntry;
+                if (target != null)
+                {
+                    string k = target.IsReference ? "REF" : (String.IsNullOrEmpty(target.GeraetKey) ? "PC:" + (target.Computer ?? "").ToUpperInvariant() : target.GeraetKey);
+                    ToggleGroup(k);
+                    return;
+                }
+            }
+            OpenEntry((DbEntry)selIt.Tag);
+        };
+        lvDb.MouseClick += delegate(object sender, MouseEventArgs e) {
+            if (e.Button != MouseButtons.Left) return;
+            ListViewHitTestInfo hit = lvDb.HitTest(e.Location);
+            if (hit.Item != null && hit.Location != ListViewHitTestLocations.StateImage)
+            {
+                if ((hit.Item.Text.StartsWith("\u25B6 ") || hit.Item.Text.StartsWith("\u25BC ")) && e.X <= hit.Item.Bounds.Left + UI.S(45))
+                {
+                    DbEntry target = hit.Item.Tag as DbEntry;
+                    if (target != null)
+                    {
+                        string k = target.IsReference ? "REF" : (String.IsNullOrEmpty(target.GeraetKey) ? "PC:" + (target.Computer ?? "").ToUpperInvariant() : target.GeraetKey);
+                        ToggleGroup(k);
+                    }
+                }
+            }
+        };
+        lvDb.KeyDown += delegate(object sender, KeyEventArgs e) {
+            if ((e.KeyCode == Keys.Right || e.KeyCode == Keys.Left) && lvDb.SelectedItems.Count == 1)
+            {
+                ListViewItem it = lvDb.SelectedItems[0];
+                DbEntry target = it.Tag as DbEntry;
+                if (target != null)
+                {
+                    string k = target.IsReference ? "REF" : (String.IsNullOrEmpty(target.GeraetKey) ? "PC:" + (target.Computer ?? "").ToUpperInvariant() : target.GeraetKey);
+                    if (e.KeyCode == Keys.Right && it.Text.StartsWith("\u25B6 ")) { ToggleGroup(k); e.Handled = true; }
+                    else if (e.KeyCode == Keys.Left && it.Text.StartsWith("\u25BC ")) { ToggleGroup(k); e.Handled = true; }
+                }
+            }
+            else if (e.KeyCode == Keys.Enter && lvDb.SelectedItems.Count > 0)
+            {
+                OpenEntry((DbEntry)lvDb.SelectedItems[0].Tag);
+                e.Handled = true;
+            }
+        };
         lvDb.ItemChecked += delegate { UpdateDbButtons(); };
         lvDb.SelectedIndexChanged += delegate { UpdateDbButtons(); };
         lvDb.ColumnClick += OnDbColumnClick;
@@ -12994,8 +13025,9 @@ public partial class DiagGui
         cm.MenuItems.Add(miSep2);
         cm.MenuItems.Add(miDelete);
         cm.Popup += delegate {
-            miExpandAll.Enabled = lvDb.Groups.Count > 0;
-            miCollapseAll.Enabled = lvDb.Groups.Count > 0;
+            List<string> expandable = GetExpandableKeys();
+            miExpandAll.Enabled = expandable.Count > 0 && expandedGroups.Count < expandable.Count;
+            miCollapseAll.Enabled = expandable.Count > 0 && expandedGroups.Count > 0;
             int selN = lvDb.SelectedItems.Count;
             int chkN = CheckedEntries().Count;
             miDashboard.Enabled = chkN >= 1 || selN >= 1;
@@ -13047,13 +13079,97 @@ public partial class DiagGui
         return d;
     }
 
+    static int CompareDbEntries(DbEntry dx, DbEntry dy, int col)
+    {
+        if (dx == null && dy == null) return 0;
+        if (dx == null) return -1;
+        if (dy == null) return 1;
+        int res = 0;
+        switch (col)
+        {
+            case 0:
+                res = String.Compare(dx.DisplayName, dy.DisplayName, StringComparison.CurrentCultureIgnoreCase);
+                break;
+            case 1:
+                res = String.Compare(dx.Datum, dy.Datum, StringComparison.Ordinal);
+                break;
+            case 2:
+                res = dx.OverallScore.CompareTo(dy.OverallScore);
+                break;
+            case 3:
+                res = String.Compare(dx.Cpu, dy.Cpu, StringComparison.CurrentCultureIgnoreCase);
+                break;
+            case 4:
+                res = String.Compare(dx.Gpu, dy.Gpu, StringComparison.CurrentCultureIgnoreCase);
+                break;
+            case 5:
+                res = String.Compare(dx.Ram, dy.Ram, StringComparison.CurrentCultureIgnoreCase);
+                break;
+            case 6:
+                res = dx.Get("CPU|MT").CompareTo(dy.Get("CPU|MT"));
+                break;
+            case 7:
+                res = dx.Get("RAM|Lesen").CompareTo(dy.Get("RAM|Lesen"));
+                break;
+            case 8:
+                double gx = dx.Get("GPU|REND") > 0 ? dx.Get("GPU|REND") : dx.Get("GPU|VMB");
+                double gy = dy.Get("GPU|REND") > 0 ? dy.Get("GPU|REND") : dy.Get("GPU|VMB");
+                res = gx.CompareTo(gy);
+                break;
+            case 9:
+                res = String.Compare(dx.Befunde, dy.Befunde, StringComparison.OrdinalIgnoreCase);
+                break;
+            default:
+                res = String.Compare(dx.Datum, dy.Datum, StringComparison.Ordinal);
+                break;
+        }
+        return res;
+    }
+
+    ListViewItem CreateDbItem(DbEntry e, string systemText)
+    {
+        string gesamt = e.OverallScore > 0 ? Num(e.OverallScore, "N0") : "";
+        string gpu = e.Get("GPU|REND") > 0 ? Num(e.Get("GPU|REND"), "N0") + " FPS" : (e.Get("GPU|VMB") > 0 ? Num(e.Get("GPU|VMB"), "N0") + " GB/s" : "");
+        ListViewItem it = new ListViewItem(new string[] {
+            systemText,
+            ShortDate(e.Datum),
+            gesamt,
+            e.Cpu,
+            e.Gpu,
+            e.Ram,
+            Num(e.Get("CPU|MT"), "N0"),
+            Num(e.Get("RAM|Lesen"), "N1") + (e.Get("RAM|Lesen") > 0 ? " GB/s" : ""),
+            gpu,
+            e.Befunde
+        });
+        it.Tag = e;
+        it.ToolTipText = e.DisplayName + (e.Disk.Length > 0 ? "\r\n" + e.Disk : "") + (e.HasBench ? "" : "\r\n(ohne Benchmark-Werte)");
+        if (!e.HasBench) it.ForeColor = UI.Muted;
+        return it;
+    }
+
     void FillDbList()
     {
         if (lvDb == null) return;
+
+        HashSet<string> checkedPaths = new HashSet<string>();
+        foreach (ListViewItem it in lvDb.CheckedItems)
+        {
+            DbEntry e = it.Tag as DbEntry;
+            if (e != null && !String.IsNullOrEmpty(e.Path)) checkedPaths.Add(e.Path);
+        }
+        string selectedPath = null;
+        if (lvDb.SelectedItems.Count > 0)
+        {
+            DbEntry sel = lvDb.SelectedItems[0].Tag as DbEntry;
+            if (sel != null && !String.IsNullOrEmpty(sel.Path)) selectedPath = sel.Path;
+        }
+
         lvDb.BeginUpdate();
+        lvDb.ListViewItemSorter = null;
         lvDb.Items.Clear();
         lvDb.Groups.Clear();
-        lvDb.ShowGroups = true;
+        lvDb.ShowGroups = false;
 
         Dictionary<string, List<DbEntry>> grpMap = new Dictionary<string, List<DbEntry>>();
         List<string> orderedKeys = new List<string>();
@@ -13069,90 +13185,111 @@ public partial class DiagGui
             grpMap[k].Add(e);
         }
 
+        foreach (KeyValuePair<string, List<DbEntry>> kv in grpMap)
+        {
+            kv.Value.Sort(delegate(DbEntry a, DbEntry b) {
+                return String.Compare(b.Datum, a.Datum, StringComparison.Ordinal);
+            });
+        }
+
         orderedKeys.Sort(delegate(string k1, string k2) {
-            string d1 = "", d2 = "";
-            foreach (DbEntry e in grpMap[k1]) { if (String.Compare(e.Datum, d1, StringComparison.Ordinal) > 0) d1 = e.Datum; }
-            foreach (DbEntry e in grpMap[k2]) { if (String.Compare(e.Datum, d2, StringComparison.Ordinal) > 0) d2 = e.Datum; }
-            return String.Compare(d2, d1, StringComparison.Ordinal);
+            DbEntry e1 = grpMap[k1].Count > 0 ? grpMap[k1][0] : null;
+            DbEntry e2 = grpMap[k2].Count > 0 ? grpMap[k2][0] : null;
+            if (e1 == null && e2 == null) return 0;
+            if (e1 == null) return 1;
+            if (e2 == null) return -1;
+            int r = CompareDbEntries(e1, e2, dbSortCol >= 0 ? dbSortCol : 1);
+            if (dbSortCol < 0) return -r;
+            return dbSortAsc ? r : -r;
         });
 
         if (grpMap.ContainsKey("REF")) orderedKeys.Add("REF");
 
-        Dictionary<string, ListViewGroup> lvGroups = new Dictionary<string, ListViewGroup>();
         foreach (string k in orderedKeys)
         {
             List<DbEntry> entries = grpMap[k];
-            string headerText;
+            if (entries.Count == 0) continue;
+
             if (k == "REF")
             {
-                int rCount = entries.Count;
-                headerText = String.Format("Referenz-Systeme  \u2022  {0}", rCount == 1 ? "1 Profil" : rCount + " Profile");
-            }
-            else
-            {
-                string devName = "";
-                string newestDate = "";
-                foreach (DbEntry e in entries)
+                DbEntry refRep = null;
+                foreach (DbEntry re in entries)
                 {
-                    if (String.Compare(e.Datum, newestDate, StringComparison.Ordinal) >= 0)
+                    if (re.DisplayName.IndexOf("Median", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        newestDate = e.Datum;
-                        devName = !String.IsNullOrEmpty(e.Computer) ? e.Computer : e.DisplayName;
+                        refRep = re;
+                        break;
                     }
                 }
-                if (String.IsNullOrEmpty(devName)) devName = "System";
-                int lCount = entries.Count;
-                string laufTxt = lCount == 1 ? "1 Lauf" : lCount + " Läufe";
-                string dateStr = FormatGroupDate(newestDate);
-                headerText = String.Format("{0}  \u2022  {1}  \u2022  zuletzt {2}", devName, laufTxt, dateStr);
-            }
-            ListViewGroup g = new ListViewGroup(k, headerText);
-            lvGroups[k] = g;
-            lvDb.Groups.Add(g);
-        }
+                if (refRep == null) refRep = entries[0];
 
-        foreach (DbEntry e in db)
-        {
-            string gesamt = e.OverallScore > 0 ? Num(e.OverallScore, "N0") : "";
-            string gpu = e.Get("GPU|REND") > 0 ? Num(e.Get("GPU|REND"), "N0") + " FPS" : (e.Get("GPU|VMB") > 0 ? Num(e.Get("GPU|VMB"), "N0") + " GB/s" : "");
-            ListViewItem it = new ListViewItem(new string[] { e.DisplayName, ShortDate(e.Datum), gesamt, e.Cpu, e.Gpu, e.Ram, Num(e.Get("CPU|MT"), "N0"), Num(e.Get("RAM|Lesen"), "N1") + (e.Get("RAM|Lesen") > 0 ? " GB/s" : ""), gpu, e.Befunde });
-            it.Tag = e; it.ToolTipText = e.DisplayName + (e.Disk.Length > 0 ? "\r\n" + e.Disk : "") + (e.HasBench ? "" : "\r\n(ohne Benchmark-Werte)");
-            if (!e.HasBench) it.ForeColor = UI.Muted;
-            string k = e.IsReference ? "REF" : (String.IsNullOrEmpty(e.GeraetKey) ? "PC:" + (e.Computer ?? "").ToUpperInvariant() : e.GeraetKey);
-            if (lvGroups.ContainsKey(k)) it.Group = lvGroups[k];
-            lvDb.Items.Add(it);
-        }
-        if (lvDb.ListViewItemSorter != null) lvDb.Sort();
-        lvDb.EndUpdate();
-
-        DbListView dlv = lvDb as DbListView;
-        if (dlv != null)
-        {
-            string curPc = Environment.MachineName;
-            foreach (string k in orderedKeys)
-            {
-                if (!lvGroups.ContainsKey(k)) continue;
-                ListViewGroup g = lvGroups[k];
-                List<DbEntry> entries = grpMap[k];
-                bool isRef = (k == "REF");
-                bool isCurrentPc = false;
-                if (!isRef)
+                if (entries.Count == 1)
                 {
-                    foreach (DbEntry e in entries)
+                    ListViewItem it = CreateDbItem(entries[0], "  " + entries[0].DisplayName);
+                    if (checkedPaths.Contains(entries[0].Path)) it.Checked = true;
+                    if (selectedPath == entries[0].Path) it.Selected = true;
+                    lvDb.Items.Add(it);
+                }
+                else
+                {
+                    bool expanded = expandedGroups.Contains("REF");
+                    string masterTitle = (expanded ? "\u25BC " : "\u25B6 ") + "Referenz-Systeme (" + entries.Count + ")";
+                    ListViewItem masterIt = CreateDbItem(refRep, masterTitle);
+                    if (checkedPaths.Contains(refRep.Path)) masterIt.Checked = true;
+                    if (selectedPath == refRep.Path) masterIt.Selected = true;
+                    lvDb.Items.Add(masterIt);
+
+                    if (expanded)
                     {
-                        if (String.Equals(e.Computer, curPc, StringComparison.OrdinalIgnoreCase))
+                        foreach (DbEntry e in entries)
                         {
-                            isCurrentPc = true;
-                            break;
+                            ListViewItem childIt = CreateDbItem(e, "    " + e.DisplayName);
+                            if (checkedPaths.Contains(e.Path)) childIt.Checked = true;
+                            if (selectedPath == e.Path) childIt.Selected = true;
+                            lvDb.Items.Add(childIt);
                         }
                     }
                 }
-                bool collapse = isRef || (entries.Count > 1) || (!isCurrentPc);
-                dlv.SetGroupState(g, true, collapse);
             }
-            UpdateToggleGroupsButton();
+            else
+            {
+                DbEntry newest = entries[0];
+                string devName = !String.IsNullOrEmpty(newest.Computer) ? newest.Computer : newest.DisplayName;
+                if (String.IsNullOrEmpty(devName)) devName = "System";
+
+                if (entries.Count == 1)
+                {
+                    ListViewItem it = CreateDbItem(newest, "  " + devName);
+                    if (checkedPaths.Contains(newest.Path)) it.Checked = true;
+                    if (selectedPath == newest.Path) it.Selected = true;
+                    lvDb.Items.Add(it);
+                }
+                else
+                {
+                    bool expanded = expandedGroups.Contains(k);
+                    string masterTitle = (expanded ? "\u25BC " : "\u25B6 ") + devName + " (" + entries.Count + ")";
+                    ListViewItem masterIt = CreateDbItem(newest, masterTitle);
+                    if (checkedPaths.Contains(newest.Path)) masterIt.Checked = true;
+                    if (selectedPath == newest.Path) masterIt.Selected = true;
+                    lvDb.Items.Add(masterIt);
+
+                    if (expanded)
+                    {
+                        for (int i = 1; i < entries.Count; i++)
+                        {
+                            DbEntry e = entries[i];
+                            ListViewItem childIt = CreateDbItem(e, "    " + e.DisplayName);
+                            if (checkedPaths.Contains(e.Path)) childIt.Checked = true;
+                            if (selectedPath == e.Path) childIt.Selected = true;
+                            lvDb.Items.Add(childIt);
+                        }
+                    }
+                }
+            }
         }
 
+        lvDb.EndUpdate();
+        UpdateToggleGroupsButton();
         if (navDb != null) { navDb.Desc = db.Count + " Systeme, vergleichen und verwalten"; navDb.Invalidate(); }
         UpdateDbButtons();
     }
@@ -13322,11 +13459,12 @@ public partial class DiagGui
             }
         }
         if (targets.Count == 0) return null;
-        string firstKey = targets[0].GeraetKey;
+        string firstKey = !String.IsNullOrEmpty(targets[0].GeraetKey) ? targets[0].GeraetKey : targets[0].Computer;
         if (String.IsNullOrEmpty(firstKey) || firstKey == "REF") return null;
         for (int i = 1; i < targets.Count; i++)
         {
-            if (targets[i].GeraetKey != firstKey) return null;
+            string k = !String.IsNullOrEmpty(targets[i].GeraetKey) ? targets[i].GeraetKey : targets[i].Computer;
+            if (!String.Equals(k, firstKey, StringComparison.OrdinalIgnoreCase)) return null;
         }
         return targets[0];
     }
@@ -15758,7 +15896,7 @@ public partial class DiagGui
         p.AutoSize = true;
         p.BackColor = UI.Panel;
         p.Margin = new Padding(0);
-        p.Padding = new Padding(0);
+        p.Padding = new Padding(0, 0, 0, UI.S(20));
 
         // 1. Kopfzeile (ohne redundanten Inventar-Link)
         Label lblWelcome = Lbl("Willkommen zurück", 15.5f, true, UI.Text);
@@ -15812,10 +15950,10 @@ public partial class DiagGui
             }
         }
 
-        // 2x2 Grid (Breite StartGruppenbreite, Höhe 448)
+        // 2x2 Grid (Breite StartGruppenbreite, Höhe 458)
         TableLayoutPanel grid2x2 = new TableLayoutPanel();
         grid2x2.Width = UI.S(UI.StartGruppenbreite);
-        grid2x2.Height = UI.S(448);
+        grid2x2.Height = UI.S(458);
         grid2x2.ColumnCount = 2;
         grid2x2.RowCount = 2;
         grid2x2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52f));
@@ -15832,8 +15970,12 @@ public partial class DiagGui
         cardLast.Padding = new Padding(UI.S(14), UI.S(12), UI.S(14), UI.S(12));
         cardLast.Paint += delegate(object sender, PaintEventArgs pe) {
             pe.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using (GraphicsPath path = UI.Round(new RectangleF(0.5f, 0.5f, cardLast.Width - 1.5f, cardLast.Height - 1.5f), UI.SF(8)))
-            using (Pen pen = new Pen(UI.Line)) pe.Graphics.DrawPath(pen, path);
+            using (GraphicsPath path = UI.Round(new RectangleF(1f, 1f, cardLast.Width - 2f, cardLast.Height - 2f), UI.SF(8)))
+            using (Pen pen = new Pen(UI.Line))
+            {
+                pen.Alignment = PenAlignment.Inset;
+                pe.Graphics.DrawPath(pen, path);
+            }
         };
 
         TableLayoutPanel lastLayout = new TableLayoutPanel();
@@ -16079,8 +16221,12 @@ public partial class DiagGui
         cardTasks.Padding = new Padding(UI.S(14), UI.S(12), UI.S(14), UI.S(10));
         cardTasks.Paint += delegate(object sender, PaintEventArgs pe) {
             pe.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using (GraphicsPath path = UI.Round(new RectangleF(0.5f, 0.5f, cardTasks.Width - 1.5f, cardTasks.Height - 1.5f), UI.SF(8)))
-            using (Pen pen = new Pen(UI.Line)) pe.Graphics.DrawPath(pen, path);
+            using (GraphicsPath path = UI.Round(new RectangleF(1f, 1f, cardTasks.Width - 2f, cardTasks.Height - 2f), UI.SF(8)))
+            using (Pen pen = new Pen(UI.Line))
+            {
+                pen.Alignment = PenAlignment.Inset;
+                pe.Graphics.DrawPath(pen, path);
+            }
         };
 
         TableLayoutPanel tasksLayout = new TableLayoutPanel();
@@ -16139,12 +16285,16 @@ public partial class DiagGui
         Panel cardQuick = new Panel();
         cardQuick.Dock = DockStyle.Fill;
         cardQuick.BackColor = UI.Panel;
-        cardQuick.Margin = new Padding(0, 0, UI.S(12), 0);
+        cardQuick.Margin = new Padding(0, 0, UI.S(12), UI.S(12));
         cardQuick.Padding = new Padding(UI.S(14), UI.S(12), UI.S(14), UI.S(10));
         cardQuick.Paint += delegate(object sender, PaintEventArgs pe) {
             pe.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using (GraphicsPath path = UI.Round(new RectangleF(0.5f, 0.5f, cardQuick.Width - 1.5f, cardQuick.Height - 1.5f), UI.SF(8)))
-            using (Pen pen = new Pen(UI.Line)) pe.Graphics.DrawPath(pen, path);
+            using (GraphicsPath path = UI.Round(new RectangleF(1f, 1f, cardQuick.Width - 2f, cardQuick.Height - 2f), UI.SF(8)))
+            using (Pen pen = new Pen(UI.Line))
+            {
+                pen.Alignment = PenAlignment.Inset;
+                pe.Graphics.DrawPath(pen, path);
+            }
         };
 
         TableLayoutPanel quickLayout = new TableLayoutPanel();
@@ -16189,12 +16339,16 @@ public partial class DiagGui
         Panel cardToolsB = new Panel();
         cardToolsB.Dock = DockStyle.Fill;
         cardToolsB.BackColor = UI.Panel;
-        cardToolsB.Margin = new Padding(0);
+        cardToolsB.Margin = new Padding(0, 0, 0, UI.S(12));
         cardToolsB.Padding = new Padding(UI.S(14), UI.S(12), UI.S(14), UI.S(10));
         cardToolsB.Paint += delegate(object sender, PaintEventArgs pe) {
             pe.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using (GraphicsPath path = UI.Round(new RectangleF(0.5f, 0.5f, cardToolsB.Width - 1.5f, cardToolsB.Height - 1.5f), UI.SF(8)))
-            using (Pen pen = new Pen(UI.Line)) pe.Graphics.DrawPath(pen, path);
+            using (GraphicsPath path = UI.Round(new RectangleF(1f, 1f, cardToolsB.Width - 2f, cardToolsB.Height - 2f), UI.SF(8)))
+            using (Pen pen = new Pen(UI.Line))
+            {
+                pen.Alignment = PenAlignment.Inset;
+                pe.Graphics.DrawPath(pen, path);
+            }
         };
 
         TableLayoutPanel toolsLayoutB = new TableLayoutPanel();
@@ -17717,6 +17871,13 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("3.881", "29.10.2026", "Startseiten-Kachelrahmen & vollständige Datenbank-Systemdaten",
+            "• Startseiten-Kachelrahmen & Layout: Saubere, unbeschnittene Umrandung aller vier Kacheln ('Letzter Lauf', 'Aufgaben', 'Schnell behebbar', 'Werkzeuge') durch PenAlignment.Inset mit 1-px-Anti-Aliasing-Sicherheitsabstand; harmonisierte Margins im 2x2-Grid (oben/unten UI.S(12)) und vergrößerter unterer Innenabstand verhindern Anstoßen an die Fußleiste.\r\n" +
+            "• Vollständige Systemdaten im eingeklappten Zustand: Abkehr von nativen Win32-Gruppenköpfen (LVGS_COLLAPSED), die Datenzeilen versteckten; kompakte Master-Zeilen zeigen alle Hardware- und Benchmarkdaten des neuesten Laufs in den Spalten 2–10 (Datum, Gesamt, CPU, GPU, RAM, Mehrkern, RAM Lesen, GPU, Befunde).\r\n" +
+            "• Überlaufschutz in Spalte 1: Schlanke Formatierung '▶ Name (Anzahl)' bzw. '  Name' (12–18 Zeichen) passt perfekt ohne Textabschneiden in die 135 px breite erste Spalte; das Messdatum steht ausschließlich in Spalte 2.\r\n" +
+            "• Sofortige Interaktion & Aktionsknöpfe: Einzelsysteme und kompakte Gruppenköpfe sind echte Tabellenzeilen mit Tag = neuester Lauf; ein Klick aktiviert sofort alle Fußleisten-Aktionen ('Bericht öffnen', 'Verlauf', 'Im Dashboard vergleichen', 'Als Referenz'); Doppelklick öffnet den Bericht.\r\n" +
+            "• Intuitive Aufklapp-Mechanik: Klick auf den Pfeil oder Doppelklick klappt das System auf ('▼ Name (Anzahl)') und listet alle Einzelläufe eingerückt darunter auf; Toolbar-Schaltfläche und Kontextmenü ('Alle aufklappen' / 'Alle einklappen') sowie Pfeiltasten (Rechts/Links) schalten synchron um.\r\n" +
+            "• Hoher Dark-Mode-Kontrast: Text in Spalte 1 und allen Datenfeldern behält mindestens 7:1-Kontrast im Hell- und Dunkelmodus; Pfeilsymbole in beiden Farbschemata klar sichtbar."),
         new Eintrag("3.88", "29.10.2026", "Einklappbare Datenbank-Gruppen, Dark-Mode-Kontrast, Startseiten-Layout & Zeichensatz-Korrektur",
             "â€¢ Einklappbare GerÃ¤tegruppen in der Datenbank: Native Win32-UnterstÃ¼tzung (LVGS_COLLAPSIBLE) mit Windows-Chevrons; Systeme mit mehreren LÃ¤ufen und Referenzsysteme starten standardmÃ¤ÃŸig kompakt eingeklappt; neue Aktionen 'Alle aufklappen / Alle einklappen' in Toolbar und KontextmenÃ¼.\r\n" +
             "â€¢ Dark-Mode-Kontrast fÃ¼r Gruppen: GruppenkÃ¶pfe der Datenbank-ListView werden im Dark Mode mit hohem Kontrast (>= 7:1) in UI.Accent/UI.Text gerendert (beseitigt unlesbares Windows-Theme-Dunkelblau auf schwarzem Grund).\r\n" +

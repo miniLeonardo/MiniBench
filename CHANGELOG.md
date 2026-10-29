@@ -1,6 +1,18 @@
 ﻿# Changelog - Leos Minibench
 
-Alle wesentlichen Ã„nderungen an Leos Minibench werden in diesem Dokument festgehalten.
+Alle wesentlichen Änderungen an Leos Minibench werden in diesem Dokument festgehalten.
+
+## v3.881 (29.10.2026)
+
+### Neu
+* **Vollständige Systemdaten im eingeklappten Zustand:** Abkehr von nativen Win32-Gruppenköpfen (LVGS_COLLAPSED), die unter Windows alle Spalten 2–10 leerten. Eingeklappte Rechner erscheinen als vollwertige Master-Zeilen mit den Daten des neuesten Laufs in allen Spalten (Datum, Gesamt, CPU, GPU, RAM, CPU Mehrkern, RAM Lesen, GPU-Leistung, Befunde).
+* **Überlaufschutz in Spalte 1 (System):** Kompaktes Format „▶ Name (Anzahl)“ bzw. „  Name“ (12–18 Zeichen) passt ohne Textabschneiden in die 135 px Spaltenbreite. Das Messdatum wird strikt in Spalte 2 ausgewiesen.
+* **Sofortige Interaktion & aktive Fußleisten-Aktionen:** Eingeklappte Rechnerzeilen sind vollwertige Tabellenelemente mit Tag = neuester Lauf. Ein Klick aktiviert unverzüglich alle Aktionsknöpfe („Bericht öffnen“, „Verlauf“, „Im Dashboard vergleichen“, „Als Referenz“); Doppelklick öffnet direkt den HTML-Bericht.
+* **Intuitive Aufklapp-Mechanik:** Klick auf das Pfeilsymbol „▶“ oder Doppelklick klappt das System auf („▼ Name (Anzahl)“) und listet alle Einzelläufe eingerückt („    “ + DisplayName) mit ihren spezifischen Messdaten auf. Toolbar-Knopf btnToggleGroups („Alle aufklappen“ / „Alle einklappen“), Kontextmenü und Pfeiltasten (Rechts/Links) schalten synchron um.
+
+### Verbessert
+* **Startseiten-Kachelrahmen & Layout-Padding:** Umrandungen aller vier Hauptkacheln („Letzter Lauf“, „Aufgaben“, „Schnell behebbar“, „Werkzeuge“) werden mit 1-px-Anti-Aliasing-Sicherheitsabstand und PenAlignment.Inset gezeichnet, wodurch kein Rahmen mehr beschnitten wird. Margins im 2x2-Grid harmonisiert und unterer Innenabstand des Hauptcontainers vergrößert, um bündigen Abstand zur Fußleiste zu garantieren.
+* **Farbschema- und Kontrastsicherheit:** Sämtliche Tabellenzellen nutzen UI.Text und UI.SubText mit mindestens 7:1-Kontrast zum Hintergrund im Dark Mode; die Pfeilsymbole „▶“ und „▼“ sind in Hell- und Dunkelmodus kontrastreich sichtbar.
 
 ## v3.88 (29.10.2026)
 
