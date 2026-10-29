@@ -21,7 +21,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
     if ($DatenDir) { $argList += '-DatenDir'; $argList += ('"{0}"' -f (ConvertTo-Unc $DatenDir).TrimEnd('\')) }
     try { Start-Process -FilePath (Get-Process -Id $PID).Path -Verb RunAs -ArgumentList $argList -ErrorAction Stop }
     catch {
-        try { Add-Type -AssemblyName System.Windows.Forms; [void][Windows.Forms.MessageBox]::Show(('Start mit Administratorrechten nicht mÃ¶glich: ' + $_.Exception.Message), 'Leos Minibench', 'OK', 'Warning') } catch { }
+        try { Add-Type -AssemblyName System.Windows.Forms; [void][Windows.Forms.MessageBox]::Show(('Start mit Administratorrechten nicht möglich: ' + $_.Exception.Message), 'Leos Minibench', 'OK', 'Warning') } catch { }
     }
     return
 }

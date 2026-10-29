@@ -239,7 +239,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
     if ($DatenDir) { $argList += '-DatenDir'; $argList += ('"{0}"' -f (ConvertTo-Unc $DatenDir).TrimEnd('\')) }
     try { Start-Process -FilePath (Get-Process -Id $PID).Path -Verb RunAs -ArgumentList $argList -ErrorAction Stop }
     catch {
-        try { Add-Type -AssemblyName System.Windows.Forms; [void][Windows.Forms.MessageBox]::Show(('Start mit Administratorrechten nicht mÃ¶glich: ' + $_.Exception.Message), 'Leos Minibench', 'OK', 'Warning') } catch { }
+        try { Add-Type -AssemblyName System.Windows.Forms; [void][Windows.Forms.MessageBox]::Show(('Start mit Administratorrechten nicht möglich: ' + $_.Exception.Message), 'Leos Minibench', 'OK', 'Warning') } catch { }
     }
     return
 }
@@ -17133,10 +17133,10 @@ function Wait-JobWithProgress($Job, [string]$Activity, [int]$ExpectedSec = 0, [i
     while ($Job.State -in 'NotStarted', 'Running') {
         if (Test-SkipRequested) {
             Stop-Job $Job -ErrorAction SilentlyContinue
-            throw (New-Object System.OperationCanceledException 'Vom Benutzer Ã¼bersprungen')
+            throw (New-Object System.OperationCanceledException 'Vom Benutzer übersprungen')
         }
-        $st = 'lÃ¤uft seit {0:hh\:mm\:ss}' -f $sw.Elapsed
-        if ($ExpectedSec -gt 0) { Show-Sub $Activity ($st + ('   (Ã¼blich: ca. {0} Min.)' -f [math]::Ceiling($ExpectedSec / 60))) ([int]([math]::Min(99.0, $sw.Elapsed.TotalSeconds / $ExpectedSec * 100.0))) }
+        $st = 'läuft seit {0:hh\:mm\:ss}' -f $sw.Elapsed
+        if ($ExpectedSec -gt 0) { Show-Sub $Activity ($st + ('   (üblich: ca. {0} Min.)' -f [math]::Ceiling($ExpectedSec / 60))) ([int]([math]::Min(99.0, $sw.Elapsed.TotalSeconds / $ExpectedSec * 100.0))) }
         else { Show-Sub $Activity $st }
         if ($sw.Elapsed.TotalSeconds -ge $TimeoutSec) { Stop-Job $Job -ErrorAction SilentlyContinue; break }
         Start-Sleep -Milliseconds 500
@@ -17193,7 +17193,7 @@ function Wait-TaskProgress($Task, [string]$Activity, [string]$Status, [int]$Expe
     $samples = New-Object System.Collections.ArrayList
     while (-not $Task.IsCompleted) {
         if (Test-SkipRequested) {
-            throw (New-Object System.OperationCanceledException 'Vom Benutzer Ã¼bersprungen')
+            throw (New-Object System.OperationCanceledException 'Vom Benutzer übersprungen')
         }
         Show-Sub $Activity $Status ([int][math]::Min(99.0, [double]$sw.ElapsedMilliseconds * 100.0 / [math]::Max(1.0, [double]$ExpectedMs)))
         $cs = $null
