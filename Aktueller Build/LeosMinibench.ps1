@@ -245,7 +245,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
 }
 #endregion
 
-$ScriptVersion = '3.84'
+$ScriptVersion = '3.85'
 $AppName       = 'Leos Minibench'
 # Eingebettete Referenzprofile für Leos Minibench (v3.0)
 $script:EmbeddedReferences = @{
@@ -391,10 +391,283 @@ $script:EmbeddedReferences = @{
     'Desktop_HighEnd.json' = @'
 {
     "Format":  "PC-Diagnose-DB/2",
-    "Name":  "Referenz: Desktop High-End (Ryzen 7600X, RX 6800)",
+    "Name":  "Referenz: Desktop High-End (Ryzen 9800X3D, RTX 5080)",
     "Computer":  "Referenz-Desktop-HighEnd",
     "Geraet":  {
                    "Id":  "REF-REFERENZ-DESKTOP-HIGHEND",
+                   "Guete":  "hoch",
+                   "Quellen":  [
+                                   "Referenzsystem"
+                               ]
+               },
+    "Datum":  "2026-10-17 12:00",
+    "Version":  "3.85",
+    "Quelle":  "Referenz",
+    "Module":  "Benchmark",
+    "Messdauer":  "normal",
+    "System":  "Desktop High-End (AMD B650E)",
+    "Hardware":  {
+                     "CPU":  "Ryzen 7 9800X3D",
+                     "Kerne":  8,
+                     "Threads":  16,
+                     "RAM":  "64 GB DDR5-6000",
+                     "GPU":  "GeForce RTX 5080",
+                     "IGPU":  null,
+                     "GPUGemessen":  "NVIDIA GeForce RTX 5080",
+                     "Datentraeger":  "Samsung SSD 990 PRO 4TB (3,64 TB, NVMe)",
+                     "Betriebssystem":  "Microsoft Windows 11",
+                     "Mainboard":  "ASUS ROG STRIX B650E-E GAMING WIFI",
+                     "WindowsInstalliert":  null
+                 },
+    "Werte":  {
+                  "GPU|DWM":  28722,
+                  "RAM|Latenz":  80.7,
+                  "GPU|VMB":  487.7,
+                  "CPU|MT":  49750,
+                  "DISK|NVMe4|W1":  59214,
+                  "GPU|REND":  296.6,
+                  "GPU|REND1":  73.3,
+                  "DISK|NVMe4|R8":  177715,
+                  "GPU|REND01":  73.1,
+                  "RAM|Kopieren":  24.6,
+                  "DISK|NVMe4|SR":  7443,
+                  "RAM|Schreiben":  30.4,
+                  "CPU|ST":  3282,
+                  "CPU|AES":  1454,
+                  "GPU|STUTTERREL":  14,
+                  "CPU|SHA":  2561,
+                  "GPU|RPKT":  27335,
+                  "RAM|Lesen":  65.3,
+                  "DISK|NVMe4|R1":  20590,
+                  "CPU|DEFL":  380,
+                  "DISK|NVMe4|SW":  6361
+              },
+    "Messwerte":  {
+                      "CPU|AMD Ryzen 7 9800X3D 8-Core Processor|ST":  3282,
+                      "CPU|AMD Ryzen 7 9800X3D 8-Core Processor|MT":  49750,
+                      "CPU|AMD Ryzen 7 9800X3D 8-Core Processor|AES":  1454,
+                      "CPU|AMD Ryzen 7 9800X3D 8-Core Processor|SHA":  2561,
+                      "CPU|AMD Ryzen 7 9800X3D 8-Core Processor|DEFL":  380,
+                      "RAM|64GB|6000|Lesen":  65.3,
+                      "RAM|64GB|6000|Schreiben":  30.4,
+                      "RAM|64GB|6000|Kopieren":  24.6,
+                      "RAM|64GB|6000|Latenz":  80.7,
+                      "GPU|NVIDIA GeForce RTX 5080|VMB":  487.7,
+                      "GPU|NVIDIA GeForce RTX 5080|DWM":  28722,
+                      "GPU|NVIDIA GeForce RTX 5080|REND|1280x720":  296.6,
+                      "GPU|NVIDIA GeForce RTX 5080|REND1|1280x720":  73.3,
+                      "GPU|NVIDIA GeForce RTX 5080|REND01|1280x720":  73.1,
+                      "GPU|NVIDIA GeForce RTX 5080|STUTTER":  0,
+                      "GPU|NVIDIA GeForce RTX 5080|STUTTERREL":  14.01,
+                      "GPU|NVIDIA GeForce RTX 5080|RPKT":  27335,
+                      "DISK|0025_3849_5140_69D7.|Samsung SSD 990 PRO 4TB|SR":  7443,
+                      "DISK|0025_3849_5140_69D7.|Samsung SSD 990 PRO 4TB|SW":  6361,
+                      "DISK|0025_3849_5140_69D7.|Samsung SSD 990 PRO 4TB|R1":  20590,
+                      "DISK|0025_3849_5140_69D7.|Samsung SSD 990 PRO 4TB|R8":  177715,
+                      "DISK|0025_3849_5140_69D7.|Samsung SSD 990 PRO 4TB|W1":  59214
+                  },
+    "Ordner":  "",
+    "Laufwerke":  [
+                      {
+                          "Laufwerk":  "Samsung SSD 990 PRO 4TB (C:)",
+                          "Klasse":  "NVMe PCIe 4.0 x4",
+                          "SR":  7443,
+                          "SW":  6361,
+                          "R1":  20590,
+                          "R8":  177715,
+                          "W1":  59214
+                      }
+                  ],
+    "Befunde":  {
+                    "Kritisch":  0,
+                    "Warnungen":  0,
+                    "Hinweise":  0,
+                    "Liste":  [
+
+                              ]
+                },
+    "Lasttest":  {
+                     "CpuTempMax":  58,
+                     "GpuTempMax":  54,
+                     "CpuWMax":  87,
+                     "GpuWMax":  285,
+                     "Drosselung":  "keine",
+                     "Taktstabilitaet":  99,
+                     "TaktAbfall":  1
+                 },
+    "Rendertest":  [
+                       {
+                           "Grafik":  "NVIDIA GeForce RTX 5080",
+                           "Art":  "dGPU",
+                           "Aufloesung":  "1280x720",
+                           "Fps":  296.6,
+                           "Low1":  73.3,
+                           "Punkte":  27335,
+                           "Bildfehler":  0,
+                           "Treiberreset":  false,
+                           "Fehler":  ""
+                       }
+                   ],
+    "Schreibzugriffe":  null,
+    "Ablauf":  "normal",
+    "Sensoren":  {
+                     "Benchmark":  {
+                                       "CpuTempLeerlauf":  38.5,
+                                       "CpuTempMax":  48.1,
+                                       "TjMax":  null,
+                                       "CpuWMax":  86.5,
+                                       "CpuMHzMax":  5225,
+                                       "Gpu":  "NVIDIA GeForce RTX 5080",
+                                       "GpuTempMax":  53.7,
+                                       "GpuWMax":  284.4,
+                                       "IGpu":  "",
+                                       "IGpuTempMax":  null,
+                                       "IGpuWMax":  null,
+                                       "LuefterMax":  1720,
+                                       "DatentraegerTempMax":  40.9,
+                                       "Messpunkte":  46,
+                                       "Quelle":  "Quellen: LibreHardwareMonitor 0.9.6, nvidia-smi, Windows-Leistungszähler, ACPI; Treiber: PawnIO 2.2.0.0 (bereits vorhanden)",
+                                       "Abschnitte":  [
+                                                          {
+                                                              "Teil":  "Prozessor",
+                                                              "CpuTempMax":  48.1,
+                                                              "CpuWMax":  86.5,
+                                                              "CpuMHzAvg":  4838,
+                                                              "GpuTempMax":  26.8,
+                                                              "GpuWMax":  36.2
+                                                          },
+                                                          {
+                                                              "Teil":  "Arbeitsspeicher",
+                                                              "CpuTempMax":  47.4,
+                                                              "CpuWMax":  75,
+                                                              "CpuMHzAvg":  5054,
+                                                              "GpuTempMax":  25.7,
+                                                              "GpuWMax":  21.5
+                                                          },
+                                                          {
+                                                              "Teil":  "Grafik",
+                                                              "CpuTempMax":  47.4,
+                                                              "CpuWMax":  64.6,
+                                                              "CpuMHzAvg":  4883,
+                                                              "GpuTempMax":  53.7,
+                                                              "GpuWMax":  284.4
+                                                          },
+                                                          {
+                                                              "Teil":  "Datenträger",
+                                                              "CpuTempMax":  42.4,
+                                                              "CpuWMax":  53.5,
+                                                              "CpuMHzAvg":  4754,
+                                                              "GpuTempMax":  35.5,
+                                                              "GpuWMax":  54.4
+                                                          }
+                                                      ]
+                                   },
+                     "Verbrauch":  {
+                                       "IsNotebook":  false,
+                                       "Leerlauf":  {
+                                                        "Verfuegbar":  true,
+                                                        "Text":  "~56 W",
+                                                        "P_AC":  56,
+                                                        "P_DC":  45,
+                                                        "CpuW":  15.6,
+                                                        "GpuW":  12,
+                                                        "RamW":  3,
+                                                        "BoardW":  10,
+                                                        "DiskW":  1.8,
+                                                        "FanW":  1.8,
+                                                        "VrmW":  0.8,
+                                                        "Wirkungsgrad":  0.8054,
+                                                        "WirkungsgradProzent":  80.5,
+                                                        "LoadPercent":  6.9,
+                                                        "PsuWattage":  650,
+                                                        "PsuRating":  "80 PLUS Bronze",
+                                                        "IsNotebook":  false,
+                                                        "Aufschluesselung":  "Gemessen: CPU 16 W, GPU 12 W + Wandler/VRM 0,8 W, Mainboard 10 W, RAM 3,0 W (2 DIMMs), Datenträger 1,8 W, Lüfter 1,8 W (3 Lüfter) = intern ~45 W | ~56 W an der Steckdose (intern ~45 W | PSU-Last ~7 % @ ~80,5 % Effizienz [650 W, 80 PLUS Bronze])",
+                                                        "AufschluesselungKurz":  "~56 W an der Steckdose (intern ~45 W | PSU-Last ~7 % @ ~80,5 % Effizienz [650 W, 80 PLUS Bronze])"
+                                                    },
+                                       "Teillast":  {
+                                                        "Verfuegbar":  true,
+                                                        "Text":  "~106 W",
+                                                        "P_AC":  106,
+                                                        "P_DC":  89.2,
+                                                        "CpuW":  35.6,
+                                                        "GpuW":  27,
+                                                        "RamW":  5,
+                                                        "BoardW":  12,
+                                                        "DiskW":  3,
+                                                        "FanW":  3,
+                                                        "VrmW":  3.6,
+                                                        "Wirkungsgrad":  0.843,
+                                                        "WirkungsgradProzent":  84.3,
+                                                        "LoadPercent":  13.7,
+                                                        "PsuWattage":  650,
+                                                        "PsuRating":  "80 PLUS Bronze",
+                                                        "IsNotebook":  false,
+                                                        "Aufschluesselung":  "Gemessen: CPU 36 W, GPU 27 W + Wandler/VRM 3,6 W, Mainboard 12 W, RAM 5,0 W (2 DIMMs), Datenträger 3,0 W, Lüfter 3,0 W (3 Lüfter) = intern ~89 W | ~106 W an der Steckdose (intern ~89 W | PSU-Last ~14 % @ ~84,3 % Effizienz [650 W, 80 PLUS Bronze])",
+                                                        "AufschluesselungKurz":  "~106 W an der Steckdose (intern ~89 W | PSU-Last ~14 % @ ~84,3 % Effizienz [650 W, 80 PLUS Bronze])"
+                                                    },
+                                       "Gaming":  {
+                                                      "Verfuegbar":  true,
+                                                      "Text":  "~438 W",
+                                                      "P_AC":  438,
+                                                      "P_DC":  384.8,
+                                                      "CpuW":  64.9,
+                                                      "GpuW":  284.4,
+                                                      "RamW":  8,
+                                                      "BoardW":  14,
+                                                      "DiskW":  2.5,
+                                                      "FanW":  4.5,
+                                                      "VrmW":  6.5,
+                                                      "Wirkungsgrad":  0.8795,
+                                                      "WirkungsgradProzent":  87.9,
+                                                      "LoadPercent":  59.2,
+                                                      "PsuWattage":  650,
+                                                      "PsuRating":  "80 PLUS Bronze",
+                                                      "IsNotebook":  false,
+                                                      "Aufschluesselung":  "Gemessen: CPU 65 W, GPU 284 W + Wandler/VRM 6,5 W, Mainboard 14 W, RAM 8,0 W (2 DIMMs), Datenträger 2,5 W, Lüfter 4,5 W (3 Lüfter) = intern ~385 W | ~438 W an der Steckdose (intern ~385 W | PSU-Last ~59 % @ ~87,9 % Effizienz [650 W, 80 PLUS Bronze])",
+                                                      "AufschluesselungKurz":  "~438 W an der Steckdose (intern ~385 W | PSU-Last ~59 % @ ~87,9 % Effizienz [650 W, 80 PLUS Bronze])"
+                                                  },
+                                       "Volllast":  {
+                                                        "Verfuegbar":  true,
+                                                        "Text":  "~469 W",
+                                                        "P_AC":  469,
+                                                        "P_DC":  411.5,
+                                                        "CpuW":  86.5,
+                                                        "GpuW":  284.4,
+                                                        "RamW":  8,
+                                                        "BoardW":  14,
+                                                        "DiskW":  5.5,
+                                                        "FanW":  4.5,
+                                                        "VrmW":  8.6,
+                                                        "Wirkungsgrad":  0.877,
+                                                        "WirkungsgradProzent":  87.7,
+                                                        "LoadPercent":  63.3,
+                                                        "PsuWattage":  650,
+                                                        "PsuRating":  "80 PLUS Bronze",
+                                                        "IsNotebook":  false,
+                                                        "Aufschluesselung":  "Gemessen: CPU 87 W, GPU 284 W + Wandler/VRM 8,6 W, Mainboard 14 W, RAM 8,0 W (2 DIMMs), Datenträger 5,5 W, Lüfter 4,5 W (3 Lüfter) = intern ~412 W | ~469 W an der Steckdose (intern ~412 W | PSU-Last ~63 % @ ~87,7 % Effizienz [650 W, 80 PLUS Bronze])",
+                                                        "AufschluesselungKurz":  "~469 W an der Steckdose (intern ~412 W | PSU-Last ~63 % @ ~87,7 % Effizienz [650 W, 80 PLUS Bronze])"
+                                                    },
+                                       "Effizienz":  {
+                                                         "CpuMT_PerWatt":  575.1,
+                                                         "Gpu_PerWatt":  1.04,
+                                                         "System_PerWatt":  41.6
+                                                     },
+                                       "PsuWattage":  650,
+                                       "PsuRating":  "80 PLUS Bronze"
+                                   }
+                 },
+    "Optimierung":  null,
+    "Akku":  null
+}
+'@
+    'Desktop_HighEnd_RX6800.json' = @'
+{
+    "Format":  "PC-Diagnose-DB/2",
+    "Name":  "Referenz: Desktop High-End (Ryzen 7600X, RX 6800)",
+    "Computer":  "Referenz-Desktop-HighEnd-RX6800",
+    "Geraet":  {
+                   "Id":  "REF-REFERENZ-DESKTOP-HIGHEND-RX6800",
                    "Guete":  "hoch",
                    "Quellen":  [
                                    "Referenzsystem"
@@ -997,6 +1270,118 @@ $script:EmbeddedReferences = @{
                  },
     "Optimierung":  null,
     "Akku":  null
+}
+'@
+    'Referenz_Desktop.json' = @'
+{
+  "Format": "PC-Diagnose-DB/2",
+  "Name": "Referenz: Median Desktop-PCs (4 Systeme)",
+  "Computer": "Referenz-Desktop-Median",
+  "Datum": "2026-10-29",
+  "Version": "3.85",
+  "Quelle": "Vergleichsdatenbank",
+  "Hardware": {
+    "CPU": "Desktop Median-Referenz",
+    "RAM": "32 GB DDR4/DDR5",
+    "GPU": "Desktop-Grafik Median",
+    "Datentraeger": "NVMe SSD",
+    "Betriebssystem": "Microsoft Windows 11",
+    "Mainboard": "Desktop Mainboard",
+    "WindowsInstalliert": "",
+    "Kerne": 6,
+    "Threads": 12
+  },
+  "Werte": {
+    "CPU|AES": 1294,
+    "CPU|DEFL": 270,
+    "CPU|MT": 35314,
+    "CPU|SHA": 2364,
+    "CPU|ST": 2912,
+    "DISK|HDD|R1": 96,
+    "DISK|HDD|R8": 165,
+    "DISK|HDD|SR": 121,
+    "DISK|HDD|SW": 128,
+    "DISK|HDD|W1": 821,
+    "DISK|NVMe3|R1": 14090,
+    "DISK|NVMe3|R8": 108045,
+    "DISK|NVMe3|SR": 3114,
+    "DISK|NVMe3|SW": 2910,
+    "DISK|NVMe3|W1": 35518,
+    "DISK|NVMe4|R1": 17384,
+    "DISK|NVMe4|R8": 148780,
+    "DISK|NVMe4|SR": 6997,
+    "DISK|NVMe4|SW": 4570,
+    "DISK|NVMe4|W1": 55940,
+    "DISK|SATA-SSD|R1": 9878,
+    "DISK|SATA-SSD|R8": 63332,
+    "DISK|SATA-SSD|SR": 555,
+    "DISK|SATA-SSD|SW": 526,
+    "DISK|SATA-SSD|W1": 21824,
+    "GPU|DWM": 12006,
+    "GPU|REND": 103.8,
+    "GPU|REND01": 73.1,
+    "GPU|REND1": 67.8,
+    "GPU|RPKT": 9571,
+    "GPU|STUTTERREL": 14,
+    "GPU|VMB": 203.9,
+    "RAM|Kopieren": 17.8,
+    "RAM|Latenz": 95.1,
+    "RAM|Lesen": 45.4,
+    "RAM|Schreiben": 21.9
+  },
+  "Herkunft": {
+    "CPU|AES": "Median aus 4 Systemen",
+    "CPU|DEFL": "Median aus 4 Systemen",
+    "CPU|MT": "Median aus 4 Systemen",
+    "CPU|SHA": "Median aus 4 Systemen",
+    "CPU|ST": "Median aus 4 Systemen",
+    "DISK|HDD|R1": "Median aus 2 Systemen",
+    "DISK|HDD|R8": "Median aus 2 Systemen",
+    "DISK|HDD|SR": "Median aus 2 Systemen",
+    "DISK|HDD|SW": "Median aus 2 Systemen",
+    "DISK|HDD|W1": "Median aus 2 Systemen",
+    "DISK|NVMe3|R1": "Median aus 3 Systemen",
+    "DISK|NVMe3|R8": "Median aus 3 Systemen",
+    "DISK|NVMe3|SR": "Median aus 3 Systemen",
+    "DISK|NVMe3|SW": "Median aus 3 Systemen",
+    "DISK|NVMe3|W1": "Median aus 3 Systemen",
+    "DISK|NVMe4|R1": "Median aus 2 Systemen",
+    "DISK|NVMe4|R8": "Median aus 2 Systemen",
+    "DISK|NVMe4|SR": "Median aus 2 Systemen",
+    "DISK|NVMe4|SW": "Median aus 2 Systemen",
+    "DISK|NVMe4|W1": "Median aus 2 Systemen",
+    "DISK|SATA-SSD|R1": "Median aus 2 Systemen",
+    "DISK|SATA-SSD|R8": "Median aus 2 Systemen",
+    "DISK|SATA-SSD|SR": "Median aus 2 Systemen",
+    "DISK|SATA-SSD|SW": "Median aus 2 Systemen",
+    "DISK|SATA-SSD|W1": "Median aus 2 Systemen",
+    "GPU|DWM": "Median aus 4 Systemen",
+    "GPU|REND": "Median aus 4 Systemen",
+    "GPU|REND01": "Median aus 1 Systemen",
+    "GPU|REND1": "Median aus 4 Systemen",
+    "GPU|RPKT": "Median aus 4 Systemen",
+    "GPU|STUTTERREL": "Median aus 1 Systemen",
+    "GPU|VMB": "Median aus 4 Systemen",
+    "RAM|Kopieren": "Median aus 4 Systemen",
+    "RAM|Latenz": "Median aus 4 Systemen",
+    "RAM|Lesen": "Median aus 4 Systemen",
+    "RAM|Schreiben": "Median aus 4 Systemen"
+  },
+  "Befunde": {
+    "Kritisch": 0,
+    "Warnungen": 0,
+    "Hinweise": 0,
+    "Liste": []
+  },
+  "Lasttest": {
+    "CpuTempMax": 75,
+    "GpuTempMax": 68,
+    "CpuWMax": 85,
+    "GpuWMax": 160,
+    "Drosselung": "keine",
+    "Taktstabilitaet": 98,
+    "TaktAbfall": 2
+  }
 }
 '@
     'Workstation_Mobil.json' = @'
@@ -3355,6 +3740,23 @@ function Get-VerifiedTool([string]$Name, [string]$ToolsDir = (Get-ToolsDir)) {
     $p = Join-Path $ToolsDir $e.Datei
     if (-not (Test-Path -LiteralPath $p)) { $script:ToolIssues.Add(('{0}: {1} fehlt im Tools-Ordner.' -f $Name, $e.Datei)); return $null }
     $h = Get-FileSha256 $p
+    $curSha = if ($e.SHA256) { [string]$e.SHA256 } else { '' }
+    if (-not $curSha -or $curSha.Trim() -eq '') {
+        $pinSha = $null
+        if ($Name -eq 'PawnIO-Setup' -and $script:PawnIoPin -and $script:PawnIoPin.SHA256) {
+            $pinSha = $script:PawnIoPin.SHA256
+        } elseif ($script:LhmPins -and $Name -like 'LibreHardwareMonitor:*') {
+            $fileKey = $Name.Substring('LibreHardwareMonitor:'.Length)
+            if ($script:LhmPins.Contains($fileKey)) {
+                $pinSha = $script:LhmPins[$fileKey].SHA256
+            }
+        }
+        if ($pinSha -and $h -eq $pinSha) {
+            $e.SHA256 = $h
+            [void](Save-ToolManifest $m $ToolsDir)
+            return $p
+        }
+    }
     if ($h -ne $e.SHA256) {
         $script:ToolIssues.Add(('{0}: {1} passt nicht zum Manifest (SHA-256 {2}… statt {3}…) und wird nicht ausgeführt. Datei neu holen oder bewusst neu aufnehmen.' -f $Name, $e.Datei, $h.Substring(0, 12), ([string]$e.SHA256).Substring(0, [math]::Min(12, ([string]$e.SHA256).Length))))
         return $null
@@ -6761,7 +7163,7 @@ public partial class DiagGui : Form
         Tip(btnHtml, "Öffnet den Bericht im Browser.");
         Tip(btnFolder, "Öffnet den Berichtsordner dieses Laufs (Bericht, KI-Dateien, Anhang.zip).");
         Tip(btnExportRun, "Exportiert diesen Durchlauf als gepackte .minibench-Datei für den Austausch oder das Archiv.");
-        Tip(btnNew, "Zurück zur Auswahl für einen neuen Lauf.");
+        Tip(btnNew, "Kehrt zur Startseite und den Ablauf-Einstellungen zurück.");
         Tip(btnKi, "Zeigt die KI-Datei im Explorer. Sie enthält Auftrag, Bericht und Rohdaten und lässt sich in ein KI-Modell hochladen.");
         Tip(cardK, "Kritische Befunde: Datenverlust oder Instabilität möglich, bald handeln.");
         Tip(cardW, "Warnungen: sollten behoben werden.");
@@ -6992,7 +7394,7 @@ public partial class DiagGui : Form
         }
         f.Controls.Add(seg);
         lblDiagProfil = Hint("", 4); f.Controls.Add(lblDiagProfil);
-        chkFast = Chk("Lesende Prüfungen parallel ausführen", false);
+        chkFast = Chk("Lesende Prüfungen parallel ausführen", true);
         chkFast.CheckedChanged += delegate { UpdateSummary(); };
         Control fastBox = Opt2(chkFast, "Updatesuche, Defender-Schnellscan, Energieanalyse und SMART-Langtest laufen nebenher. Messungen bleiben exklusiv, damit die Werte vergleichbar sind.");
         fastBox.Margin = new Padding(0, UI.S(UI.Abstand2), 0, 0); f.Controls.Add(fastBox);
@@ -7293,7 +7695,7 @@ public partial class DiagGui : Form
         Label lPct = CellLabel("Anteil am freien RAM", 150);
         AddLoadRow(t, 2, chkLRam, "Mustertest mit Bitfehlerprüfung", cmbLRam, new Control[] { SettingRow(lPct, cmbLRamPct) });
 
-        chkLGpu = Chk("Grafik", false); cmbLGpu = Combo(110, mins, 0);
+        chkLGpu = Chk("Grafik", true); cmbLGpu = Combo(110, mins, 0);
         cmbLGpuSel = Combo(260, GpuChoiceTexts(), 0);
         cmbLGpuRes = Combo(120, new string[] { "1280x720", "1920x1080" }, 0);
         cmbLGpuShow = Combo(140, new string[] { "Fenster", "Vollbild", "ohne Anzeige" }, 0);
@@ -9161,7 +9563,7 @@ public partial class DiagGui : Form
         lblResult = Lbl("", 10.5f, true, UI.Text); lblResult.Anchor = AnchorStyles.Left; lblResult.AutoEllipsis = true;
         FlowLayoutPanel btns = new FlowLayoutPanel(); btns.AutoSize = true; btns.WrapContents = false; btns.BackColor = UI.Bg; btns.Anchor = AnchorStyles.Right;
         btnStopWait = UI.Secondary("Test beenden"); btnSkipStep = UI.SkipStepButton(); btnCancel = UI.Secondary("Abbrechen");
-        btnFolder = UI.Secondary("Ordner öffnen"); btnNew = UI.Secondary("Neuer Lauf"); btnKi = UI.Secondary("KI-Datei zeigen");
+        btnFolder = UI.Secondary("Ordner öffnen"); btnNew = UI.Secondary("Zurück"); btnKi = UI.Secondary("KI-Datei zeigen");
         btnExportRun = UI.Secondary("Lauf exportieren …"); btnHtml = UI.Primary("Bericht öffnen");
         btnHtml.Margin = new Padding(UI.S(UI.Abstand5), 0, 0, 0); btnHtml.MinimumSize = new Size(UI.S(150), UI.S(44));
         foreach (Button sb in new Button[] { btnStopWait, btnSkipStep, btnCancel, btnFolder, btnNew, btnKi, btnExportRun }) { sb.Margin = new Padding(UI.S(8), UI.S(6), 0, 0); sb.MinimumSize = new Size(0, UI.S(32)); }
@@ -15028,6 +15430,9 @@ public partial class DiagGui
             if (nav.Count > 2) nav[2].Checked = true;
             if (nav.Count > 3) nav[3].Checked = true;
             if (rbVoll != null) rbVoll.Checked = true;
+            if (chkLCpu != null) chkLCpu.Checked = true;
+            if (chkLRam != null) chkLRam.Checked = true;
+            if (chkLGpu != null) chkLGpu.Checked = true;
             ShowPage(1);
         }
         else if (name == "Leistung messen")
@@ -15038,6 +15443,9 @@ public partial class DiagGui
         else if (name == "Stabilität prüfen")
         {
             if (nav.Count > 3) nav[3].Checked = true;
+            if (chkLCpu != null) chkLCpu.Checked = true;
+            if (chkLRam != null) chkLRam.Checked = true;
+            if (chkLGpu != null) chkLGpu.Checked = true;
             ShowPage(3);
         }
         else if (name == "Pflegen und beschleunigen")
@@ -16148,6 +16556,12 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("3.85", "29.10.2026", "Sensor-Manifest-Selbstreparatur, lautloser Smartctl-Lifecycle, RTX 5080 Referenz & UI-Standards",
+            "• Manifest-Selbstreparatur für Sensoren & Tools: Automatische Korrektur von leeren Prüfsummen im Manifest Tools.json für LibreHardwareMonitor und PawnIO; lautloser Abgleich gegen fest hinterlegte Release-Hashes verhindert Fehlalarme.\r\n" +
+            "• Keine Werkzeug-Warnungen im Kundenbericht: Technische Prüfsummenabweichungen oder fehlende optionale Sensor-Treiber werden im internen Protokoll (Start.log) vermerkt und überfluten den Diagnosebericht nicht mehr mit Warnungen.\r\n" +
+            "• Lautloser Smartmontools-Lifecycle: Bevorzugung vorhandener smartctl.exe im Tools-Ordner ohne winget-Aufrufe; Deinstallation ausschließlich am Gesamtlaufende mit striktem NSIS-Silent-Schalter (/S) ohne Dialogfenster.\r\n" +
+            "• UI-Standards & Ablauf-Optimierung: Schaltfläche in der Laufansicht in 'Zurück' umbenannt; Grafikstresstest bei Lasttest sowie Aufgaben 'PC durchchecken' und 'Stabilität prüfen' standardmäßig aktiv; parallele lesende Prüfungen als Standard aktiviert.\r\n" +
+            "• High-End-Referenz RTX 5080 & Desktop-Median: Modernisierung von Desktop_HighEnd.json auf AMD Ryzen 7 9800X3D und NVIDIA GeForce RTX 5080; RX 6800 als weiteres Profil erhalten; Desktop-Median (Referenz_Desktop.json) neu berechnet und autark eingebettet."),
         new Eintrag("3.84", "28.10.2026", "GitHub-Härtung, granulare Umzugs-Messung, lautloser Sensoren-Lifecycle & Text-Feinschliff",
             "• GitHub-Härtung & Git-Disziplin: Striktes Verbot und globale .gitignore-Absicherung für Binärarchive (*.zip, *.7z, *.tar), ausführbare Dateien (*.exe, *.dll, *.sys) und Treiber; Schutz vor automatischen GitHub-Sperren.\r\n" +
             "• Granulare Umzugs-Bibliotheken: Individuelle Auswahl aller Standardbibliotheken (Desktop, Dokumente, Downloads, Bilder, Musik, Videos) mit Schnellauswahl (Alle / Keine); Downloads standardmäßig abgewählt zum Schutz vor Datenbergen.\r\n" +
@@ -16955,7 +17369,7 @@ function Get-SavedReference([string]$Path = '') {
     $isNb = if (Get-Command 'Test-IsNotebookSystem' -ErrorAction SilentlyContinue) { [bool](Test-IsNotebookSystem) } else { [bool]$script:IsLaptop }
     $preferredRef = if ($isNb) { 'Referenz_Notebook.json' } else { 'Referenz_Desktop.json' }
     $altRef = if ($isNb) { 'Referenz_Desktop.json' } else { 'Referenz_Notebook.json' }
-    $preferredEmbedded = if ($isNb) { 'Notebook_Standard.json' } else { 'Desktop_Mittelklasse.json' }
+    $preferredEmbedded = if ($isNb) { 'Notebook_Standard.json' } else { 'Referenz_Desktop.json' }
     if ($script:DataDir) {
         if (-not $Path) { $cands += (Join-Path $script:DataDir $preferredRef) }
         $cands += (Join-Path $script:DataDir 'Referenz.json'), (Join-Path $script:DataDir $altRef), (Join-Path $script:DataDir 'PC-Diagnose-Referenz.json')
@@ -20203,7 +20617,7 @@ function Export-BenchDashboardData {
         if ($script:EmbeddedReferences -and $script:EmbeddedReferences.Count -gt 0) {
             $refDict = $script:EmbeddedReferences
         } else {
-            $refFiles = @('Desktop_HighEnd.json', 'Desktop_Mittelklasse.json', 'MiniPC_APU.json', 'Notebook_Standard.json', 'Workstation_Mobil.json')
+            $refFiles = @('Desktop_HighEnd.json', 'Desktop_HighEnd_RX6800.json', 'Desktop_Mittelklasse.json', 'Desktop_GTX1070.json', 'MiniPC_APU.json', 'Notebook_Standard.json', 'Referenz_Desktop.json', 'Workstation_Mobil.json')
             foreach ($rf in $refFiles) {
                 $cand = Join-Path (Join-Path (Get-Location) 'src\Daten\Referenzen') $rf
                 if (Test-Path -LiteralPath $cand) {
@@ -27830,6 +28244,37 @@ function Find-Smartctl {
     }
     return $null
 }
+
+function Uninstall-Smartmontools {
+    $done = $false
+    # 1. NSIS-Uninstaller direkt und strikt lautlos mit /S aufrufen (verhindert interaktive Abfrage-Popups)
+    $candidates = @(
+        "$env:ProgramFiles\smartmontools\uninstall.exe",
+        "${env:ProgramFiles(x86)}\smartmontools\uninstall.exe"
+    ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+    if ($candidates.Count -gt 0) {
+        $uninst = $candidates[0]
+        $r = Invoke-External -File $uninst -Arguments '/S' -TimeoutSec 120 -Progress 'smartmontools wird deinstalliert'
+        if ($r.ExitCode -eq 0 -or -not (Test-Path -LiteralPath $uninst)) {
+            $done = $true
+        }
+    }
+    # 2. Absicherung über winget (falls vorhanden und nötig)
+    $stillThere = @("$env:ProgramFiles\smartmontools\bin\smartctl.exe", "${env:ProgramFiles(x86)}\smartmontools\bin\smartctl.exe") | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+    if ($stillThere.Count -gt 0) {
+        $wg = Get-Command winget.exe -ErrorAction SilentlyContinue
+        if (-not $wg) {
+            $wp = Get-ChildItem "$env:ProgramFiles\WindowsApps\Microsoft.DesktopAppInstaller_*_x64__8wekyb3d8bbwe\winget.exe" -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
+            if ($wp) { $wg = [pscustomobject]@{ Source = $wp.FullName } }
+        }
+        if ($wg) {
+            $u = Invoke-External -File $wg.Source -Arguments 'uninstall --id smartmontools.smartmontools -e --silent --disable-interactivity --accept-source-agreements' -TimeoutSec 180 -Progress 'smartmontools-Paket wird entfernt'
+            if ($u.ExitCode -eq 0) { $done = $true }
+        }
+    }
+    $stillThereAfter = @("$env:ProgramFiles\smartmontools\bin\smartctl.exe", "${env:ProgramFiles(x86)}\smartmontools\bin\smartctl.exe") | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+    return ($stillThereAfter.Count -eq 0)
+}
 #endregion
 
 #region ---------- Sensoren: LibreHardwareMonitor, PawnIO und Ersatzquellen ----------
@@ -28552,11 +28997,22 @@ function Register-PinnedSensorTools([string]$ToolsDir = (Get-ToolsDir)) {
     $items = @(foreach ($f in $script:LhmPins.Keys) { [pscustomobject]@{ Name = (Get-LhmToolName $f); Rel = (Join-Path $script:LhmSubDir $f); SHA256 = $script:LhmPins[$f].SHA256; Lizenz = $script:LhmPins[$f].Lizenz; Quelle = $script:LhmSource } })
     $items += [pscustomobject]@{ Name = 'PawnIO-Setup'; Rel = (Join-Path $script:PawnIoPin.Ordner $script:PawnIoPin.Datei); SHA256 = $script:PawnIoPin.SHA256; Lizenz = $script:PawnIoPin.Lizenz; Quelle = $script:PawnIoPin.Quelle }
     foreach ($it in $items) {
-        if ($known.ContainsKey($it.Name)) { continue }
+        if ($known.ContainsKey($it.Name)) {
+            $exSha = if ($known[$it.Name].SHA256) { [string]$known[$it.Name].SHA256 } else { '' }
+            if ($exSha -and $exSha.Length -eq 64 -and $exSha -eq $it.SHA256) { continue }
+            $p = Join-Path $ToolsDir $it.Rel
+            if (-not (Test-Path -LiteralPath $p)) { continue }
+            $h = Get-FileSha256 $p
+            if ($h -eq $it.SHA256) {
+                Unblock-SensorFile $p
+                [void](Register-Tool -Name $it.Name -Path $p -Lizenz $it.Lizenz -Quelle $it.Quelle -Herkunft 'im Tools-Ordner vorgefunden, Manifest repariert (Release-Prüfsumme bestätigt)' -ToolsDir $ToolsDir)
+            }
+            continue
+        }
         $p = Join-Path $ToolsDir $it.Rel
         if (-not (Test-Path -LiteralPath $p)) { continue }
         $h = Get-FileSha256 $p
-        if ($h -ne $it.SHA256) { $script:ToolIssues.Add(('{0}: {1} hat nicht die bekannte Prüfsumme (SHA-256 {2}…) und wird nicht geladen. Nur LibreHardwareMonitor {3} und PawnIO {4} aus den offiziellen Releases sind freigegeben.' -f $it.Name, $it.Rel, $h.Substring(0, 12), $script:LhmVersion, $script:PawnIoPin.Version)); continue }
+        if ($h -ne $it.SHA256) { $script:ToolIssues.Add(('{0}: {1} hat nicht die bekannte Prüfsumme (SHA-256 {2}…) und wird nicht geladen. Nur LibreHardwareMonitor {3} und PawnIO {4} aus den offiziellen Releases sind freigegeben.' -f $it.Name, $it.Rel, $h.Substring(0, [math]::Min(12, $h.Length)), $script:LhmVersion, $script:PawnIoPin.Version)); continue }
         Unblock-SensorFile $p
         [void](Register-Tool -Name $it.Name -Path $p -Lizenz $it.Lizenz -Quelle $it.Quelle -Herkunft 'im Tools-Ordner vorgefunden, Prüfsumme entspricht dem offiziellen Release' -ToolsDir $ToolsDir)
     }
@@ -28612,7 +29068,7 @@ function Install-SensorTools([string]$ToolsDir = (Get-ToolsDir)) {
         $zip = Join-Path $work 'LibreHardwareMonitor.zip'
         Save-WebFile $script:LhmZip.Url $zip
         $h = Get-FileSha256 $zip
-        if ($h -ne $script:LhmZip.SHA256) { throw ('LibreHardwareMonitor.zip hat eine unerwartete Prüfsumme ({0}…), nichts übernommen.' -f $h.Substring(0, 12)) }
+        if ($h -ne $script:LhmZip.SHA256) { throw ('LibreHardwareMonitor.zip hat eine unerwartete Prüfsumme ({0}…), nichts übernommen.' -f $h.Substring(0, [math]::Min(12, $h.Length))) }
         $ex = Join-Path $work 'lhm'
         Expand-Archive -LiteralPath $zip -DestinationPath $ex -Force -ErrorAction Stop
         foreach ($f in $script:LhmPins.Keys) {
@@ -28636,7 +29092,7 @@ function Install-SensorTools([string]$ToolsDir = (Get-ToolsDir)) {
         $tmp = Join-Path $work 'PawnIO_setup.exe'
         Save-WebFile $script:PawnIoPin.Url $tmp
         $h = Get-FileSha256 $tmp
-        if ($h -ne $script:PawnIoPin.SHA256) { throw ('PawnIO_setup.exe hat eine unerwartete Prüfsumme ({0}…), nicht übernommen.' -f $h.Substring(0, 12)) }
+        if ($h -ne $script:PawnIoPin.SHA256) { throw ('PawnIO_setup.exe hat eine unerwartete Prüfsumme ({0}…), nicht übernommen.' -f $h.Substring(0, [math]::Min(12, $h.Length))) }
         Copy-Item -LiteralPath $tmp -Destination $pdest -Force -ErrorAction Stop
         Unblock-SensorFile $pdest
         if (-not (Register-Tool -Name 'PawnIO-Setup' -Path $pdest -Lizenz $script:PawnIoPin.Lizenz -Quelle $script:PawnIoPin.Quelle -Herkunft ('von GitHub geholt auf {0}, Prüfsumme bestätigt' -f $env:COMPUTERNAME) -ToolsDir $ToolsDir)) { throw 'Eintrag ins Werkzeug-Manifest fehlgeschlagen.' }
@@ -31085,14 +31541,7 @@ Write-Host ''
 try { Invoke-CrashAnalysis } catch { Write-Warning ('Absturzanalyse des letzten Laufs nicht möglich: {0}' -f $_.Exception.Message); Add-Finding INFO 'Absturzanalyse' ('Die Auswertung des letzten unterbrochenen Laufs schlug fehl: {0}' -f $_.Exception.Message); Remove-Item -LiteralPath $script:CpFlag -Force -ErrorAction SilentlyContinue }
 # Hilfswerkzeuge: Wahl dieses Laufs (Parameter oder je Gerät gespeichert)
 Write-Host ('  Hilfswerkzeuge : {0}' -f $(if ((Get-ToolKeep) -eq 'behalten') { 'auf diesem PC behalten' } else { 'nach dem Lauf entfernen' }))
-# früher behaltene smartmontools entfernen, wenn sie jetzt nicht mehr bleiben sollen
-if ((Test-ToolRemoveKept) -and (Test-KeptTool 'smartmontools')) {
-    $wg = Get-Command winget.exe -ErrorAction SilentlyContinue
-    if ($wg) {
-        $u = Invoke-External -File $wg.Source -Arguments 'uninstall --id smartmontools.smartmontools -e --silent --accept-source-agreements --disable-interactivity' -TimeoutSec 300 -Progress 'smartmontools wird deinstalliert (nicht mehr behalten)' -ExpectedSec 30 -Encoding ([Text.Encoding]::UTF8)
-        if ($u.ExitCode -eq 0) { [void](Set-KeptTool 'smartmontools' $false); $script:ToolNotes.Add('Früher behaltene smartmontools wurden deinstalliert (Einstellung Hilfswerkzeuge: entfernen).') }
-    }
-}
+# früher behaltene smartmontools werden erst am Laufende in Abschluss.ps1 deinstalliert, falls nicht mehr gewünscht
 # PawnIO-Treiber eines abgebrochenen Laufs entfernen (Markierung im Laufzeitordner)
 Remove-PawnIoLeftover
 # vorübergehende Einstellungen eines abgebrochenen Laufs zurücknehmen (GPU-Wahl für winsat.exe)
@@ -31110,7 +31559,10 @@ if ($script:FastMode) { Write-Host '  Schneller Modus: unabhängige Prüfungen l
 $script:Smartctl = Find-Smartctl
 $script:SmartInstallMsg = ''
 $script:SmartLeftInstalled = $false
-if (-not $script:Smartctl -and $ModDiag -and -not $AnalyzeLastRun -and -not $Kurztest -and $InstallSmartmontools) {
+$script:SmartInstalledByUs = $false
+$toolsBinSmartctl = if ($script:DataDir) { Join-Path $script:DataDir 'Tools\smartmontools\bin\smartctl.exe' } else { '' }
+$hasLocalSmartctl = $toolsBinSmartctl -and (Test-Path -LiteralPath $toolsBinSmartctl)
+if (-not $hasLocalSmartctl -and -not $script:Smartctl -and $ModDiag -and -not $AnalyzeLastRun -and -not $Kurztest -and $InstallSmartmontools) {
     $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
     if (-not $winget) {
         $wp = Get-ChildItem "$env:ProgramFiles\WindowsApps\Microsoft.DesktopAppInstaller_*_x64__8wekyb3d8bbwe\winget.exe" -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
@@ -31134,9 +31586,8 @@ if (-not $script:Smartctl -and $ModDiag -and -not $AnalyzeLastRun -and -not $Kur
                     [void](Add-ChangeRecord -Modul 'Diagnose' -Schritt 'SmartmontoolsHolen' -Titel 'smartmontools bleibt auf Wunsch installiert' -Risiko 'Eingriff' -Art 'Programm' -Ziel 'smartmontools (winget)' -Vorher 'nicht installiert' -Nachher 'installiert (behalten)' -Gegenbefehl 'winget uninstall --id smartmontools.smartmontools -e' -NurHinweis)
                     $script:SmartInstallMsg = 'per winget geholt, in den Datenordner übernommen und auf Wunsch auf diesem PC behalten'
                 } else {
-                    $u = Invoke-External -File $winget.Source -Arguments 'uninstall --id smartmontools.smartmontools -e --silent --accept-source-agreements --disable-interactivity' -TimeoutSec 300 -Progress 'smartmontools wird wieder deinstalliert' -ExpectedSec 30 -Encoding ([Text.Encoding]::UTF8)
-                    $script:SmartInstallMsg = $(if ($u.ExitCode -eq 0) { 'per winget geholt, in den Datenordner übernommen und wieder deinstalliert' } else { 'per winget geholt und in den Datenordner übernommen, Deinstallation meldete Code ' + $u.ExitCode })
-                    $script:SmartLeftInstalled = ($u.ExitCode -ne 0)
+                    $script:SmartInstalledByUs = $true
+                    $script:SmartInstallMsg = 'per winget geholt und in den Datenordner übernommen (wird am Laufende deinstalliert)'
                 }
                 $installed = Find-Smartctl
             } catch { $script:SmartLeftInstalled = $true; $script:SmartInstallMsg = 'per winget installiert, Übernahme in den Datenordner fehlgeschlagen: ' + $_.Exception.Message }
@@ -34013,8 +34464,31 @@ Close-SensorSession
 foreach ($t in @($script:SensorNotes | Select-Object -Unique)) { Add-Finding INFO 'Sensoren' $t }
 
 # Werkzeug-Manifest: abgewiesene oder neu aufgenommene Dateien
-foreach ($t in @($script:ToolIssues | Select-Object -Unique)) { Add-Finding WARNUNG 'Werkzeuge' $t }
+if ($script:ToolIssues.Count) {
+    $sl = $(if ($script:DataDir) { Join-Path (Join-Path $script:DataDir 'Laufzeit') 'Start.log' } else { '' })
+    if ($sl -and (Test-Path -LiteralPath (Split-Path $sl -Parent))) {
+        try {
+            $toolLogLines = @($script:ToolIssues | Select-Object -Unique | ForEach-Object { 'WERKZEUGE|{0:yyyy-MM-dd HH:mm:ss}|WARNUNG|{1}' -f (Get-Date), $_ })
+            [IO.File]::AppendAllLines($sl, [string[]]$toolLogLines, (New-Object Text.UTF8Encoding($false)))
+        } catch { }
+    }
+}
 foreach ($t in @($script:ToolNotes | Select-Object -Unique)) { Add-Finding INFO 'Werkzeuge' $t }
+
+# smartmontools deinstallieren, wenn durch uns installiert und nicht behalten werden soll
+if (($script:SmartInstalledByUs -and (Get-ToolKeep) -ne 'behalten') -or ((Test-ToolRemoveKept) -and (Test-KeptTool 'smartmontools'))) {
+    $ok = Uninstall-Smartmontools
+    if ($ok) {
+        if (Test-KeptTool 'smartmontools') {
+            [void](Set-KeptTool 'smartmontools' $false)
+            $script:ToolNotes.Add('Früher behaltene smartmontools wurden deinstalliert (Einstellung Hilfswerkzeuge: entfernen).')
+        }
+        $script:SmartLeftInstalled = $false
+        [void](Add-ChangeRecord -Modul 'Diagnose' -Schritt 'SmartmontoolsEntfernen' -Titel 'smartmontools wieder deinstalliert' -Risiko 'Eingriff' -Art 'Programm' -Ziel 'smartmontools' -Vorher 'installiert' -Nachher 'nicht installiert' -NurHinweis)
+    } else {
+        $script:SmartLeftInstalled = $true
+    }
+}
 
 # ---------- Rückstandskontrolle: auf dem geprüften PC sollen keine Dateien des Werkzeugs bleiben ----------
 # Eintrag im gemeinsamen TEMP-Ordner (Lauf_<PID>, Start_<PID>.log, LeosMinibench_<PID>.ps1): veraltet, wenn der Prozess
@@ -34096,6 +34570,7 @@ function Invoke-ResidueCheck {
     if (Test-KeptTool 'PawnIO') { if (-not @($kept | Where-Object { $_ -match 'PawnIO' }).Count) { [void]$kept.Add('Treiber: PawnIO (auf Wunsch behalten)') } }
     if (Test-KeptTool 'smartmontools') { [void]$kept.Add('smartmontools (per winget installiert, auf Wunsch behalten)') }
     if ($script:SmartLeftInstalled) { [void]$left.Add('smartmontools ist noch installiert (Deinstallation fehlgeschlagen): winget uninstall smartmontools.smartmontools') }
+    if ($script:SmartInstalledByUs -and -not $script:SmartLeftInstalled -and (Get-ToolKeep) -ne 'behalten') { [void]$removed.Add('smartmontools wieder deinstalliert') }
     foreach ($t in @($script:StaleWorkNotes)) { if ($t -match 'nicht entfernbar') { [void]$left.Add($t) } else { [void]$removed.Add($t) } }
 
     if ($removed.Count) { Add-Line '  Entfernt oder verschoben:'; $removed | ForEach-Object { Add-Line ('    ' + $_) } }

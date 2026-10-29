@@ -1,4 +1,4 @@
-﻿#region ---------- Vorbereitung: smartmontools ----------
+#region ---------- Vorbereitung: smartmontools ----------
 $script:SmartLicense = 'GPL-2.0-or-later'
 $script:SmartSource  = 'smartmontools.org, per winget (smartmontools.smartmontools)'
 $script:ToolNotes    = New-Object System.Collections.Generic.List[string]
@@ -21,6 +21,37 @@ function Find-Smartctl {
         }
     }
     return $null
+}
+
+function Uninstall-Smartmontools {
+    $done = $false
+    # 1. NSIS-Uninstaller direkt und strikt lautlos mit /S aufrufen (verhindert interaktive Abfrage-Popups)
+    $candidates = @(
+        "$env:ProgramFiles\smartmontools\uninstall.exe",
+        "${env:ProgramFiles(x86)}\smartmontools\uninstall.exe"
+    ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+    if ($candidates.Count -gt 0) {
+        $uninst = $candidates[0]
+        $r = Invoke-External -File $uninst -Arguments '/S' -TimeoutSec 120 -Progress 'smartmontools wird deinstalliert'
+        if ($r.ExitCode -eq 0 -or -not (Test-Path -LiteralPath $uninst)) {
+            $done = $true
+        }
+    }
+    # 2. Absicherung über winget (falls vorhanden und nötig)
+    $stillThere = @("$env:ProgramFiles\smartmontools\bin\smartctl.exe", "${env:ProgramFiles(x86)}\smartmontools\bin\smartctl.exe") | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+    if ($stillThere.Count -gt 0) {
+        $wg = Get-Command winget.exe -ErrorAction SilentlyContinue
+        if (-not $wg) {
+            $wp = Get-ChildItem "$env:ProgramFiles\WindowsApps\Microsoft.DesktopAppInstaller_*_x64__8wekyb3d8bbwe\winget.exe" -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
+            if ($wp) { $wg = [pscustomobject]@{ Source = $wp.FullName } }
+        }
+        if ($wg) {
+            $u = Invoke-External -File $wg.Source -Arguments 'uninstall --id smartmontools.smartmontools -e --silent --disable-interactivity --accept-source-agreements' -TimeoutSec 180 -Progress 'smartmontools-Paket wird entfernt'
+            if ($u.ExitCode -eq 0) { $done = $true }
+        }
+    }
+    $stillThereAfter = @("$env:ProgramFiles\smartmontools\bin\smartctl.exe", "${env:ProgramFiles(x86)}\smartmontools\bin\smartctl.exe") | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+    return ($stillThereAfter.Count -eq 0)
 }
 #endregion
 

@@ -142,10 +142,283 @@ $script:EmbeddedReferences = @{
     'Desktop_HighEnd.json' = @'
 {
     "Format":  "PC-Diagnose-DB/2",
-    "Name":  "Referenz: Desktop High-End (Ryzen 7600X, RX 6800)",
+    "Name":  "Referenz: Desktop High-End (Ryzen 9800X3D, RTX 5080)",
     "Computer":  "Referenz-Desktop-HighEnd",
     "Geraet":  {
                    "Id":  "REF-REFERENZ-DESKTOP-HIGHEND",
+                   "Guete":  "hoch",
+                   "Quellen":  [
+                                   "Referenzsystem"
+                               ]
+               },
+    "Datum":  "2026-10-17 12:00",
+    "Version":  "3.85",
+    "Quelle":  "Referenz",
+    "Module":  "Benchmark",
+    "Messdauer":  "normal",
+    "System":  "Desktop High-End (AMD B650E)",
+    "Hardware":  {
+                     "CPU":  "Ryzen 7 9800X3D",
+                     "Kerne":  8,
+                     "Threads":  16,
+                     "RAM":  "64 GB DDR5-6000",
+                     "GPU":  "GeForce RTX 5080",
+                     "IGPU":  null,
+                     "GPUGemessen":  "NVIDIA GeForce RTX 5080",
+                     "Datentraeger":  "Samsung SSD 990 PRO 4TB (3,64 TB, NVMe)",
+                     "Betriebssystem":  "Microsoft Windows 11",
+                     "Mainboard":  "ASUS ROG STRIX B650E-E GAMING WIFI",
+                     "WindowsInstalliert":  null
+                 },
+    "Werte":  {
+                  "GPU|DWM":  28722,
+                  "RAM|Latenz":  80.7,
+                  "GPU|VMB":  487.7,
+                  "CPU|MT":  49750,
+                  "DISK|NVMe4|W1":  59214,
+                  "GPU|REND":  296.6,
+                  "GPU|REND1":  73.3,
+                  "DISK|NVMe4|R8":  177715,
+                  "GPU|REND01":  73.1,
+                  "RAM|Kopieren":  24.6,
+                  "DISK|NVMe4|SR":  7443,
+                  "RAM|Schreiben":  30.4,
+                  "CPU|ST":  3282,
+                  "CPU|AES":  1454,
+                  "GPU|STUTTERREL":  14,
+                  "CPU|SHA":  2561,
+                  "GPU|RPKT":  27335,
+                  "RAM|Lesen":  65.3,
+                  "DISK|NVMe4|R1":  20590,
+                  "CPU|DEFL":  380,
+                  "DISK|NVMe4|SW":  6361
+              },
+    "Messwerte":  {
+                      "CPU|AMD Ryzen 7 9800X3D 8-Core Processor|ST":  3282,
+                      "CPU|AMD Ryzen 7 9800X3D 8-Core Processor|MT":  49750,
+                      "CPU|AMD Ryzen 7 9800X3D 8-Core Processor|AES":  1454,
+                      "CPU|AMD Ryzen 7 9800X3D 8-Core Processor|SHA":  2561,
+                      "CPU|AMD Ryzen 7 9800X3D 8-Core Processor|DEFL":  380,
+                      "RAM|64GB|6000|Lesen":  65.3,
+                      "RAM|64GB|6000|Schreiben":  30.4,
+                      "RAM|64GB|6000|Kopieren":  24.6,
+                      "RAM|64GB|6000|Latenz":  80.7,
+                      "GPU|NVIDIA GeForce RTX 5080|VMB":  487.7,
+                      "GPU|NVIDIA GeForce RTX 5080|DWM":  28722,
+                      "GPU|NVIDIA GeForce RTX 5080|REND|1280x720":  296.6,
+                      "GPU|NVIDIA GeForce RTX 5080|REND1|1280x720":  73.3,
+                      "GPU|NVIDIA GeForce RTX 5080|REND01|1280x720":  73.1,
+                      "GPU|NVIDIA GeForce RTX 5080|STUTTER":  0,
+                      "GPU|NVIDIA GeForce RTX 5080|STUTTERREL":  14.01,
+                      "GPU|NVIDIA GeForce RTX 5080|RPKT":  27335,
+                      "DISK|0025_3849_5140_69D7.|Samsung SSD 990 PRO 4TB|SR":  7443,
+                      "DISK|0025_3849_5140_69D7.|Samsung SSD 990 PRO 4TB|SW":  6361,
+                      "DISK|0025_3849_5140_69D7.|Samsung SSD 990 PRO 4TB|R1":  20590,
+                      "DISK|0025_3849_5140_69D7.|Samsung SSD 990 PRO 4TB|R8":  177715,
+                      "DISK|0025_3849_5140_69D7.|Samsung SSD 990 PRO 4TB|W1":  59214
+                  },
+    "Ordner":  "",
+    "Laufwerke":  [
+                      {
+                          "Laufwerk":  "Samsung SSD 990 PRO 4TB (C:)",
+                          "Klasse":  "NVMe PCIe 4.0 x4",
+                          "SR":  7443,
+                          "SW":  6361,
+                          "R1":  20590,
+                          "R8":  177715,
+                          "W1":  59214
+                      }
+                  ],
+    "Befunde":  {
+                    "Kritisch":  0,
+                    "Warnungen":  0,
+                    "Hinweise":  0,
+                    "Liste":  [
+
+                              ]
+                },
+    "Lasttest":  {
+                     "CpuTempMax":  58,
+                     "GpuTempMax":  54,
+                     "CpuWMax":  87,
+                     "GpuWMax":  285,
+                     "Drosselung":  "keine",
+                     "Taktstabilitaet":  99,
+                     "TaktAbfall":  1
+                 },
+    "Rendertest":  [
+                       {
+                           "Grafik":  "NVIDIA GeForce RTX 5080",
+                           "Art":  "dGPU",
+                           "Aufloesung":  "1280x720",
+                           "Fps":  296.6,
+                           "Low1":  73.3,
+                           "Punkte":  27335,
+                           "Bildfehler":  0,
+                           "Treiberreset":  false,
+                           "Fehler":  ""
+                       }
+                   ],
+    "Schreibzugriffe":  null,
+    "Ablauf":  "normal",
+    "Sensoren":  {
+                     "Benchmark":  {
+                                       "CpuTempLeerlauf":  38.5,
+                                       "CpuTempMax":  48.1,
+                                       "TjMax":  null,
+                                       "CpuWMax":  86.5,
+                                       "CpuMHzMax":  5225,
+                                       "Gpu":  "NVIDIA GeForce RTX 5080",
+                                       "GpuTempMax":  53.7,
+                                       "GpuWMax":  284.4,
+                                       "IGpu":  "",
+                                       "IGpuTempMax":  null,
+                                       "IGpuWMax":  null,
+                                       "LuefterMax":  1720,
+                                       "DatentraegerTempMax":  40.9,
+                                       "Messpunkte":  46,
+                                       "Quelle":  "Quellen: LibreHardwareMonitor 0.9.6, nvidia-smi, Windows-Leistungszähler, ACPI; Treiber: PawnIO 2.2.0.0 (bereits vorhanden)",
+                                       "Abschnitte":  [
+                                                          {
+                                                              "Teil":  "Prozessor",
+                                                              "CpuTempMax":  48.1,
+                                                              "CpuWMax":  86.5,
+                                                              "CpuMHzAvg":  4838,
+                                                              "GpuTempMax":  26.8,
+                                                              "GpuWMax":  36.2
+                                                          },
+                                                          {
+                                                              "Teil":  "Arbeitsspeicher",
+                                                              "CpuTempMax":  47.4,
+                                                              "CpuWMax":  75,
+                                                              "CpuMHzAvg":  5054,
+                                                              "GpuTempMax":  25.7,
+                                                              "GpuWMax":  21.5
+                                                          },
+                                                          {
+                                                              "Teil":  "Grafik",
+                                                              "CpuTempMax":  47.4,
+                                                              "CpuWMax":  64.6,
+                                                              "CpuMHzAvg":  4883,
+                                                              "GpuTempMax":  53.7,
+                                                              "GpuWMax":  284.4
+                                                          },
+                                                          {
+                                                              "Teil":  "Datenträger",
+                                                              "CpuTempMax":  42.4,
+                                                              "CpuWMax":  53.5,
+                                                              "CpuMHzAvg":  4754,
+                                                              "GpuTempMax":  35.5,
+                                                              "GpuWMax":  54.4
+                                                          }
+                                                      ]
+                                   },
+                     "Verbrauch":  {
+                                       "IsNotebook":  false,
+                                       "Leerlauf":  {
+                                                        "Verfuegbar":  true,
+                                                        "Text":  "~56 W",
+                                                        "P_AC":  56,
+                                                        "P_DC":  45,
+                                                        "CpuW":  15.6,
+                                                        "GpuW":  12,
+                                                        "RamW":  3,
+                                                        "BoardW":  10,
+                                                        "DiskW":  1.8,
+                                                        "FanW":  1.8,
+                                                        "VrmW":  0.8,
+                                                        "Wirkungsgrad":  0.8054,
+                                                        "WirkungsgradProzent":  80.5,
+                                                        "LoadPercent":  6.9,
+                                                        "PsuWattage":  650,
+                                                        "PsuRating":  "80 PLUS Bronze",
+                                                        "IsNotebook":  false,
+                                                        "Aufschluesselung":  "Gemessen: CPU 16 W, GPU 12 W + Wandler/VRM 0,8 W, Mainboard 10 W, RAM 3,0 W (2 DIMMs), Datenträger 1,8 W, Lüfter 1,8 W (3 Lüfter) = intern ~45 W | ~56 W an der Steckdose (intern ~45 W | PSU-Last ~7 % @ ~80,5 % Effizienz [650 W, 80 PLUS Bronze])",
+                                                        "AufschluesselungKurz":  "~56 W an der Steckdose (intern ~45 W | PSU-Last ~7 % @ ~80,5 % Effizienz [650 W, 80 PLUS Bronze])"
+                                                    },
+                                       "Teillast":  {
+                                                        "Verfuegbar":  true,
+                                                        "Text":  "~106 W",
+                                                        "P_AC":  106,
+                                                        "P_DC":  89.2,
+                                                        "CpuW":  35.6,
+                                                        "GpuW":  27,
+                                                        "RamW":  5,
+                                                        "BoardW":  12,
+                                                        "DiskW":  3,
+                                                        "FanW":  3,
+                                                        "VrmW":  3.6,
+                                                        "Wirkungsgrad":  0.843,
+                                                        "WirkungsgradProzent":  84.3,
+                                                        "LoadPercent":  13.7,
+                                                        "PsuWattage":  650,
+                                                        "PsuRating":  "80 PLUS Bronze",
+                                                        "IsNotebook":  false,
+                                                        "Aufschluesselung":  "Gemessen: CPU 36 W, GPU 27 W + Wandler/VRM 3,6 W, Mainboard 12 W, RAM 5,0 W (2 DIMMs), Datenträger 3,0 W, Lüfter 3,0 W (3 Lüfter) = intern ~89 W | ~106 W an der Steckdose (intern ~89 W | PSU-Last ~14 % @ ~84,3 % Effizienz [650 W, 80 PLUS Bronze])",
+                                                        "AufschluesselungKurz":  "~106 W an der Steckdose (intern ~89 W | PSU-Last ~14 % @ ~84,3 % Effizienz [650 W, 80 PLUS Bronze])"
+                                                    },
+                                       "Gaming":  {
+                                                      "Verfuegbar":  true,
+                                                      "Text":  "~438 W",
+                                                      "P_AC":  438,
+                                                      "P_DC":  384.8,
+                                                      "CpuW":  64.9,
+                                                      "GpuW":  284.4,
+                                                      "RamW":  8,
+                                                      "BoardW":  14,
+                                                      "DiskW":  2.5,
+                                                      "FanW":  4.5,
+                                                      "VrmW":  6.5,
+                                                      "Wirkungsgrad":  0.8795,
+                                                      "WirkungsgradProzent":  87.9,
+                                                      "LoadPercent":  59.2,
+                                                      "PsuWattage":  650,
+                                                      "PsuRating":  "80 PLUS Bronze",
+                                                      "IsNotebook":  false,
+                                                      "Aufschluesselung":  "Gemessen: CPU 65 W, GPU 284 W + Wandler/VRM 6,5 W, Mainboard 14 W, RAM 8,0 W (2 DIMMs), Datenträger 2,5 W, Lüfter 4,5 W (3 Lüfter) = intern ~385 W | ~438 W an der Steckdose (intern ~385 W | PSU-Last ~59 % @ ~87,9 % Effizienz [650 W, 80 PLUS Bronze])",
+                                                      "AufschluesselungKurz":  "~438 W an der Steckdose (intern ~385 W | PSU-Last ~59 % @ ~87,9 % Effizienz [650 W, 80 PLUS Bronze])"
+                                                  },
+                                       "Volllast":  {
+                                                        "Verfuegbar":  true,
+                                                        "Text":  "~469 W",
+                                                        "P_AC":  469,
+                                                        "P_DC":  411.5,
+                                                        "CpuW":  86.5,
+                                                        "GpuW":  284.4,
+                                                        "RamW":  8,
+                                                        "BoardW":  14,
+                                                        "DiskW":  5.5,
+                                                        "FanW":  4.5,
+                                                        "VrmW":  8.6,
+                                                        "Wirkungsgrad":  0.877,
+                                                        "WirkungsgradProzent":  87.7,
+                                                        "LoadPercent":  63.3,
+                                                        "PsuWattage":  650,
+                                                        "PsuRating":  "80 PLUS Bronze",
+                                                        "IsNotebook":  false,
+                                                        "Aufschluesselung":  "Gemessen: CPU 87 W, GPU 284 W + Wandler/VRM 8,6 W, Mainboard 14 W, RAM 8,0 W (2 DIMMs), Datenträger 5,5 W, Lüfter 4,5 W (3 Lüfter) = intern ~412 W | ~469 W an der Steckdose (intern ~412 W | PSU-Last ~63 % @ ~87,7 % Effizienz [650 W, 80 PLUS Bronze])",
+                                                        "AufschluesselungKurz":  "~469 W an der Steckdose (intern ~412 W | PSU-Last ~63 % @ ~87,7 % Effizienz [650 W, 80 PLUS Bronze])"
+                                                    },
+                                       "Effizienz":  {
+                                                         "CpuMT_PerWatt":  575.1,
+                                                         "Gpu_PerWatt":  1.04,
+                                                         "System_PerWatt":  41.6
+                                                     },
+                                       "PsuWattage":  650,
+                                       "PsuRating":  "80 PLUS Bronze"
+                                   }
+                 },
+    "Optimierung":  null,
+    "Akku":  null
+}
+'@
+    'Desktop_HighEnd_RX6800.json' = @'
+{
+    "Format":  "PC-Diagnose-DB/2",
+    "Name":  "Referenz: Desktop High-End (Ryzen 7600X, RX 6800)",
+    "Computer":  "Referenz-Desktop-HighEnd-RX6800",
+    "Geraet":  {
+                   "Id":  "REF-REFERENZ-DESKTOP-HIGHEND-RX6800",
                    "Guete":  "hoch",
                    "Quellen":  [
                                    "Referenzsystem"
@@ -748,6 +1021,118 @@ $script:EmbeddedReferences = @{
                  },
     "Optimierung":  null,
     "Akku":  null
+}
+'@
+    'Referenz_Desktop.json' = @'
+{
+  "Format": "PC-Diagnose-DB/2",
+  "Name": "Referenz: Median Desktop-PCs (4 Systeme)",
+  "Computer": "Referenz-Desktop-Median",
+  "Datum": "2026-10-29",
+  "Version": "3.85",
+  "Quelle": "Vergleichsdatenbank",
+  "Hardware": {
+    "CPU": "Desktop Median-Referenz",
+    "RAM": "32 GB DDR4/DDR5",
+    "GPU": "Desktop-Grafik Median",
+    "Datentraeger": "NVMe SSD",
+    "Betriebssystem": "Microsoft Windows 11",
+    "Mainboard": "Desktop Mainboard",
+    "WindowsInstalliert": "",
+    "Kerne": 6,
+    "Threads": 12
+  },
+  "Werte": {
+    "CPU|AES": 1294,
+    "CPU|DEFL": 270,
+    "CPU|MT": 35314,
+    "CPU|SHA": 2364,
+    "CPU|ST": 2912,
+    "DISK|HDD|R1": 96,
+    "DISK|HDD|R8": 165,
+    "DISK|HDD|SR": 121,
+    "DISK|HDD|SW": 128,
+    "DISK|HDD|W1": 821,
+    "DISK|NVMe3|R1": 14090,
+    "DISK|NVMe3|R8": 108045,
+    "DISK|NVMe3|SR": 3114,
+    "DISK|NVMe3|SW": 2910,
+    "DISK|NVMe3|W1": 35518,
+    "DISK|NVMe4|R1": 17384,
+    "DISK|NVMe4|R8": 148780,
+    "DISK|NVMe4|SR": 6997,
+    "DISK|NVMe4|SW": 4570,
+    "DISK|NVMe4|W1": 55940,
+    "DISK|SATA-SSD|R1": 9878,
+    "DISK|SATA-SSD|R8": 63332,
+    "DISK|SATA-SSD|SR": 555,
+    "DISK|SATA-SSD|SW": 526,
+    "DISK|SATA-SSD|W1": 21824,
+    "GPU|DWM": 12006,
+    "GPU|REND": 103.8,
+    "GPU|REND01": 73.1,
+    "GPU|REND1": 67.8,
+    "GPU|RPKT": 9571,
+    "GPU|STUTTERREL": 14,
+    "GPU|VMB": 203.9,
+    "RAM|Kopieren": 17.8,
+    "RAM|Latenz": 95.1,
+    "RAM|Lesen": 45.4,
+    "RAM|Schreiben": 21.9
+  },
+  "Herkunft": {
+    "CPU|AES": "Median aus 4 Systemen",
+    "CPU|DEFL": "Median aus 4 Systemen",
+    "CPU|MT": "Median aus 4 Systemen",
+    "CPU|SHA": "Median aus 4 Systemen",
+    "CPU|ST": "Median aus 4 Systemen",
+    "DISK|HDD|R1": "Median aus 2 Systemen",
+    "DISK|HDD|R8": "Median aus 2 Systemen",
+    "DISK|HDD|SR": "Median aus 2 Systemen",
+    "DISK|HDD|SW": "Median aus 2 Systemen",
+    "DISK|HDD|W1": "Median aus 2 Systemen",
+    "DISK|NVMe3|R1": "Median aus 3 Systemen",
+    "DISK|NVMe3|R8": "Median aus 3 Systemen",
+    "DISK|NVMe3|SR": "Median aus 3 Systemen",
+    "DISK|NVMe3|SW": "Median aus 3 Systemen",
+    "DISK|NVMe3|W1": "Median aus 3 Systemen",
+    "DISK|NVMe4|R1": "Median aus 2 Systemen",
+    "DISK|NVMe4|R8": "Median aus 2 Systemen",
+    "DISK|NVMe4|SR": "Median aus 2 Systemen",
+    "DISK|NVMe4|SW": "Median aus 2 Systemen",
+    "DISK|NVMe4|W1": "Median aus 2 Systemen",
+    "DISK|SATA-SSD|R1": "Median aus 2 Systemen",
+    "DISK|SATA-SSD|R8": "Median aus 2 Systemen",
+    "DISK|SATA-SSD|SR": "Median aus 2 Systemen",
+    "DISK|SATA-SSD|SW": "Median aus 2 Systemen",
+    "DISK|SATA-SSD|W1": "Median aus 2 Systemen",
+    "GPU|DWM": "Median aus 4 Systemen",
+    "GPU|REND": "Median aus 4 Systemen",
+    "GPU|REND01": "Median aus 1 Systemen",
+    "GPU|REND1": "Median aus 4 Systemen",
+    "GPU|RPKT": "Median aus 4 Systemen",
+    "GPU|STUTTERREL": "Median aus 1 Systemen",
+    "GPU|VMB": "Median aus 4 Systemen",
+    "RAM|Kopieren": "Median aus 4 Systemen",
+    "RAM|Latenz": "Median aus 4 Systemen",
+    "RAM|Lesen": "Median aus 4 Systemen",
+    "RAM|Schreiben": "Median aus 4 Systemen"
+  },
+  "Befunde": {
+    "Kritisch": 0,
+    "Warnungen": 0,
+    "Hinweise": 0,
+    "Liste": []
+  },
+  "Lasttest": {
+    "CpuTempMax": 75,
+    "GpuTempMax": 68,
+    "CpuWMax": 85,
+    "GpuWMax": 160,
+    "Drosselung": "keine",
+    "Taktstabilitaet": 98,
+    "TaktAbfall": 2
+  }
 }
 '@
     'Workstation_Mobil.json' = @'

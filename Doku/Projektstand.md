@@ -2,7 +2,18 @@
 
 Gemeinsamer Stand fÃƒÂ¼r alle Agenten (Claude, Antigravity). Wird am Ende jeder Version aktualisiert (siehe AGENTS.md).
 
-## Stand: Version 3.84 (28.10.2026)
+## Stand: Version 3.85 (29.10.2026)
+Release v3.85: Sensor-Manifest-Selbstreparatur, lautloser Smartctl-Lifecycle, RTX 5080 Referenz & UI-Standards auf https://github.com/miniLeonardo/MiniBench (Zweig main).
+Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.
+
+Inhalt von 3.85 (Einzelheiten in Doku\Änderungen_v3.85.txt):
+1. Manifest-Selbstreparatur für Sensoren & Tools: Erkennung und automatische Selbstreparatur leerer SHA-256-Prüfsummen ("") in Tools.json (LibreHardwareMonitor und PawnIO); lautloser Abgleich gegen hinterlegte Release-Hashes verhindert Fehlalarme.
+2. Bereinigung des Diagnoseberichts: Technische Werkzeug- und Treiberwarnungen ($script:ToolIssues) werden in Start.log verlagert und belasten den kundenorientierten Diagnosebericht nicht mehr.
+3. Lautloser Smartmontools-Lifecycle: Bevorzugung vorhandener smartctl.exe im Tools-Ordner ohne winget-Aufrufe; Deinstallation ausschließlich am Gesamtlaufende mit striktem NSIS-Silent-Schalter (/S) ohne Dialogfenster.
+4. UI-Standards & Ablauf-Optimierung: Schaltfläche in der Laufansicht in „Zurück“ umbenannt; Grafikstresstest und parallele lesende Hintergrundprüfungen standardmäßig aktiviert.
+5. High-End-Referenz RTX 5080 & Desktop-Median: Modernisierung von Desktop_HighEnd.json auf AMD Ryzen 7 9800X3D und NVIDIA GeForce RTX 5080; RX 6800 als weiteres Profil (Desktop_HighEnd_RX6800.json) erhalten; Desktop-Median (Referenz_Desktop.json) neu berechnet und autark eingebettet.
+
+## Vorher: Version 3.84 (28.10.2026)
 Release-Commit "Release v3.84: GitHub-Härtung, granulare Umzugs-Messung, lautloser Sensoren-Lifecycle & Text-Feinschliff" (Commit ce16931) auf https://github.com/miniLeonardo/MiniBench (Zweig main).
 Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.
 
@@ -12,7 +23,6 @@ Inhalt von 3.84 (Einzelheiten in Doku\Änderungen_v3.84.txt):
 3. Echte Größenmessung beim Schnell-Scan: Beseitigung statischer 2-GB-Pauschalen; exakte Ordnergrößenermittlung in Bytes für alle Bibliotheken und C:\-Zusatzordner mit dynamischer Größenbeschriftung und Speicherplatzkalkulation.
 4. Lautloser Sensoren-Lifecycle: Unterdrückung interaktiver Deinstallationsdialoge von PawnIO via /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /S -uninstall -silent; Treiber bleibt während des gesamten Mehrfachlaufs im Speicher und wird ausschließlich am Gesamtlaufende freigegeben; Protokollierung ohne modale Fehlerdialoge.
 5. Text- & Oberflächen-Feinschliff: Checkbox chkAnon als „Personenbezogene Daten entfernen“ beschriftet; Seite Versionen vollständig von Mojibake befreit und auf übersichtliche Stichpunkte (•) umgestellt.
-
 ## Vorher: Version 3.83 (23.10.2026)
 Release-Commit "Initial commit: Leos Minibench v3.83" (Commit b7ee742) auf https://github.com/miniLeonardo/MiniBench.
 Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.

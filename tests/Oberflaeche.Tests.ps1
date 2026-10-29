@@ -149,4 +149,11 @@ Describe 'Projektregeln der Oberfläche' {
     It 'Hinweise ohne Spiegelstrich-Aufzählung' {
         foreach ($m in [regex]::Matches($script:Gui, 'Tip\([^,]+, "([^"]+)"')) { $m.Groups[1].Value | Should -Not -Match '(^|\\n)\s*[-–] ' }
     }
+    It 'v3.85 Oberflächen-Standards: Zurück-Button, Lasttest-Grafik & parallele Prüfungen' {
+        $script:Gui | Should -Match 'btnNew = UI\.Secondary\("Zurück"\);'
+        $script:Gui | Should -Match 'Tip\(btnNew, "Kehrt zur Startseite und den Ablauf-Einstellungen zurück\."\);'
+        $script:Gui | Should -Match 'chkFast = Chk\("Lesende Prüfungen parallel ausführen", true\);'
+        $script:Gui | Should -Match 'chkLGpu = Chk\("Grafik", true\);'
+        $script:Gui | Should -Match 'if \(chkLGpu != null\) chkLGpu\.Checked = true;'
+    }
 }

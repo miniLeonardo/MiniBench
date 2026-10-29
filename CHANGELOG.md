@@ -2,6 +2,18 @@
 
 Alle wesentlichen Ã„nderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v3.85 (29.10.2026)
+
+### Neu
+* **High-End-Referenzsystem RTX 5080 & Desktop-Median:** Integration des High-End-Referenzsystems mit AMD Ryzen 7 9800X3D und NVIDIA GeForce RTX 5080 (Desktop_HighEnd.json). Das bisherige RX 6800-System bleibt als Desktop_HighEnd_RX6800.json in der Datenbank und Referenzauswahl erhalten. Der Desktop-Median (Referenz_Desktop.json) wurde über alle 4 Referenzsysteme neu berechnet und autark in das Skript eingebettet.
+
+### Verbessert
+* **UI-Standards & Ablauf-Optimierung:** Die Abschluss-Schaltfläche in der Laufansicht wurde von „Neuer Lauf“ in „Zurück“ umbenannt mit passendem Hinweis zur Rückkehr zur Startseite. Parallele lesende Prüfungen (chkFast) sind für zeitsparende Durchläufe auf Mehrkern-CPUs standardmäßig aktiviert. Der Grafikstresstest (chkLGpu) ist im Lasttest-Modul sowie in den Standardaufgaben „PC durchchecken“ und „Stabilität prüfen“ standardmäßig vorausgewählt.
+* **Saubere Trennung von Diagnosebericht & internem Protokoll:** Technische Prüfsummenabweichungen oder fehlende optionale Sensortreiber werden ausschließlich im internen Ausführungsprotokoll (Start.log) erfasst und überfluten den kundenorientierten Diagnosebericht nicht mehr mit irreführenden [WARNUNG]-Meldungen.
+
+### Behoben
+* **Sensor-Manifest Selbstreparatur:** Fehlalarme durch leere SHA-256-Prüfsummen ("") im Manifest Tools.json für LibreHardwareMonitor und PawnIO behoben. Register-PinnedSensorTools und Get-VerifiedTool reparieren fehlerhafte oder leere Manifest-Einträge bei übereinstimmendem Datei-Hash lautlos zur Laufzeit.
+* **Lautloser Smartctl-Lifecycle:** NSIS-Deinstallationsfenster von smartmontools während des Programmlaufs dauerhaft unterdrückt. Eine im Ordner Minibench-Daten\Tools\smartmontools\bin\ vorhandene smartctl.exe wird direkt verwendet, ohne winget aufzurufen. Erforderliche Deinstallationen finden ausschließlich am Gesamtlaufende in Abschluss.ps1 mit striktem Silent-Schalter (/S) statt.
 ## v3.84 (28.10.2026)
 
 ### Neu

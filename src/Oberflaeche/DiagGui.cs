@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -1114,7 +1114,7 @@ public partial class DiagGui : Form
         Tip(btnHtml, "Öffnet den Bericht im Browser.");
         Tip(btnFolder, "Öffnet den Berichtsordner dieses Laufs (Bericht, KI-Dateien, Anhang.zip).");
         Tip(btnExportRun, "Exportiert diesen Durchlauf als gepackte .minibench-Datei für den Austausch oder das Archiv.");
-        Tip(btnNew, "Zurück zur Auswahl für einen neuen Lauf.");
+        Tip(btnNew, "Kehrt zur Startseite und den Ablauf-Einstellungen zurück.");
         Tip(btnKi, "Zeigt die KI-Datei im Explorer. Sie enthält Auftrag, Bericht und Rohdaten und lässt sich in ein KI-Modell hochladen.");
         Tip(cardK, "Kritische Befunde: Datenverlust oder Instabilität möglich, bald handeln.");
         Tip(cardW, "Warnungen: sollten behoben werden.");
@@ -1345,7 +1345,7 @@ public partial class DiagGui : Form
         }
         f.Controls.Add(seg);
         lblDiagProfil = Hint("", 4); f.Controls.Add(lblDiagProfil);
-        chkFast = Chk("Lesende Prüfungen parallel ausführen", false);
+        chkFast = Chk("Lesende Prüfungen parallel ausführen", true);
         chkFast.CheckedChanged += delegate { UpdateSummary(); };
         Control fastBox = Opt2(chkFast, "Updatesuche, Defender-Schnellscan, Energieanalyse und SMART-Langtest laufen nebenher. Messungen bleiben exklusiv, damit die Werte vergleichbar sind.");
         fastBox.Margin = new Padding(0, UI.S(UI.Abstand2), 0, 0); f.Controls.Add(fastBox);
@@ -1646,7 +1646,7 @@ public partial class DiagGui : Form
         Label lPct = CellLabel("Anteil am freien RAM", 150);
         AddLoadRow(t, 2, chkLRam, "Mustertest mit Bitfehlerprüfung", cmbLRam, new Control[] { SettingRow(lPct, cmbLRamPct) });
 
-        chkLGpu = Chk("Grafik", false); cmbLGpu = Combo(110, mins, 0);
+        chkLGpu = Chk("Grafik", true); cmbLGpu = Combo(110, mins, 0);
         cmbLGpuSel = Combo(260, GpuChoiceTexts(), 0);
         cmbLGpuRes = Combo(120, new string[] { "1280x720", "1920x1080" }, 0);
         cmbLGpuShow = Combo(140, new string[] { "Fenster", "Vollbild", "ohne Anzeige" }, 0);
@@ -3514,7 +3514,7 @@ public partial class DiagGui : Form
         lblResult = Lbl("", 10.5f, true, UI.Text); lblResult.Anchor = AnchorStyles.Left; lblResult.AutoEllipsis = true;
         FlowLayoutPanel btns = new FlowLayoutPanel(); btns.AutoSize = true; btns.WrapContents = false; btns.BackColor = UI.Bg; btns.Anchor = AnchorStyles.Right;
         btnStopWait = UI.Secondary("Test beenden"); btnSkipStep = UI.SkipStepButton(); btnCancel = UI.Secondary("Abbrechen");
-        btnFolder = UI.Secondary("Ordner öffnen"); btnNew = UI.Secondary("Neuer Lauf"); btnKi = UI.Secondary("KI-Datei zeigen");
+        btnFolder = UI.Secondary("Ordner öffnen"); btnNew = UI.Secondary("Zurück"); btnKi = UI.Secondary("KI-Datei zeigen");
         btnExportRun = UI.Secondary("Lauf exportieren …"); btnHtml = UI.Primary("Bericht öffnen");
         btnHtml.Margin = new Padding(UI.S(UI.Abstand5), 0, 0, 0); btnHtml.MinimumSize = new Size(UI.S(150), UI.S(44));
         foreach (Button sb in new Button[] { btnStopWait, btnSkipStep, btnCancel, btnFolder, btnNew, btnKi, btnExportRun }) { sb.Margin = new Padding(UI.S(8), UI.S(6), 0, 0); sb.MinimumSize = new Size(0, UI.S(32)); }

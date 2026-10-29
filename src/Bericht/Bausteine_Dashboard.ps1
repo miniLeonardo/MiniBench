@@ -957,7 +957,7 @@ function Export-BenchDashboardData {
         if ($script:EmbeddedReferences -and $script:EmbeddedReferences.Count -gt 0) {
             $refDict = $script:EmbeddedReferences
         } else {
-            $refFiles = @('Desktop_HighEnd.json', 'Desktop_Mittelklasse.json', 'MiniPC_APU.json', 'Notebook_Standard.json', 'Workstation_Mobil.json')
+            $refFiles = @('Desktop_HighEnd.json', 'Desktop_HighEnd_RX6800.json', 'Desktop_Mittelklasse.json', 'Desktop_GTX1070.json', 'MiniPC_APU.json', 'Notebook_Standard.json', 'Referenz_Desktop.json', 'Workstation_Mobil.json')
             foreach ($rf in $refFiles) {
                 $cand = Join-Path (Join-Path (Get-Location) 'src\Daten\Referenzen') $rf
                 if (Test-Path -LiteralPath $cand) {

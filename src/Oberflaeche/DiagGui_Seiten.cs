@@ -1,4 +1,4 @@
-﻿// Seiten der grafischen Oberfläche: Versionen und Änderungen (Teilklasse DiagGui)
+// Seiten der grafischen Oberfläche: Versionen und Änderungen (Teilklasse DiagGui)
 public partial class DiagGui
 {
     Control BuildVersionPage()
@@ -2692,6 +2692,9 @@ public partial class DiagGui
             if (nav.Count > 2) nav[2].Checked = true;
             if (nav.Count > 3) nav[3].Checked = true;
             if (rbVoll != null) rbVoll.Checked = true;
+            if (chkLCpu != null) chkLCpu.Checked = true;
+            if (chkLRam != null) chkLRam.Checked = true;
+            if (chkLGpu != null) chkLGpu.Checked = true;
             ShowPage(1);
         }
         else if (name == "Leistung messen")
@@ -2702,6 +2705,9 @@ public partial class DiagGui
         else if (name == "Stabilität prüfen")
         {
             if (nav.Count > 3) nav[3].Checked = true;
+            if (chkLCpu != null) chkLCpu.Checked = true;
+            if (chkLRam != null) chkLRam.Checked = true;
+            if (chkLGpu != null) chkLGpu.Checked = true;
             ShowPage(3);
         }
         else if (name == "Pflegen und beschleunigen")

@@ -5,6 +5,14 @@ Neueste Version zuerst. Einzelheiten je Version in Doku\Ã„nderungen_vX.Y.txt 
 keine Ã„nderungsdateien mehr; die EintrÃ¤ge nennen nur, was im Quelltext und in den Ã„nderungen zu 2.2 belegt ist.
 Die Liste steht auch im Programm (Info-Knopf oben rechts, Quelle: src\Oberflaeche\Versionen.cs).
 
+VERSION 3.85   (29.10.2026)  SENSOR-MANIFEST-SELBSTREPARATUR, LAUTLOSER SMARTCTL-LIFECYCLE, RTX 5080 REFERENZ & UI-STANDARDS
+====================================================================================================
+• Manifest-Selbstreparatur für Sensoren & Tools: Automatische Korrektur von leeren Prüfsummen im Manifest Tools.json für LibreHardwareMonitor und PawnIO; lautloser Abgleich gegen fest hinterlegte Release-Hashes verhindert Fehlalarme.
+• Keine Werkzeug-Warnungen im Kundenbericht: Technische Prüfsummenabweichungen oder fehlende optionale Sensor-Treiber werden im internen Protokoll (Start.log) vermerkt und überfluten den Diagnosebericht nicht mehr mit Warnungen.
+• Lautloser Smartmontools-Lifecycle: Bevorzugung vorhandener smartctl.exe im Tools-Ordner ohne winget-Aufrufe; Deinstallation ausschließlich am Gesamtlaufende mit striktem NSIS-Silent-Schalter (/S) ohne Dialogfenster.
+• UI-Standards & Ablauf-Optimierung: Schaltfläche in der Laufansicht in 'Zurück' umbenannt; Grafikstresstest bei Lasttest sowie Aufgaben 'PC durchchecken' und 'Stabilität prüfen' standardmäßig aktiv; parallele lesende Prüfungen als Standard aktiviert.
+• High-End-Referenz RTX 5080 & Desktop-Median: Modernisierung von Desktop_HighEnd.json auf AMD Ryzen 7 9800X3D und NVIDIA GeForce RTX 5080; RX 6800 als weiteres Profil erhalten; Desktop-Median (Referenz_Desktop.json) neu berechnet und autark eingebettet.
+
 VERSION 3.84   (28.10.2026)  GITHUB-HÄRTUNG, GRANULARE UMZUGS-MESSUNG, LAUTLOSER SENSOREN-LIFECYCLE & TEXT-FEINSCHLIFF
 ====================================================================================================
 • GitHub-Härtung & Git-Disziplin: Striktes Verbot und globale .gitignore-Absicherung für Binärarchive (*.zip, *.7z, *.tar), ausführbare Dateien (*.exe, *.dll, *.sys) und Treiber; Schutz vor automatischen GitHub-Sperren.

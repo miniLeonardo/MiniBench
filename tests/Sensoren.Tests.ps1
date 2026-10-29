@@ -568,6 +568,20 @@ Describe 'Sensorwerkzeuge mit festen Prüfsummen' {
         [IO.File]::WriteAllText((Join-Path $lhm 'LibreHardwareMonitorLib.dll'), 'manipuliert')
         (MinibenchTest\Get-SensorToolState $tools).LhmBereit | Should -BeFalse
     }
+    It 'repariert einen Manifesteintrag mit leerer PrÃ¼fsumme automatisch gegen das offizielle Release' {
+        [void](MinibenchTest\Get-SensorToolState $tools)
+        $mPath = Join-Path $tools 'Tools.json'
+        $mJson = Get-Content $mPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        foreach ($w in $mJson.Werkzeuge) { $w.SHA256 = '' }
+        [IO.File]::WriteAllText($mPath, ($mJson | ConvertTo-Json -Depth 5), [Text.Encoding]::UTF8)
+        $st = MinibenchTest\Get-SensorToolState $tools
+        $st.LhmBereit | Should -BeTrue
+        $st.PawnIoSetup | Should -Be $setup
+        $mRep = Get-Content $mPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $lhmEntry = @($mRep.Werkzeuge | Where-Object { $_.Name -eq 'LibreHardwareMonitor:LibreHardwareMonitorLib.dll' })[0]
+        $lhmEntry.SHA256 | Should -Be ((Get-ModuleVar 'LhmPins')['LibreHardwareMonitorLib.dll'].SHA256)
+        @(Get-ModuleVar 'ToolIssues').Count | Should -Be 0
+    }
     It 'sperrt einen Manifesteintrag, der vom Release abweicht' {
         [void](MinibenchTest\Get-SensorToolState $tools)
         $pins = Get-ModuleVar 'LhmPins'; $pins['HidSharp.dll'].SHA256 = ('0' * 64); Set-ModuleVar 'LhmPins' $pins

@@ -1,4 +1,4 @@
-﻿#region ---------- Portable Werkzeuge mit Manifest ----------
+#region ---------- Portable Werkzeuge mit Manifest ----------
 # Externe Programme auf dem Stick liegen unter Minibench-Daten\Tools. Tools.json hält je Werkzeug Datei, Version,
 # SHA-256, Lizenz und Quelle fest. Ausgeführt wird eine Datei nur, wenn ihr Hash zum Manifest passt; eine veränderte
 # oder ausgetauschte Datei bleibt liegen und erscheint als Befund.
@@ -82,6 +82,23 @@ function Get-VerifiedTool([string]$Name, [string]$ToolsDir = (Get-ToolsDir)) {
     $p = Join-Path $ToolsDir $e.Datei
     if (-not (Test-Path -LiteralPath $p)) { $script:ToolIssues.Add(('{0}: {1} fehlt im Tools-Ordner.' -f $Name, $e.Datei)); return $null }
     $h = Get-FileSha256 $p
+    $curSha = if ($e.SHA256) { [string]$e.SHA256 } else { '' }
+    if (-not $curSha -or $curSha.Trim() -eq '') {
+        $pinSha = $null
+        if ($Name -eq 'PawnIO-Setup' -and $script:PawnIoPin -and $script:PawnIoPin.SHA256) {
+            $pinSha = $script:PawnIoPin.SHA256
+        } elseif ($script:LhmPins -and $Name -like 'LibreHardwareMonitor:*') {
+            $fileKey = $Name.Substring('LibreHardwareMonitor:'.Length)
+            if ($script:LhmPins.Contains($fileKey)) {
+                $pinSha = $script:LhmPins[$fileKey].SHA256
+            }
+        }
+        if ($pinSha -and $h -eq $pinSha) {
+            $e.SHA256 = $h
+            [void](Save-ToolManifest $m $ToolsDir)
+            return $p
+        }
+    }
     if ($h -ne $e.SHA256) {
         $script:ToolIssues.Add(('{0}: {1} passt nicht zum Manifest (SHA-256 {2}… statt {3}…) und wird nicht ausgeführt. Datei neu holen oder bewusst neu aufnehmen.' -f $Name, $e.Datei, $h.Substring(0, 12), ([string]$e.SHA256).Substring(0, [math]::Min(12, ([string]$e.SHA256).Length))))
         return $null

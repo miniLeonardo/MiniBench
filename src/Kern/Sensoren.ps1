@@ -1,4 +1,4 @@
-﻿#region ---------- Sensoren: LibreHardwareMonitor, PawnIO und Ersatzquellen ----------
+#region ---------- Sensoren: LibreHardwareMonitor, PawnIO und Ersatzquellen ----------
 # Temperatur, Takt, Lüfter, Spannung und Leistung kommen bevorzugt aus LibreHardwareMonitorLib (portabel unter
 # Minibench-Daten\Tools\LibreHardwareMonitor). Ab 0.9.5 liest die Bibliothek CPU-Werte und Mainboard-Chips nur über den
 # Treiber PawnIO. Der Treiber wird nie ungefragt installiert: nur mit -SensorTreiber (Rückfrage in der Oberfläche),
@@ -58,11 +58,22 @@ function Register-PinnedSensorTools([string]$ToolsDir = (Get-ToolsDir)) {
     $items = @(foreach ($f in $script:LhmPins.Keys) { [pscustomobject]@{ Name = (Get-LhmToolName $f); Rel = (Join-Path $script:LhmSubDir $f); SHA256 = $script:LhmPins[$f].SHA256; Lizenz = $script:LhmPins[$f].Lizenz; Quelle = $script:LhmSource } })
     $items += [pscustomobject]@{ Name = 'PawnIO-Setup'; Rel = (Join-Path $script:PawnIoPin.Ordner $script:PawnIoPin.Datei); SHA256 = $script:PawnIoPin.SHA256; Lizenz = $script:PawnIoPin.Lizenz; Quelle = $script:PawnIoPin.Quelle }
     foreach ($it in $items) {
-        if ($known.ContainsKey($it.Name)) { continue }
+        if ($known.ContainsKey($it.Name)) {
+            $exSha = if ($known[$it.Name].SHA256) { [string]$known[$it.Name].SHA256 } else { '' }
+            if ($exSha -and $exSha.Length -eq 64 -and $exSha -eq $it.SHA256) { continue }
+            $p = Join-Path $ToolsDir $it.Rel
+            if (-not (Test-Path -LiteralPath $p)) { continue }
+            $h = Get-FileSha256 $p
+            if ($h -eq $it.SHA256) {
+                Unblock-SensorFile $p
+                [void](Register-Tool -Name $it.Name -Path $p -Lizenz $it.Lizenz -Quelle $it.Quelle -Herkunft 'im Tools-Ordner vorgefunden, Manifest repariert (Release-Prüfsumme bestätigt)' -ToolsDir $ToolsDir)
+            }
+            continue
+        }
         $p = Join-Path $ToolsDir $it.Rel
         if (-not (Test-Path -LiteralPath $p)) { continue }
         $h = Get-FileSha256 $p
-        if ($h -ne $it.SHA256) { $script:ToolIssues.Add(('{0}: {1} hat nicht die bekannte Prüfsumme (SHA-256 {2}…) und wird nicht geladen. Nur LibreHardwareMonitor {3} und PawnIO {4} aus den offiziellen Releases sind freigegeben.' -f $it.Name, $it.Rel, $h.Substring(0, 12), $script:LhmVersion, $script:PawnIoPin.Version)); continue }
+        if ($h -ne $it.SHA256) { $script:ToolIssues.Add(('{0}: {1} hat nicht die bekannte Prüfsumme (SHA-256 {2}…) und wird nicht geladen. Nur LibreHardwareMonitor {3} und PawnIO {4} aus den offiziellen Releases sind freigegeben.' -f $it.Name, $it.Rel, $h.Substring(0, [math]::Min(12, $h.Length)), $script:LhmVersion, $script:PawnIoPin.Version)); continue }
         Unblock-SensorFile $p
         [void](Register-Tool -Name $it.Name -Path $p -Lizenz $it.Lizenz -Quelle $it.Quelle -Herkunft 'im Tools-Ordner vorgefunden, Prüfsumme entspricht dem offiziellen Release' -ToolsDir $ToolsDir)
     }
@@ -118,7 +129,7 @@ function Install-SensorTools([string]$ToolsDir = (Get-ToolsDir)) {
         $zip = Join-Path $work 'LibreHardwareMonitor.zip'
         Save-WebFile $script:LhmZip.Url $zip
         $h = Get-FileSha256 $zip
-        if ($h -ne $script:LhmZip.SHA256) { throw ('LibreHardwareMonitor.zip hat eine unerwartete Prüfsumme ({0}…), nichts übernommen.' -f $h.Substring(0, 12)) }
+        if ($h -ne $script:LhmZip.SHA256) { throw ('LibreHardwareMonitor.zip hat eine unerwartete Prüfsumme ({0}…), nichts übernommen.' -f $h.Substring(0, [math]::Min(12, $h.Length))) }
         $ex = Join-Path $work 'lhm'
         Expand-Archive -LiteralPath $zip -DestinationPath $ex -Force -ErrorAction Stop
         foreach ($f in $script:LhmPins.Keys) {
@@ -142,7 +153,7 @@ function Install-SensorTools([string]$ToolsDir = (Get-ToolsDir)) {
         $tmp = Join-Path $work 'PawnIO_setup.exe'
         Save-WebFile $script:PawnIoPin.Url $tmp
         $h = Get-FileSha256 $tmp
-        if ($h -ne $script:PawnIoPin.SHA256) { throw ('PawnIO_setup.exe hat eine unerwartete Prüfsumme ({0}…), nicht übernommen.' -f $h.Substring(0, 12)) }
+        if ($h -ne $script:PawnIoPin.SHA256) { throw ('PawnIO_setup.exe hat eine unerwartete Prüfsumme ({0}…), nicht übernommen.' -f $h.Substring(0, [math]::Min(12, $h.Length))) }
         Copy-Item -LiteralPath $tmp -Destination $pdest -Force -ErrorAction Stop
         Unblock-SensorFile $pdest
         if (-not (Register-Tool -Name 'PawnIO-Setup' -Path $pdest -Lizenz $script:PawnIoPin.Lizenz -Quelle $script:PawnIoPin.Quelle -Herkunft ('von GitHub geholt auf {0}, Prüfsumme bestätigt' -f $env:COMPUTERNAME) -ToolsDir $ToolsDir)) { throw 'Eintrag ins Werkzeug-Manifest fehlgeschlagen.' }

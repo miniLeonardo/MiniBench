@@ -85,7 +85,7 @@ function Get-SavedReference([string]$Path = '') {
     $isNb = if (Get-Command 'Test-IsNotebookSystem' -ErrorAction SilentlyContinue) { [bool](Test-IsNotebookSystem) } else { [bool]$script:IsLaptop }
     $preferredRef = if ($isNb) { 'Referenz_Notebook.json' } else { 'Referenz_Desktop.json' }
     $altRef = if ($isNb) { 'Referenz_Desktop.json' } else { 'Referenz_Notebook.json' }
-    $preferredEmbedded = if ($isNb) { 'Notebook_Standard.json' } else { 'Desktop_Mittelklasse.json' }
+    $preferredEmbedded = if ($isNb) { 'Notebook_Standard.json' } else { 'Referenz_Desktop.json' }
     if ($script:DataDir) {
         if (-not $Path) { $cands += (Join-Path $script:DataDir $preferredRef) }
         $cands += (Join-Path $script:DataDir 'Referenz.json'), (Join-Path $script:DataDir $altRef), (Join-Path $script:DataDir 'PC-Diagnose-Referenz.json')

@@ -72,14 +72,7 @@ Write-Host ''
 try { Invoke-CrashAnalysis } catch { Write-Warning ('Absturzanalyse des letzten Laufs nicht möglich: {0}' -f $_.Exception.Message); Add-Finding INFO 'Absturzanalyse' ('Die Auswertung des letzten unterbrochenen Laufs schlug fehl: {0}' -f $_.Exception.Message); Remove-Item -LiteralPath $script:CpFlag -Force -ErrorAction SilentlyContinue }
 # Hilfswerkzeuge: Wahl dieses Laufs (Parameter oder je Gerät gespeichert)
 Write-Host ('  Hilfswerkzeuge : {0}' -f $(if ((Get-ToolKeep) -eq 'behalten') { 'auf diesem PC behalten' } else { 'nach dem Lauf entfernen' }))
-# früher behaltene smartmontools entfernen, wenn sie jetzt nicht mehr bleiben sollen
-if ((Test-ToolRemoveKept) -and (Test-KeptTool 'smartmontools')) {
-    $wg = Get-Command winget.exe -ErrorAction SilentlyContinue
-    if ($wg) {
-        $u = Invoke-External -File $wg.Source -Arguments 'uninstall --id smartmontools.smartmontools -e --silent --accept-source-agreements --disable-interactivity' -TimeoutSec 300 -Progress 'smartmontools wird deinstalliert (nicht mehr behalten)' -ExpectedSec 30 -Encoding ([Text.Encoding]::UTF8)
-        if ($u.ExitCode -eq 0) { [void](Set-KeptTool 'smartmontools' $false); $script:ToolNotes.Add('Früher behaltene smartmontools wurden deinstalliert (Einstellung Hilfswerkzeuge: entfernen).') }
-    }
-}
+# früher behaltene smartmontools werden erst am Laufende in Abschluss.ps1 deinstalliert, falls nicht mehr gewünscht
 # PawnIO-Treiber eines abgebrochenen Laufs entfernen (Markierung im Laufzeitordner)
 Remove-PawnIoLeftover
 # vorübergehende Einstellungen eines abgebrochenen Laufs zurücknehmen (GPU-Wahl für winsat.exe)
@@ -97,7 +90,10 @@ if ($script:FastMode) { Write-Host '  Schneller Modus: unabhängige Prüfungen l
 $script:Smartctl = Find-Smartctl
 $script:SmartInstallMsg = ''
 $script:SmartLeftInstalled = $false
-if (-not $script:Smartctl -and $ModDiag -and -not $AnalyzeLastRun -and -not $Kurztest -and $InstallSmartmontools) {
+$script:SmartInstalledByUs = $false
+$toolsBinSmartctl = if ($script:DataDir) { Join-Path $script:DataDir 'Tools\smartmontools\bin\smartctl.exe' } else { '' }
+$hasLocalSmartctl = $toolsBinSmartctl -and (Test-Path -LiteralPath $toolsBinSmartctl)
+if (-not $hasLocalSmartctl -and -not $script:Smartctl -and $ModDiag -and -not $AnalyzeLastRun -and -not $Kurztest -and $InstallSmartmontools) {
     $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
     if (-not $winget) {
         $wp = Get-ChildItem "$env:ProgramFiles\WindowsApps\Microsoft.DesktopAppInstaller_*_x64__8wekyb3d8bbwe\winget.exe" -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
@@ -121,9 +117,8 @@ if (-not $script:Smartctl -and $ModDiag -and -not $AnalyzeLastRun -and -not $Kur
                     [void](Add-ChangeRecord -Modul 'Diagnose' -Schritt 'SmartmontoolsHolen' -Titel 'smartmontools bleibt auf Wunsch installiert' -Risiko 'Eingriff' -Art 'Programm' -Ziel 'smartmontools (winget)' -Vorher 'nicht installiert' -Nachher 'installiert (behalten)' -Gegenbefehl 'winget uninstall --id smartmontools.smartmontools -e' -NurHinweis)
                     $script:SmartInstallMsg = 'per winget geholt, in den Datenordner übernommen und auf Wunsch auf diesem PC behalten'
                 } else {
-                    $u = Invoke-External -File $winget.Source -Arguments 'uninstall --id smartmontools.smartmontools -e --silent --accept-source-agreements --disable-interactivity' -TimeoutSec 300 -Progress 'smartmontools wird wieder deinstalliert' -ExpectedSec 30 -Encoding ([Text.Encoding]::UTF8)
-                    $script:SmartInstallMsg = $(if ($u.ExitCode -eq 0) { 'per winget geholt, in den Datenordner übernommen und wieder deinstalliert' } else { 'per winget geholt und in den Datenordner übernommen, Deinstallation meldete Code ' + $u.ExitCode })
-                    $script:SmartLeftInstalled = ($u.ExitCode -ne 0)
+                    $script:SmartInstalledByUs = $true
+                    $script:SmartInstallMsg = 'per winget geholt und in den Datenordner übernommen (wird am Laufende deinstalliert)'
                 }
                 $installed = Find-Smartctl
             } catch { $script:SmartLeftInstalled = $true; $script:SmartInstallMsg = 'per winget installiert, Übernahme in den Datenordner fehlgeschlagen: ' + $_.Exception.Message }

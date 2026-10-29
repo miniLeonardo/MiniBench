@@ -19,8 +19,31 @@ Close-SensorSession
 foreach ($t in @($script:SensorNotes | Select-Object -Unique)) { Add-Finding INFO 'Sensoren' $t }
 
 # Werkzeug-Manifest: abgewiesene oder neu aufgenommene Dateien
-foreach ($t in @($script:ToolIssues | Select-Object -Unique)) { Add-Finding WARNUNG 'Werkzeuge' $t }
+if ($script:ToolIssues.Count) {
+    $sl = $(if ($script:DataDir) { Join-Path (Join-Path $script:DataDir 'Laufzeit') 'Start.log' } else { '' })
+    if ($sl -and (Test-Path -LiteralPath (Split-Path $sl -Parent))) {
+        try {
+            $toolLogLines = @($script:ToolIssues | Select-Object -Unique | ForEach-Object { 'WERKZEUGE|{0:yyyy-MM-dd HH:mm:ss}|WARNUNG|{1}' -f (Get-Date), $_ })
+            [IO.File]::AppendAllLines($sl, [string[]]$toolLogLines, (New-Object Text.UTF8Encoding($false)))
+        } catch { }
+    }
+}
 foreach ($t in @($script:ToolNotes | Select-Object -Unique)) { Add-Finding INFO 'Werkzeuge' $t }
+
+# smartmontools deinstallieren, wenn durch uns installiert und nicht behalten werden soll
+if (($script:SmartInstalledByUs -and (Get-ToolKeep) -ne 'behalten') -or ((Test-ToolRemoveKept) -and (Test-KeptTool 'smartmontools'))) {
+    $ok = Uninstall-Smartmontools
+    if ($ok) {
+        if (Test-KeptTool 'smartmontools') {
+            [void](Set-KeptTool 'smartmontools' $false)
+            $script:ToolNotes.Add('Früher behaltene smartmontools wurden deinstalliert (Einstellung Hilfswerkzeuge: entfernen).')
+        }
+        $script:SmartLeftInstalled = $false
+        [void](Add-ChangeRecord -Modul 'Diagnose' -Schritt 'SmartmontoolsEntfernen' -Titel 'smartmontools wieder deinstalliert' -Risiko 'Eingriff' -Art 'Programm' -Ziel 'smartmontools' -Vorher 'installiert' -Nachher 'nicht installiert' -NurHinweis)
+    } else {
+        $script:SmartLeftInstalled = $true
+    }
+}
 
 # ---------- Rückstandskontrolle: auf dem geprüften PC sollen keine Dateien des Werkzeugs bleiben ----------
 # Eintrag im gemeinsamen TEMP-Ordner (Lauf_<PID>, Start_<PID>.log, LeosMinibench_<PID>.ps1): veraltet, wenn der Prozess
@@ -102,6 +125,7 @@ function Invoke-ResidueCheck {
     if (Test-KeptTool 'PawnIO') { if (-not @($kept | Where-Object { $_ -match 'PawnIO' }).Count) { [void]$kept.Add('Treiber: PawnIO (auf Wunsch behalten)') } }
     if (Test-KeptTool 'smartmontools') { [void]$kept.Add('smartmontools (per winget installiert, auf Wunsch behalten)') }
     if ($script:SmartLeftInstalled) { [void]$left.Add('smartmontools ist noch installiert (Deinstallation fehlgeschlagen): winget uninstall smartmontools.smartmontools') }
+    if ($script:SmartInstalledByUs -and -not $script:SmartLeftInstalled -and (Get-ToolKeep) -ne 'behalten') { [void]$removed.Add('smartmontools wieder deinstalliert') }
     foreach ($t in @($script:StaleWorkNotes)) { if ($t -match 'nicht entfernbar') { [void]$left.Add($t) } else { [void]$removed.Add($t) } }
 
     if ($removed.Count) { Add-Line '  Entfernt oder verschoben:'; $removed | ForEach-Object { Add-Line ('    ' + $_) } }

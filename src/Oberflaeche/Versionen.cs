@@ -11,6 +11,12 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("3.85", "29.10.2026", "Sensor-Manifest-Selbstreparatur, lautloser Smartctl-Lifecycle, RTX 5080 Referenz & UI-Standards",
+            "• Manifest-Selbstreparatur für Sensoren & Tools: Automatische Korrektur von leeren Prüfsummen im Manifest Tools.json für LibreHardwareMonitor und PawnIO; lautloser Abgleich gegen fest hinterlegte Release-Hashes verhindert Fehlalarme.\r\n" +
+            "• Keine Werkzeug-Warnungen im Kundenbericht: Technische Prüfsummenabweichungen oder fehlende optionale Sensor-Treiber werden im internen Protokoll (Start.log) vermerkt und überfluten den Diagnosebericht nicht mehr mit Warnungen.\r\n" +
+            "• Lautloser Smartmontools-Lifecycle: Bevorzugung vorhandener smartctl.exe im Tools-Ordner ohne winget-Aufrufe; Deinstallation ausschließlich am Gesamtlaufende mit striktem NSIS-Silent-Schalter (/S) ohne Dialogfenster.\r\n" +
+            "• UI-Standards & Ablauf-Optimierung: Schaltfläche in der Laufansicht in 'Zurück' umbenannt; Grafikstresstest bei Lasttest sowie Aufgaben 'PC durchchecken' und 'Stabilität prüfen' standardmäßig aktiv; parallele lesende Prüfungen als Standard aktiviert.\r\n" +
+            "• High-End-Referenz RTX 5080 & Desktop-Median: Modernisierung von Desktop_HighEnd.json auf AMD Ryzen 7 9800X3D und NVIDIA GeForce RTX 5080; RX 6800 als weiteres Profil erhalten; Desktop-Median (Referenz_Desktop.json) neu berechnet und autark eingebettet."),
         new Eintrag("3.84", "28.10.2026", "GitHub-Härtung, granulare Umzugs-Messung, lautloser Sensoren-Lifecycle & Text-Feinschliff",
             "• GitHub-Härtung & Git-Disziplin: Striktes Verbot und globale .gitignore-Absicherung für Binärarchive (*.zip, *.7z, *.tar), ausführbare Dateien (*.exe, *.dll, *.sys) und Treiber; Schutz vor automatischen GitHub-Sperren.\r\n" +
             "• Granulare Umzugs-Bibliotheken: Individuelle Auswahl aller Standardbibliotheken (Desktop, Dokumente, Downloads, Bilder, Musik, Videos) mit Schnellauswahl (Alle / Keine); Downloads standardmäßig abgewählt zum Schutz vor Datenbergen.\r\n" +

@@ -253,12 +253,12 @@ Describe 'Referenzsysteme und eingebettete Referenzen' {
         MinibenchTest\Initialize-DbDir
         @(Get-ChildItem -LiteralPath $d -Filter '*.json').Count | Should -Be 1
     }
-    It 'ohne gespeicherte Referenz gilt Desktop Mittelklasse als Standard' {
+    It 'ohne gespeicherte Referenz gilt Desktop-Median als Standard' {
         Set-ModuleVar 'DataDir' ''
         Set-ModuleVar 'DbDir' (New-TestDir 'leer')
         $ref = MinibenchTest\Get-SavedReference
         $ref | Should -Not -BeNullOrEmpty
-        $ref.Name | Should -Match 'Desktop Mittelklasse'
+        $ref.Name | Should -Match 'Median Desktop-PCs'
         $ref.Quelle | Should -Match 'Eingebettet'
         $ref.Werte.Count | Should -BeGreaterThan 0
     }

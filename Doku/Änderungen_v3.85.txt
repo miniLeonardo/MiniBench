@@ -1,0 +1,85 @@
+﻿LEOS MINIBENCH 3.85: ÄNDERUNGEN
+===============================
+
+Version 3.85 behebt Fehlalarme bei der Werkzeug- und Sensorüberprüfung durch automatische Selbstreparatur
+des Manifests Tools.json, verlagert interne Treiber- und Prüfsummenwarnungen aus dem Kundenbericht in das
+interne Start.log, stellt einen vollständig popup-freien Lebenszyklus für smartmontools sicher, benennt den
+Abschluss-Button in „Zurück“ um, aktiviert Grafikstresstest und parallele Prüfungen als praxistaugliche
+Standardeinstellungen und führt ein High-End-Referenzsystem mit AMD Ryzen 7 9800X3D und NVIDIA GeForce RTX 5080
+sowie einen neu berechneten Desktop-Median ein.
+
+
+1. MANIFEST-SELBSTREPARATUR FÜR SENSOREN UND TOOLS
+  Automatische Reparatur     In Tools.json vorhandene Einträge mit leerer SHA-256-Prüfsumme ("")
+                             werden von Register-PinnedSensorTools nicht mehr blind übersprungen.
+                             Stimmt der reale Hash der Datei auf der Festplatte mit der fest hinterlegten
+                             Release-Prüfsumme überein, wird der Eintrag im Manifest automatisch repariert.
+  Lautloser Abgleich         Get-VerifiedTool gleicht Dateien mit leerem Manifest-Hash gegen die festen
+                             Pins (, ) ab und aktualisiert das Manifest
+                             zur Laufzeit lautlos, ohne Warnungen zu werfen.
+
+
+2. BEREINIGUNG DES DIAGNOSEBERICHTS
+  Keine internen Warnungen   Technische Prüfsummenabweichungen oder fehlende optionale Sensor-Treiber
+                             gehören in das technische Protokoll (Start.log), nicht in den Kundenbericht.
+                              wird in Abschluss.ps1 nicht mehr als [WARNUNG] Werkzeuge
+                             in die Berichts-Befunde geschrieben.
+  Sachlicher Sensor-Hinweis  Fehlen Sensor-Treiber wie LibreHardwareMonitor oder PawnIO, genügt der
+                             sachliche Standardhinweis im Sensor-Abschnitt (Get-SensorGapText).
+
+
+3. LAUTLOSER SMARTMONTOOLS-LIFECYCLE
+  Lokale Kopie bevorzugen    Ist smartctl.exe bereits im Ordner Minibench-Daten\Tools\smartmontools\bin\
+                             vorhanden, unterbleibt jeglicher Aufruf von winget (weder Installation noch
+                             Deinstallation).
+  Kein Uninstaller im Lauf   Wird smartmontools temporär installiert, wird es während des Programmlaufs
+                             behalten und ausschließlich am Gesamtlaufende in Abschluss.ps1 deinstalliert.
+  Strikter Silent-Aufruf     Uninstall-Smartmontools ruft den zugrundeliegenden NSIS-Uninstaller direkt
+                             mit dem Schalter /S auf ("C:\Program Files\smartmontools\uninstall.exe" /S)
+                             und nutzt winget mit --silent --disable-interactivity als Fallback, sodass
+                             kein Bestätigungsfenster aufpoppt.
+
+
+4. OBERFLÄCHEN-FEINSCHLIFF UND STANDARDEINSTELLUNGEN
+  Button „Zurück“            Die Schaltfläche in der Laufansicht wurde von „Neuer Lauf“ in „Zurück“
+                             umbenannt; der Hinweis lautet: „Kehrt zur Startseite und den Ablauf-Einstellungen zurück.“
+  Grafikstresstest aktiv     Im Lasttest-Modul sowie in den Standardaufgaben „PC durchchecken“ und
+                             „Stabilität prüfen“ ist der Grafikstresstest (chkLGpu) standardmäßig aktiv,
+                             sodass eine kombinierte Prüfung von Prozessor, RAM und Grafikkarte erfolgt.
+  Parallele Prüfungen        Die Option „Lesende Prüfungen parallel ausführen“ (chkFast) ist standardmäßig
+                             aktiv (true). Dies spart auf modernen Mehrkern-Systemen mit SSD 5 bis 10 Minuten
+                             Laufzeit. Für schwächere Zweikern-Systeme bleibt sie abwählbar.
+
+
+5. HIGH-END-REFERENZ RTX 5080 & DESKTOP-MEDIAN
+  RTX 5080 Referenz          Aktualisierung von Desktop_HighEnd.json auf eine moderne High-End-Plattform
+                             (AMD Ryzen 7 9800X3D, NVIDIA GeForce RTX 5080, 64 GB DDR5-6000, Samsung 990 PRO).
+  RX 6800 als Profil         Das bisherige High-End-System bleibt als Desktop_HighEnd_RX6800.json in der
+                             Referenzauswahl und in der Datenbank erhalten.
+  Desktop-Median             Neuberechnung von Referenz_Desktop.json als mathematischer Median über alle
+                             4 Desktop-Referenzsysteme (High-End RTX 5080, High-End RX 6800, Mittelklasse,
+                             GTX 1070) und autarke Einbettung in Referenzen_Eingebettet.ps1.
+
+
+GEFUNDEN UND BEHOBEN
+  - Selbstreparatur von Tools.json verhindert 10 ungerechtfertigte Werkzeug-Warnungen bei leeren Prüfsummen.
+  - Interne Werkzeugwarnungen () aus dem Kunden- und Prüfbericht nach Start.log verlagert.
+  - Interaktives NSIS-Deinstallationsfenster von smartmontools während des Starts durch Lebenszyklus-Anpassung
+    und strikten /S Schalter behoben.
+  - Schaltfläche in der Laufansicht von irreführendem „Neuer Lauf“ auf „Zurück“ umgestellt.
+  - Grafikstresstest und parallele lesende Hintergrundprüfungen als zeitgemäße Standards aktiviert.
+
+
+GRENZEN UND OFFENE PUNKTE
+  - Keine. Alle Prüfungen und Sensorpfade arbeiten lautlos und fehlertolerant.
+
+
+UMSTIEG
+  - Vollständig abwärtskompatibel. Vorhandene Tools.json-Dateien mit leeren SHA-256-Werten reparieren sich
+    beim ersten Start automatisch.
+
+
+QUELLEN
+  - Eigene Implementierung in src\Kern\Sensoren.ps1, src\Kern\Werkzeuge.ps1, src\Kern\Smartmontools.ps1,
+    src\Ablauf\Start.ps1, src\Ablauf\Abschluss.ps1, src\Oberflaeche\DiagGui.cs, src\Oberflaeche\DiagGui_Seiten.cs,
+    src\Daten\Referenzen\, src\Kern\Referenzen_Eingebettet.ps1 und src\Kern\Referenz_Vergleich.ps1.
