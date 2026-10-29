@@ -1,0 +1,91 @@
+﻿LEOS MINIBENCH 3.87: ÄNDERUNGEN
+===============================
+
+Version 3.87 bündelt alle Messläufe desselben Rechners über seine Hardware-Identität und stellt historische Läufe
+direkt gegenüber – ohne dafür ein separates Menüwerkzeug einzuführen: gruppiert in der Datenbank-ListView, als
+vollwertiger Verlaufsmodus im interaktiven Dashboard, als neuer Abschnitt „Seit dem letzten Lauf“ im HTML-Diagnosebericht
+sowie mit Trend-Pfeilen auf der Startseite. So sieht der Nutzer auf einen Blick, ob Leistung nachlässt, Temperaturen
+steigen oder was sich zwischen zwei Messungen im System geändert hat.
+
+
+1. GERÄTE-ZUORDNUNG UND DATENBANK-FUNKTION (KERN)
+  Zuordnungslogik            Get-DbDeviceRuns ermittelt alle Läufe eines bestimmten Rechners und sortiert sie
+                             chronologisch aufsteigend. Die Bündelung erfolgt primär über die hardwarebasierte Geräte-ID
+                             (Geraet.Id), die auch Windows-Neuinstallationen oder Rechner-Umbenennungen übersteht.
+                             Altdaten ohne ID werden über den Computernamen zugeordnet.
+  Ausschluss von Referenzen  Referenzsysteme (Quelle Referenz) werden grundsätzlich ausgeschlossen und niemals als
+                             historische Messungen eines PCs interpretiert.
+
+
+2. DATENBANK-OBERFLÄCHE (LISTVIEWGROUP & VERLAUF-AKTION)
+  ListViewGroup-Gruppierung  Die Datenbank-ListView (lvDb) fasst alle Messungen automatisch nach Rechnern zusammen.
+                             Der Gruppenkopf nennt Rechnername, Anzahl der Läufe und das jüngste Datum
+                             (z. B. „TORRENT • 4 Läufe • zuletzt 29.10.2026“).
+  Referenz-Gruppe            Alle Referenzsysteme werden am Ende in einer geschlossenen Gruppe „Referenz-Systeme“
+                             übersichtlich zusammengefasst.
+  Theme-Konsistenz           Gruppenköpfe und Listenelemente sind im Dunkel- und Hellmodus durch SetWindowTheme und
+                             systemkonforme Zeichnung fehlerfrei und kontrastreich lesbar (keine dunkle Schrift auf dunklem Grund).
+  Verlauf-Schaltfläche       Schaltfläche „Verlauf“ und Kontextmenüeintrag öffnen das Dashboard direkt im Verlaufsmodus
+                             für das markierte System bzw. die markierte Gerätegruppe.
+
+
+3. DASHBOARD: INTERAKTIVER VERLAUFSMODUS
+  Modus & Timeline           Unterstützung des Verlaufsmodus über -DashboardModus Verlauf oder URL-Query ?mode=history.
+                             Die chronologischen Läufe des ausgewählten Geräts bilden die Spalten von links (ältester)
+                             nach rechts (neuester Lauf). Der klassische Systemvergleich bleibt parallel uneingeschränkt erhalten.
+  Delta-Badges               Jede Spalte weist die relative und absolute Abweichung zum direkten Vorläufer farbig aus
+                             (grün = besser, rot/orange = schlechter).
+  Inventar-Differenzanalyse  Die Zeile „Geändert (Inventar)“ stellt automatisch Modifikationen an BIOS-Version,
+                             Grafiktreiber, Windows-Build und RAM-Takt zwischen den Messungen übersichtlich dar.
+  Verlaufs-Liniendiagramme   Zeitliche Entwicklungsdiagramme für Gesamtpunktzahl, CPU ST/MT, Grafik-FPS, SSD 4K,
+                             SSD- und Akku-Verschleiß sowie Höchsttemperaturen.
+  Temperatur-Filter          Temperaturen fließen nur aus vergleichbaren Läufen (identische Lastart, Mindestdauer
+                             60s ab v2.67) in die Verlaufskurve ein.
+  Einzellauf-Faktenhinweis   Liegt erst ein einzelner Lauf vor, weist das Dashboard sachlich darauf hin, dass mindestens
+                             zwei Läufe für eine Verlaufskurve erforderlich sind (keine synthetisierten Datenpunkte).
+
+
+4. DIAGNOSEBERICHT: ABSCHNITT „SEIT DEM LETZTEN LAUF“
+  Berichts-Integration       Liegen frühere Läufe desselben PCs vor, wird vor dem Benchmark ein kompakter Abschnitt
+                             „Seit dem letzten Lauf“ gerendert: Kernmesswerte im Vergleich mit Delta-Badges,
+                             Auflistung der Inventaränderungen und Direktlink zum Dashboard-Verlauf.
+  Strikte 3-Läufe-Regel      Trendwarnungen (z. B. CPU unter gleicher Last signifikant wärmer) werden erst ab mindestens
+                             drei Läufen erzeugt, wenn der Anstieg sowohl mindestens 8 K beträgt als auch die doppelte
+                             Standardabweichung der bisherigen Messstreuung überschreitet.
+  SSD-Verschleiß-Prognose    Lineare Restlebensdauer-Hochrechnung basierend auf TBW / Percentage Used und Zeitintervall
+                             als geschätzte Hochrechnung des bisherigen Schreibaufkommens.
+  KI-Zusammenfassung         Strukturierte Übernahme der Verlaufs-Deltas und Inventar-Modifikationen in die KI-Datei.
+
+
+5. STARTSEITE: KPI-DELTAS & VERLAUF-SCHNELLZUGRIFF
+  Trend-Pfeile               In der Kachel „Letzter Lauf“ zeigen die 4 Kern-KPIs (Gesamt, CPU MT, RAM Lesen, Grafik)
+                             kompakte Pfeile mit prozentualer Abweichung zum direkten Vorläufer (↑ +2 %, ↓ -6 %).
+  Schnellzugriff             Button „Verlauf“ neben „Bericht öffnen“ und „Im Dashboard vergleichen“ öffnet das Dashboard
+                             direkt im Verlaufsmodus für diesen PC.
+
+
+GEFUNDEN UND BEHOBEN
+  - Syntaxfehler in Bausteine_Systemvergleich.ps1 durch Kommasetzung im Formatierungsstring behoben.
+  - Doppelte Variablendeklaration von curPc in Oberflaeche\DiagGui_Seiten.cs behoben.
+  - Regex-Kollision in Bericht.Tests.ps1 (b.Datum) durch Umbenennung der Sortierargumente in JavaScript verhindert.
+  - Fehlende Absicherung gegen null bei $script:Findings in Add-Finding zur Laufzeit und im Testmodul ergänzt.
+  - Fehlender Parameter 'DashboardModus' in der allgemeinen Parameterliste $general in tests\Modulvertrag.Tests.ps1 ergänzt.
+  - Falsch kodierte Zeichen (Mojibake) in Berichtshilfen und Testdateien auf sauberes UTF-8 mit BOM vereinheitlicht.
+
+
+GRENZEN UND OFFENE PUNKTE
+  - Für Verlaufsdiagramme und Trend-Befunde werden mindestens zwei bzw. drei Läufe auf demselben PC benötigt;
+    Einzelläufe zeigen sachliche Hinweistexte ohne Trendextrapolation.
+
+
+UMSTIEG
+  - Vollständig abwärtskompatibel. Ältere Datenbankeinträge werden automatisch über den Computernamen gebündelt.
+
+
+QUELLEN
+  - Eigene Implementierung in src\Kern\Version.ps1, src\Kern\Geraeteidentitaet.ps1, src\Kern\Referenz_Vergleich.ps1,
+    src\Kern\Berichtshilfen.ps1, src\Oberflaeche\Versionen.cs, src\Oberflaeche\DiagGui_Modelle.cs,
+    src\Oberflaeche\DiagGui_Vergleich.cs, src\Oberflaeche\DiagGui_Steuerelemente.cs, src\Oberflaeche\DiagGui_Seiten.cs,
+    src\Bericht\Bausteine_Dashboard.ps1, src\Bericht\Bausteine_Systemvergleich.ps1, src\Bericht\HtmlBericht.ps1,
+    src\Bericht\KI-Datei.ps1, src\Bericht\Dashboard\, tests\Datenbank.Tests.ps1, tests\Oberflaeche.Tests.ps1,
+    tests\Auswertung.Tests.ps1, tests\Bericht.Tests.ps1 und tests\Modulvertrag.Tests.ps1.

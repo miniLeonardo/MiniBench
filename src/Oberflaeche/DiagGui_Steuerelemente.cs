@@ -679,20 +679,23 @@ public class StartTaskRow : Control
 // ab v3.72: KPI-Kachel für Letzter Lauf auf der Startseite
 public class KpiBox : Control
 {
-    string title = "", val = "";
-    public KpiBox(string title, string val)
+    string title = "", val = "", delta = "";
+    public KpiBox(string title, string val, string delta = null)
     {
         this.title = title ?? "";
         this.val = val ?? "";
+        this.delta = delta ?? "";
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor, true);
         BackColor = Color.Transparent;
         Size = new Size(UI.S(96), UI.S(64));
         Dock = DockStyle.Fill;
         Margin = new Padding(0, 0, UI.S(4), 0);
     }
+    public KpiBox(string title, string val) : this(title, val, null) { }
 
     public string Title { get { return title; } set { title = value ?? ""; Invalidate(); } }
     public string Value { get { return val; } set { val = value ?? ""; Invalidate(); } }
+    public string Delta { get { return delta; } set { delta = value ?? ""; Invalidate(); } }
 
     public override Size GetPreferredSize(Size proposedSize)
     {
@@ -717,8 +720,19 @@ public class KpiBox : Control
 
         using (Font fVal = new Font("Segoe UI Semibold", 10.75f))
         {
-            Rectangle rVal = new Rectangle(UI.S(6), UI.S(23), Width - UI.S(12), Height - UI.S(27));
+            int hVal = String.IsNullOrEmpty(delta) ? (Height - UI.S(27)) : UI.S(20);
+            Rectangle rVal = new Rectangle(UI.S(6), UI.S(21), Width - UI.S(12), hVal);
             TextRenderer.DrawText(g, val, fVal, rVal, UI.Text, TextFormatFlags.Left | TextFormatFlags.Top | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+        }
+
+        if (!String.IsNullOrEmpty(delta))
+        {
+            Color dCol = delta.Contains("â†‘") ? UI.Ok : (delta.Contains("â†“") ? UI.Crit : UI.Muted);
+            using (Font fDelta = new Font("Segoe UI", 7.5f, FontStyle.Bold))
+            {
+                Rectangle rDelta = new Rectangle(UI.S(6), Height - UI.S(18), Width - UI.S(12), UI.S(14));
+                TextRenderer.DrawText(g, delta, fDelta, rDelta, dCol, TextFormatFlags.Left | TextFormatFlags.Top | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+            }
         }
     }
 }

@@ -1,4 +1,4 @@
-#region ---------- Sensoren: LibreHardwareMonitor, PawnIO und Ersatzquellen ----------
+﻿#region ---------- Sensoren: LibreHardwareMonitor, PawnIO und Ersatzquellen ----------
 # Temperatur, Takt, Lüfter, Spannung und Leistung kommen bevorzugt aus LibreHardwareMonitorLib (portabel unter
 # Minibench-Daten\Tools\LibreHardwareMonitor). Ab 0.9.5 liest die Bibliothek CPU-Werte und Mainboard-Chips nur über den
 # Treiber PawnIO. Der Treiber wird nie ungefragt installiert: nur mit -SensorTreiber (Rückfrage in der Oberfläche),
@@ -36,7 +36,7 @@ $script:SensorNotes = New-Object System.Collections.Generic.List[string]
 $script:SensorSnapshot = $null
 $script:SensorDb = [ordered]@{}
 
-if ($FullLanguage -and -not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $SensorWerkzeugeHolen -and -not $SensorAufraeumen -and -not $OptimierungZustand -and -not $OptWerkzeugeHolen -and -not $SoftwareInstallieren -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardSysteme -and -not $MedianAktualisieren -and -not $Umzug -and -not ('DiagSensors' -as [type])) {
+if ($FullLanguage -and -not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $SensorWerkzeugeHolen -and -not $SensorAufraeumen -and -not $OptimierungZustand -and -not $OptWerkzeugeHolen -and -not $SoftwareInstallieren -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardModus -and -not $DashboardSysteme -and -not $MedianAktualisieren -and -not $Umzug -and -not ('DiagSensors' -as [type])) {
     $sensCode = @'
 #>> EINBINDEN Kern\Sensoren.cs
 '@

@@ -120,6 +120,7 @@ param(
     [string]$Rueckgaengig,
     [switch]$Dashboard,
     [string]$DashboardExport,
+    [string]$DashboardModus = '',
     [string]$DashboardSysteme = '',
     # Auswertung von Minibench-Daten\Laufzeit\Start.log ausgeben (Startzeit je Phase, Stick und Festplatte getrennt)
     [switch]$StartAuswertung,
@@ -220,7 +221,7 @@ if ('ä' -ne [string][char]0xE4 -and $PSCommandPath) {
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 # Vergleich, Import, Export, Dashboard, Datenpflege sowie Abgleich, Entfernen, Umbenennen und MedianAktualisieren
 # arbeiten nur im Datenordner und brauchen keine Administratorrechte
-if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $ExportLauf -and -not $Datenpflege -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardSysteme -and -not $Abgleich -and -not $Entfernen -and -not $Umbenennen -and -not $MedianAktualisieren -and -not $Umzug) {
+if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $ExportLauf -and -not $Datenpflege -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardModus -and -not $DashboardSysteme -and -not $Abgleich -and -not $Entfernen -and -not $Umbenennen -and -not $MedianAktualisieren -and -not $Umzug) {
     if (-not $PSCommandPath) { return }
     # Netzlaufwerke sind im Administratorkontext nicht verbunden: Skript und Datenordner als UNC-Pfad weitergeben
     function ConvertTo-Unc([string]$Path) {
@@ -245,7 +246,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
 }
 #endregion
 
-$ScriptVersion = '3.86'
+$ScriptVersion = '3.87'
 $AppName       = 'Leos Minibench'
 # Eingebettete Referenzprofile für Leos Minibench (v3.0)
 $script:EmbeddedReferences = @{
@@ -3323,15 +3324,17 @@ function Get-DeviceIdentity {
 function Set-DbDeviceKeys($Entries) {
     $byName = @{}
     foreach ($e in @($Entries)) {
-        if ([string]$e.GeraetId) {
+        $gid = $(if ([string]$e.GeraetId) { [string]$e.GeraetId } elseif ($e.Geraet -and [string]$e.Geraet.Id) { [string]$e.Geraet.Id } else { '' })
+        if ($gid) {
             $n = ([string]$e.Computer).ToUpperInvariant()
             if (-not $byName.ContainsKey($n)) { $byName[$n] = New-Object 'System.Collections.Generic.HashSet[string]' }
-            [void]$byName[$n].Add([string]$e.GeraetId)
+            [void]$byName[$n].Add($gid)
         }
     }
     foreach ($e in @($Entries)) {
+        $gid = $(if ([string]$e.GeraetId) { [string]$e.GeraetId } elseif ($e.Geraet -and [string]$e.Geraet.Id) { [string]$e.Geraet.Id } else { '' })
         $n = ([string]$e.Computer).ToUpperInvariant()
-        $key = $(if ([string]$e.GeraetId) { [string]$e.GeraetId } elseif ($byName.ContainsKey($n) -and $byName[$n].Count -eq 1) { @($byName[$n])[0] } else { 'PC:' + $n })
+        $key = $(if ($gid) { $gid } elseif ($byName.ContainsKey($n) -and $byName[$n].Count -eq 1) { @($byName[$n])[0] } else { 'PC:' + $n })
         $e | Add-Member -NotePropertyName GeraetKey -NotePropertyValue $key -Force
     }
 }
@@ -3339,9 +3342,51 @@ function Set-DbDeviceKeys($Entries) {
 # Gehört ein Datenbankeintrag zu diesem Gerät? Über die Kennung, bei älteren Einträgen ohne Zuordnung über den Computernamen.
 function Test-SameDevice($Entry, [string]$DeviceId, [string]$ComputerName) {
     $key = [string]$Entry.GeraetKey
-    if (-not $key) { $key = $(if ([string]$Entry.GeraetId) { [string]$Entry.GeraetId } else { 'PC:' + ([string]$Entry.Computer).ToUpperInvariant() }) }
-    if ($key.StartsWith('G-')) { return ($DeviceId -and $key -eq $DeviceId) }
-    return ([string]$Entry.Computer -eq $ComputerName)
+    if (-not $key) {
+        $gid = $(if ([string]$Entry.GeraetId) { [string]$Entry.GeraetId } elseif ($Entry.Geraet -and [string]$Entry.Geraet.Id) { [string]$Entry.Geraet.Id } else { '' })
+        $key = $(if ($gid) { $gid } else { 'PC:' + ([string]$Entry.Computer).ToUpperInvariant() })
+    }
+    if ($key.StartsWith('G-')) { return [bool]($DeviceId -and $key -eq $DeviceId) }
+    return [bool]($ComputerName -and ([string]$Entry.Computer -ieq $ComputerName))
+}
+
+# Alle Läufe desselben Geräts chronologisch aufsteigend sortiert zurückgeben.
+# Schließt Referenzen grundsätzlich aus.
+function Get-DbDeviceRuns {
+    param(
+        [object[]]$Entries = @(),
+        [string]$DeviceId = '',
+        [string]$ComputerName = ''
+    )
+    if (-not $Entries -or -not $Entries.Count) {
+        if (Get-Command 'Get-DbEntries' -ErrorAction SilentlyContinue) {
+            $Entries = @(Get-DbEntries)
+        }
+    }
+    if (-not $DeviceId -and -not $ComputerName) {
+        try {
+            $dev = Get-DeviceIdentity
+            if ($dev) { $DeviceId = [string]$dev.Id }
+        } catch { }
+        $ComputerName = $env:COMPUTERNAME
+    }
+    if (-not $DeviceId -and -not $ComputerName) { return @() }
+
+    if (Get-Command 'Set-DbDeviceKeys' -ErrorAction SilentlyContinue) {
+        Set-DbDeviceKeys $Entries
+    }
+
+    $filtered = @($Entries | Where-Object {
+        if (-not $_) { return $false }
+        $q = [string]$_.Quelle
+        $f = [string]$_.Format
+        $p = [string]$_.Path
+        $t = [string]$_.Typ
+        if ($q -like '*Referenz*' -or $f -like '*Referenz*' -or $p -like '*Referenz*.json' -or $t -eq 'Referenz') { return $false }
+        Test-SameDevice $_ $DeviceId $ComputerName
+    })
+
+    return @($filtered | Sort-Object Datum)
 }
 #endregion
 #region ---------- Änderungsprotokoll mit Rückgängig ----------
@@ -6510,6 +6555,7 @@ public partial class DiagGui : Form
         };
         lv.DrawItem += delegate(object s, DrawListViewItemEventArgs e) { e.DrawDefault = true; };
         lv.DrawSubItem += delegate(object s, DrawListViewSubItemEventArgs e) { e.DrawDefault = true; };
+        lv.HandleCreated += delegate { try { SetWindowTheme(lv.Handle, UI.IsDark ? "DarkMode_Explorer" : "Explorer", null); } catch { } };
         if (lv.IsHandleCreated) try { SetWindowTheme(lv.Handle, UI.IsDark ? "DarkMode_Explorer" : "Explorer", null); } catch { }
     }
 
@@ -11064,20 +11110,23 @@ public class StartTaskRow : Control
 // ab v3.72: KPI-Kachel für Letzter Lauf auf der Startseite
 public class KpiBox : Control
 {
-    string title = "", val = "";
-    public KpiBox(string title, string val)
+    string title = "", val = "", delta = "";
+    public KpiBox(string title, string val, string delta = null)
     {
         this.title = title ?? "";
         this.val = val ?? "";
+        this.delta = delta ?? "";
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor, true);
         BackColor = Color.Transparent;
         Size = new Size(UI.S(96), UI.S(64));
         Dock = DockStyle.Fill;
         Margin = new Padding(0, 0, UI.S(4), 0);
     }
+    public KpiBox(string title, string val) : this(title, val, null) { }
 
     public string Title { get { return title; } set { title = value ?? ""; Invalidate(); } }
     public string Value { get { return val; } set { val = value ?? ""; Invalidate(); } }
+    public string Delta { get { return delta; } set { delta = value ?? ""; Invalidate(); } }
 
     public override Size GetPreferredSize(Size proposedSize)
     {
@@ -11102,8 +11151,19 @@ public class KpiBox : Control
 
         using (Font fVal = new Font("Segoe UI Semibold", 10.75f))
         {
-            Rectangle rVal = new Rectangle(UI.S(6), UI.S(23), Width - UI.S(12), Height - UI.S(27));
+            int hVal = String.IsNullOrEmpty(delta) ? (Height - UI.S(27)) : UI.S(20);
+            Rectangle rVal = new Rectangle(UI.S(6), UI.S(21), Width - UI.S(12), hVal);
             TextRenderer.DrawText(g, val, fVal, rVal, UI.Text, TextFormatFlags.Left | TextFormatFlags.Top | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+        }
+
+        if (!String.IsNullOrEmpty(delta))
+        {
+            Color dCol = delta.Contains("â†‘") ? UI.Ok : (delta.Contains("â†“") ? UI.Crit : UI.Muted);
+            using (Font fDelta = new Font("Segoe UI", 7.5f, FontStyle.Bold))
+            {
+                Rectangle rDelta = new Rectangle(UI.S(6), Height - UI.S(18), Width - UI.S(12), UI.S(14));
+                TextRenderer.DrawText(g, delta, fDelta, rDelta, dCol, TextFormatFlags.Left | TextFormatFlags.Top | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+            }
         }
     }
 }
@@ -11965,6 +12025,8 @@ class SensorChart : Control
 public class DbEntry
 {
     public string Path = "", Name = "", Computer = "", Datum = "", Cpu = "", Gpu = "", Ram = "", Disk = "", Befunde = "", Module = "", Quelle = "", Ordner = "";
+    public string GeraetId = "", GeraetKey = "";
+    public bool IsReference = false;
     public int Kerne = 0, Threads = 0;
     public Dictionary<string, double> Werte = new Dictionary<string, double>();
     public bool HasBench { get { return Werte.Count > 0; } }
@@ -12060,12 +12122,63 @@ public class DbEntry
                     Dictionary<string, object> bd = b as Dictionary<string, object>;
                     if (bd != null) e.Befunde = String.Format("{0} / {1} / {2}", S(bd, "Kritisch"), S(bd, "Warnungen"), S(bd, "Hinweise"));
                 }
+                object gObj; if (d.TryGetValue("Geraet", out gObj))
+                {
+                    Dictionary<string, object> gd = gObj as Dictionary<string, object>;
+                    if (gd != null) e.GeraetId = S(gd, "Id");
+                }
+                string q = e.Quelle ?? "";
+                string fmt = S(d, "Format");
+                string fName = System.IO.Path.GetFileName(f);
+                if (q.IndexOf("Referenz", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    fmt.IndexOf("Referenz", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    fName.IndexOf("Referenz", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    fName.StartsWith("Desktop_", StringComparison.OrdinalIgnoreCase) ||
+                    fName.StartsWith("Notebook_", StringComparison.OrdinalIgnoreCase) ||
+                    fName.StartsWith("Workstation_", StringComparison.OrdinalIgnoreCase) ||
+                    fName.StartsWith("MiniPC_", StringComparison.OrdinalIgnoreCase))
+                {
+                    e.IsReference = true;
+                }
                 if (e.Computer.Length == 0) e.Computer = System.IO.Path.GetFileNameWithoutExtension(f);
                 list.Add(e);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("DbEntry.Load Fehler in " + f + ": " + ex.Message);
+            }
+        }
+        Dictionary<string, List<string>> byName = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (DbEntry e in list)
+        {
+            if (!e.IsReference && !String.IsNullOrEmpty(e.GeraetId))
+            {
+                string n = (e.Computer ?? "").ToUpperInvariant();
+                if (!byName.ContainsKey(n)) byName[n] = new List<string>();
+                if (!byName[n].Contains(e.GeraetId)) byName[n].Add(e.GeraetId);
+            }
+        }
+        foreach (DbEntry e in list)
+        {
+            if (e.IsReference)
+            {
+                e.GeraetKey = "REF";
+            }
+            else if (!String.IsNullOrEmpty(e.GeraetId))
+            {
+                e.GeraetKey = e.GeraetId;
+            }
+            else
+            {
+                string n = (e.Computer ?? "").ToUpperInvariant();
+                if (byName.ContainsKey(n) && byName[n].Count == 1)
+                {
+                    e.GeraetKey = byName[n][0];
+                }
+                else
+                {
+                    e.GeraetKey = "PC:" + n;
+                }
             }
         }
         list.Sort(delegate(DbEntry a, DbEntry c) { int r = String.Compare(a.DisplayName, c.DisplayName, StringComparison.OrdinalIgnoreCase); return r != 0 ? r : String.Compare(c.Datum, a.Datum, StringComparison.Ordinal); });
@@ -12456,7 +12569,7 @@ public partial class DiagGui
     int dbSortCol = -1;
     bool dbSortAsc = true;
     Button btnRename;
-    Button btnCompare, btnDashboard, btnDelete, btnOpenReport, btnExport, btnSetRef;
+    Button btnCompare, btnDashboard, btnVerlauf, btnDelete, btnOpenReport, btnExport, btnSetRef;
 
     void OnDbColumnClick(object sender, ColumnClickEventArgs e)
     {
@@ -12567,6 +12680,10 @@ public partial class DiagGui
         btnDashboard = UI.Primary("Interaktives Dashboard"); btnDashboard.Margin = new Padding(0); btnDashboard.Padding = new Padding(UI.S(14), UI.S(3), UI.S(14), UI.S(3)); btnDashboard.Font = new Font("Segoe UI Semibold", 9.75f);
         btnDashboard.Click += delegate { OpenDashboard(); };
         Tip(btnDashboard, "Öffnet das interaktive HTML5-Dashboard für detaillierten System- und Benchmark-Vergleich.");
+        btnVerlauf = UI.Secondary("Verlauf"); btnVerlauf.Margin = new Padding(UI.S(8), 0, 0, 0);
+        btnVerlauf.Click += delegate { OpenDeviceHistory(); };
+        btnVerlauf.Enabled = false;
+        Tip(btnVerlauf, "Öffnet das interaktive Dashboard im Verlaufsmodus für alle Läufe des ausgewählten Geräts.");
         btnOpenReport = UI.Secondary("Bericht öffnen"); btnOpenReport.Margin = new Padding(UI.S(8), 0, 0, 0);
         btnOpenReport.Click += delegate {
             DbEntry target = null;
@@ -12590,7 +12707,7 @@ public partial class DiagGui
         Tip(btnExport, "Exportiert den ausgewählten Lauf als eigenständiges .minibench-Austauschpaket mit Datenbankeintrag und Bericht.");
         btnDelete = UI.Secondary("Entfernen"); btnDelete.Margin = new Padding(UI.S(8), 0, 0, 0); btnDelete.Click += delegate { DeleteSelected(); };
         Tip(btnDelete, "Verschiebt die angehakten Läufe samt Berichtsordner nach Minibench-Daten\\Archiv\\Entfernt. Beim nächsten Abgleich verschwinden sie auch vom Netzlaufwerk.");
-        b.Controls.Add(btnDashboard); b.Controls.Add(btnOpenReport); b.Controls.Add(btnSetRef); b.Controls.Add(btnRename); b.Controls.Add(btnExport); b.Controls.Add(btnDelete); bottom.Controls.Add(b);
+        b.Controls.Add(btnDashboard); b.Controls.Add(btnVerlauf); b.Controls.Add(btnOpenReport); b.Controls.Add(btnSetRef); b.Controls.Add(btnRename); b.Controls.Add(btnExport); b.Controls.Add(btnDelete); bottom.Controls.Add(b);
         lblDbClean = Lbl(DatenpflegeInfo.Length > 0 ? DatenpflegeInfo : "Lasttests vor v2.67 (nicht vergleichbar), abgebrochene und kurze Läufe verschiebt die Datenpflege beim Start nach Minibench-Daten\\Archiv.", 8.75f, false, UI.Muted);
         lblDbClean.Margin = new Padding(UI.S(4), UI.S(8), UI.S(4), 0); bottom.Controls.Add(lblDbClean);
         bottom.Resize += delegate { lblDbClean.MaximumSize = new Size(Math.Max(UI.S(200), bottom.ClientSize.Width - UI.S(10)), 0); };
@@ -12613,6 +12730,7 @@ public partial class DiagGui
 
         ContextMenu cm = new ContextMenu();
         MenuItem miDashboard = new MenuItem("Im Dashboard vergleichen", delegate { OpenDashboard(); });
+        MenuItem miHistory = new MenuItem("Geräte-Verlauf im Dashboard öffnen", delegate { OpenDeviceHistory(); });
         MenuItem miSetRef = new MenuItem("Als Referenz festlegen (persistent)", delegate { SetSelectedAsReference(); });
         MenuItem miDashboardBase = new MenuItem("Als Basis im Dashboard öffnen (temporär)", delegate { OpenDashboardWithBase(); });
         MenuItem miSep1 = new MenuItem("-");
@@ -12622,6 +12740,7 @@ public partial class DiagGui
         MenuItem miSep2 = new MenuItem("-");
         MenuItem miDelete = new MenuItem("Aus Datenbank entfernen", delegate { DeleteSelected(); });
         cm.MenuItems.Add(miDashboard);
+        cm.MenuItems.Add(miHistory);
         cm.MenuItems.Add(miSetRef);
         cm.MenuItems.Add(miDashboardBase);
         cm.MenuItems.Add(miSep1);
@@ -12634,6 +12753,7 @@ public partial class DiagGui
             int selN = lvDb.SelectedItems.Count;
             int chkN = CheckedEntries().Count;
             miDashboard.Enabled = chkN >= 1 || selN >= 1;
+            miHistory.Enabled = (GetSelectedDeviceTarget() != null);
             miSetRef.Enabled = selN == 1 || (selN == 0 && chkN == 1);
             miDashboardBase.Enabled = selN == 1 || (selN == 0 && chkN == 1);
             miRename.Enabled = selN == 1 || (selN == 0 && chkN == 1);
@@ -12662,10 +12782,89 @@ public partial class DiagGui
 
     static string Num(double v, string fmt) { return v > 0 ? v.ToString(fmt, CultureInfo.GetCultureInfo("de-DE")) : ""; }
 
+    static string FormatGroupDate(string d)
+    {
+        if (String.IsNullOrEmpty(d)) return "";
+        DateTime dt;
+        if (DateTime.TryParseExact(d, "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out dt) ||
+            DateTime.TryParseExact(d, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out dt) ||
+            DateTime.TryParse(d, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt))
+        {
+            return dt.ToString("dd.MM.yyyy");
+        }
+        string[] parts = d.Split(' ', 'T');
+        if (parts.Length > 0 && parts[0].Contains("-"))
+        {
+            string[] dp = parts[0].Split('-');
+            if (dp.Length == 3) return dp[2] + "." + dp[1] + "." + dp[0];
+        }
+        return d;
+    }
+
     void FillDbList()
     {
         if (lvDb == null) return;
-        lvDb.BeginUpdate(); lvDb.Items.Clear();
+        lvDb.BeginUpdate();
+        lvDb.Items.Clear();
+        lvDb.Groups.Clear();
+        lvDb.ShowGroups = true;
+
+        Dictionary<string, List<DbEntry>> grpMap = new Dictionary<string, List<DbEntry>>();
+        List<string> orderedKeys = new List<string>();
+
+        foreach (DbEntry e in db)
+        {
+            string k = e.IsReference ? "REF" : (String.IsNullOrEmpty(e.GeraetKey) ? "PC:" + (e.Computer ?? "").ToUpperInvariant() : e.GeraetKey);
+            if (!grpMap.ContainsKey(k))
+            {
+                grpMap[k] = new List<DbEntry>();
+                if (k != "REF") orderedKeys.Add(k);
+            }
+            grpMap[k].Add(e);
+        }
+
+        orderedKeys.Sort(delegate(string k1, string k2) {
+            string d1 = "", d2 = "";
+            foreach (DbEntry e in grpMap[k1]) { if (String.Compare(e.Datum, d1, StringComparison.Ordinal) > 0) d1 = e.Datum; }
+            foreach (DbEntry e in grpMap[k2]) { if (String.Compare(e.Datum, d2, StringComparison.Ordinal) > 0) d2 = e.Datum; }
+            return String.Compare(d2, d1, StringComparison.Ordinal);
+        });
+
+        if (grpMap.ContainsKey("REF")) orderedKeys.Add("REF");
+
+        Dictionary<string, ListViewGroup> lvGroups = new Dictionary<string, ListViewGroup>();
+        foreach (string k in orderedKeys)
+        {
+            List<DbEntry> entries = grpMap[k];
+            string headerText;
+            if (k == "REF")
+            {
+                int rCount = entries.Count;
+                headerText = String.Format("Referenz-Systeme  \u2022  {0}", rCount == 1 ? "1 Profil" : rCount + " Profile");
+            }
+            else
+            {
+                string devName = "";
+                string newestDate = "";
+                foreach (DbEntry e in entries)
+                {
+                    if (String.Compare(e.Datum, newestDate, StringComparison.Ordinal) >= 0)
+                    {
+                        newestDate = e.Datum;
+                        devName = !String.IsNullOrEmpty(e.Computer) ? e.Computer : e.DisplayName;
+                    }
+                }
+                if (String.IsNullOrEmpty(devName)) devName = "System";
+                int lCount = entries.Count;
+                string laufTxt = lCount == 1 ? "1 Lauf" : lCount + " Läufe";
+                string dateStr = FormatGroupDate(newestDate);
+                headerText = String.Format("{0}  \u2022  {1}  \u2022  zuletzt {2}", devName, laufTxt, dateStr);
+            }
+            ListViewGroup g = new ListViewGroup(k, headerText);
+            lvGroups[k] = g;
+            lvDb.Groups.Add(g);
+        }
+
         foreach (DbEntry e in db)
         {
             string gesamt = e.OverallScore > 0 ? Num(e.OverallScore, "N0") : "";
@@ -12673,6 +12872,8 @@ public partial class DiagGui
             ListViewItem it = new ListViewItem(new string[] { e.DisplayName, ShortDate(e.Datum), gesamt, e.Cpu, e.Gpu, e.Ram, Num(e.Get("CPU|MT"), "N0"), Num(e.Get("RAM|Lesen"), "N1") + (e.Get("RAM|Lesen") > 0 ? " GB/s" : ""), gpu, e.Befunde });
             it.Tag = e; it.ToolTipText = e.DisplayName + (e.Disk.Length > 0 ? "\r\n" + e.Disk : "") + (e.HasBench ? "" : "\r\n(ohne Benchmark-Werte)");
             if (!e.HasBench) it.ForeColor = UI.Muted;
+            string k = e.IsReference ? "REF" : (String.IsNullOrEmpty(e.GeraetKey) ? "PC:" + (e.Computer ?? "").ToUpperInvariant() : e.GeraetKey);
+            if (lvGroups.ContainsKey(k)) it.Group = lvGroups[k];
             lvDb.Items.Add(it);
         }
         if (lvDb.ListViewItemSorter != null) lvDb.Sort();
@@ -12701,6 +12902,10 @@ public partial class DiagGui
         if (btnDashboard != null)
         {
             btnDashboard.Text = n >= 2 ? n + " Systeme im Dashboard vergleichen" : (n == 1 ? "1 System im Dashboard anzeigen" : "Interaktives Dashboard");
+        }
+        if (btnVerlauf != null)
+        {
+            btnVerlauf.Enabled = (GetSelectedDeviceTarget() != null);
         }
         if (btnRename != null)
         {
@@ -12817,6 +13022,71 @@ public partial class DiagGui
     void CompareSelected()
     {
         OpenDashboard();
+    }
+
+    DbEntry GetSelectedDeviceTarget()
+    {
+        List<DbEntry> targets = new List<DbEntry>();
+        if (lvDb != null)
+        {
+            if (lvDb.SelectedItems.Count > 0)
+            {
+                foreach (ListViewItem it in lvDb.SelectedItems)
+                {
+                    DbEntry e = it.Tag as DbEntry;
+                    if (e != null && !e.IsReference) targets.Add(e);
+                }
+            }
+            else if (lvDb.CheckedItems.Count > 0)
+            {
+                foreach (ListViewItem it in lvDb.CheckedItems)
+                {
+                    DbEntry e = it.Tag as DbEntry;
+                    if (e != null && !e.IsReference) targets.Add(e);
+                }
+            }
+        }
+        if (targets.Count == 0) return null;
+        string firstKey = targets[0].GeraetKey;
+        if (String.IsNullOrEmpty(firstKey) || firstKey == "REF") return null;
+        for (int i = 1; i < targets.Count; i++)
+        {
+            if (targets[i].GeraetKey != firstKey) return null;
+        }
+        return targets[0];
+    }
+
+    public void OpenDeviceHistory(DbEntry specificTarget = null)
+    {
+        DbEntry target = specificTarget != null ? specificTarget : GetSelectedDeviceTarget();
+        if (target == null) return;
+        string devKey = target.GeraetKey;
+        if (String.IsNullOrEmpty(devKey)) return;
+
+        List<DbEntry> runs = new List<DbEntry>();
+        foreach (DbEntry e in db)
+        {
+            if (!e.IsReference && e.GeraetKey == devKey) runs.Add(e);
+        }
+        runs.Sort(delegate(DbEntry a, DbEntry b) { return String.Compare(a.Datum, b.Datum, StringComparison.Ordinal); });
+        if (runs.Count == 0) return;
+
+        List<string> paths = new List<string>();
+        foreach (DbEntry e in runs) paths.Add(e.Path);
+
+        Cursor = Cursors.WaitCursor;
+        List<string> lines = new List<string>(); string res = "";
+        string args = "-Dashboard -DashboardModus Verlauf -DashboardSysteme \"" + String.Join(";", paths.ToArray()) + "\"";
+        try { res = RunHelper(args, out lines); }
+        catch (Exception ex) { lines.Add("Dashboard-Aufruf fehlgeschlagen: " + ex.Message); }
+        Cursor = Cursors.Default;
+        if (res.Length > 0 && File.Exists(res)) OpenShell(res);
+        else
+        {
+            string dashPath = System.IO.Path.Combine(dataDir, "Berichte\\Dashboard.html");
+            if (File.Exists(dashPath)) OpenShell(dashPath);
+            else MessageBox.Show(this, "Das Dashboard konnte nicht geöffnet werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Leos Minibench", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
     }
 
     void OpenDashboard()
@@ -15352,10 +15622,73 @@ public partial class DiagGui
             if (gVal > 0) kpiGpu = Math.Round(gVal, 0) + " FPS";
         }
 
-        KpiBox kpi1 = new KpiBox("Gesamt", kpiGesamt); kpi1.Dock = DockStyle.Fill; Tip(kpi1, "Gesamtpunktzahl des letzten Benchmarklaufs.");
-        KpiBox kpi2 = new KpiBox("CPU Mehrkern", kpiCpu); kpi2.Dock = DockStyle.Fill; Tip(kpi2, "CPU-Mehrkern-Punktzahl des letzten Laufs.");
-        KpiBox kpi3 = new KpiBox("RAM Lesen", kpiRam); kpi3.Dock = DockStyle.Fill; Tip(kpi3, "Gemessener Speicherdurchsatz beim Lesen.");
-        KpiBox kpi4 = new KpiBox("Grafik", kpiGpu); kpi4.Dock = DockStyle.Fill; kpi4.Margin = new Padding(0); Tip(kpi4, "Gemessene Bildrate im Grafik-Rendertest.");
+        // Finde vorherigen Lauf dieses Rechners (chronologisch aufsteigend)
+        List<DbEntry> thisPcRuns = new List<DbEntry>();
+        string devKey = lastRun != null ? lastRun.GeraetKey : null;
+        foreach (DbEntry e in db)
+        {
+            if (e.IsReference) continue;
+            bool match = false;
+            if (!String.IsNullOrEmpty(devKey) && !String.IsNullOrEmpty(e.GeraetKey) && String.Equals(e.GeraetKey, devKey, StringComparison.OrdinalIgnoreCase))
+                match = true;
+            else if (!String.IsNullOrEmpty(e.Computer) && (String.Equals(e.Computer, curPc, StringComparison.OrdinalIgnoreCase) || e.Computer.StartsWith(curPc + "_", StringComparison.OrdinalIgnoreCase)))
+                match = true;
+            else if (!String.IsNullOrEmpty(e.Name) && String.Equals(e.Name, curPc, StringComparison.OrdinalIgnoreCase))
+                match = true;
+
+            if (match) thisPcRuns.Add(e);
+        }
+        thisPcRuns.Sort(delegate(DbEntry a, DbEntry b) {
+            return String.Compare(a.Datum, b.Datum, StringComparison.Ordinal);
+        });
+
+        DbEntry prevRun = null;
+        if (thisPcRuns.Count >= 2 && lastRun != null)
+        {
+            int idx = thisPcRuns.IndexOf(lastRun);
+            if (idx > 0) prevRun = thisPcRuns[idx - 1];
+            else if (idx < 0) prevRun = thisPcRuns[thisPcRuns.Count - 2];
+        }
+
+        string dGesamt = null, dCpu = null, dRam = null, dGpu = null;
+        if (prevRun != null && lastRun != null)
+        {
+            if (prevRun.OverallScore > 0 && lastRun.OverallScore > 0)
+            {
+                double d = Math.Round(((lastRun.OverallScore - prevRun.OverallScore) / (double)prevRun.OverallScore) * 100.0, 0);
+                dGesamt = (d >= 0 ? "â†‘ +" : "â†“ ") + d.ToString("0", CultureInfo.CurrentCulture) + " %";
+            }
+            double prevCpu = prevRun.Get("CPU|MT");
+            double curCpu = lastRun.Get("CPU|MT");
+            if (prevCpu > 0 && curCpu > 0)
+            {
+                double d = Math.Round(((curCpu - prevCpu) / prevCpu) * 100.0, 0);
+                dCpu = (d >= 0 ? "â†‘ +" : "â†“ ") + d.ToString("0", CultureInfo.CurrentCulture) + " %";
+            }
+            double prevRam = prevRun.Get("RAM|Lesen");
+            if (prevRam <= 0) prevRam = prevRun.Get("RAM|Read");
+            double curRam = lastRun.Get("RAM|Lesen");
+            if (curRam <= 0) curRam = lastRun.Get("RAM|Read");
+            if (prevRam > 0 && curRam > 0)
+            {
+                double d = Math.Round(((curRam - prevRam) / prevRam) * 100.0, 0);
+                dRam = (d >= 0 ? "â†‘ +" : "â†“ ") + d.ToString("0", CultureInfo.CurrentCulture) + " %";
+            }
+            double prevGpu = prevRun.Get("GPU|REND");
+            if (prevGpu <= 0) prevGpu = prevRun.Get("GPU|FPS");
+            double curGpu = lastRun.Get("GPU|REND");
+            if (curGpu <= 0) curGpu = lastRun.Get("GPU|FPS");
+            if (prevGpu > 0 && curGpu > 0)
+            {
+                double d = Math.Round(((curGpu - prevGpu) / prevGpu) * 100.0, 0);
+                dGpu = (d >= 0 ? "â†‘ +" : "â†“ ") + d.ToString("0", CultureInfo.CurrentCulture) + " %";
+            }
+        }
+
+        KpiBox kpi1 = new KpiBox("Gesamt", kpiGesamt, dGesamt); kpi1.Dock = DockStyle.Fill; Tip(kpi1, "Gesamtpunktzahl des letzten Benchmarklaufs" + (dGesamt != null ? " (" + dGesamt + " zum vorigen Lauf)" : "") + ".");
+        KpiBox kpi2 = new KpiBox("CPU Mehrkern", kpiCpu, dCpu); kpi2.Dock = DockStyle.Fill; Tip(kpi2, "CPU-Mehrkern-Punktzahl des letzten Laufs" + (dCpu != null ? " (" + dCpu + " zum vorigen Lauf)" : "") + ".");
+        KpiBox kpi3 = new KpiBox("RAM Lesen", kpiRam, dRam); kpi3.Dock = DockStyle.Fill; Tip(kpi3, "Gemessener Speicherdurchsatz beim Lesen" + (dRam != null ? " (" + dRam + " zum vorigen Lauf)" : "") + ".");
+        KpiBox kpi4 = new KpiBox("Grafik", kpiGpu, dGpu); kpi4.Dock = DockStyle.Fill; kpi4.Margin = new Padding(0); Tip(kpi4, "Gemessene Bildrate im Grafik-Rendertest" + (dGpu != null ? " (" + dGpu + " zum vorigen Lauf)" : "") + ".");
 
         kpiGrid.Controls.Add(kpi1, 0, 0);
         kpiGrid.Controls.Add(kpi2, 1, 0);
@@ -15420,6 +15753,27 @@ public partial class DiagGui
         Tip(btnDash, "Öffnet das interaktive Dashboard zum grafischen Vergleich mit anderen Systemen.");
         btnDash.Click += delegate { OpenDashboard(); };
         pnlButtons.Controls.Add(btnDash);
+        Button btnVerlauf = new Button();
+        btnVerlauf.Text = "Verlauf";
+        btnVerlauf.FlatStyle = FlatStyle.Flat;
+        btnVerlauf.FlatAppearance.BorderColor = UI.Accent;
+        btnVerlauf.FlatAppearance.BorderSize = 1;
+        btnVerlauf.BackColor = UI.IsDark ? Color.FromArgb(24, 44, 68) : Color.FromArgb(234, 243, 252);
+        btnVerlauf.ForeColor = UI.IsDark ? Color.FromArgb(100, 180, 246) : Color.FromArgb(0, 100, 190);
+        btnVerlauf.FlatAppearance.MouseOverBackColor = UI.Accent;
+        btnVerlauf.FlatAppearance.MouseDownBackColor = UI.AccentActive;
+        btnVerlauf.Font = new Font("Segoe UI Semibold", 8.5f);
+        btnVerlauf.Padding = new Padding(UI.S(10), UI.S(3), UI.S(10), UI.S(3));
+        btnVerlauf.Margin = new Padding(UI.S(6), UI.S(2), 0, 0);
+        btnVerlauf.AutoSize = true;
+        btnVerlauf.Cursor = Cursors.Hand;
+        btnVerlauf.UseVisualStyleBackColor = false;
+        btnVerlauf.MouseEnter += delegate { btnVerlauf.ForeColor = UI.OnAccent; };
+        btnVerlauf.MouseLeave += delegate { btnVerlauf.ForeColor = UI.IsDark ? Color.FromArgb(100, 180, 246) : Color.FromArgb(0, 100, 190); };
+        Tip(btnVerlauf, "Ã–ffnet das interaktive Dashboard im Verlaufsmodus fÃ¼r diesen PC.");
+        DbEntry devHistoryTarget = lastRun;
+        btnVerlauf.Click += delegate { if (devHistoryTarget != null) OpenDeviceHistory(devHistoryTarget); };
+        pnlButtons.Controls.Add(btnVerlauf);
         actGrid.Controls.Add(pnlButtons, 0, 0);
 
         string befundeText = "Befunde: keine";
@@ -17087,6 +17441,13 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("3.87", "29.10.2026", "Läufe je Gerät bündeln (Verlauf ohne eigene Seite)",
+            "• ListViewGroup-Gruppierung in der Datenbank: Die Datenbank-ListView gruppiert alle Messungen automatisch nach Geräten (Hardware-Signatur über Geraet.Id oder Computername) mit Angabe von Gerätename, Laufanzahl und jüngstem Messdatum. Referenzprofile sind am Listenende in einer geschlossenen Gruppe gebündelt. Volle Farbschema-Unterstützung (Hell/Dunkel) ohne Kontrastfehler.\r\n" +
+            "• Verlauf-Aktionen in Datenbank & Startseite: Neue Schaltfläche 'Verlauf' sowie Kontextmenüeintrag 'Geräte-Verlauf im Dashboard öffnen' in der Datenbankansicht; Kachel 'Letzter Lauf' auf der Startseite mit 'Verlauf'-Button und kompakten Trend-Pfeilen (↑ +X %, ↓ -X %) für die 4 Kern-KPIs (Gesamt, CPU Mehrkern, RAM Lesen, Grafik) gegen den direkten Vorläufer desselben PCs.\r\n" +
+            "• Interaktiver Verlaufsmodus im Dashboard: Timeline-Vergleich aller chronologischen Läufe des ausgewählten Rechners (von links = ältester nach rechts = neuester Lauf) mit Delta-Badges zum vorherigen Lauf, Hardware-Inventar-Differenzanalyse (BIOS, Treiber, Windows-Build, RAM-Takt) und Liniendiagrammen über die Zeit für Leistung, SSD-/Akku-Verschleiß und Höchsttemperaturen mit striktem Vergleichbarkeitsfilter.\r\n" +
+            "• Neuer Berichtsabschnitt 'Seit dem letzten Lauf': Kompakte Gegenüberstellung der Kernmesswerte und Inventar-Modifikationen direkt vor der Leistungsmessung im HTML-Diagnosebericht sowie strukturierter Export in die KI-Zusammenfassung.\r\n" +
+            "• Strikte 3-Läufe-Regel für Trend-Befunde: Statistische Trendwarnungen (z. B. CPU unter gleicher Last signifikant wärmer) werden frühestens ab mindestens drei Läufen und nur bei Überschreitung der doppelten Standardabweichung ausgelöst; Einzellauf-Faktenhinweis schützt vor verfrühten Warnungen.\r\n" +
+            "• Lineare SSD-Verschleiß-Hochrechnung: Transparente Restlebensdauer-Prognose auf Basis von TBW / Percentage Used und Zeitintervall als geschätzte Hochrechnung des bisherigen Schreibaufkommens."),
         new Eintrag("3.86", "29.10.2026", "Update-Prüfung, Grafiktreiber-Links, Resizable BAR, geprüfter System-Umzug mit WLAN & Gesamtläufe",
             "• Asynchrone Update-Prüfung & Self-Replace: Lautlose Versionsprüfung im Hintergrund mit 24h-Cache; dezenter Badge in der Kopfzeile und Update-Kachel auf der Startseite; Download von LMB.exe nach Minibench-Daten\\Update\\, SHA-256-Validierung und nahtloser Austausch mit Archivierung nach Minibench-Daten\\Archiv\\v<alteVersion>\\ über Update.cmd; abschaltbar über Einstellungen.\r\n" +
             "• Offizielle Grafiktreiber-Links & Laptop-Hinweis: Direkte Hersteller-Downloadlinks für NVIDIA, AMD und Intel; dedizierte Schnell-behebbar-Karte mit 'Treiber laden'-Schaltfläche bei Treibern älter als 18 Monate; klarer OEM-Hinweis bei Hybridgrafik auf Notebooks; zusätzliche Treiberversions-Gegenprüfung via nvidia-smi.\r\n" +
@@ -17541,7 +17902,7 @@ function Test-StepEnabled([string]$Key) {
     return $false
 }
 
-if (-not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $SensorLive -and -not $SensorWerkzeugeHolen -and -not $SensorAufraeumen -and -not $OptimierungZustand -and -not $OptWerkzeugeHolen -and -not $SoftwareInstallieren -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardSysteme -and -not $MedianAktualisieren -and -not $Umzug) {
+if (-not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $SensorLive -and -not $SensorWerkzeugeHolen -and -not $SensorAufraeumen -and -not $OptimierungZustand -and -not $OptWerkzeugeHolen -and -not $SoftwareInstallieren -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardModus -and -not $DashboardSysteme -and -not $MedianAktualisieren -and -not $Umzug) {
     # Berichte landen ausschlieÃŸlich im Datenordner neben dem Programm (z. B. auf dem USB-Stick)
     if (-not $OutputDir) {
         $base = $(if ($script:DataDir) { Join-Path $script:DataDir 'Berichte' } else { Join-Path $env:TEMP 'LeosMinibench-Berichte' })
@@ -18536,9 +18897,13 @@ function Out-Report {
 
 function Add-Finding {
     param([ValidateSet('KRITISCH', 'WARNUNG', 'INFO')][string]$Level, [string]$Area, [string]$Text)
+    if ($null -eq $script:Findings) { $script:Findings = [System.Collections.Generic.List[object]]::new() }
+    if ($null -eq $script:FindKeys) { $script:FindKeys = [System.Collections.Generic.HashSet[string]]::new() }
     if ($script:FindKeys -and -not $script:FindKeys.Add(('{0}|{1}|{2}' -f $Level, $Area, $Text))) { return }
     $script:Findings.Add([pscustomobject]@{ Stufe = $Level; Bereich = $Area; Befund = $Text })
-    Send-GuiEvent 'FIND' $Level $Area $Text
+    if (Get-Command 'Send-GuiEvent' -ErrorAction SilentlyContinue) {
+        Send-GuiEvent 'FIND' $Level $Area $Text
+    }
     $color = @{ KRITISCH = 'Red'; WARNUNG = 'Yellow'; INFO = 'DarkCyan' }[$Level]
     Write-Host ('    [{0}] {1}: {2}' -f $Level, $Area, $Text) -ForegroundColor $color
 }
@@ -20194,8 +20559,268 @@ function New-CompareReport([string[]]$Paths) {
     Write-Host ('Vergleich gespeichert: {0}' -f $file)
     return $file
 }
-#endregion
 
+# Ermittelt Verlaufsdaten fÃ¼r dasselbe GerÃ¤t aus frÃ¼heren Läufen der Datenbank
+function Get-DeviceRunComparison {
+    param(
+        [object[]]$Entries = @(),
+        [string]$DeviceId = '',
+        [string]$ComputerName = ''
+    )
+    if (-not $Entries -or -not $Entries.Count) {
+        if (Get-Command 'Get-DbEntries' -ErrorAction SilentlyContinue) {
+            $Entries = @(Get-DbEntries)
+        }
+    }
+    if (-not $DeviceId -and -not $ComputerName) {
+        try {
+            $dev = Get-DeviceIdentity
+            if ($dev) { $DeviceId = [string]$dev.Id }
+        } catch { }
+        $ComputerName = $env:COMPUTERNAME
+    }
+
+    $allRuns = @(if (Get-Command 'Get-DbDeviceRuns' -ErrorAction SilentlyContinue) { Get-DbDeviceRuns -Entries $Entries -DeviceId $DeviceId -ComputerName $ComputerName } else { @() })
+    $nowStr = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+    if ($script:StartTime) { $nowStr = $script:StartTime.ToString('yyyy-MM-dd HH:mm:ss') }
+    $earlierRuns = @($allRuns | Where-Object { $null -ne $_.Datum -and $_.Datum -lt $nowStr })
+
+    if (-not $earlierRuns.Count) {
+        return [pscustomobject]@{
+            HasHistory       = $false
+            EarlierCount     = 0
+            TotalCount       = 1
+            PrevRun          = $null
+            PrevDate         = ''
+            TimeSpanDays     = 0
+            InventoryChanges = @()
+            MetricDeltas     = @()
+            SsdWear          = $null
+            TrendFindings    = @()
+        }
+    }
+
+    $prev = $earlierRuns[-1]
+    $prevDateStr = [string]$prev.Datum
+    $days = 0.0
+    try {
+        $pDt = [datetime]::Parse($prevDateStr)
+        $cDt = $(if ($script:StartTime) { $script:StartTime } else { Get-Date })
+        $days = [math]::Max(0.0, [math]::Round(($cDt - $pDt).TotalDays, 1))
+    } catch { }
+
+    # 1. Inventar-Ã„nderungen ermitteln
+    $diffs = [System.Collections.Generic.List[object]]::new()
+    $curBios = $(if ($script:Facts -and $script:Facts.Contains('BIOS/UEFI')) { [string]$script:Facts['BIOS/UEFI'] } else { '' })
+    $prevBios = $(if ($prev.Hardware -and $prev.Hardware.BiosVersion) { [string]$prev.Hardware.BiosVersion } elseif ($prev.Hardware -and $prev.Hardware.BIOS) { [string]$prev.Hardware.BIOS } else { '' })
+    if ($curBios -and $prevBios) {
+        $cBVer = if ($curBios -match '([A-Za-z0-9._-]+)\s+vom') { $matches[1] } else { $curBios }
+        $pBVer = if ($prevBios -match '([A-Za-z0-9._-]+)\s+vom') { $matches[1] } else { $prevBios }
+        if ($cBVer -ne $pBVer) {
+            $diffs.Add([pscustomobject]@{ Item = 'BIOS'; Old = $pBVer; New = $cBVer; Text = ('BIOS: {0} &rarr; <b>{1}</b>' -f $pBVer, $cBVer) })
+        }
+    }
+
+    $curDrv = $(if ($script:Facts -and $script:Facts.Contains('Grafik')) { [string]$script:Facts['Grafik'] } else { '' })
+    $prevDrv = $(if ($prev.Hardware -and $prev.Hardware.GpuDriver) { [string]$prev.Hardware.GpuDriver } elseif ($prev.Hardware -and $prev.Hardware.GrafikTreiber) { [string]$prev.Hardware.GrafikTreiber } else { '' })
+    if ($curDrv -and $prevDrv) {
+        $cDrvVer = if ($curDrv -match '(\d{2,3}\.\d{2})') { $matches[1] } else { $curDrv }
+        $pDrvVer = if ($prevDrv -match '(\d{2,3}\.\d{2})') { $matches[1] } else { $prevDrv }
+        if ($cDrvVer -ne $pDrvVer) {
+            $diffs.Add([pscustomobject]@{ Item = 'Grafiktreiber'; Old = $pDrvVer; New = $cDrvVer; Text = ('Grafiktreiber: {0} &rarr; <b>{1}</b>' -f $pDrvVer, $cDrvVer) })
+        }
+    }
+
+    $curOs = $(if ($script:Facts -and $script:Facts.Contains('Betriebssystem')) { [string]$script:Facts['Betriebssystem'] } else { '' })
+    $prevOs = $(if ($prev.Hardware -and $prev.Hardware.WinBuild) { [string]$prev.Hardware.WinBuild } elseif ($prev.System) { [string]$prev.System } else { '' })
+    if ($curOs -and $prevOs) {
+        $cBuild = if ($curOs -match 'Build\s+(\d+)') { $matches[1] } else { '' }
+        $pBuild = if ($prevOs -match '(\d{5})') { $matches[1] } else { $prevOs }
+        if ($cBuild -and $pBuild -and $cBuild -ne $pBuild) {
+            $diffs.Add([pscustomobject]@{ Item = 'Windows-Build'; Old = $pBuild; New = $cBuild; Text = ('Windows: Build {0} &rarr; <b>Build {1}</b>' -f $pBuild, $cBuild) })
+        }
+    }
+
+    $curRam = $(if ($script:Facts -and $script:Facts.Contains('Arbeitsspeicher')) { [string]$script:Facts['Arbeitsspeicher'] } else { '' })
+    $prevRam = $(if ($prev.Hardware -and $prev.Hardware.RAM) { [string]$prev.Hardware.RAM } else { '' })
+    if ($curRam -and $prevRam) {
+        $cSpd = if ($curRam -match '(\d{4,5}\s*MT/s)') { $matches[1] } else { '' }
+        $pSpd = if ($prevRam -match '(\d{4,5}\s*MT/s)') { $matches[1] } else { '' }
+        if ($cSpd -and $pSpd -and $cSpd -ne $pSpd) {
+            $diffs.Add([pscustomobject]@{ Item = 'RAM-Takt'; Old = $pSpd; New = $cSpd; Text = ('RAM: {0} &rarr; <b>{1}</b>' -f $pSpd, $cSpd) })
+        }
+    }
+
+    # 2. Kernmesswerte-Deltas ermitteln
+    $curVals = if (Get-Command 'Get-CurrentRefValues' -ErrorAction SilentlyContinue) { Get-CurrentRefValues } else { @{} }
+    $deltas = [System.Collections.Generic.List[object]]::new()
+    $metricDefs = @(
+        @{ Key = 'CPU|MT'; Name = 'CPU Mehrkern'; Unit = 'Pkt.'; Fmt = 'N0'; Lower = $false }
+        @{ Key = 'CPU|ST'; Name = 'CPU Einzelkern'; Unit = 'Pkt.'; Fmt = 'N0'; Lower = $false }
+        @{ Key = 'RAM|Lesen'; Name = 'Arbeitsspeicher Lesen'; Unit = 'GB/s'; Fmt = 'N1'; Lower = $false; AltKey = 'RAM|READ' }
+        @{ Key = 'GPU|REND'; Name = 'Grafik Renderleistung'; Unit = 'FPS'; Fmt = 'N0'; Lower = $false; AltKey = 'GPU|FPS' }
+        @{ Key = 'DISK|NVMe4|SR'; Name = 'SSD Sequentiell lesen'; Unit = 'MB/s'; Fmt = 'N0'; Lower = $false; AltKey = 'LW|SR' }
+        @{ Key = 'DISK|NVMe4|R1'; Name = 'SSD 4K Random Read'; Unit = 'IOPS'; Fmt = 'N0'; Lower = $false; AltKey = 'LW|R1' }
+    )
+
+    foreach ($m in $metricDefs) {
+        $cV = $(if ($curVals.Contains($m.Key)) { [double]$curVals[$m.Key] } elseif ($m.AltKey -and $curVals.Contains($m.AltKey)) { [double]$curVals[$m.AltKey] } else { 0.0 })
+        $pV = 0.0
+        if ($prev.Werte) {
+            if ($prev.Werte.ContainsKey($m.Key)) { $pV = [double]$prev.Werte[$m.Key] }
+            elseif ($m.AltKey -and $prev.Werte.ContainsKey($m.AltKey)) { $pV = [double]$prev.Werte[$m.AltKey] }
+        }
+        if ($pV -le 0 -and $prev.Messwerte) {
+            if ($prev.Messwerte.ContainsKey($m.Key)) { $pV = [double]$prev.Messwerte[$m.Key] }
+            elseif ($m.AltKey -and $prev.Messwerte.ContainsKey($m.AltKey)) { $pV = [double]$prev.Messwerte[$m.AltKey] }
+        }
+        if ($cV -gt 0 -and $pV -gt 0) {
+            $diffPct = [math]::Round((($cV - $pV) / $pV) * 100.0, 1)
+            $diffAbs = [math]::Round($cV - $pV, 1)
+            $badgeCls = if ($diffPct -ge 3.0) { 'ok' } elseif ($diffPct -le -5.0) { 'warn' } else { 'neutral' }
+            $deltas.Add([pscustomobject]@{
+                Key       = $m.Key
+                Name      = $m.Name
+                Unit      = $m.Unit
+                CurrVal   = $cV
+                PrevVal   = $pV
+                CurrText  = (('{0:' + $m.Fmt + '} {1}') -f $cV, $m.Unit)
+                PrevText  = (('{0:' + $m.Fmt + '} {1}') -f $pV, $m.Unit)
+                DiffPct   = $diffPct
+                DiffAbs   = $diffAbs
+                BadgeCls  = $badgeCls
+                SignStr   = $(if ($diffPct -ge 0) { '+' } else { '' })
+            })
+        }
+    }
+
+    # 3. SSD-Verschleiß-Hochrechnung
+    $ssdWearObj = $null
+    $curUsed = $null
+    if ($script:SmartData -and $null -ne $script:SmartData.PercentageUsed) { $curUsed = [double]$script:SmartData.PercentageUsed }
+    elseif ($curVals.Contains('SSD|Wear')) { $curUsed = [double]$curVals['SSD|Wear'] }
+    $prevUsed = $null
+    if ($prev.Hardware -and $null -ne $prev.Hardware.SsdWearPct) { $prevUsed = [double]$prev.Hardware.SsdWearPct }
+    elseif ($prev.Werte -and $prev.Werte.ContainsKey('SSD|Wear')) { $prevUsed = [double]$prev.Werte['SSD|Wear'] }
+
+    if ($curUsed -ne $null -and $prevUsed -ne $null) {
+        $dUsed = $curUsed - $prevUsed
+        $projText = ''
+        $estYears = $null
+        if ($days -gt 0 -and $dUsed -gt 0) {
+            $dailyRate = $dUsed / $days
+            $remPct = [math]::Max(0.0, 100.0 - $curUsed)
+            $remDays = $remPct / $dailyRate
+            $estYears = [math]::Round($remDays / 365.25, 1)
+            $projText = ('Geschätzte Hochrechnung basierend auf dem bisherigen Schreibaufkommen: voraussichtlich ca. {0:N1} Jahre Restlebensdauer (aktueller Verbrauch: {1:N0} %).' -f $estYears, $curUsed)
+        } else {
+            $projText = ('Geschätzte Hochrechnung basierend auf dem bisherigen Schreibaufkommen: minimaler Verschleiß zwischen den Läufen ({0:N0} % verbraucht, Restlebensdauer > 10 Jahre).' -f $curUsed)
+        }
+        $ssdWearObj = [pscustomobject]@{
+            HasWearData    = $true
+            CurrentUsedPct = $curUsed
+            PrevUsedPct    = $prevUsed
+            DaysElapsed    = $days
+            EstimatedYears = $estYears
+            ProjectionText = $projText
+        }
+    }
+
+    # 4. Trend-Befunde (Strikte 3-Läufe-Regel: erst ab mindestens 3 Läufen)
+    $totalCount = $earlierRuns.Count + 1
+    $trendFindings = [System.Collections.Generic.List[object]]::new()
+    if ($totalCount -ge 3) {
+        $curTMax = $(if ($script:Telemetry -and $script:Telemetry.CpuTempMax) { [double]$script:Telemetry.CpuTempMax }
+                     elseif ($curVals.Contains('LAST|CpuTempMax')) { [double]$curVals['LAST|CpuTempMax'] }
+                     else { $null })
+
+        $compTemps = [System.Collections.Generic.List[double]]::new()
+        foreach ($r in $earlierRuns) {
+            $t = $null
+            if ($r.Hardware -and $r.Hardware.CpuTempMax) { $t = [double]$r.Hardware.CpuTempMax }
+            elseif ($r.Werte -and $r.Werte.ContainsKey('LAST|CpuTempMax')) { $t = [double]$r.Werte['LAST|CpuTempMax'] }
+            if ($null -ne $t -and $t -gt 30.0 -and $t -lt 115.0) {
+                $dauer = $(if ($r.Messdauer -match '(\d+)') { [int]$matches[1] } else { 0 })
+                if ($dauer -ge 60 -or -not $dauer) {
+                    $compTemps.Add($t)
+                }
+            }
+        }
+        if ($curTMax -ne $null -and $compTemps.Count -ge 2) {
+            $sum = 0.0; foreach ($t in $compTemps) { $sum += $t }
+            $mean = $sum / $compTemps.Count
+            $sqDiff = 0.0; foreach ($t in $compTemps) { $sqDiff += [math]::Pow($t - $mean, 2) }
+            $stdDev = [math]::Sqrt($sqDiff / [math]::Max(1, ($compTemps.Count - 1)))
+            $margin = [math]::Max(4.0, 2.0 * $stdDev)
+            $deltaT = $curTMax - $mean
+            if ($deltaT -ge 8.0 -and $deltaT -gt $margin) {
+                $fObj = [pscustomobject]@{
+                    Level = 'WARNUNG'
+                    Area  = 'Kühlung'
+                    Text  = ('CPU unter gleicher Last {0:N0} K wärmer als im vorherigen Verlauf: Kühlung/WÃ¤rmeleitpaste prüfen' -f [math]::Round($deltaT))
+                }
+                $trendFindings.Add($fObj)
+                if (Get-Command 'Add-Finding' -ErrorAction SilentlyContinue) {
+                    Add-Finding $fObj.Level $fObj.Area $fObj.Text
+                }
+            }
+        }
+    }
+
+    return [pscustomobject]@{
+        HasHistory       = $true
+        EarlierCount     = $earlierRuns.Count
+        TotalCount       = $totalCount
+        PrevRun          = $prev
+        PrevDate         = $prevDateStr
+        TimeSpanDays     = $days
+        InventoryChanges = @($diffs)
+        MetricDeltas     = @($deltas)
+        SsdWear          = $ssdWearObj
+        TrendFindings    = @($trendFindings)
+    }
+}
+
+# HTML-Abschnitt "Seit dem letzten Lauf" fÃ¼r den Diagnosebericht
+function New-RunHistoryHtml {
+    $comp = Get-DeviceRunComparison
+    if (-not $comp -or -not $comp.HasHistory) { return '' }
+
+    $sb = New-Object System.Text.StringBuilder
+    $timeNote = if ($comp.TimeSpanDays -gt 0) { ('vor {0:N0} Tagen am {1}' -f $comp.TimeSpanDays, $comp.PrevDate) } else { ('Lauf vom {0}' -f $comp.PrevDate) }
+    $compParam = [System.Uri]::EscapeDataString($env:COMPUTERNAME)
+
+    [void]$sb.Append('<section class="box" data-section="benchmark">')
+    [void]$sb.Append(('<div class="bar"><h2>Seit dem letzten Lauf ({0})</h2><a href="../Dashboard.html?mode=history&system={1}" class="tab-btn btn-dash" target="_blank" style="margin-left:auto; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:600; padding:4px 10px; border-radius:4px; font-size:12px;">Geräte-Verlauf im Dashboard öffnen &rarr;</a></div>' -f
+        (ConvertTo-HtmlText $timeNote), $compParam))
+
+    if ($comp.InventoryChanges.Count) {
+        [void]$sb.Append('<div style="margin:8px 0 14px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">')
+        [void]$sb.Append('<span style="font-size:12px; font-weight:600; color:var(--text-muted, #6B7280);">Geändert:</span>')
+        foreach ($d in $comp.InventoryChanges) {
+            [void]$sb.Append(('<span class="badge info" style="font-size:11px; text-transform:none; font-weight:normal; padding:3px 8px; border:1px solid rgba(0,120,212,0.3);">{0}</span>' -f $d.Text))
+        }
+        [void]$sb.Append('</div>')
+    }
+
+    if ($comp.MetricDeltas.Count) {
+        [void]$sb.Append('<div class="tw"><table><thead><tr><th>Kernmesswert</th><th class="r">Voriger Lauf</th><th class="r">Aktueller Lauf</th><th>Abweichung</th></tr></thead><tbody>')
+        foreach ($m in $comp.MetricDeltas) {
+            $badgeCls = switch ($m.BadgeCls) { 'ok' { 'badge ok' } 'warn' { 'badge warn' } default { 'badge neutral' } }
+            [void]$sb.Append(('<tr><td><b>{0}</b></td><td class="num r">{1}</td><td class="num r"><b>{2}</b></td><td><span class="{3}">{4}{5:N1} %</span></td></tr>' -f
+                (ConvertTo-HtmlText $m.Name), (ConvertTo-HtmlText $m.PrevText), (ConvertTo-HtmlText $m.CurrText), $badgeCls, $m.SignStr, $m.DiffPct))
+        }
+        [void]$sb.Append('</tbody></table></div>')
+    }
+
+    if ($comp.SsdWear -and $comp.SsdWear.ProjectionText) {
+        [void]$sb.Append(('<p class="note tight" style="margin-top:10px;"><em>{0}</em></p>' -f (ConvertTo-HtmlText $comp.SsdWear.ProjectionText)))
+    }
+
+    [void]$sb.Append('</section>')
+    return $sb.ToString()
+}
+#endregion
 # =====================================================================================
 #             LEOS MINIBENCH: BENCHMARK- & DIAGNOSE-DASHBOARD (HTML5/VANILLA-JS)
 # =====================================================================================
@@ -20209,6 +20834,7 @@ function Export-BenchDashboardData {
         [string]$DatabaseDir = '',
         [string]$ReportDir = '',
         [string[]]$SystemPaths = @(),
+        [Alias('DashboardModus')][string]$Modus = '',
         [switch]$IncludeReferences = $true,
         [string]$OutputPath = '',
         [switch]$AsJson
@@ -20499,6 +21125,28 @@ function Export-BenchDashboardData {
         $os = $(if ($j.Hardware -and $j.Hardware.Betriebssystem) { [string]$j.Hardware.Betriebssystem } elseif ($j.System) { [string]$j.System } else { '' })
         $winInst = $(if ($j.Hardware -and $j.Hardware.WindowsInstalliert) { [string]$j.Hardware.WindowsInstalliert } else { '' })
         $sysBoard = $(if ($j.System) { [string]$j.System } else { '' })
+        $gid = $(if ($j.Geraet -and $j.Geraet.Id) { [string]$j.Geraet.Id } elseif ($j.GeraetId) { [string]$j.GeraetId } else { '' })
+        $gKey = $(if ($isRef) { 'REF' } elseif ($gid) { $gid } else { 'PC:' + $comp.ToUpperInvariant() })
+        $biosVer = $(if ($j.Hardware -and $j.Hardware.BiosVersion) { [string]$j.Hardware.BiosVersion } elseif ($mb -match 'BIOS\s+([A-Za-z0-9._-]+)') { $matches[1] } else { '' })
+        $biosDate = $(if ($j.Hardware -and $j.Hardware.BiosDatum) { [string]$j.Hardware.BiosDatum } elseif ($mb -match '(\d{2}[./-]\d{2}[./-]\d{2,4}|\d{4}-\d{2}-\d{2})') { $matches[1] } else { '' })
+        $gpuDriver = $(if ($j.Hardware -and $j.Hardware.GpuTreiber) { [string]$j.Hardware.GpuTreiber } else {
+            $dMatch = @($j.Befunde.Liste | Where-Object { $_ -match 'Treiber\s+([\d.]+)' }) | Select-Object -First 1
+            if ($dMatch -and $dMatch -match 'Treiber\s+([\d.]+)' ) { $matches[1] } else { '' }
+        })
+        $winBuild = $(if ($os -match 'Build\s+(\d+(?:\.\d+)?)') { $matches[1] } else { '' })
+        $ramSpeed = $(if ($ram -match '((?:DDR\d+-\d+|\d+\s*MHz))') { $matches[1] } else { '' })
+        $batWear = $null
+        if ($j.Akku -and $j.Akku.Count -gt 0) {
+            $b0 = $j.Akku[0]
+            if ($null -ne $b0.VerschleissProzent) { $batWear = [double]$b0.VerschleissProzent }
+            elseif ($b0.DesignmWh -and $b0.VollmWh -and [double]$b0.DesignmWh -gt 0) {
+                $batWear = [math]::Round((1.0 - ([double]$b0.VollmWh / [double]$b0.DesignmWh)) * 100.0, 1)
+            }
+        }
+        $ssdWear = $null
+        if ($j.SMART -and $null -ne $j.SMART.PercentageUsed) { $ssdWear = [double]$j.SMART.PercentageUsed }
+        elseif ($j.Sensoren -and $null -ne $j.Sensoren.PercentageUsed) { $ssdWear = [double]$j.Sensoren.PercentageUsed }
+        elseif ($werte.ContainsKey('SSD|Wear')) { $ssdWear = [double]$werte['SSD|Wear'] }
 
         # Befunde
         $crit = 0; $warn = 0; $info = 0; $liste = @()
@@ -21011,7 +21659,12 @@ function Export-BenchDashboardData {
             Computer    = $comp
             DisplayName = $name
             Datum       = $datum
+            GeraetId    = $gid
+            GeraetKey   = $gKey
             IsReference = $isRef
+            Lasttest    = [string]$j.Lasttest
+            Messdauer   = [string]$j.Messdauer
+            Version     = $(if ($j.Version) { [string]$j.Version } else { '' })
             OS          = $os
             Hardware    = [ordered]@{
                 CPU                = $cpuRaw
@@ -21029,6 +21682,11 @@ function Export-BenchDashboardData {
                 WindowsInstalliert = $winInst
                 FastestDisk        = $(if ($fastestDisk) { $fastestDisk.Model } else { '' })
                 System             = $sysBoard
+                BiosVersion        = $biosVer
+                BiosDatum          = $biosDate
+                GpuDriver          = $gpuDriver
+                WinBuild           = $winBuild
+                RamSpeed           = $ramSpeed
                 PowerDisplay       = $pDisplay
                 PowerLoad          = $pLoadVal
                 PowerIdle          = $pIdleVal
@@ -21058,6 +21716,7 @@ function Export-BenchDashboardData {
                 GPU_STUTTER   = $gpuStutter
                 GPU_VMB       = $gpuVmb
                 FastestDisk   = $fastestDisk
+                DISK_R1       = $(if ($fastestDisk -and $fastestDisk.R1) { [double]$fastestDisk.R1 } else { $null })
                 Disks         = @($disksList)
                 DisksByClass  = $disksByClass
                 LAST_CpuTemp  = $cpuTMax
@@ -21070,6 +21729,8 @@ function Export-BenchDashboardData {
                 EFF_CPU         = $effCpu
                 EFF_GPU         = $effGpu
                 EFF_SYS         = $effSys
+                BatteryWearPct  = $batWear
+                SsdWearPct      = $ssdWear
             }
             Telemetry   = [ordered]@{
                 TestType                 = $(if ($isBenchFallback) { 'Benchmark' } elseif ($lasttestArt) { $lasttestArt } else { 'Lasttest' })
@@ -21176,6 +21837,7 @@ function Export-BenchDashboardData {
     $aggData = [ordered]@{
         Version        = $(if ($script:ScriptVersion) { $script:ScriptVersion } else { '3.7' })
         Generated      = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+        Mode           = $(if ($Modus -ieq 'Verlauf' -or $Modus -ieq 'history') { 'history' } else { 'compare' })
         PreselectedIds = @($preselectedIds)
         Systems        = @($systems)
         References     = @($references)
@@ -21881,6 +22543,68 @@ function Get-BenchDashboardHtmlTemplate {
       border-top: 1px solid var(--card-border);
     }
 
+
+    /* VERLAUFS-MODUS & DELTA-BADGES (v3.87) */
+    .mode-tab-btn {
+      padding: 7px 16px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+      background: var(--card-bg);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .mode-tab-btn:hover {
+      background: var(--neutral-bg);
+      color: var(--text);
+    }
+    .mode-tab-btn.active {
+      background: var(--accent);
+      color: #FFFFFF;
+      border-color: var(--accent);
+    }
+    [data-theme="dark"] .mode-tab-btn.active {
+      color: #0A1017;
+    }
+    .delta-badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 4px;
+      margin-left: 6px;
+      white-space: nowrap;
+    }
+    .delta-badge.pos {
+      background: var(--ok-bg);
+      color: var(--ok-text);
+      border: 1px solid var(--ok-border);
+    }
+    .delta-badge.neg {
+      background: var(--crit-bg);
+      color: var(--crit-text);
+      border: 1px solid var(--crit-border);
+    }
+    .delta-badge.neutral {
+      background: var(--neutral-bg);
+      color: var(--text-muted);
+      border: 1px solid var(--card-border);
+    }
+    .diff-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      margin: 2px 4px 2px 0;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      background: var(--accent-subtle);
+      color: var(--accent);
+      border: 1px solid var(--accent-border);
+      font-weight: 500;
+    }
   </style>
 </head>
 <body>
@@ -21905,8 +22629,23 @@ function Get-BenchDashboardHtmlTemplate {
     </div>
   </header>
 
+  <!-- MODUS-LEISTE (MULTI-SYSTEM-VERGLEICH VS. GERÄTE-VERLAUF) -->
+  <div class="dash-mode-bar" style="margin: 14px 0 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+    <div class="dash-mode-tabs" style="display: flex; gap: 8px;">
+      <button id="tabModeCompare" class="mode-tab-btn active" type="button" title="Systemübergreifender Multi-System-Vergleich">Multi-System-Vergleich</button>
+      <button id="tabModeHistory" class="mode-tab-btn" type="button" title="Chronologischer Verlauf aller Läufe eines Rechners">Geräte-Verlauf (Timeline)</button>
+    </div>
+    <div id="historyDeviceWrap" style="display: none; align-items: center; gap: 10px;">
+      <span class="selector-label" style="margin: 0; font-weight: 600;">Rechner:</span>
+      <div class="select-wrapper" style="min-width: 260px;">
+        <select id="deviceSelect"></select>
+        <span class="select-arrow">▼</span>
+      </div>
+    </div>
+  </div>
+
   <!-- MULTI-SYSTEM SELECTOR -->
-  <section class="selector-card">
+  <section id="compareSelectorCard" class="selector-card">
     <div class="selector-top">
       <div class="selector-base-wrap">
         <div class="selector-label">Basis- / Referenzsystem (100 % Bezugspunkt)</div>
@@ -21984,10 +22723,19 @@ function Get-BenchDashboardHtmlTemplate {
         <h2>Lasttest-Telemetrie &amp; Multi-System-Sensorverlauf</h2>
         <p>Sensorverlauf über die Belastungsdauer mit Farbcodierung je System.</p>
       </div>
-      <div class="chart-controls">
+      <div id="chartControlsCompare" class="chart-controls">
         <button id="btnModeCpu" class="chart-btn active" type="button">CPU</button>
         <button id="btnModeGpu" class="chart-btn" type="button">GPU</button>
         <button id="btnModeWatt" class="chart-btn" type="button">Leistung (W)</button>
+      </div>
+      <div id="chartControlsHistory" class="chart-controls" style="display: none; flex-wrap: wrap;">
+        <button id="btnHistOverall" class="chart-btn active" type="button">Gesamt</button>
+        <button id="btnHistCpu" class="chart-btn" type="button">CPU</button>
+        <button id="btnHistGpu" class="chart-btn" type="button">Grafik (FPS)</button>
+        <button id="btnHistDisk" class="chart-btn" type="button">SSD 4K</button>
+        <button id="btnHistSsdWear" class="chart-btn" type="button">SSD-Verschleiß</button>
+        <button id="btnHistBatWear" class="chart-btn" type="button">Akku-Verschleiß</button>
+        <button id="btnHistTemp" class="chart-btn" type="button">Höchsttemperaturen</button>
       </div>
     </div>
 
@@ -22034,7 +22782,11 @@ window.MINIBENCH_DASHBOARD_DATA = window.MINIBENCH_DASHBOARD_DATA || null;
   let baseSystem = null;
   let comparedSystems = [];
   let selectedCompareIds = new Set();
-  let chartMode = 'cpu'; // 'cpu', 'gpu'
+  let chartMode = 'cpu'; // 'cpu', 'gpu', 'watt'
+  let dashboardMode = (data && data.Mode === 'history') ? 'history' : 'compare';
+  let historyChartMetric = 'overall'; // 'overall', 'cpu', 'gpu', 'disk', 'ssdwear', 'batwear', 'temp'
+  let selectedDeviceKey = null;
+  let deviceGroups = new Map(); // key -> { name, runs: [] }
 
   function escapeHtml(str) {
     if (str === null || str === undefined) return '';
@@ -22409,6 +23161,33 @@ window.MINIBENCH_DASHBOARD_DATA = window.MINIBENCH_DASHBOARD_DATA || null;
       }
     }
 
+    buildDeviceGroups();
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('mode') === 'history' || urlParams.get('mode') === 'verlauf') {
+        dashboardMode = 'history';
+      }
+      const devP = urlParams.get('device') || urlParams.get('system') || urlParams.get('pc');
+      if (devP) {
+        const tDev = devP.toLowerCase();
+        deviceGroups.forEach((grp, key) => {
+          if (key.toLowerCase() === tDev || grp.name.toLowerCase().includes(tDev) || grp.runs.some(r => (r.Computer && r.Computer.toLowerCase() === tDev) || (r.Id && r.Id.toLowerCase() === tDev))) {
+            selectedDeviceKey = key;
+          }
+        });
+      }
+    } catch(e) {}
+
+    if (tabModeCompare) tabModeCompare.addEventListener('click', () => setDashboardMode('compare'));
+    if (tabModeHistory) tabModeHistory.addEventListener('click', () => setDashboardMode('history'));
+    if (deviceSelect) {
+      deviceSelect.addEventListener('change', () => {
+        selectedDeviceKey = deviceSelect.value;
+        updateDashboard();
+      });
+    }
+
+    setDashboardMode(dashboardMode);
     renderCompareChips();
     updateDashboard();
 
@@ -22456,6 +23235,21 @@ window.MINIBENCH_DASHBOARD_DATA = window.MINIBENCH_DASHBOARD_DATA || null;
     btnModeGpu.addEventListener('click', () => { setChartMode('gpu'); });
     if (btnModeWatt) btnModeWatt.addEventListener('click', () => { setChartMode('watt'); });
 
+    // History Metric Umschalter
+    const histBtns = [
+      { id: 'btnHistOverall', m: 'overall' },
+      { id: 'btnHistCpu', m: 'cpu' },
+      { id: 'btnHistGpu', m: 'gpu' },
+      { id: 'btnHistDisk', m: 'disk' },
+      { id: 'btnHistSsdWear', m: 'ssdwear' },
+      { id: 'btnHistBatWear', m: 'batwear' },
+      { id: 'btnHistTemp', m: 'temp' }
+    ];
+    histBtns.forEach(b => {
+      const el = document.getElementById(b.id);
+      if (el) el.addEventListener('click', () => setHistoryMetric(b.m));
+    });
+
     window.addEventListener('resize', renderChart);
   }
 
@@ -22466,6 +23260,125 @@ window.MINIBENCH_DASHBOARD_DATA = window.MINIBENCH_DASHBOARD_DATA || null;
     if (btnModeWatt) btnModeWatt.classList.toggle('active', mode === 'watt');
     renderChartLegend();
     renderChart();
+  }
+
+  function setHistoryMetric(m) {
+    historyChartMetric = m;
+    const histIds = ['btnHistOverall', 'btnHistCpu', 'btnHistGpu', 'btnHistDisk', 'btnHistSsdWear', 'btnHistBatWear', 'btnHistTemp'];
+    histIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('active');
+    });
+    const map = {
+      overall: 'btnHistOverall',
+      cpu: 'btnHistCpu',
+      gpu: 'btnHistGpu',
+      disk: 'btnHistDisk',
+      ssdwear: 'btnHistSsdWear',
+      batwear: 'btnHistBatWear',
+      temp: 'btnHistTemp'
+    };
+    const act = document.getElementById(map[m]);
+    if (act) act.classList.add('active');
+    renderChartLegend();
+    renderChart();
+  }
+
+  function buildDeviceGroups() {
+    deviceGroups.clear();
+    const all = data.Systems || [];
+    all.forEach(s => {
+      if (s.IsReference) return;
+      const key = s.GeraetKey || s.GeraetId || ('PC:' + (s.Computer || 'SYSTEM').toUpperCase());
+      if (!deviceGroups.has(key)) {
+        deviceGroups.set(key, {
+          name: s.Computer || s.DisplayName || 'System',
+          runs: []
+        });
+      }
+      deviceGroups.get(key).runs.push(s);
+    });
+    deviceGroups.forEach(grp => {
+      grp.runs.sort((runA, runB) => String(runA.Datum || '').localeCompare(String(runB.Datum || '')));
+      if (grp.runs.length > 0) {
+        const newest = grp.runs[grp.runs.length - 1];
+        grp.name = newest.Computer || newest.DisplayName || grp.name;
+      }
+    });
+    populateDeviceSelect();
+  }
+
+  function populateDeviceSelect() {
+    const devSel = document.getElementById('deviceSelect');
+    if (!devSel) return;
+    devSel.innerHTML = '';
+    deviceGroups.forEach((grp, key) => {
+      const opt = document.createElement('option');
+      opt.value = key;
+      const count = grp.runs.length;
+      const lastRun = count > 0 ? grp.runs[count - 1] : null;
+      const lastDate = lastRun && lastRun.Datum ? ' (' + lastRun.Datum.split(' ')[0] + ')' : '';
+      opt.textContent = grp.name + ' (' + count + ' ' + (count === 1 ? 'Lauf' : 'Läufe') + lastDate + ')';
+      devSel.appendChild(opt);
+    });
+    if (selectedDeviceKey && deviceGroups.has(selectedDeviceKey)) {
+      devSel.value = selectedDeviceKey;
+    } else if (deviceGroups.size > 0) {
+      selectedDeviceKey = deviceGroups.keys().next().value;
+      devSel.value = selectedDeviceKey;
+    }
+  }
+
+  function getInventoryDiff(prev, curr) {
+    if (!prev || !curr) return null;
+    const diffs = [];
+    const prevBios = (prev.Hardware?.BiosVersion || '') + (prev.Hardware?.BiosDatum ? ' (' + prev.Hardware.BiosDatum + ')' : '');
+    const currBios = (curr.Hardware?.BiosVersion || '') + (curr.Hardware?.BiosDatum ? ' (' + curr.Hardware.BiosDatum + ')' : '');
+    if (prevBios && currBios && prevBios !== currBios) {
+      diffs.push('BIOS: ' + escapeHtml(prevBios) + ' &rarr; <b>' + escapeHtml(currBios) + '</b>');
+    } else if (!prevBios && currBios) {
+      diffs.push('BIOS: <b>' + escapeHtml(currBios) + '</b>');
+    }
+    const prevDrv = prev.Hardware?.GpuDriver || '';
+    const currDrv = curr.Hardware?.GpuDriver || '';
+    if (prevDrv && currDrv && prevDrv !== currDrv) {
+      diffs.push('Grafiktreiber: ' + escapeHtml(prevDrv) + ' &rarr; <b>' + escapeHtml(currDrv) + '</b>');
+    } else if (!prevDrv && currDrv) {
+      diffs.push('Grafiktreiber: <b>' + escapeHtml(currDrv) + '</b>');
+    }
+    const prevBuild = prev.Hardware?.WinBuild || '';
+    const currBuild = curr.Hardware?.WinBuild || '';
+    if (prevBuild && currBuild && prevBuild !== currBuild) {
+      diffs.push('Windows: Build ' + escapeHtml(prevBuild) + ' &rarr; <b>Build ' + escapeHtml(currBuild) + '</b>');
+    }
+    const prevRam = prev.Hardware?.RamSpeed || prev.Hardware?.RAM || '';
+    const currRam = curr.Hardware?.RamSpeed || curr.Hardware?.RAM || '';
+    if (prevRam && currRam && prevRam !== currRam) {
+      diffs.push('RAM: ' + escapeHtml(prevRam) + ' &rarr; <b>' + escapeHtml(currRam) + '</b>');
+    }
+    const prevDisk = prev.Hardware?.Datentraeger || '';
+    const currDisk = curr.Hardware?.Datentraeger || '';
+    if (prevDisk && currDisk && prevDisk !== currDisk) {
+      diffs.push('Laufwerke aktualisiert');
+    }
+    return diffs;
+  }
+
+  function setDashboardMode(mode) {
+    dashboardMode = mode;
+    const tabC = document.getElementById('tabModeCompare');
+    const tabH = document.getElementById('tabModeHistory');
+    const selCard = document.getElementById('compareSelectorCard');
+    const devWrap = document.getElementById('historyDeviceWrap');
+    const ctrlC = document.getElementById('chartControlsCompare');
+    const ctrlH = document.getElementById('chartControlsHistory');
+    if (tabC) tabC.classList.toggle('active', mode === 'compare');
+    if (tabH) tabH.classList.toggle('active', mode === 'history');
+    if (selCard) selCard.style.display = (mode === 'compare') ? 'block' : 'none';
+    if (devWrap) devWrap.style.display = (mode === 'history') ? 'flex' : 'none';
+    if (ctrlC) ctrlC.style.display = (mode === 'compare') ? 'flex' : 'none';
+    if (ctrlH) ctrlH.style.display = (mode === 'history') ? 'flex' : 'none';
+    updateDashboard();
   }
 
   function populateBaseSelect() {
@@ -22540,23 +23453,32 @@ window.MINIBENCH_DASHBOARD_DATA = window.MINIBENCH_DASHBOARD_DATA || null;
   }
 
   function updateDashboard() {
-    baseSystem = getSystemById(baseSelect.value);
-    if (!baseSystem && getAllSystems().length > 0) {
-      baseSystem = getAllSystems()[0];
-      baseSelect.value = String(baseSystem.Id);
+    const countBadge = document.getElementById('comparedCountBadge');
+    if (dashboardMode === 'history') {
+      const grp = deviceGroups.get(selectedDeviceKey);
+      comparedSystems = grp ? grp.runs.slice() : [];
+      baseSystem = comparedSystems.length > 0 ? comparedSystems[0] : null;
+      if (countBadge) {
+        const n = comparedSystems.length;
+        countBadge.textContent = n + (n === 1 ? ' Lauf für diesen Rechner' : ' Läufe für diesen Rechner (chronologisch)');
+      }
+    } else {
+      baseSystem = getSystemById(baseSelect.value);
+      if (!baseSystem && getAllSystems().length > 0) {
+        baseSystem = getAllSystems()[0];
+        baseSelect.value = String(baseSystem.Id);
+      }
+      comparedSystems = [];
+      if (baseSystem) comparedSystems.push(baseSystem);
+      selectedCompareIds.forEach(id => {
+        const s = getSystemById(id);
+        if (s && s !== baseSystem) comparedSystems.push(s);
+      });
+      if (countBadge) {
+        const totalN = comparedSystems.length;
+        countBadge.textContent = totalN + (totalN === 1 ? ' System' : ' Systeme im Vergleich');
+      }
     }
-
-    // Liste aller aktiven Systeme: Basissystem zuerst, dann die angehakten
-    comparedSystems = [];
-    if (baseSystem) comparedSystems.push(baseSystem);
-
-    selectedCompareIds.forEach(id => {
-      const s = getSystemById(id);
-      if (s && s !== baseSystem) comparedSystems.push(s);
-    });
-
-    const totalN = comparedSystems.length;
-    comparedCountBadge.textContent = totalN + (totalN === 1 ? ' System' : ' Systeme im Vergleich');
 
     renderSpecsTable();
     renderProfilesGrid();
@@ -22594,6 +23516,24 @@ window.MINIBENCH_DASHBOARD_DATA = window.MINIBENCH_DASHBOARD_DATA || null;
       </th>`;
     });
     html += '</tr></thead><tbody>';
+
+    let geaendertRow = '';
+    if (dashboardMode === 'history') {
+      geaendertRow = '<tr style="background: var(--accent-subtle);"><td class="col-feature" style="font-weight: 700; color: var(--accent);">Geändert (Inventar)</td>';
+      comparedSystems.forEach((s, idx) => {
+        if (idx === 0) {
+          geaendertRow += '<td class="col-base" style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">Erster erfasster Lauf (Basis)</td>';
+        } else {
+          const diffs = getInventoryDiff(comparedSystems[idx - 1], s);
+          if (diffs && diffs.length > 0) {
+            geaendertRow += '<td>' + diffs.map(d => '<span class="diff-badge">' + d + '</span>').join(' ') + '</td>';
+          } else {
+            geaendertRow += '<td style="font-size:0.8rem; color:var(--ok-text);">Keine Änderungen</td>';
+          }
+        }
+      });
+      geaendertRow += '</tr>';
+    }
 
     const rows = [
       { key: 'Computer', label: 'Rechnername', get: s => escapeHtml(s.Computer || '-') },
@@ -22638,6 +23578,7 @@ window.MINIBENCH_DASHBOARD_DATA = window.MINIBENCH_DASHBOARD_DATA || null;
       html += '</tr>';
     });
 
+    if (geaendertRow) html = html.replace('<tbody>', '<tbody>' + geaendertRow);
     html += '</tbody>';
     specsTable.innerHTML = html;
   }
@@ -22921,6 +23862,10 @@ window.MINIBENCH_DASHBOARD_DATA = window.MINIBENCH_DASHBOARD_DATA || null;
   // 5. CHART-LEGENDE
   function renderChartLegend() {
     if (!chartLegend) return;
+    if (dashboardMode === 'history') {
+      renderHistoryLegend();
+      return;
+    }
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
     let html = '';
@@ -22964,6 +23909,10 @@ window.MINIBENCH_DASHBOARD_DATA = window.MINIBENCH_DASHBOARD_DATA || null;
   // 6. CANVAS CHART RENDERING (MULTI-SYSTEM CANVAS)
   function renderChart() {
     if (!canvas || !chartWrapper) return;
+    if (dashboardMode === 'history') {
+      renderHistoryChart();
+      return;
+    }
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
     const dpr = window.devicePixelRatio || 1;
@@ -23409,6 +24358,354 @@ window.MINIBENCH_DASHBOARD_DATA = window.MINIBENCH_DASHBOARD_DATA || null;
 
   // DOM READY
 
+  // 7. VERLAUFS-CHART (HISTORY MODE)
+  function isTempComparable(s, base) {
+    if (!s) return false;
+    const dauer = s.Messdauer != null ? Number(s.Messdauer) : 0;
+    if (dauer < 60) return false;
+    const vStr = String(s.Version || '0');
+    const vParts = vStr.split('.').map(Number);
+    const vNum = (vParts[0] || 0) * 100 + (vParts[1] || 0);
+    if (vNum < 267) return false;
+    const tType = s.Telemetry?.TestType || s.Lasttest || '';
+    if (!tType || tType === 'Benchmark') return false;
+    const bType = base?.Telemetry?.TestType || base?.Lasttest || '';
+    if (bType && bType !== 'Benchmark' && tType !== bType) return false;
+    return true;
+  }
+
+  function renderHistoryLegend() {
+    if (!chartLegend) return;
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    const subTitleEl = document.querySelector('.dash-card .card-head p');
+    if (subTitleEl) {
+      subTitleEl.textContent = 'Zeitlicher Verlauf der Messwerte fÃ¼r diesen Rechner Ã¼ber alle vorliegenden LÃ¤ufe.';
+    }
+
+    if (comparedSystems.length < 2) {
+      chartLegend.innerHTML = '<div style="font-size:0.85rem; color:var(--text-muted); font-style:italic;">Noch kein Verlauf verfÃ¼gbar â€“ mindestens zwei LÃ¤ufe fÃ¼r diesen PC erforderlich.</div>';
+      return;
+    }
+
+    let html = '';
+    const m = historyChartMetric;
+    if (m === 'overall') {
+      const col = isDark ? '#4CC2FF' : '#0078D4';
+      html = '<div class="legend-item"><div class="legend-color" style="background:' + col + ';"></div><span>Gesamtpunktzahl (Overall Score)</span></div>';
+    } else if (m === 'cpu') {
+      const cMt = isDark ? '#4CC2FF' : '#0078D4';
+      const cSt = isDark ? '#FFA057' : '#F7630C';
+      html = '<div class="legend-item"><div class="legend-color" style="background:' + cMt + ';"></div><span>CPU Mehrkern (MT, Punkte)</span></div>' +
+             '<div class="legend-item"><div class="legend-color" style="background:' + cSt + ';"></div><span>CPU Einzelkern (ST, Punkte)</span></div>';
+    } else if (m === 'gpu') {
+      const col = isDark ? '#6CCB5F' : '#107C41';
+      html = '<div class="legend-item"><div class="legend-color" style="background:' + col + ';"></div><span>Grafik-Renderleistung (FPS)</span></div>';
+    } else if (m === 'disk') {
+      const col = isDark ? '#B388FF' : '#8E44AD';
+      html = '<div class="legend-item"><div class="legend-color" style="background:' + col + ';"></div><span>SSD 4K Random Read (MB/s)</span></div>';
+    } else if (m === 'ssdwear') {
+      const col = isDark ? '#FF5A5A' : '#E81123';
+      html = '<div class="legend-item"><div class="legend-color" style="background:' + col + ';"></div><span>SSD-VerschleiÃŸ (Percentage Used %)</span></div>';
+    } else if (m === 'batwear') {
+      const col = isDark ? '#26A69A' : '#009688';
+      html = '<div class="legend-item"><div class="legend-color" style="background:' + col + ';"></div><span>Akku-Gesundheit (% der DesignkapazitÃ¤t)</span></div>';
+    } else if (m === 'temp') {
+      const cCpu = isDark ? '#FF5A5A' : '#E81123';
+      const cGpu = isDark ? '#FFA057' : '#F7630C';
+      html = '<div class="legend-item"><div class="legend-color" style="background:' + cCpu + ';"></div><span>CPU HÃ¶chsttemperatur (Â°C)</span></div>' +
+             '<div class="legend-item"><div class="legend-color" style="background:' + cGpu + ';"></div><span>GPU HÃ¶chsttemperatur (Â°C)</span></div>' +
+             '<div class="legend-item" style="margin-left:auto; font-size:0.8rem; color:var(--text-muted);"><span>Nur vergleichbare LÃ¤ufe (â‰¥ 60s, ab v2.67)</span></div>';
+    }
+
+    chartLegend.innerHTML = html;
+  }
+
+  function renderHistoryChart() {
+    if (!canvas || !chartWrapper) return;
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = chartWrapper.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, width, height);
+
+    if (comparedSystems.length < 2) {
+      ctx.fillStyle = isDark ? '#A0A0A0' : '#5F6368';
+      ctx.font = '14px Segoe UI, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Noch kein Verlauf verfÃ¼gbar â€“ mindestens zwei LÃ¤ufe fÃ¼r diesen PC erforderlich.', width / 2, height / 2);
+      canvas.onmousemove = null;
+      canvas.onmouseleave = null;
+      return;
+    }
+
+    const m = historyChartMetric;
+    const runs = comparedSystems;
+    const n = runs.length;
+
+    let series = [];
+    if (m === 'overall') {
+      series = [{ name: 'Gesamtpunktzahl', unit: 'Pkt.', color: isDark ? '#4CC2FF' : '#0078D4', getVal: s => s.Scores?.Overall }];
+    } else if (m === 'cpu') {
+      series = [
+        { name: 'CPU Mehrkern', unit: 'Pkt.', color: isDark ? '#4CC2FF' : '#0078D4', getVal: s => s.Metrics?.CPU_MT },
+        { name: 'CPU Einzelkern', unit: 'Pkt.', color: isDark ? '#FFA057' : '#F7630C', getVal: s => s.Metrics?.CPU_ST }
+      ];
+    } else if (m === 'gpu') {
+      series = [{ name: 'Grafik-Renderleistung', unit: 'FPS', color: isDark ? '#6CCB5F' : '#107C41', getVal: s => s.Metrics?.GPU_REND }];
+    } else if (m === 'disk') {
+      series = [{ name: 'SSD 4K Random Read', unit: 'MB/s', color: isDark ? '#B388FF' : '#8E44AD', getVal: s => (s.Metrics?.DISK_R1 != null ? s.Metrics.DISK_R1 : (s.Metrics?.FastestDisk?.R1 != null ? s.Metrics.FastestDisk.R1 : null)) }];
+    } else if (m === 'ssdwear') {
+      series = [{ name: 'SSD-VerschleiÃŸ', unit: '%', color: isDark ? '#FF5A5A' : '#E81123', getVal: s => s.Metrics?.SsdWearPct }];
+    } else if (m === 'batwear') {
+      series = [{ name: 'Akku-Gesundheit', unit: '%', color: isDark ? '#26A69A' : '#009688', getVal: s => s.Metrics?.BatteryWearPct }];
+    } else if (m === 'temp') {
+      series = [
+        { name: 'CPU Max', unit: 'Â°C', color: isDark ? '#FF5A5A' : '#E81123', getVal: s => (isTempComparable(s, runs[0]) ? (s.Metrics?.LAST_CpuTemp != null ? s.Metrics.LAST_CpuTemp : s.Telemetry?.CpuTempMax) : null) },
+        { name: 'GPU Max', unit: 'Â°C', color: isDark ? '#FFA057' : '#F7630C', getVal: s => (isTempComparable(s, runs[0]) ? (s.Metrics?.LAST_GpuTemp != null ? s.Metrics.LAST_GpuTemp : s.Telemetry?.GpuTempMax) : null) }
+      ];
+    }
+
+    let allVals = [];
+    series.forEach(sr => {
+      sr.data = runs.map(s => {
+        const v = sr.getVal(s);
+        const num = (v != null && !isNaN(Number(v))) ? Number(v) : null;
+        if (num != null) allVals.push(num);
+        return num;
+      });
+    });
+
+    if (allVals.length === 0) {
+      ctx.fillStyle = isDark ? '#A0A0A0' : '#5F6368';
+      ctx.font = '14px Segoe UI, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Keine Messwerte fÃ¼r diese Metrik in den LÃ¤ufen vorhanden.', width / 2, height / 2);
+      canvas.onmousemove = null;
+      canvas.onmouseleave = null;
+      return;
+    }
+
+    let minVal = Math.min(...allVals);
+    let maxVal = Math.max(...allVals);
+    if (minVal === maxVal) {
+      minVal = Math.max(0, minVal * 0.9 - 1);
+      maxVal = maxVal * 1.1 + 1;
+    } else {
+      const span = maxVal - minVal;
+      minVal = Math.max(0, minVal - span * 0.15);
+      maxVal = maxVal + span * 0.15;
+    }
+
+    const padding = { top: 35, right: 45, bottom: 55, left: 65 };
+    const chartW = width - padding.left - padding.right;
+    const chartH = height - padding.top - padding.bottom;
+
+    function getX(idx) {
+      if (n <= 1) return padding.left + chartW / 2;
+      return padding.left + (idx / (n - 1)) * chartW;
+    }
+
+    function getY(val) {
+      if (maxVal === minVal) return padding.top + chartH / 2;
+      return padding.top + chartH - ((val - minVal) / (maxVal - minVal)) * chartH;
+    }
+
+    // Gitterlinien & Achse
+    ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
+    ctx.lineWidth = 1;
+    ctx.fillStyle = isDark ? '#9CA3AF' : '#6B7280';
+    ctx.font = '11px Segoe UI, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+
+    const gridSteps = 5;
+    for (let step = 0; step <= gridSteps; step++) {
+      const gVal = minVal + (step / gridSteps) * (maxVal - minVal);
+      const gy = getY(gVal);
+      ctx.beginPath();
+      ctx.moveTo(padding.left, gy);
+      ctx.lineTo(padding.left + chartW, gy);
+      ctx.stroke();
+
+      const valLabel = (gVal >= 100) ? Math.round(gVal).toString() : (gVal >= 10 ? gVal.toFixed(1) : gVal.toFixed(2));
+      const u = series[0]?.unit || '';
+      ctx.fillText(valLabel + ' ' + u, padding.left - 8, gy);
+    }
+
+    // X-Achsen-Beschriftung
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    runs.forEach((s, idx) => {
+      const x = getX(idx);
+      const parts = (s.Datum || '').split(' ');
+      const dStr = parts[0] || ('Lauf ' + (idx + 1));
+      const tStr = parts[1] ? parts[1].substring(0, 5) : '';
+      ctx.fillStyle = isDark ? '#D1D5DB' : '#374151';
+      ctx.fillText(dStr, x, padding.top + chartH + 8);
+      if (tStr) {
+        ctx.fillStyle = isDark ? '#9CA3AF' : '#6B7280';
+        ctx.font = '10px Segoe UI, sans-serif';
+        ctx.fillText(tStr, x, padding.top + chartH + 22);
+        ctx.font = '11px Segoe UI, sans-serif';
+      }
+    });
+
+    // Linien & Datenpunkte zeichnen
+    series.forEach(sr => {
+      ctx.strokeStyle = sr.color;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      let started = false;
+      sr.data.forEach((val, idx) => {
+        if (val == null) {
+          started = false;
+          return;
+        }
+        const x = getX(idx);
+        const y = getY(val);
+        if (!started) {
+          ctx.moveTo(x, y);
+          started = true;
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      ctx.stroke();
+
+      sr.data.forEach((val, idx) => {
+        if (val == null) return;
+        const x = getX(idx);
+        const y = getY(val);
+        ctx.fillStyle = sr.color;
+        ctx.beginPath();
+        ctx.arc(x, y, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = isDark ? '#1F2937' : '#FFFFFF';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.fillStyle = isDark ? '#F3F4F6' : '#111827';
+        ctx.font = '10px Segoe UI, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        const vText = (val >= 100) ? Math.round(val).toString() : (val >= 10 ? val.toFixed(1) : val.toFixed(2));
+        ctx.fillText(vText, x, y - 6);
+      });
+    });
+
+    // Hover
+    canvas.onmousemove = function(e) {
+      const mRect = canvas.getBoundingClientRect();
+      const mx = e.clientX - mRect.left;
+      if (mx < padding.left - 20 || mx > padding.left + chartW + 20) {
+        tooltip.style.display = 'none';
+        renderHistoryChartStatic();
+        return;
+      }
+
+      let closestIdx = 0;
+      let closestDist = Infinity;
+      for (let i = 0; i < n; i++) {
+        const dist = Math.abs(mx - getX(i));
+        if (dist < closestDist) {
+          closestDist = dist;
+          closestIdx = i;
+        }
+      }
+
+      renderHistoryChartStatic();
+      const cx = getX(closestIdx);
+
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx, padding.top);
+      ctx.lineTo(cx, padding.top + chartH);
+      ctx.stroke();
+
+      series.forEach(sr => {
+        const val = sr.data[closestIdx];
+        if (val != null) {
+          const cy = getY(val);
+          ctx.fillStyle = sr.color;
+          ctx.beginPath();
+          ctx.arc(cx, cy, 6.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = isDark ? '#FFFFFF' : '#000000';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+      });
+      ctx.restore();
+
+      const curRun = runs[closestIdx];
+      const prevRun = closestIdx > 0 ? runs[closestIdx - 1] : null;
+
+      let tipHtml = '<div style=\"font-weight:700; font-size:12px; margin-bottom:4px;\">' + escapeHtml(curRun.Computer || 'PC') + ' Â· ' + escapeHtml(curRun.Datum || '') + '</div>';
+      if (curRun.Hardware?.BiosVersion) {
+        tipHtml += '<div style=\"font-size:10px; color:var(--text-muted); margin-bottom:6px;\">BIOS: ' + escapeHtml(curRun.Hardware.BiosVersion) + ' Â· Treiber: ' + escapeHtml(curRun.Hardware.GpuDriver || 'n/v') + '</div>';
+      }
+
+      series.forEach(sr => {
+        const curVal = sr.data[closestIdx];
+        if (curVal == null) {
+          tipHtml += '<div style=\"font-size:11px; margin-top:2px; color:var(--text-muted);\">â— ' + sr.name + ': nicht messbar/nicht vergleichbar</div>';
+          return;
+        }
+        let deltaStr = '';
+        if (prevRun) {
+          const prevVal = sr.data[closestIdx - 1];
+          if (prevVal != null && prevVal > 0) {
+            const diffPct = ((curVal - prevVal) / prevVal) * 100;
+            const diffAbs = curVal - prevVal;
+            const sign = diffAbs >= 0 ? '+' : '';
+            const color = (m === 'temp' || m === 'ssdwear')
+              ? (diffAbs <= 0 ? 'var(--good)' : 'var(--bad)')
+              : (diffAbs >= 0 ? 'var(--good)' : 'var(--bad)');
+            deltaStr = ' <span style=\"color:' + color + '; font-weight:700; margin-left:4px;\">(' + sign + diffPct.toFixed(1) + ' %, ' + sign + diffAbs.toFixed(1) + ' ' + sr.unit + ')</span>';
+          }
+        }
+        const vText = (curVal >= 100) ? Math.round(curVal).toString() : (curVal >= 10 ? curVal.toFixed(1) : curVal.toFixed(2));
+        tipHtml += '<div style=\"font-size:11px; margin-top:3px;\"><span style=\"color:' + sr.color + '; font-weight:600;\">â— ' + sr.name + ':</span> <b>' + vText + ' ' + sr.unit + '</b>' + deltaStr + '</div>';
+      });
+
+      tooltip.innerHTML = tipHtml;
+      tooltip.style.display = 'block';
+      const tipW = Math.max(260, tooltip.offsetWidth || 280);
+      let tooltipX = cx + 15;
+      if (tooltipX + tipW > width) tooltipX = cx - tipW - 15;
+      tooltip.style.left = Math.max(10, tooltipX) + 'px';
+      tooltip.style.top = (padding.top + 10) + 'px';
+    };
+
+    canvas.onmouseleave = function() {
+      tooltip.style.display = 'none';
+      renderHistoryChartStatic();
+    };
+
+    function renderHistoryChartStatic() {
+      renderHistoryChartNoHover();
+    }
+  }
+
+  function renderHistoryChartNoHover() {
+    renderHistoryChart();
+  }
 
   // DOM READY
   if (document.readyState === 'loading') {
@@ -23431,13 +24728,14 @@ function New-BenchDashboardHtml {
         [string]$DatabaseDir = '',
         [string]$ReportDir = '',
         [string[]]$SystemPaths = @(),
+        [Alias('DashboardModus')][string]$Modus = '',
         [string]$OutputPath = '',
         [switch]$PassThru
     )
 
     $data = $DashboardData
     if (-not $data) {
-        $data = Export-BenchDashboardData -DatabaseDir $DatabaseDir -ReportDir $ReportDir -SystemPaths $SystemPaths -IncludeReferences
+        $data = Export-BenchDashboardData -DatabaseDir $DatabaseDir -ReportDir $ReportDir -SystemPaths $SystemPaths -IncludeReferences -Modus $Modus
     }
 
     $json = $data | ConvertTo-Json -Depth 10 -Compress
@@ -23469,7 +24767,8 @@ function Export-BenchDashboardHtml {
         [Alias('DatenOrdner', 'AppDir')]
         [string]$DatabaseDir = '',
         [string]$ReportDir = '',
-        [string[]]$SystemPaths = @()
+        [string[]]$SystemPaths = @(),
+        [Alias('DashboardModus')][string]$Modus = ''
     )
 
     $target = $OutputPath
@@ -23489,7 +24788,7 @@ function Export-BenchDashboardHtml {
         }
     }
 
-    return (New-BenchDashboardHtml -OutputPath $target -DatabaseDir $DatabaseDir -ReportDir $ReportDir -SystemPaths $SystemPaths)
+    return (New-BenchDashboardHtml -OutputPath $target -DatabaseDir $DatabaseDir -ReportDir $ReportDir -SystemPaths $SystemPaths -Modus $Modus)
 }
 
 function Show-BenchDashboard {
@@ -23498,7 +24797,8 @@ function Show-BenchDashboard {
         [string]$DatabaseDir = '',
         [string]$ReportDir = '',
         [string]$OutputPath = '',
-        [string[]]$SystemPaths = @()
+        [string[]]$SystemPaths = @(),
+        [Alias('DashboardModus')][string]$Modus = ''
     )
 
     $f = Export-BenchDashboardHtml -OutputPath $OutputPath -DatabaseDir $DatabaseDir -ReportDir $ReportDir -SystemPaths $SystemPaths
@@ -24291,6 +25591,10 @@ function New-HtmlReport {
         $refDat = ''; try { if ($script:Ref.Datum) { $refDat = ' vom ' + [datetime]::ParseExact([string]$script:Ref.Datum, 'yyyy-MM-dd', $script:Inv).ToString('dd.MM.yyyy') } } catch { $refDat = ' vom ' + $script:Ref.Datum }
         $refNote = $(if ($script:RefSavedNow -and -not (Test-HasReference)) { ' Dieser Lauf wurde als Referenz gespeichert; ab dem nächsten Lauf ist dieser PC 100 %.' }
             elseif ($script:RefSavedNow) { ' Referenz 100 % = {0}{1}; dieser Lauf wurde als neue Referenz gespeichert und gilt ab dem nächsten Lauf.' -f $script:Ref.Name, $refDat } elseif (Test-HasReference) { ' Referenz 100 % = {0}{1}, Laufwerke im Vergleich zur gleichen Klasse.' -f $script:Ref.Name, $refDat } else { ' Keine Referenz festgelegt (Haken "Dieses System als Referenz festlegen" im Benchmark).' })
+        if (Get-Command 'New-RunHistoryHtml' -ErrorAction SilentlyContinue) {
+            $histHtml = New-RunHistoryHtml
+            if ($histHtml) { [void]$sb.Append($histHtml) }
+        }
         [void]$sb.Append('<section class="box" data-section="benchmark"><div class="bar"><h2>Leistung (Benchmark)</h2><button onclick="var d=this.closest(''section'').querySelectorAll(''details''),o=!d[0].open;for(var i=0;i<d.length;i++)d[i].open=o">Alle auf- oder zuklappen</button></div>')
         [void]$sb.Append(('<p class="note">Index 100 in den Tabellen entspricht dem typischen Wert der Hardwareklasse.{0} Vergleich bezieht sich auf frühere Läufe auf diesem PC, grün besser, orange mindestens 10 % schlechter. Für den Systemvergleich das Dashboard nutzen.</p>' -f $refNote))
         if (Get-Command 'New-ProfileCards' -ErrorAction SilentlyContinue) {
@@ -24890,7 +26194,7 @@ function Read-Minidumps {
 #endregion
 
 #region ---------- C#-Testroutinen (RAM, CPU, Energiesparen) ----------
-if ($FullLanguage -and -not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $SensorLive -and -not $SensorWerkzeugeHolen -and -not $SensorAufraeumen -and -not $OptimierungZustand -and -not $OptWerkzeugeHolen -and -not $SoftwareInstallieren -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardSysteme -and -not $MedianAktualisieren -and -not $Umzug -and -not ('DiagDiskStress' -as [type])) {
+if ($FullLanguage -and -not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $SensorLive -and -not $SensorWerkzeugeHolen -and -not $SensorAufraeumen -and -not $OptimierungZustand -and -not $OptWerkzeugeHolen -and -not $SoftwareInstallieren -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardModus -and -not $DashboardSysteme -and -not $MedianAktualisieren -and -not $Umzug -and -not ('DiagDiskStress' -as [type])) {
     $csCode = @'
 using System;
 using System.ComponentModel;
@@ -27591,6 +28895,32 @@ function New-KiExport {
         }
     }
 
+    $comp = if (Get-Command 'Get-DeviceRunComparison' -ErrorAction SilentlyContinue) { Get-DeviceRunComparison } else { $null }
+    if ($comp -and $comp.HasHistory) {
+        & $head 'GERÄTE-VERLAUF (Seit dem letzten Lauf)'
+        & $add ('Voriger Lauf         : {0} ({1:N0} Tage her)' -f $comp.PrevDate, $comp.TimeSpanDays)
+        if ($comp.InventoryChanges.Count) {
+            & $add ('Inventar-Änderungen  : {0}' -f (($comp.InventoryChanges | ForEach-Object { $_.Text -replace '&rarr;', '->' -replace '<[^>]+>', '' }) -join '; '))
+        } else {
+            & $add 'Inventar-Änderungen  : keine Hardware- oder Firmwareänderungen erkannt'
+        }
+        if ($comp.MetricDeltas.Count) {
+            & $add 'Kernmesswerte (Messung; Vorher; Aktuell; Delta)'
+            foreach ($m in $comp.MetricDeltas) {
+                & $add ('  {0,-22}: {1} -> {2} ({3}{4:N1} %)' -f $m.Name, $m.PrevText, $m.CurrText, $m.SignStr, $m.DiffPct)
+            }
+        }
+        if ($comp.SsdWear -and $comp.SsdWear.ProjectionText) {
+            & $add ('SSD-Lebensdauer      : {0}' -f $comp.SsdWear.ProjectionText)
+        }
+        if ($comp.TrendFindings.Count) {
+            & $add 'Trend-Befunde (ab 3 Läufen):'
+            foreach ($f in $comp.TrendFindings) {
+                & $add ('  [{0}] {1}: {2}' -f $f.Level, $f.Area, $f.Text)
+            }
+        }
+    }
+
     if ($script:BenchResults.Count -or $script:BenchDisks.Count) {
         & $head 'BENCHMARK'
         & $add $(if ($script:RefSavedNow -and -not (Test-HasReference)) { 'Dieser Lauf wurde als Referenz gespeichert (ab dem nächsten Lauf 100 %)' }
@@ -28963,7 +30293,7 @@ $script:SensorNotes = New-Object System.Collections.Generic.List[string]
 $script:SensorSnapshot = $null
 $script:SensorDb = [ordered]@{}
 
-if ($FullLanguage -and -not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $SensorWerkzeugeHolen -and -not $SensorAufraeumen -and -not $OptimierungZustand -and -not $OptWerkzeugeHolen -and -not $SoftwareInstallieren -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardSysteme -and -not $MedianAktualisieren -and -not $Umzug -and -not ('DiagSensors' -as [type])) {
+if ($FullLanguage -and -not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $SensorWerkzeugeHolen -and -not $SensorAufraeumen -and -not $OptimierungZustand -and -not $OptWerkzeugeHolen -and -not $SoftwareInstallieren -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardModus -and -not $DashboardSysteme -and -not $MedianAktualisieren -and -not $Umzug -and -not ('DiagSensors' -as [type])) {
     $sensCode = @'
 using System;
 using System.Collections;
@@ -32454,7 +33784,7 @@ if ($Vergleich) {
 }
 
 # Interaktives Dashboard generieren oder öffnen (wird von der Oberfläche oder über die Befehlszeile aufgerufen)
-if ($Dashboard -or $DashboardExport -or $DashboardSysteme) {
+if ($Dashboard -or $DashboardExport -or $DashboardSysteme -or $DashboardModus) {
     $df = ''
     try {
         $outPath = $(if ($DashboardExport) { $DashboardExport } else { '' })
@@ -32462,7 +33792,7 @@ if ($Dashboard -or $DashboardExport -or $DashboardSysteme) {
         if ($DashboardSysteme) {
             $sysPaths = @($DashboardSysteme -split ';' | Where-Object { $_ -and (Test-Path -LiteralPath $_) })
         }
-        $df = Export-BenchDashboardHtml -OutputPath $outPath -SystemPaths $sysPaths
+        $df = Export-BenchDashboardHtml -OutputPath $outPath -SystemPaths $sysPaths -Modus $DashboardModus
     } catch {
         Write-Host ('Dashboard-Erstellung fehlgeschlagen: {0}' -f $_.Exception.Message)
     }

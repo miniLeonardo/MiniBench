@@ -11,6 +11,7 @@ function Export-BenchDashboardData {
         [string]$DatabaseDir = '',
         [string]$ReportDir = '',
         [string[]]$SystemPaths = @(),
+        [Alias('DashboardModus')][string]$Modus = '',
         [switch]$IncludeReferences = $true,
         [string]$OutputPath = '',
         [switch]$AsJson
@@ -301,6 +302,28 @@ function Export-BenchDashboardData {
         $os = $(if ($j.Hardware -and $j.Hardware.Betriebssystem) { [string]$j.Hardware.Betriebssystem } elseif ($j.System) { [string]$j.System } else { '' })
         $winInst = $(if ($j.Hardware -and $j.Hardware.WindowsInstalliert) { [string]$j.Hardware.WindowsInstalliert } else { '' })
         $sysBoard = $(if ($j.System) { [string]$j.System } else { '' })
+        $gid = $(if ($j.Geraet -and $j.Geraet.Id) { [string]$j.Geraet.Id } elseif ($j.GeraetId) { [string]$j.GeraetId } else { '' })
+        $gKey = $(if ($isRef) { 'REF' } elseif ($gid) { $gid } else { 'PC:' + $comp.ToUpperInvariant() })
+        $biosVer = $(if ($j.Hardware -and $j.Hardware.BiosVersion) { [string]$j.Hardware.BiosVersion } elseif ($mb -match 'BIOS\s+([A-Za-z0-9._-]+)') { $matches[1] } else { '' })
+        $biosDate = $(if ($j.Hardware -and $j.Hardware.BiosDatum) { [string]$j.Hardware.BiosDatum } elseif ($mb -match '(\d{2}[./-]\d{2}[./-]\d{2,4}|\d{4}-\d{2}-\d{2})') { $matches[1] } else { '' })
+        $gpuDriver = $(if ($j.Hardware -and $j.Hardware.GpuTreiber) { [string]$j.Hardware.GpuTreiber } else {
+            $dMatch = @($j.Befunde.Liste | Where-Object { $_ -match 'Treiber\s+([\d.]+)' }) | Select-Object -First 1
+            if ($dMatch -and $dMatch -match 'Treiber\s+([\d.]+)' ) { $matches[1] } else { '' }
+        })
+        $winBuild = $(if ($os -match 'Build\s+(\d+(?:\.\d+)?)') { $matches[1] } else { '' })
+        $ramSpeed = $(if ($ram -match '((?:DDR\d+-\d+|\d+\s*MHz))') { $matches[1] } else { '' })
+        $batWear = $null
+        if ($j.Akku -and $j.Akku.Count -gt 0) {
+            $b0 = $j.Akku[0]
+            if ($null -ne $b0.VerschleissProzent) { $batWear = [double]$b0.VerschleissProzent }
+            elseif ($b0.DesignmWh -and $b0.VollmWh -and [double]$b0.DesignmWh -gt 0) {
+                $batWear = [math]::Round((1.0 - ([double]$b0.VollmWh / [double]$b0.DesignmWh)) * 100.0, 1)
+            }
+        }
+        $ssdWear = $null
+        if ($j.SMART -and $null -ne $j.SMART.PercentageUsed) { $ssdWear = [double]$j.SMART.PercentageUsed }
+        elseif ($j.Sensoren -and $null -ne $j.Sensoren.PercentageUsed) { $ssdWear = [double]$j.Sensoren.PercentageUsed }
+        elseif ($werte.ContainsKey('SSD|Wear')) { $ssdWear = [double]$werte['SSD|Wear'] }
 
         # Befunde
         $crit = 0; $warn = 0; $info = 0; $liste = @()
@@ -813,7 +836,12 @@ function Export-BenchDashboardData {
             Computer    = $comp
             DisplayName = $name
             Datum       = $datum
+            GeraetId    = $gid
+            GeraetKey   = $gKey
             IsReference = $isRef
+            Lasttest    = [string]$j.Lasttest
+            Messdauer   = [string]$j.Messdauer
+            Version     = $(if ($j.Version) { [string]$j.Version } else { '' })
             OS          = $os
             Hardware    = [ordered]@{
                 CPU                = $cpuRaw
@@ -831,6 +859,11 @@ function Export-BenchDashboardData {
                 WindowsInstalliert = $winInst
                 FastestDisk        = $(if ($fastestDisk) { $fastestDisk.Model } else { '' })
                 System             = $sysBoard
+                BiosVersion        = $biosVer
+                BiosDatum          = $biosDate
+                GpuDriver          = $gpuDriver
+                WinBuild           = $winBuild
+                RamSpeed           = $ramSpeed
                 PowerDisplay       = $pDisplay
                 PowerLoad          = $pLoadVal
                 PowerIdle          = $pIdleVal
@@ -860,6 +893,7 @@ function Export-BenchDashboardData {
                 GPU_STUTTER   = $gpuStutter
                 GPU_VMB       = $gpuVmb
                 FastestDisk   = $fastestDisk
+                DISK_R1       = $(if ($fastestDisk -and $fastestDisk.R1) { [double]$fastestDisk.R1 } else { $null })
                 Disks         = @($disksList)
                 DisksByClass  = $disksByClass
                 LAST_CpuTemp  = $cpuTMax
@@ -872,6 +906,8 @@ function Export-BenchDashboardData {
                 EFF_CPU         = $effCpu
                 EFF_GPU         = $effGpu
                 EFF_SYS         = $effSys
+                BatteryWearPct  = $batWear
+                SsdWearPct      = $ssdWear
             }
             Telemetry   = [ordered]@{
                 TestType                 = $(if ($isBenchFallback) { 'Benchmark' } elseif ($lasttestArt) { $lasttestArt } else { 'Lasttest' })
@@ -978,6 +1014,7 @@ function Export-BenchDashboardData {
     $aggData = [ordered]@{
         Version        = $(if ($script:ScriptVersion) { $script:ScriptVersion } else { '3.7' })
         Generated      = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+        Mode           = $(if ($Modus -ieq 'Verlauf' -or $Modus -ieq 'history') { 'history' } else { 'compare' })
         PreselectedIds = @($preselectedIds)
         Systems        = @($systems)
         References     = @($references)
@@ -1020,13 +1057,14 @@ function New-BenchDashboardHtml {
         [string]$DatabaseDir = '',
         [string]$ReportDir = '',
         [string[]]$SystemPaths = @(),
+        [Alias('DashboardModus')][string]$Modus = '',
         [string]$OutputPath = '',
         [switch]$PassThru
     )
 
     $data = $DashboardData
     if (-not $data) {
-        $data = Export-BenchDashboardData -DatabaseDir $DatabaseDir -ReportDir $ReportDir -SystemPaths $SystemPaths -IncludeReferences
+        $data = Export-BenchDashboardData -DatabaseDir $DatabaseDir -ReportDir $ReportDir -SystemPaths $SystemPaths -IncludeReferences -Modus $Modus
     }
 
     $json = $data | ConvertTo-Json -Depth 10 -Compress
@@ -1058,7 +1096,8 @@ function Export-BenchDashboardHtml {
         [Alias('DatenOrdner', 'AppDir')]
         [string]$DatabaseDir = '',
         [string]$ReportDir = '',
-        [string[]]$SystemPaths = @()
+        [string[]]$SystemPaths = @(),
+        [Alias('DashboardModus')][string]$Modus = ''
     )
 
     $target = $OutputPath
@@ -1078,7 +1117,7 @@ function Export-BenchDashboardHtml {
         }
     }
 
-    return (New-BenchDashboardHtml -OutputPath $target -DatabaseDir $DatabaseDir -ReportDir $ReportDir -SystemPaths $SystemPaths)
+    return (New-BenchDashboardHtml -OutputPath $target -DatabaseDir $DatabaseDir -ReportDir $ReportDir -SystemPaths $SystemPaths -Modus $Modus)
 }
 
 function Show-BenchDashboard {
@@ -1087,7 +1126,8 @@ function Show-BenchDashboard {
         [string]$DatabaseDir = '',
         [string]$ReportDir = '',
         [string]$OutputPath = '',
-        [string[]]$SystemPaths = @()
+        [string[]]$SystemPaths = @(),
+        [Alias('DashboardModus')][string]$Modus = ''
     )
 
     $f = Export-BenchDashboardHtml -OutputPath $OutputPath -DatabaseDir $DatabaseDir -ReportDir $ReportDir -SystemPaths $SystemPaths

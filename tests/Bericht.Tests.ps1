@@ -769,4 +769,131 @@ Describe 'Energieeffizienz und Netzteil-Konfiguration im Bericht' {
     }
 }
 
+Describe 'Geräte-Verlauf und Abschnitt Seit dem letzten Lauf (v3.87)' {
+    BeforeAll {
+        Import-MinibenchTestModule -Parts 'Kern\Geraeteidentitaet.ps1', 'Kern\Referenz_Vergleich.ps1', 'Kern\Berichtshilfen.ps1', 'Bericht\Bausteine_Systemvergleich.ps1', 'Bericht\HtmlBericht.ps1' -Functions 'ConvertTo-HtmlText', 'Send-GuiEvent'
+    }
 
+    It 'New-RunHistoryHtml liefert nichts, wenn kein früherer Lauf vorliegt' {
+        Mock -ModuleName MinibenchTest Get-DbEntries { @() }
+        Mock -ModuleName MinibenchTest Get-DeviceIdentity { [pscustomobject]@{ Id = 'G-TESTPC1' } }
+        $html = MinibenchTest\New-RunHistoryHtml
+        $html | Should -Be ''
+    }
+
+    It 'rendert Abschnitt Seit dem letzten Lauf mit Inventar-Änderungen und Deltas' {
+        $prevRun = [pscustomobject]@{
+            Computer   = 'TESTPC'
+            Datum      = '2026-05-10 10:00:00'
+            GeraetId   = 'G-TESTPC1'
+            Hardware   = [pscustomobject]@{
+                BiosVersion = 'F2'
+                GpuDriver   = '560.94'
+                WinBuild    = '22631'
+                RAM         = '32 GB DDR5-4800 MT/s'
+                SsdWearPct  = 2.0
+            }
+            Werte      = @{
+                'CPU|MT'    = 15000.0
+                'CPU|ST'    = 2000.0
+                'GPU|REND'  = 120.0
+                'RAM|Lesen' = 48.0
+            }
+            Messwerte  = @{}
+            Laufwerke  = @()
+            Messdauer  = '120'
+            Quelle     = 'Datenbank'
+        }
+        Mock -ModuleName MinibenchTest Get-DbEntries { @($prevRun) }
+        Mock -ModuleName MinibenchTest Get-DeviceIdentity { [pscustomobject]@{ Id = 'G-TESTPC1' } }
+        Mock -ModuleName MinibenchTest Get-CurrentRefValues {
+            @{
+                'CPU|MT'    = 15500.0
+                'CPU|ST'    = 2050.0
+                'GPU|REND'  = 130.0
+                'RAM|Lesen' = 60.0
+                'SSD|Wear'  = 3.0
+            }
+        }
+        & (Get-Module MinibenchTest) {
+            $script:StartTime = [datetime]'2026-10-29 14:00:00'
+            $script:Facts = [ordered]@{
+                'BIOS/UEFI'        = 'F3 vom 15.08.2026'
+                'Grafik'           = 'GeForce RTX 4080 (566.03)'
+                'Betriebssystem'   = 'Windows 11 (Build 26100.1742)'
+                'Arbeitsspeicher'  = '32 GB (2x 16 GB DDR5, 6000 MT/s)'
+            }
+        }
+
+        $html = MinibenchTest\New-RunHistoryHtml
+        $html | Should -Match 'Seit dem letzten Lauf'
+        $html | Should -Match 'BIOS: F2 &rarr; <b>F3</b>'
+        $html | Should -Match 'Grafiktreiber: 560.94 &rarr; <b>566.03</b>'
+        $html | Should -Match 'Windows: Build 22631 &rarr; <b>Build 26100</b>'
+        $html | Should -Match 'RAM: 4800 MT/s &rarr; <b>6000 MT/s</b>'
+        $html | Should -Match 'CPU Mehrkern'
+        $html | Should -Match 'Geschätzte Hochrechnung basierend auf dem bisherigen Schreibaufkommen'
+    }
+
+    It 'Trend-Befund wird bei unter 3 Läufen nicht ausgelöst (Strikte 3-Läufe-Regel)' {
+        $prevRun = [pscustomobject]@{
+            Computer   = 'TESTPC'
+            Datum      = '2026-05-10 10:00:00'
+            GeraetId   = 'G-TESTPC1'
+            Hardware   = [pscustomobject]@{ CpuTempMax = 70.0 }
+            Werte      = @{ 'LAST|CpuTempMax' = 70.0; 'CPU|MT' = 15000.0 }
+            Messdauer  = '120'
+            Quelle     = 'Datenbank'
+        }
+        Mock -ModuleName MinibenchTest Get-DbEntries { @($prevRun) }
+        Mock -ModuleName MinibenchTest Get-DeviceIdentity { [pscustomobject]@{ Id = 'G-TESTPC1' } }
+        Mock -ModuleName MinibenchTest Get-CurrentRefValues { @{ 'CPU|MT' = 15000.0 } }
+        & (Get-Module MinibenchTest) {
+            $script:StartTime = [datetime]'2026-10-29 14:00:00'
+            $script:Telemetry = [pscustomobject]@{ CpuTempMax = 82.0 }
+            $script:Findings = [System.Collections.Generic.List[object]]::new()
+            $script:FindKeys = [System.Collections.Generic.HashSet[string]]::new()
+        }
+
+        $res = MinibenchTest\Get-DeviceRunComparison
+        $res.TotalCount | Should -Be 2
+        $res.TrendFindings.Count | Should -Be 0
+    }
+
+    It 'Trend-Befund wird ab 3 Läufen bei signifikanter Temperaturerhöhung ausgelöst' {
+        $run1 = [pscustomobject]@{
+            Computer   = 'TESTPC'
+            Datum      = '2025-10-10 10:00:00'
+            GeraetId   = 'G-TESTPC1'
+            Hardware   = [pscustomobject]@{ CpuTempMax = 69.0 }
+            Werte      = @{ 'LAST|CpuTempMax' = 69.0 }
+            Messdauer  = '120'
+            Quelle     = 'Datenbank'
+        }
+        $run2 = [pscustomobject]@{
+            Computer   = 'TESTPC'
+            Datum      = '2026-03-10 10:00:00'
+            GeraetId   = 'G-TESTPC1'
+            Hardware   = [pscustomobject]@{ CpuTempMax = 70.0 }
+            Werte      = @{ 'LAST|CpuTempMax' = 70.0 }
+            Messdauer  = '120'
+            Quelle     = 'Datenbank'
+        }
+        Mock -ModuleName MinibenchTest Get-DbEntries { @($run1, $run2) }
+        Mock -ModuleName MinibenchTest Get-DeviceIdentity { [pscustomobject]@{ Id = 'G-TESTPC1' } }
+        Mock -ModuleName MinibenchTest Get-CurrentRefValues { @{ 'CPU|MT' = 15000.0 } }
+        & (Get-Module MinibenchTest) {
+            $script:StartTime = [datetime]'2026-10-29 14:00:00'
+            $script:Telemetry = [pscustomobject]@{ CpuTempMax = 81.0 }
+            $script:Findings = [System.Collections.Generic.List[object]]::new()
+            $script:FindKeys = [System.Collections.Generic.HashSet[string]]::new()
+        }
+
+        $res = MinibenchTest\Get-DeviceRunComparison
+        $res.TotalCount | Should -Be 3
+        $res.TrendFindings.Count | Should -Be 1
+        $res.TrendFindings[0].Level | Should -Be 'WARNUNG'
+        $res.TrendFindings[0].Area | Should -Be 'Kühlung'
+        $res.TrendFindings[0].Text | Should -Match 'CPU unter gleicher Last .* K wärmer'
+    }
+}

@@ -1,4 +1,4 @@
-﻿#region ---------- Datenschutz für die KI-Datei ----------
+#region ---------- Datenschutz für die KI-Datei ----------
 function Protect-Text([string]$Text) {
     if (-not $Text) { return $Text }
     $t = $Text
@@ -171,6 +171,32 @@ function New-KiExport {
                 & $add 'Kapazitätsverlauf (Zeitraum;volle Ladung mWh;Design mWh)'
                 $step = [math]::Max(1, [int][math]::Ceiling($hist.Count / 20))
                 for ($i = 0; $i -lt $hist.Count; $i += $step) { & $add ('{0};{1:0};{2:0}' -f $hist[$i].Zeitraum, $hist[$i].VollmWh, $hist[$i].DesignmWh) }
+            }
+        }
+    }
+
+    $comp = if (Get-Command 'Get-DeviceRunComparison' -ErrorAction SilentlyContinue) { Get-DeviceRunComparison } else { $null }
+    if ($comp -and $comp.HasHistory) {
+        & $head 'GERÄTE-VERLAUF (Seit dem letzten Lauf)'
+        & $add ('Voriger Lauf         : {0} ({1:N0} Tage her)' -f $comp.PrevDate, $comp.TimeSpanDays)
+        if ($comp.InventoryChanges.Count) {
+            & $add ('Inventar-Änderungen  : {0}' -f (($comp.InventoryChanges | ForEach-Object { $_.Text -replace '&rarr;', '->' -replace '<[^>]+>', '' }) -join '; '))
+        } else {
+            & $add 'Inventar-Änderungen  : keine Hardware- oder Firmwareänderungen erkannt'
+        }
+        if ($comp.MetricDeltas.Count) {
+            & $add 'Kernmesswerte (Messung; Vorher; Aktuell; Delta)'
+            foreach ($m in $comp.MetricDeltas) {
+                & $add ('  {0,-22}: {1} -> {2} ({3}{4:N1} %)' -f $m.Name, $m.PrevText, $m.CurrText, $m.SignStr, $m.DiffPct)
+            }
+        }
+        if ($comp.SsdWear -and $comp.SsdWear.ProjectionText) {
+            & $add ('SSD-Lebensdauer      : {0}' -f $comp.SsdWear.ProjectionText)
+        }
+        if ($comp.TrendFindings.Count) {
+            & $add 'Trend-Befunde (ab 3 Läufen):'
+            foreach ($f in $comp.TrendFindings) {
+                & $add ('  [{0}] {1}: {2}' -f $f.Level, $f.Area, $f.Text)
             }
         }
     }

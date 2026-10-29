@@ -66,7 +66,7 @@ public partial class DiagGui
     int dbSortCol = -1;
     bool dbSortAsc = true;
     Button btnRename;
-    Button btnCompare, btnDashboard, btnDelete, btnOpenReport, btnExport, btnSetRef;
+    Button btnCompare, btnDashboard, btnVerlauf, btnDelete, btnOpenReport, btnExport, btnSetRef;
 
     void OnDbColumnClick(object sender, ColumnClickEventArgs e)
     {
@@ -177,6 +177,10 @@ public partial class DiagGui
         btnDashboard = UI.Primary("Interaktives Dashboard"); btnDashboard.Margin = new Padding(0); btnDashboard.Padding = new Padding(UI.S(14), UI.S(3), UI.S(14), UI.S(3)); btnDashboard.Font = new Font("Segoe UI Semibold", 9.75f);
         btnDashboard.Click += delegate { OpenDashboard(); };
         Tip(btnDashboard, "Öffnet das interaktive HTML5-Dashboard für detaillierten System- und Benchmark-Vergleich.");
+        btnVerlauf = UI.Secondary("Verlauf"); btnVerlauf.Margin = new Padding(UI.S(8), 0, 0, 0);
+        btnVerlauf.Click += delegate { OpenDeviceHistory(); };
+        btnVerlauf.Enabled = false;
+        Tip(btnVerlauf, "Öffnet das interaktive Dashboard im Verlaufsmodus für alle Läufe des ausgewählten Geräts.");
         btnOpenReport = UI.Secondary("Bericht öffnen"); btnOpenReport.Margin = new Padding(UI.S(8), 0, 0, 0);
         btnOpenReport.Click += delegate {
             DbEntry target = null;
@@ -200,7 +204,7 @@ public partial class DiagGui
         Tip(btnExport, "Exportiert den ausgewählten Lauf als eigenständiges .minibench-Austauschpaket mit Datenbankeintrag und Bericht.");
         btnDelete = UI.Secondary("Entfernen"); btnDelete.Margin = new Padding(UI.S(8), 0, 0, 0); btnDelete.Click += delegate { DeleteSelected(); };
         Tip(btnDelete, "Verschiebt die angehakten Läufe samt Berichtsordner nach Minibench-Daten\\Archiv\\Entfernt. Beim nächsten Abgleich verschwinden sie auch vom Netzlaufwerk.");
-        b.Controls.Add(btnDashboard); b.Controls.Add(btnOpenReport); b.Controls.Add(btnSetRef); b.Controls.Add(btnRename); b.Controls.Add(btnExport); b.Controls.Add(btnDelete); bottom.Controls.Add(b);
+        b.Controls.Add(btnDashboard); b.Controls.Add(btnVerlauf); b.Controls.Add(btnOpenReport); b.Controls.Add(btnSetRef); b.Controls.Add(btnRename); b.Controls.Add(btnExport); b.Controls.Add(btnDelete); bottom.Controls.Add(b);
         lblDbClean = Lbl(DatenpflegeInfo.Length > 0 ? DatenpflegeInfo : "Lasttests vor v2.67 (nicht vergleichbar), abgebrochene und kurze Läufe verschiebt die Datenpflege beim Start nach Minibench-Daten\\Archiv.", 8.75f, false, UI.Muted);
         lblDbClean.Margin = new Padding(UI.S(4), UI.S(8), UI.S(4), 0); bottom.Controls.Add(lblDbClean);
         bottom.Resize += delegate { lblDbClean.MaximumSize = new Size(Math.Max(UI.S(200), bottom.ClientSize.Width - UI.S(10)), 0); };
@@ -223,6 +227,7 @@ public partial class DiagGui
 
         ContextMenu cm = new ContextMenu();
         MenuItem miDashboard = new MenuItem("Im Dashboard vergleichen", delegate { OpenDashboard(); });
+        MenuItem miHistory = new MenuItem("Geräte-Verlauf im Dashboard öffnen", delegate { OpenDeviceHistory(); });
         MenuItem miSetRef = new MenuItem("Als Referenz festlegen (persistent)", delegate { SetSelectedAsReference(); });
         MenuItem miDashboardBase = new MenuItem("Als Basis im Dashboard öffnen (temporär)", delegate { OpenDashboardWithBase(); });
         MenuItem miSep1 = new MenuItem("-");
@@ -232,6 +237,7 @@ public partial class DiagGui
         MenuItem miSep2 = new MenuItem("-");
         MenuItem miDelete = new MenuItem("Aus Datenbank entfernen", delegate { DeleteSelected(); });
         cm.MenuItems.Add(miDashboard);
+        cm.MenuItems.Add(miHistory);
         cm.MenuItems.Add(miSetRef);
         cm.MenuItems.Add(miDashboardBase);
         cm.MenuItems.Add(miSep1);
@@ -244,6 +250,7 @@ public partial class DiagGui
             int selN = lvDb.SelectedItems.Count;
             int chkN = CheckedEntries().Count;
             miDashboard.Enabled = chkN >= 1 || selN >= 1;
+            miHistory.Enabled = (GetSelectedDeviceTarget() != null);
             miSetRef.Enabled = selN == 1 || (selN == 0 && chkN == 1);
             miDashboardBase.Enabled = selN == 1 || (selN == 0 && chkN == 1);
             miRename.Enabled = selN == 1 || (selN == 0 && chkN == 1);
@@ -272,10 +279,89 @@ public partial class DiagGui
 
     static string Num(double v, string fmt) { return v > 0 ? v.ToString(fmt, CultureInfo.GetCultureInfo("de-DE")) : ""; }
 
+    static string FormatGroupDate(string d)
+    {
+        if (String.IsNullOrEmpty(d)) return "";
+        DateTime dt;
+        if (DateTime.TryParseExact(d, "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out dt) ||
+            DateTime.TryParseExact(d, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out dt) ||
+            DateTime.TryParse(d, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt))
+        {
+            return dt.ToString("dd.MM.yyyy");
+        }
+        string[] parts = d.Split(' ', 'T');
+        if (parts.Length > 0 && parts[0].Contains("-"))
+        {
+            string[] dp = parts[0].Split('-');
+            if (dp.Length == 3) return dp[2] + "." + dp[1] + "." + dp[0];
+        }
+        return d;
+    }
+
     void FillDbList()
     {
         if (lvDb == null) return;
-        lvDb.BeginUpdate(); lvDb.Items.Clear();
+        lvDb.BeginUpdate();
+        lvDb.Items.Clear();
+        lvDb.Groups.Clear();
+        lvDb.ShowGroups = true;
+
+        Dictionary<string, List<DbEntry>> grpMap = new Dictionary<string, List<DbEntry>>();
+        List<string> orderedKeys = new List<string>();
+
+        foreach (DbEntry e in db)
+        {
+            string k = e.IsReference ? "REF" : (String.IsNullOrEmpty(e.GeraetKey) ? "PC:" + (e.Computer ?? "").ToUpperInvariant() : e.GeraetKey);
+            if (!grpMap.ContainsKey(k))
+            {
+                grpMap[k] = new List<DbEntry>();
+                if (k != "REF") orderedKeys.Add(k);
+            }
+            grpMap[k].Add(e);
+        }
+
+        orderedKeys.Sort(delegate(string k1, string k2) {
+            string d1 = "", d2 = "";
+            foreach (DbEntry e in grpMap[k1]) { if (String.Compare(e.Datum, d1, StringComparison.Ordinal) > 0) d1 = e.Datum; }
+            foreach (DbEntry e in grpMap[k2]) { if (String.Compare(e.Datum, d2, StringComparison.Ordinal) > 0) d2 = e.Datum; }
+            return String.Compare(d2, d1, StringComparison.Ordinal);
+        });
+
+        if (grpMap.ContainsKey("REF")) orderedKeys.Add("REF");
+
+        Dictionary<string, ListViewGroup> lvGroups = new Dictionary<string, ListViewGroup>();
+        foreach (string k in orderedKeys)
+        {
+            List<DbEntry> entries = grpMap[k];
+            string headerText;
+            if (k == "REF")
+            {
+                int rCount = entries.Count;
+                headerText = String.Format("Referenz-Systeme  \u2022  {0}", rCount == 1 ? "1 Profil" : rCount + " Profile");
+            }
+            else
+            {
+                string devName = "";
+                string newestDate = "";
+                foreach (DbEntry e in entries)
+                {
+                    if (String.Compare(e.Datum, newestDate, StringComparison.Ordinal) >= 0)
+                    {
+                        newestDate = e.Datum;
+                        devName = !String.IsNullOrEmpty(e.Computer) ? e.Computer : e.DisplayName;
+                    }
+                }
+                if (String.IsNullOrEmpty(devName)) devName = "System";
+                int lCount = entries.Count;
+                string laufTxt = lCount == 1 ? "1 Lauf" : lCount + " Läufe";
+                string dateStr = FormatGroupDate(newestDate);
+                headerText = String.Format("{0}  \u2022  {1}  \u2022  zuletzt {2}", devName, laufTxt, dateStr);
+            }
+            ListViewGroup g = new ListViewGroup(k, headerText);
+            lvGroups[k] = g;
+            lvDb.Groups.Add(g);
+        }
+
         foreach (DbEntry e in db)
         {
             string gesamt = e.OverallScore > 0 ? Num(e.OverallScore, "N0") : "";
@@ -283,6 +369,8 @@ public partial class DiagGui
             ListViewItem it = new ListViewItem(new string[] { e.DisplayName, ShortDate(e.Datum), gesamt, e.Cpu, e.Gpu, e.Ram, Num(e.Get("CPU|MT"), "N0"), Num(e.Get("RAM|Lesen"), "N1") + (e.Get("RAM|Lesen") > 0 ? " GB/s" : ""), gpu, e.Befunde });
             it.Tag = e; it.ToolTipText = e.DisplayName + (e.Disk.Length > 0 ? "\r\n" + e.Disk : "") + (e.HasBench ? "" : "\r\n(ohne Benchmark-Werte)");
             if (!e.HasBench) it.ForeColor = UI.Muted;
+            string k = e.IsReference ? "REF" : (String.IsNullOrEmpty(e.GeraetKey) ? "PC:" + (e.Computer ?? "").ToUpperInvariant() : e.GeraetKey);
+            if (lvGroups.ContainsKey(k)) it.Group = lvGroups[k];
             lvDb.Items.Add(it);
         }
         if (lvDb.ListViewItemSorter != null) lvDb.Sort();
@@ -311,6 +399,10 @@ public partial class DiagGui
         if (btnDashboard != null)
         {
             btnDashboard.Text = n >= 2 ? n + " Systeme im Dashboard vergleichen" : (n == 1 ? "1 System im Dashboard anzeigen" : "Interaktives Dashboard");
+        }
+        if (btnVerlauf != null)
+        {
+            btnVerlauf.Enabled = (GetSelectedDeviceTarget() != null);
         }
         if (btnRename != null)
         {
@@ -427,6 +519,71 @@ public partial class DiagGui
     void CompareSelected()
     {
         OpenDashboard();
+    }
+
+    DbEntry GetSelectedDeviceTarget()
+    {
+        List<DbEntry> targets = new List<DbEntry>();
+        if (lvDb != null)
+        {
+            if (lvDb.SelectedItems.Count > 0)
+            {
+                foreach (ListViewItem it in lvDb.SelectedItems)
+                {
+                    DbEntry e = it.Tag as DbEntry;
+                    if (e != null && !e.IsReference) targets.Add(e);
+                }
+            }
+            else if (lvDb.CheckedItems.Count > 0)
+            {
+                foreach (ListViewItem it in lvDb.CheckedItems)
+                {
+                    DbEntry e = it.Tag as DbEntry;
+                    if (e != null && !e.IsReference) targets.Add(e);
+                }
+            }
+        }
+        if (targets.Count == 0) return null;
+        string firstKey = targets[0].GeraetKey;
+        if (String.IsNullOrEmpty(firstKey) || firstKey == "REF") return null;
+        for (int i = 1; i < targets.Count; i++)
+        {
+            if (targets[i].GeraetKey != firstKey) return null;
+        }
+        return targets[0];
+    }
+
+    public void OpenDeviceHistory(DbEntry specificTarget = null)
+    {
+        DbEntry target = specificTarget != null ? specificTarget : GetSelectedDeviceTarget();
+        if (target == null) return;
+        string devKey = target.GeraetKey;
+        if (String.IsNullOrEmpty(devKey)) return;
+
+        List<DbEntry> runs = new List<DbEntry>();
+        foreach (DbEntry e in db)
+        {
+            if (!e.IsReference && e.GeraetKey == devKey) runs.Add(e);
+        }
+        runs.Sort(delegate(DbEntry a, DbEntry b) { return String.Compare(a.Datum, b.Datum, StringComparison.Ordinal); });
+        if (runs.Count == 0) return;
+
+        List<string> paths = new List<string>();
+        foreach (DbEntry e in runs) paths.Add(e.Path);
+
+        Cursor = Cursors.WaitCursor;
+        List<string> lines = new List<string>(); string res = "";
+        string args = "-Dashboard -DashboardModus Verlauf -DashboardSysteme \"" + String.Join(";", paths.ToArray()) + "\"";
+        try { res = RunHelper(args, out lines); }
+        catch (Exception ex) { lines.Add("Dashboard-Aufruf fehlgeschlagen: " + ex.Message); }
+        Cursor = Cursors.Default;
+        if (res.Length > 0 && File.Exists(res)) OpenShell(res);
+        else
+        {
+            string dashPath = System.IO.Path.Combine(dataDir, "Berichte\\Dashboard.html");
+            if (File.Exists(dashPath)) OpenShell(dashPath);
+            else MessageBox.Show(this, "Das Dashboard konnte nicht geöffnet werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Leos Minibench", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
     }
 
     void OpenDashboard()

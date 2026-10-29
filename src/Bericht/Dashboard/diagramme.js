@@ -58,6 +58,10 @@
   // 5. CHART-LEGENDE
   function renderChartLegend() {
     if (!chartLegend) return;
+    if (dashboardMode === 'history') {
+      renderHistoryLegend();
+      return;
+    }
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
     let html = '';
@@ -101,6 +105,10 @@
   // 6. CANVAS CHART RENDERING (MULTI-SYSTEM CANVAS)
   function renderChart() {
     if (!canvas || !chartWrapper) return;
+    if (dashboardMode === 'history') {
+      renderHistoryChart();
+      return;
+    }
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
     const dpr = window.devicePixelRatio || 1;
@@ -545,3 +553,352 @@
   }
 
   // DOM READY
+
+  // 7. VERLAUFS-CHART (HISTORY MODE)
+  function isTempComparable(s, base) {
+    if (!s) return false;
+    const dauer = s.Messdauer != null ? Number(s.Messdauer) : 0;
+    if (dauer < 60) return false;
+    const vStr = String(s.Version || '0');
+    const vParts = vStr.split('.').map(Number);
+    const vNum = (vParts[0] || 0) * 100 + (vParts[1] || 0);
+    if (vNum < 267) return false;
+    const tType = s.Telemetry?.TestType || s.Lasttest || '';
+    if (!tType || tType === 'Benchmark') return false;
+    const bType = base?.Telemetry?.TestType || base?.Lasttest || '';
+    if (bType && bType !== 'Benchmark' && tType !== bType) return false;
+    return true;
+  }
+
+  function renderHistoryLegend() {
+    if (!chartLegend) return;
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    const subTitleEl = document.querySelector('.dash-card .card-head p');
+    if (subTitleEl) {
+      subTitleEl.textContent = 'Zeitlicher Verlauf der Messwerte fÃ¼r diesen Rechner Ã¼ber alle vorliegenden LÃ¤ufe.';
+    }
+
+    if (comparedSystems.length < 2) {
+      chartLegend.innerHTML = '<div style="font-size:0.85rem; color:var(--text-muted); font-style:italic;">Noch kein Verlauf verfÃ¼gbar â€“ mindestens zwei LÃ¤ufe fÃ¼r diesen PC erforderlich.</div>';
+      return;
+    }
+
+    let html = '';
+    const m = historyChartMetric;
+    if (m === 'overall') {
+      const col = isDark ? '#4CC2FF' : '#0078D4';
+      html = '<div class="legend-item"><div class="legend-color" style="background:' + col + ';"></div><span>Gesamtpunktzahl (Overall Score)</span></div>';
+    } else if (m === 'cpu') {
+      const cMt = isDark ? '#4CC2FF' : '#0078D4';
+      const cSt = isDark ? '#FFA057' : '#F7630C';
+      html = '<div class="legend-item"><div class="legend-color" style="background:' + cMt + ';"></div><span>CPU Mehrkern (MT, Punkte)</span></div>' +
+             '<div class="legend-item"><div class="legend-color" style="background:' + cSt + ';"></div><span>CPU Einzelkern (ST, Punkte)</span></div>';
+    } else if (m === 'gpu') {
+      const col = isDark ? '#6CCB5F' : '#107C41';
+      html = '<div class="legend-item"><div class="legend-color" style="background:' + col + ';"></div><span>Grafik-Renderleistung (FPS)</span></div>';
+    } else if (m === 'disk') {
+      const col = isDark ? '#B388FF' : '#8E44AD';
+      html = '<div class="legend-item"><div class="legend-color" style="background:' + col + ';"></div><span>SSD 4K Random Read (MB/s)</span></div>';
+    } else if (m === 'ssdwear') {
+      const col = isDark ? '#FF5A5A' : '#E81123';
+      html = '<div class="legend-item"><div class="legend-color" style="background:' + col + ';"></div><span>SSD-VerschleiÃŸ (Percentage Used %)</span></div>';
+    } else if (m === 'batwear') {
+      const col = isDark ? '#26A69A' : '#009688';
+      html = '<div class="legend-item"><div class="legend-color" style="background:' + col + ';"></div><span>Akku-Gesundheit (% der DesignkapazitÃ¤t)</span></div>';
+    } else if (m === 'temp') {
+      const cCpu = isDark ? '#FF5A5A' : '#E81123';
+      const cGpu = isDark ? '#FFA057' : '#F7630C';
+      html = '<div class="legend-item"><div class="legend-color" style="background:' + cCpu + ';"></div><span>CPU HÃ¶chsttemperatur (Â°C)</span></div>' +
+             '<div class="legend-item"><div class="legend-color" style="background:' + cGpu + ';"></div><span>GPU HÃ¶chsttemperatur (Â°C)</span></div>' +
+             '<div class="legend-item" style="margin-left:auto; font-size:0.8rem; color:var(--text-muted);"><span>Nur vergleichbare LÃ¤ufe (â‰¥ 60s, ab v2.67)</span></div>';
+    }
+
+    chartLegend.innerHTML = html;
+  }
+
+  function renderHistoryChart() {
+    if (!canvas || !chartWrapper) return;
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = chartWrapper.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, width, height);
+
+    if (comparedSystems.length < 2) {
+      ctx.fillStyle = isDark ? '#A0A0A0' : '#5F6368';
+      ctx.font = '14px Segoe UI, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Noch kein Verlauf verfÃ¼gbar â€“ mindestens zwei LÃ¤ufe fÃ¼r diesen PC erforderlich.', width / 2, height / 2);
+      canvas.onmousemove = null;
+      canvas.onmouseleave = null;
+      return;
+    }
+
+    const m = historyChartMetric;
+    const runs = comparedSystems;
+    const n = runs.length;
+
+    let series = [];
+    if (m === 'overall') {
+      series = [{ name: 'Gesamtpunktzahl', unit: 'Pkt.', color: isDark ? '#4CC2FF' : '#0078D4', getVal: s => s.Scores?.Overall }];
+    } else if (m === 'cpu') {
+      series = [
+        { name: 'CPU Mehrkern', unit: 'Pkt.', color: isDark ? '#4CC2FF' : '#0078D4', getVal: s => s.Metrics?.CPU_MT },
+        { name: 'CPU Einzelkern', unit: 'Pkt.', color: isDark ? '#FFA057' : '#F7630C', getVal: s => s.Metrics?.CPU_ST }
+      ];
+    } else if (m === 'gpu') {
+      series = [{ name: 'Grafik-Renderleistung', unit: 'FPS', color: isDark ? '#6CCB5F' : '#107C41', getVal: s => s.Metrics?.GPU_REND }];
+    } else if (m === 'disk') {
+      series = [{ name: 'SSD 4K Random Read', unit: 'MB/s', color: isDark ? '#B388FF' : '#8E44AD', getVal: s => (s.Metrics?.DISK_R1 != null ? s.Metrics.DISK_R1 : (s.Metrics?.FastestDisk?.R1 != null ? s.Metrics.FastestDisk.R1 : null)) }];
+    } else if (m === 'ssdwear') {
+      series = [{ name: 'SSD-VerschleiÃŸ', unit: '%', color: isDark ? '#FF5A5A' : '#E81123', getVal: s => s.Metrics?.SsdWearPct }];
+    } else if (m === 'batwear') {
+      series = [{ name: 'Akku-Gesundheit', unit: '%', color: isDark ? '#26A69A' : '#009688', getVal: s => s.Metrics?.BatteryWearPct }];
+    } else if (m === 'temp') {
+      series = [
+        { name: 'CPU Max', unit: 'Â°C', color: isDark ? '#FF5A5A' : '#E81123', getVal: s => (isTempComparable(s, runs[0]) ? (s.Metrics?.LAST_CpuTemp != null ? s.Metrics.LAST_CpuTemp : s.Telemetry?.CpuTempMax) : null) },
+        { name: 'GPU Max', unit: 'Â°C', color: isDark ? '#FFA057' : '#F7630C', getVal: s => (isTempComparable(s, runs[0]) ? (s.Metrics?.LAST_GpuTemp != null ? s.Metrics.LAST_GpuTemp : s.Telemetry?.GpuTempMax) : null) }
+      ];
+    }
+
+    let allVals = [];
+    series.forEach(sr => {
+      sr.data = runs.map(s => {
+        const v = sr.getVal(s);
+        const num = (v != null && !isNaN(Number(v))) ? Number(v) : null;
+        if (num != null) allVals.push(num);
+        return num;
+      });
+    });
+
+    if (allVals.length === 0) {
+      ctx.fillStyle = isDark ? '#A0A0A0' : '#5F6368';
+      ctx.font = '14px Segoe UI, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Keine Messwerte fÃ¼r diese Metrik in den LÃ¤ufen vorhanden.', width / 2, height / 2);
+      canvas.onmousemove = null;
+      canvas.onmouseleave = null;
+      return;
+    }
+
+    let minVal = Math.min(...allVals);
+    let maxVal = Math.max(...allVals);
+    if (minVal === maxVal) {
+      minVal = Math.max(0, minVal * 0.9 - 1);
+      maxVal = maxVal * 1.1 + 1;
+    } else {
+      const span = maxVal - minVal;
+      minVal = Math.max(0, minVal - span * 0.15);
+      maxVal = maxVal + span * 0.15;
+    }
+
+    const padding = { top: 35, right: 45, bottom: 55, left: 65 };
+    const chartW = width - padding.left - padding.right;
+    const chartH = height - padding.top - padding.bottom;
+
+    function getX(idx) {
+      if (n <= 1) return padding.left + chartW / 2;
+      return padding.left + (idx / (n - 1)) * chartW;
+    }
+
+    function getY(val) {
+      if (maxVal === minVal) return padding.top + chartH / 2;
+      return padding.top + chartH - ((val - minVal) / (maxVal - minVal)) * chartH;
+    }
+
+    // Gitterlinien & Achse
+    ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
+    ctx.lineWidth = 1;
+    ctx.fillStyle = isDark ? '#9CA3AF' : '#6B7280';
+    ctx.font = '11px Segoe UI, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+
+    const gridSteps = 5;
+    for (let step = 0; step <= gridSteps; step++) {
+      const gVal = minVal + (step / gridSteps) * (maxVal - minVal);
+      const gy = getY(gVal);
+      ctx.beginPath();
+      ctx.moveTo(padding.left, gy);
+      ctx.lineTo(padding.left + chartW, gy);
+      ctx.stroke();
+
+      const valLabel = (gVal >= 100) ? Math.round(gVal).toString() : (gVal >= 10 ? gVal.toFixed(1) : gVal.toFixed(2));
+      const u = series[0]?.unit || '';
+      ctx.fillText(valLabel + ' ' + u, padding.left - 8, gy);
+    }
+
+    // X-Achsen-Beschriftung
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    runs.forEach((s, idx) => {
+      const x = getX(idx);
+      const parts = (s.Datum || '').split(' ');
+      const dStr = parts[0] || ('Lauf ' + (idx + 1));
+      const tStr = parts[1] ? parts[1].substring(0, 5) : '';
+      ctx.fillStyle = isDark ? '#D1D5DB' : '#374151';
+      ctx.fillText(dStr, x, padding.top + chartH + 8);
+      if (tStr) {
+        ctx.fillStyle = isDark ? '#9CA3AF' : '#6B7280';
+        ctx.font = '10px Segoe UI, sans-serif';
+        ctx.fillText(tStr, x, padding.top + chartH + 22);
+        ctx.font = '11px Segoe UI, sans-serif';
+      }
+    });
+
+    // Linien & Datenpunkte zeichnen
+    series.forEach(sr => {
+      ctx.strokeStyle = sr.color;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      let started = false;
+      sr.data.forEach((val, idx) => {
+        if (val == null) {
+          started = false;
+          return;
+        }
+        const x = getX(idx);
+        const y = getY(val);
+        if (!started) {
+          ctx.moveTo(x, y);
+          started = true;
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      ctx.stroke();
+
+      sr.data.forEach((val, idx) => {
+        if (val == null) return;
+        const x = getX(idx);
+        const y = getY(val);
+        ctx.fillStyle = sr.color;
+        ctx.beginPath();
+        ctx.arc(x, y, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = isDark ? '#1F2937' : '#FFFFFF';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.fillStyle = isDark ? '#F3F4F6' : '#111827';
+        ctx.font = '10px Segoe UI, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        const vText = (val >= 100) ? Math.round(val).toString() : (val >= 10 ? val.toFixed(1) : val.toFixed(2));
+        ctx.fillText(vText, x, y - 6);
+      });
+    });
+
+    // Hover
+    canvas.onmousemove = function(e) {
+      const mRect = canvas.getBoundingClientRect();
+      const mx = e.clientX - mRect.left;
+      if (mx < padding.left - 20 || mx > padding.left + chartW + 20) {
+        tooltip.style.display = 'none';
+        renderHistoryChartStatic();
+        return;
+      }
+
+      let closestIdx = 0;
+      let closestDist = Infinity;
+      for (let i = 0; i < n; i++) {
+        const dist = Math.abs(mx - getX(i));
+        if (dist < closestDist) {
+          closestDist = dist;
+          closestIdx = i;
+        }
+      }
+
+      renderHistoryChartStatic();
+      const cx = getX(closestIdx);
+
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx, padding.top);
+      ctx.lineTo(cx, padding.top + chartH);
+      ctx.stroke();
+
+      series.forEach(sr => {
+        const val = sr.data[closestIdx];
+        if (val != null) {
+          const cy = getY(val);
+          ctx.fillStyle = sr.color;
+          ctx.beginPath();
+          ctx.arc(cx, cy, 6.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = isDark ? '#FFFFFF' : '#000000';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+      });
+      ctx.restore();
+
+      const curRun = runs[closestIdx];
+      const prevRun = closestIdx > 0 ? runs[closestIdx - 1] : null;
+
+      let tipHtml = '<div style=\"font-weight:700; font-size:12px; margin-bottom:4px;\">' + escapeHtml(curRun.Computer || 'PC') + ' Â· ' + escapeHtml(curRun.Datum || '') + '</div>';
+      if (curRun.Hardware?.BiosVersion) {
+        tipHtml += '<div style=\"font-size:10px; color:var(--text-muted); margin-bottom:6px;\">BIOS: ' + escapeHtml(curRun.Hardware.BiosVersion) + ' Â· Treiber: ' + escapeHtml(curRun.Hardware.GpuDriver || 'n/v') + '</div>';
+      }
+
+      series.forEach(sr => {
+        const curVal = sr.data[closestIdx];
+        if (curVal == null) {
+          tipHtml += '<div style=\"font-size:11px; margin-top:2px; color:var(--text-muted);\">â— ' + sr.name + ': nicht messbar/nicht vergleichbar</div>';
+          return;
+        }
+        let deltaStr = '';
+        if (prevRun) {
+          const prevVal = sr.data[closestIdx - 1];
+          if (prevVal != null && prevVal > 0) {
+            const diffPct = ((curVal - prevVal) / prevVal) * 100;
+            const diffAbs = curVal - prevVal;
+            const sign = diffAbs >= 0 ? '+' : '';
+            const color = (m === 'temp' || m === 'ssdwear')
+              ? (diffAbs <= 0 ? 'var(--good)' : 'var(--bad)')
+              : (diffAbs >= 0 ? 'var(--good)' : 'var(--bad)');
+            deltaStr = ' <span style=\"color:' + color + '; font-weight:700; margin-left:4px;\">(' + sign + diffPct.toFixed(1) + ' %, ' + sign + diffAbs.toFixed(1) + ' ' + sr.unit + ')</span>';
+          }
+        }
+        const vText = (curVal >= 100) ? Math.round(curVal).toString() : (curVal >= 10 ? curVal.toFixed(1) : curVal.toFixed(2));
+        tipHtml += '<div style=\"font-size:11px; margin-top:3px;\"><span style=\"color:' + sr.color + '; font-weight:600;\">â— ' + sr.name + ':</span> <b>' + vText + ' ' + sr.unit + '</b>' + deltaStr + '</div>';
+      });
+
+      tooltip.innerHTML = tipHtml;
+      tooltip.style.display = 'block';
+      const tipW = Math.max(260, tooltip.offsetWidth || 280);
+      let tooltipX = cx + 15;
+      if (tooltipX + tipW > width) tooltipX = cx - tipW - 15;
+      tooltip.style.left = Math.max(10, tooltipX) + 'px';
+      tooltip.style.top = (padding.top + 10) + 'px';
+    };
+
+    canvas.onmouseleave = function() {
+      tooltip.style.display = 'none';
+      renderHistoryChartStatic();
+    };
+
+    function renderHistoryChartStatic() {
+      renderHistoryChartNoHover();
+    }
+  }
+
+  function renderHistoryChartNoHover() {
+    renderHistoryChart();
+  }

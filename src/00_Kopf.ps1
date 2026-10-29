@@ -120,6 +120,7 @@ param(
     [string]$Rueckgaengig,
     [switch]$Dashboard,
     [string]$DashboardExport,
+    [string]$DashboardModus = '',
     [string]$DashboardSysteme = '',
     # Auswertung von Minibench-Daten\Laufzeit\Start.log ausgeben (Startzeit je Phase, Stick und Festplatte getrennt)
     [switch]$StartAuswertung,

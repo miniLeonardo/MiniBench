@@ -2300,10 +2300,73 @@ public partial class DiagGui
             if (gVal > 0) kpiGpu = Math.Round(gVal, 0) + " FPS";
         }
 
-        KpiBox kpi1 = new KpiBox("Gesamt", kpiGesamt); kpi1.Dock = DockStyle.Fill; Tip(kpi1, "Gesamtpunktzahl des letzten Benchmarklaufs.");
-        KpiBox kpi2 = new KpiBox("CPU Mehrkern", kpiCpu); kpi2.Dock = DockStyle.Fill; Tip(kpi2, "CPU-Mehrkern-Punktzahl des letzten Laufs.");
-        KpiBox kpi3 = new KpiBox("RAM Lesen", kpiRam); kpi3.Dock = DockStyle.Fill; Tip(kpi3, "Gemessener Speicherdurchsatz beim Lesen.");
-        KpiBox kpi4 = new KpiBox("Grafik", kpiGpu); kpi4.Dock = DockStyle.Fill; kpi4.Margin = new Padding(0); Tip(kpi4, "Gemessene Bildrate im Grafik-Rendertest.");
+        // Finde vorherigen Lauf dieses Rechners (chronologisch aufsteigend)
+        List<DbEntry> thisPcRuns = new List<DbEntry>();
+        string devKey = lastRun != null ? lastRun.GeraetKey : null;
+        foreach (DbEntry e in db)
+        {
+            if (e.IsReference) continue;
+            bool match = false;
+            if (!String.IsNullOrEmpty(devKey) && !String.IsNullOrEmpty(e.GeraetKey) && String.Equals(e.GeraetKey, devKey, StringComparison.OrdinalIgnoreCase))
+                match = true;
+            else if (!String.IsNullOrEmpty(e.Computer) && (String.Equals(e.Computer, curPc, StringComparison.OrdinalIgnoreCase) || e.Computer.StartsWith(curPc + "_", StringComparison.OrdinalIgnoreCase)))
+                match = true;
+            else if (!String.IsNullOrEmpty(e.Name) && String.Equals(e.Name, curPc, StringComparison.OrdinalIgnoreCase))
+                match = true;
+
+            if (match) thisPcRuns.Add(e);
+        }
+        thisPcRuns.Sort(delegate(DbEntry a, DbEntry b) {
+            return String.Compare(a.Datum, b.Datum, StringComparison.Ordinal);
+        });
+
+        DbEntry prevRun = null;
+        if (thisPcRuns.Count >= 2 && lastRun != null)
+        {
+            int idx = thisPcRuns.IndexOf(lastRun);
+            if (idx > 0) prevRun = thisPcRuns[idx - 1];
+            else if (idx < 0) prevRun = thisPcRuns[thisPcRuns.Count - 2];
+        }
+
+        string dGesamt = null, dCpu = null, dRam = null, dGpu = null;
+        if (prevRun != null && lastRun != null)
+        {
+            if (prevRun.OverallScore > 0 && lastRun.OverallScore > 0)
+            {
+                double d = Math.Round(((lastRun.OverallScore - prevRun.OverallScore) / (double)prevRun.OverallScore) * 100.0, 0);
+                dGesamt = (d >= 0 ? "â†‘ +" : "â†“ ") + d.ToString("0", CultureInfo.CurrentCulture) + " %";
+            }
+            double prevCpu = prevRun.Get("CPU|MT");
+            double curCpu = lastRun.Get("CPU|MT");
+            if (prevCpu > 0 && curCpu > 0)
+            {
+                double d = Math.Round(((curCpu - prevCpu) / prevCpu) * 100.0, 0);
+                dCpu = (d >= 0 ? "â†‘ +" : "â†“ ") + d.ToString("0", CultureInfo.CurrentCulture) + " %";
+            }
+            double prevRam = prevRun.Get("RAM|Lesen");
+            if (prevRam <= 0) prevRam = prevRun.Get("RAM|Read");
+            double curRam = lastRun.Get("RAM|Lesen");
+            if (curRam <= 0) curRam = lastRun.Get("RAM|Read");
+            if (prevRam > 0 && curRam > 0)
+            {
+                double d = Math.Round(((curRam - prevRam) / prevRam) * 100.0, 0);
+                dRam = (d >= 0 ? "â†‘ +" : "â†“ ") + d.ToString("0", CultureInfo.CurrentCulture) + " %";
+            }
+            double prevGpu = prevRun.Get("GPU|REND");
+            if (prevGpu <= 0) prevGpu = prevRun.Get("GPU|FPS");
+            double curGpu = lastRun.Get("GPU|REND");
+            if (curGpu <= 0) curGpu = lastRun.Get("GPU|FPS");
+            if (prevGpu > 0 && curGpu > 0)
+            {
+                double d = Math.Round(((curGpu - prevGpu) / prevGpu) * 100.0, 0);
+                dGpu = (d >= 0 ? "â†‘ +" : "â†“ ") + d.ToString("0", CultureInfo.CurrentCulture) + " %";
+            }
+        }
+
+        KpiBox kpi1 = new KpiBox("Gesamt", kpiGesamt, dGesamt); kpi1.Dock = DockStyle.Fill; Tip(kpi1, "Gesamtpunktzahl des letzten Benchmarklaufs" + (dGesamt != null ? " (" + dGesamt + " zum vorigen Lauf)" : "") + ".");
+        KpiBox kpi2 = new KpiBox("CPU Mehrkern", kpiCpu, dCpu); kpi2.Dock = DockStyle.Fill; Tip(kpi2, "CPU-Mehrkern-Punktzahl des letzten Laufs" + (dCpu != null ? " (" + dCpu + " zum vorigen Lauf)" : "") + ".");
+        KpiBox kpi3 = new KpiBox("RAM Lesen", kpiRam, dRam); kpi3.Dock = DockStyle.Fill; Tip(kpi3, "Gemessener Speicherdurchsatz beim Lesen" + (dRam != null ? " (" + dRam + " zum vorigen Lauf)" : "") + ".");
+        KpiBox kpi4 = new KpiBox("Grafik", kpiGpu, dGpu); kpi4.Dock = DockStyle.Fill; kpi4.Margin = new Padding(0); Tip(kpi4, "Gemessene Bildrate im Grafik-Rendertest" + (dGpu != null ? " (" + dGpu + " zum vorigen Lauf)" : "") + ".");
 
         kpiGrid.Controls.Add(kpi1, 0, 0);
         kpiGrid.Controls.Add(kpi2, 1, 0);
@@ -2368,6 +2431,27 @@ public partial class DiagGui
         Tip(btnDash, "Öffnet das interaktive Dashboard zum grafischen Vergleich mit anderen Systemen.");
         btnDash.Click += delegate { OpenDashboard(); };
         pnlButtons.Controls.Add(btnDash);
+        Button btnVerlauf = new Button();
+        btnVerlauf.Text = "Verlauf";
+        btnVerlauf.FlatStyle = FlatStyle.Flat;
+        btnVerlauf.FlatAppearance.BorderColor = UI.Accent;
+        btnVerlauf.FlatAppearance.BorderSize = 1;
+        btnVerlauf.BackColor = UI.IsDark ? Color.FromArgb(24, 44, 68) : Color.FromArgb(234, 243, 252);
+        btnVerlauf.ForeColor = UI.IsDark ? Color.FromArgb(100, 180, 246) : Color.FromArgb(0, 100, 190);
+        btnVerlauf.FlatAppearance.MouseOverBackColor = UI.Accent;
+        btnVerlauf.FlatAppearance.MouseDownBackColor = UI.AccentActive;
+        btnVerlauf.Font = new Font("Segoe UI Semibold", 8.5f);
+        btnVerlauf.Padding = new Padding(UI.S(10), UI.S(3), UI.S(10), UI.S(3));
+        btnVerlauf.Margin = new Padding(UI.S(6), UI.S(2), 0, 0);
+        btnVerlauf.AutoSize = true;
+        btnVerlauf.Cursor = Cursors.Hand;
+        btnVerlauf.UseVisualStyleBackColor = false;
+        btnVerlauf.MouseEnter += delegate { btnVerlauf.ForeColor = UI.OnAccent; };
+        btnVerlauf.MouseLeave += delegate { btnVerlauf.ForeColor = UI.IsDark ? Color.FromArgb(100, 180, 246) : Color.FromArgb(0, 100, 190); };
+        Tip(btnVerlauf, "Ã–ffnet das interaktive Dashboard im Verlaufsmodus fÃ¼r diesen PC.");
+        DbEntry devHistoryTarget = lastRun;
+        btnVerlauf.Click += delegate { if (devHistoryTarget != null) OpenDeviceHistory(devHistoryTarget); };
+        pnlButtons.Controls.Add(btnVerlauf);
         actGrid.Controls.Add(pnlButtons, 0, 0);
 
         string befundeText = "Befunde: keine";

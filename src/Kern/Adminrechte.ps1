@@ -2,7 +2,7 @@
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 # Vergleich, Import, Export, Dashboard, Datenpflege sowie Abgleich, Entfernen, Umbenennen und MedianAktualisieren
 # arbeiten nur im Datenordner und brauchen keine Administratorrechte
-if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $ExportLauf -and -not $Datenpflege -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardSysteme -and -not $Abgleich -and -not $Entfernen -and -not $Umbenennen -and -not $MedianAktualisieren -and -not $Umzug) {
+if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $ExportLauf -and -not $Datenpflege -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardModus -and -not $DashboardSysteme -and -not $Abgleich -and -not $Entfernen -and -not $Umbenennen -and -not $MedianAktualisieren -and -not $Umzug) {
     if (-not $PSCommandPath) { return }
     # Netzlaufwerke sind im Administratorkontext nicht verbunden: Skript und Datenordner als UNC-Pfad weitergeben
     function ConvertTo-Unc([string]$Path) {

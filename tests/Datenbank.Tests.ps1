@@ -9,7 +9,7 @@ BeforeAll {
         -Functions 'Read-JsonFile', 'ConvertTo-ValueTable', 'Get-DbEntries', 'Get-DbLatest', 'Get-SafeName', 'Save-DbEntry', 'Get-CurrentRefValues', 'Import-BenchReference', 'Get-Median', 'Add-Line',
                    'Test-WritableDir', 'Resolve-DataDir', 'Test-IsNetworkPath', 'Initialize-DbDir',
                    'Test-EntryIsNotebook', 'Test-DbEntryIsBattery', 'Update-BenchReferenceMedians',
-                   'Import-LegacyFolder', 'Import-SingleRunItem', 'Import-ArchiveRun', 'Import-JsonRun', 'Import-LegacyRun', 'Import-RunFromDirWithJson' `
+                   'Import-LegacyFolder', 'Import-SingleRunItem', 'Import-ArchiveRun', 'Import-JsonRun', 'Import-LegacyRun', 'Import-RunFromDirWithJson', 'Get-DbDeviceRuns' `
         -Setup @'
 $script:DbFormat = 'PC-Diagnose-DB/2'
 $script:Report = New-Object System.Text.StringBuilder
@@ -127,6 +127,75 @@ Describe 'Lesen und Toleranz der Datenbank' {
             $ref.Name | Should -Match 'Median von 2 Systemen'
         } finally { $env:COMPUTERNAME = 'TESTPC'; & (Get-Module MinibenchTest) { $script:ReferenzDatei = '' } }
     }
+Describe 'Verlaufs-Abfragefunktion (Get-DbDeviceRuns)' {
+    It 'bündelt Läufe bei Rechner-Umbenennung über die Hardware-Kennung (Geraet.Id)' {
+        $devId = 'G-abcdef0123456789abcd'
+        $entries = @(
+            [pscustomobject]@{ Computer = 'ALTER-NAME'; Datum = '2026-08-01 10:00'; GeraetId = $devId; Quelle = 'Lauf' },
+            [pscustomobject]@{ Computer = 'NEUER-NAME'; Datum = '2026-09-01 11:00'; GeraetId = $devId; Quelle = 'Lauf' },
+            [pscustomobject]@{ Computer = 'FREMDER-PC'; Datum = '2026-08-15 12:00'; GeraetId = 'G-99999999999999999999'; Quelle = 'Lauf' }
+        )
+        $runs = @(MinibenchTest\Get-DbDeviceRuns -Entries $entries -DeviceId $devId -ComputerName 'NEUER-NAME')
+        $runs.Count | Should -Be 2
+        $runs[0].Computer | Should -Be 'ALTER-NAME'
+        $runs[1].Computer | Should -Be 'NEUER-NAME'
+    }
+
+    It 'bündelt Läufe nach Windows-Neuinstallation bei gleicher Hardware-Kennung' {
+        $devId = 'G-neuinstall1234567890'
+        $entries = @(
+            [pscustomobject]@{ Computer = 'DESKTOP-ABC'; Datum = '2026-05-10 14:00'; GeraetId = $devId; Hardware = @{ WindowsInstalliert = '2025-01-01' }; Quelle = 'Lauf' },
+            [pscustomobject]@{ Computer = 'DESKTOP-ABC'; Datum = '2026-10-01 09:00'; GeraetId = $devId; Hardware = @{ WindowsInstalliert = '2026-09-28' }; Quelle = 'Lauf' },
+            [pscustomobject]@{ Computer = 'DESKTOP-XYZ'; Datum = '2026-06-01 10:00'; GeraetId = 'G-anderesGeraet000000'; Hardware = @{ WindowsInstalliert = '2026-01-01' }; Quelle = 'Lauf' }
+        )
+        $runs = @(MinibenchTest\Get-DbDeviceRuns -Entries $entries -DeviceId $devId -ComputerName 'DESKTOP-ABC')
+        $runs.Count | Should -Be 2
+        $runs[0].Datum | Should -Be '2026-05-10 14:00'
+        $runs[1].Datum | Should -Be '2026-10-01 09:00'
+    }
+
+    It 'ordnet Altdaten ohne Geraet.Id über den Computernamen zu und ignoriert abweichende PCs' {
+        $entries = @(
+            [pscustomobject]@{ Computer = 'LEGACY-PC'; Datum = '2026-03-01 12:00'; GeraetId = ''; Quelle = 'Lauf' },
+            [pscustomobject]@{ Computer = 'LEGACY-PC'; Datum = '2026-04-01 12:00'; GeraetId = ''; Quelle = 'Lauf' },
+            [pscustomobject]@{ Computer = 'ANDERER-PC'; Datum = '2026-03-15 12:00'; GeraetId = ''; Quelle = 'Lauf' }
+        )
+        $runs = @(MinibenchTest\Get-DbDeviceRuns -Entries $entries -DeviceId '' -ComputerName 'LEGACY-PC')
+        $runs.Count | Should -Be 2
+        $runs[0].Datum | Should -Be '2026-03-01 12:00'
+        $runs[1].Datum | Should -Be '2026-04-01 12:00'
+    }
+
+    It 'schließt Referenzen grundsätzlich aus und mischt sie niemals in Geräteverläufe ein' {
+        $devId = 'G-meinpc00000000000000'
+        $entries = @(
+            [pscustomobject]@{ Computer = 'MEIN-PC'; Datum = '2026-07-01 10:00'; GeraetId = $devId; Quelle = 'Lauf' },
+            [pscustomobject]@{ Computer = 'MEIN-PC'; Datum = '2026-07-02 10:00'; GeraetId = $devId; Quelle = 'Referenz_Desktop.json'; Format = 'PC-Diagnose-Referenz' },
+            [pscustomobject]@{ Computer = 'MEIN-PC'; Datum = '2026-07-03 10:00'; GeraetId = $devId; Quelle = 'Referenz'; Typ = 'Referenz' },
+            [pscustomobject]@{ Computer = 'MEIN-PC'; Datum = '2026-07-04 10:00'; GeraetId = $devId; Path = 'C:\Minibench\Referenz.json'; Quelle = 'Lauf' },
+            [pscustomobject]@{ Computer = 'MEIN-PC'; Datum = '2026-08-01 10:00'; GeraetId = $devId; Quelle = 'Lauf' }
+        )
+        $runs = @(MinibenchTest\Get-DbDeviceRuns -Entries $entries -DeviceId $devId -ComputerName 'MEIN-PC')
+        $runs.Count | Should -Be 2
+        $runs[0].Datum | Should -Be '2026-07-01 10:00'
+        $runs[1].Datum | Should -Be '2026-08-01 10:00'
+    }
+
+    It 'sortiert die Läufe chronologisch aufsteigend' {
+        $devId = 'G-sortierung123456789'
+        $entries = @(
+            [pscustomobject]@{ Computer = 'TEST'; Datum = '2026-10-15 10:00'; GeraetId = $devId; Quelle = 'Lauf' },
+            [pscustomobject]@{ Computer = 'TEST'; Datum = '2026-01-05 08:00'; GeraetId = $devId; Quelle = 'Lauf' },
+            [pscustomobject]@{ Computer = 'TEST'; Datum = '2026-06-20 18:00'; GeraetId = $devId; Quelle = 'Lauf' }
+        )
+        $runs = @(MinibenchTest\Get-DbDeviceRuns -Entries $entries -DeviceId $devId -ComputerName 'TEST')
+        $runs.Count | Should -Be 3
+        $runs[0].Datum | Should -Be '2026-01-05 08:00'
+        $runs[1].Datum | Should -Be '2026-06-20 18:00'
+        $runs[2].Datum | Should -Be '2026-10-15 10:00'
+    }
+}
+
     It 'Test-EntryIsNotebook erkennt Mobilgeräte an Akku oder Modellname' {
         $nbAkku = [pscustomobject]@{ Akku = @([pscustomobject]@{ DesignmWh = 50000; VollmWh = 48000 }) }
         (MinibenchTest\Test-EntryIsNotebook $nbAkku) | Should -BeTrue

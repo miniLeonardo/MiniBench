@@ -32,7 +32,7 @@ if ($Vergleich) {
 }
 
 # Interaktives Dashboard generieren oder öffnen (wird von der Oberfläche oder über die Befehlszeile aufgerufen)
-if ($Dashboard -or $DashboardExport -or $DashboardSysteme) {
+if ($Dashboard -or $DashboardExport -or $DashboardSysteme -or $DashboardModus) {
     $df = ''
     try {
         $outPath = $(if ($DashboardExport) { $DashboardExport } else { '' })
@@ -40,7 +40,7 @@ if ($Dashboard -or $DashboardExport -or $DashboardSysteme) {
         if ($DashboardSysteme) {
             $sysPaths = @($DashboardSysteme -split ';' | Where-Object { $_ -and (Test-Path -LiteralPath $_) })
         }
-        $df = Export-BenchDashboardHtml -OutputPath $outPath -SystemPaths $sysPaths
+        $df = Export-BenchDashboardHtml -OutputPath $outPath -SystemPaths $sysPaths -Modus $DashboardModus
     } catch {
         Write-Host ('Dashboard-Erstellung fehlgeschlagen: {0}' -f $_.Exception.Message)
     }

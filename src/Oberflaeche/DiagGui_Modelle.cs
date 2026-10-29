@@ -4,6 +4,8 @@
 public class DbEntry
 {
     public string Path = "", Name = "", Computer = "", Datum = "", Cpu = "", Gpu = "", Ram = "", Disk = "", Befunde = "", Module = "", Quelle = "", Ordner = "";
+    public string GeraetId = "", GeraetKey = "";
+    public bool IsReference = false;
     public int Kerne = 0, Threads = 0;
     public Dictionary<string, double> Werte = new Dictionary<string, double>();
     public bool HasBench { get { return Werte.Count > 0; } }
@@ -99,12 +101,63 @@ public class DbEntry
                     Dictionary<string, object> bd = b as Dictionary<string, object>;
                     if (bd != null) e.Befunde = String.Format("{0} / {1} / {2}", S(bd, "Kritisch"), S(bd, "Warnungen"), S(bd, "Hinweise"));
                 }
+                object gObj; if (d.TryGetValue("Geraet", out gObj))
+                {
+                    Dictionary<string, object> gd = gObj as Dictionary<string, object>;
+                    if (gd != null) e.GeraetId = S(gd, "Id");
+                }
+                string q = e.Quelle ?? "";
+                string fmt = S(d, "Format");
+                string fName = System.IO.Path.GetFileName(f);
+                if (q.IndexOf("Referenz", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    fmt.IndexOf("Referenz", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    fName.IndexOf("Referenz", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    fName.StartsWith("Desktop_", StringComparison.OrdinalIgnoreCase) ||
+                    fName.StartsWith("Notebook_", StringComparison.OrdinalIgnoreCase) ||
+                    fName.StartsWith("Workstation_", StringComparison.OrdinalIgnoreCase) ||
+                    fName.StartsWith("MiniPC_", StringComparison.OrdinalIgnoreCase))
+                {
+                    e.IsReference = true;
+                }
                 if (e.Computer.Length == 0) e.Computer = System.IO.Path.GetFileNameWithoutExtension(f);
                 list.Add(e);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("DbEntry.Load Fehler in " + f + ": " + ex.Message);
+            }
+        }
+        Dictionary<string, List<string>> byName = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (DbEntry e in list)
+        {
+            if (!e.IsReference && !String.IsNullOrEmpty(e.GeraetId))
+            {
+                string n = (e.Computer ?? "").ToUpperInvariant();
+                if (!byName.ContainsKey(n)) byName[n] = new List<string>();
+                if (!byName[n].Contains(e.GeraetId)) byName[n].Add(e.GeraetId);
+            }
+        }
+        foreach (DbEntry e in list)
+        {
+            if (e.IsReference)
+            {
+                e.GeraetKey = "REF";
+            }
+            else if (!String.IsNullOrEmpty(e.GeraetId))
+            {
+                e.GeraetKey = e.GeraetId;
+            }
+            else
+            {
+                string n = (e.Computer ?? "").ToUpperInvariant();
+                if (byName.ContainsKey(n) && byName[n].Count == 1)
+                {
+                    e.GeraetKey = byName[n][0];
+                }
+                else
+                {
+                    e.GeraetKey = "PC:" + n;
+                }
             }
         }
         list.Sort(delegate(DbEntry a, DbEntry c) { int r = String.Compare(a.DisplayName, c.DisplayName, StringComparison.OrdinalIgnoreCase); return r != 0 ? r : String.Compare(c.Datum, a.Datum, StringComparison.Ordinal); });

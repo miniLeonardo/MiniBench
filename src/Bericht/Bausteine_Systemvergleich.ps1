@@ -343,5 +343,265 @@ function New-CompareReport([string[]]$Paths) {
     Write-Host ('Vergleich gespeichert: {0}' -f $file)
     return $file
 }
-#endregion
 
+# Ermittelt Verlaufsdaten fÃ¼r dasselbe GerÃ¤t aus frÃ¼heren Läufen der Datenbank
+function Get-DeviceRunComparison {
+    param(
+        [object[]]$Entries = @(),
+        [string]$DeviceId = '',
+        [string]$ComputerName = ''
+    )
+    if (-not $Entries -or -not $Entries.Count) {
+        if (Get-Command 'Get-DbEntries' -ErrorAction SilentlyContinue) {
+            $Entries = @(Get-DbEntries)
+        }
+    }
+    if (-not $DeviceId -and -not $ComputerName) {
+        try {
+            $dev = Get-DeviceIdentity
+            if ($dev) { $DeviceId = [string]$dev.Id }
+        } catch { }
+        $ComputerName = $env:COMPUTERNAME
+    }
+
+    $allRuns = @(if (Get-Command 'Get-DbDeviceRuns' -ErrorAction SilentlyContinue) { Get-DbDeviceRuns -Entries $Entries -DeviceId $DeviceId -ComputerName $ComputerName } else { @() })
+    $nowStr = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+    if ($script:StartTime) { $nowStr = $script:StartTime.ToString('yyyy-MM-dd HH:mm:ss') }
+    $earlierRuns = @($allRuns | Where-Object { $null -ne $_.Datum -and $_.Datum -lt $nowStr })
+
+    if (-not $earlierRuns.Count) {
+        return [pscustomobject]@{
+            HasHistory       = $false
+            EarlierCount     = 0
+            TotalCount       = 1
+            PrevRun          = $null
+            PrevDate         = ''
+            TimeSpanDays     = 0
+            InventoryChanges = @()
+            MetricDeltas     = @()
+            SsdWear          = $null
+            TrendFindings    = @()
+        }
+    }
+
+    $prev = $earlierRuns[-1]
+    $prevDateStr = [string]$prev.Datum
+    $days = 0.0
+    try {
+        $pDt = [datetime]::Parse($prevDateStr)
+        $cDt = $(if ($script:StartTime) { $script:StartTime } else { Get-Date })
+        $days = [math]::Max(0.0, [math]::Round(($cDt - $pDt).TotalDays, 1))
+    } catch { }
+
+    # 1. Inventar-Ã„nderungen ermitteln
+    $diffs = [System.Collections.Generic.List[object]]::new()
+    $curBios = $(if ($script:Facts -and $script:Facts.Contains('BIOS/UEFI')) { [string]$script:Facts['BIOS/UEFI'] } else { '' })
+    $prevBios = $(if ($prev.Hardware -and $prev.Hardware.BiosVersion) { [string]$prev.Hardware.BiosVersion } elseif ($prev.Hardware -and $prev.Hardware.BIOS) { [string]$prev.Hardware.BIOS } else { '' })
+    if ($curBios -and $prevBios) {
+        $cBVer = if ($curBios -match '([A-Za-z0-9._-]+)\s+vom') { $matches[1] } else { $curBios }
+        $pBVer = if ($prevBios -match '([A-Za-z0-9._-]+)\s+vom') { $matches[1] } else { $prevBios }
+        if ($cBVer -ne $pBVer) {
+            $diffs.Add([pscustomobject]@{ Item = 'BIOS'; Old = $pBVer; New = $cBVer; Text = ('BIOS: {0} &rarr; <b>{1}</b>' -f $pBVer, $cBVer) })
+        }
+    }
+
+    $curDrv = $(if ($script:Facts -and $script:Facts.Contains('Grafik')) { [string]$script:Facts['Grafik'] } else { '' })
+    $prevDrv = $(if ($prev.Hardware -and $prev.Hardware.GpuDriver) { [string]$prev.Hardware.GpuDriver } elseif ($prev.Hardware -and $prev.Hardware.GrafikTreiber) { [string]$prev.Hardware.GrafikTreiber } else { '' })
+    if ($curDrv -and $prevDrv) {
+        $cDrvVer = if ($curDrv -match '(\d{2,3}\.\d{2})') { $matches[1] } else { $curDrv }
+        $pDrvVer = if ($prevDrv -match '(\d{2,3}\.\d{2})') { $matches[1] } else { $prevDrv }
+        if ($cDrvVer -ne $pDrvVer) {
+            $diffs.Add([pscustomobject]@{ Item = 'Grafiktreiber'; Old = $pDrvVer; New = $cDrvVer; Text = ('Grafiktreiber: {0} &rarr; <b>{1}</b>' -f $pDrvVer, $cDrvVer) })
+        }
+    }
+
+    $curOs = $(if ($script:Facts -and $script:Facts.Contains('Betriebssystem')) { [string]$script:Facts['Betriebssystem'] } else { '' })
+    $prevOs = $(if ($prev.Hardware -and $prev.Hardware.WinBuild) { [string]$prev.Hardware.WinBuild } elseif ($prev.System) { [string]$prev.System } else { '' })
+    if ($curOs -and $prevOs) {
+        $cBuild = if ($curOs -match 'Build\s+(\d+)') { $matches[1] } else { '' }
+        $pBuild = if ($prevOs -match '(\d{5})') { $matches[1] } else { $prevOs }
+        if ($cBuild -and $pBuild -and $cBuild -ne $pBuild) {
+            $diffs.Add([pscustomobject]@{ Item = 'Windows-Build'; Old = $pBuild; New = $cBuild; Text = ('Windows: Build {0} &rarr; <b>Build {1}</b>' -f $pBuild, $cBuild) })
+        }
+    }
+
+    $curRam = $(if ($script:Facts -and $script:Facts.Contains('Arbeitsspeicher')) { [string]$script:Facts['Arbeitsspeicher'] } else { '' })
+    $prevRam = $(if ($prev.Hardware -and $prev.Hardware.RAM) { [string]$prev.Hardware.RAM } else { '' })
+    if ($curRam -and $prevRam) {
+        $cSpd = if ($curRam -match '(\d{4,5}\s*MT/s)') { $matches[1] } else { '' }
+        $pSpd = if ($prevRam -match '(\d{4,5}\s*MT/s)') { $matches[1] } else { '' }
+        if ($cSpd -and $pSpd -and $cSpd -ne $pSpd) {
+            $diffs.Add([pscustomobject]@{ Item = 'RAM-Takt'; Old = $pSpd; New = $cSpd; Text = ('RAM: {0} &rarr; <b>{1}</b>' -f $pSpd, $cSpd) })
+        }
+    }
+
+    # 2. Kernmesswerte-Deltas ermitteln
+    $curVals = if (Get-Command 'Get-CurrentRefValues' -ErrorAction SilentlyContinue) { Get-CurrentRefValues } else { @{} }
+    $deltas = [System.Collections.Generic.List[object]]::new()
+    $metricDefs = @(
+        @{ Key = 'CPU|MT'; Name = 'CPU Mehrkern'; Unit = 'Pkt.'; Fmt = 'N0'; Lower = $false }
+        @{ Key = 'CPU|ST'; Name = 'CPU Einzelkern'; Unit = 'Pkt.'; Fmt = 'N0'; Lower = $false }
+        @{ Key = 'RAM|Lesen'; Name = 'Arbeitsspeicher Lesen'; Unit = 'GB/s'; Fmt = 'N1'; Lower = $false; AltKey = 'RAM|READ' }
+        @{ Key = 'GPU|REND'; Name = 'Grafik Renderleistung'; Unit = 'FPS'; Fmt = 'N0'; Lower = $false; AltKey = 'GPU|FPS' }
+        @{ Key = 'DISK|NVMe4|SR'; Name = 'SSD Sequentiell lesen'; Unit = 'MB/s'; Fmt = 'N0'; Lower = $false; AltKey = 'LW|SR' }
+        @{ Key = 'DISK|NVMe4|R1'; Name = 'SSD 4K Random Read'; Unit = 'IOPS'; Fmt = 'N0'; Lower = $false; AltKey = 'LW|R1' }
+    )
+
+    foreach ($m in $metricDefs) {
+        $cV = $(if ($curVals.Contains($m.Key)) { [double]$curVals[$m.Key] } elseif ($m.AltKey -and $curVals.Contains($m.AltKey)) { [double]$curVals[$m.AltKey] } else { 0.0 })
+        $pV = 0.0
+        if ($prev.Werte) {
+            if ($prev.Werte.ContainsKey($m.Key)) { $pV = [double]$prev.Werte[$m.Key] }
+            elseif ($m.AltKey -and $prev.Werte.ContainsKey($m.AltKey)) { $pV = [double]$prev.Werte[$m.AltKey] }
+        }
+        if ($pV -le 0 -and $prev.Messwerte) {
+            if ($prev.Messwerte.ContainsKey($m.Key)) { $pV = [double]$prev.Messwerte[$m.Key] }
+            elseif ($m.AltKey -and $prev.Messwerte.ContainsKey($m.AltKey)) { $pV = [double]$prev.Messwerte[$m.AltKey] }
+        }
+        if ($cV -gt 0 -and $pV -gt 0) {
+            $diffPct = [math]::Round((($cV - $pV) / $pV) * 100.0, 1)
+            $diffAbs = [math]::Round($cV - $pV, 1)
+            $badgeCls = if ($diffPct -ge 3.0) { 'ok' } elseif ($diffPct -le -5.0) { 'warn' } else { 'neutral' }
+            $deltas.Add([pscustomobject]@{
+                Key       = $m.Key
+                Name      = $m.Name
+                Unit      = $m.Unit
+                CurrVal   = $cV
+                PrevVal   = $pV
+                CurrText  = (('{0:' + $m.Fmt + '} {1}') -f $cV, $m.Unit)
+                PrevText  = (('{0:' + $m.Fmt + '} {1}') -f $pV, $m.Unit)
+                DiffPct   = $diffPct
+                DiffAbs   = $diffAbs
+                BadgeCls  = $badgeCls
+                SignStr   = $(if ($diffPct -ge 0) { '+' } else { '' })
+            })
+        }
+    }
+
+    # 3. SSD-Verschleiß-Hochrechnung
+    $ssdWearObj = $null
+    $curUsed = $null
+    if ($script:SmartData -and $null -ne $script:SmartData.PercentageUsed) { $curUsed = [double]$script:SmartData.PercentageUsed }
+    elseif ($curVals.Contains('SSD|Wear')) { $curUsed = [double]$curVals['SSD|Wear'] }
+    $prevUsed = $null
+    if ($prev.Hardware -and $null -ne $prev.Hardware.SsdWearPct) { $prevUsed = [double]$prev.Hardware.SsdWearPct }
+    elseif ($prev.Werte -and $prev.Werte.ContainsKey('SSD|Wear')) { $prevUsed = [double]$prev.Werte['SSD|Wear'] }
+
+    if ($curUsed -ne $null -and $prevUsed -ne $null) {
+        $dUsed = $curUsed - $prevUsed
+        $projText = ''
+        $estYears = $null
+        if ($days -gt 0 -and $dUsed -gt 0) {
+            $dailyRate = $dUsed / $days
+            $remPct = [math]::Max(0.0, 100.0 - $curUsed)
+            $remDays = $remPct / $dailyRate
+            $estYears = [math]::Round($remDays / 365.25, 1)
+            $projText = ('Geschätzte Hochrechnung basierend auf dem bisherigen Schreibaufkommen: voraussichtlich ca. {0:N1} Jahre Restlebensdauer (aktueller Verbrauch: {1:N0} %).' -f $estYears, $curUsed)
+        } else {
+            $projText = ('Geschätzte Hochrechnung basierend auf dem bisherigen Schreibaufkommen: minimaler Verschleiß zwischen den Läufen ({0:N0} % verbraucht, Restlebensdauer > 10 Jahre).' -f $curUsed)
+        }
+        $ssdWearObj = [pscustomobject]@{
+            HasWearData    = $true
+            CurrentUsedPct = $curUsed
+            PrevUsedPct    = $prevUsed
+            DaysElapsed    = $days
+            EstimatedYears = $estYears
+            ProjectionText = $projText
+        }
+    }
+
+    # 4. Trend-Befunde (Strikte 3-Läufe-Regel: erst ab mindestens 3 Läufen)
+    $totalCount = $earlierRuns.Count + 1
+    $trendFindings = [System.Collections.Generic.List[object]]::new()
+    if ($totalCount -ge 3) {
+        $curTMax = $(if ($script:Telemetry -and $script:Telemetry.CpuTempMax) { [double]$script:Telemetry.CpuTempMax }
+                     elseif ($curVals.Contains('LAST|CpuTempMax')) { [double]$curVals['LAST|CpuTempMax'] }
+                     else { $null })
+
+        $compTemps = [System.Collections.Generic.List[double]]::new()
+        foreach ($r in $earlierRuns) {
+            $t = $null
+            if ($r.Hardware -and $r.Hardware.CpuTempMax) { $t = [double]$r.Hardware.CpuTempMax }
+            elseif ($r.Werte -and $r.Werte.ContainsKey('LAST|CpuTempMax')) { $t = [double]$r.Werte['LAST|CpuTempMax'] }
+            if ($null -ne $t -and $t -gt 30.0 -and $t -lt 115.0) {
+                $dauer = $(if ($r.Messdauer -match '(\d+)') { [int]$matches[1] } else { 0 })
+                if ($dauer -ge 60 -or -not $dauer) {
+                    $compTemps.Add($t)
+                }
+            }
+        }
+        if ($curTMax -ne $null -and $compTemps.Count -ge 2) {
+            $sum = 0.0; foreach ($t in $compTemps) { $sum += $t }
+            $mean = $sum / $compTemps.Count
+            $sqDiff = 0.0; foreach ($t in $compTemps) { $sqDiff += [math]::Pow($t - $mean, 2) }
+            $stdDev = [math]::Sqrt($sqDiff / [math]::Max(1, ($compTemps.Count - 1)))
+            $margin = [math]::Max(4.0, 2.0 * $stdDev)
+            $deltaT = $curTMax - $mean
+            if ($deltaT -ge 8.0 -and $deltaT -gt $margin) {
+                $fObj = [pscustomobject]@{
+                    Level = 'WARNUNG'
+                    Area  = 'Kühlung'
+                    Text  = ('CPU unter gleicher Last {0:N0} K wärmer als im vorherigen Verlauf: Kühlung/WÃ¤rmeleitpaste prüfen' -f [math]::Round($deltaT))
+                }
+                $trendFindings.Add($fObj)
+                if (Get-Command 'Add-Finding' -ErrorAction SilentlyContinue) {
+                    Add-Finding $fObj.Level $fObj.Area $fObj.Text
+                }
+            }
+        }
+    }
+
+    return [pscustomobject]@{
+        HasHistory       = $true
+        EarlierCount     = $earlierRuns.Count
+        TotalCount       = $totalCount
+        PrevRun          = $prev
+        PrevDate         = $prevDateStr
+        TimeSpanDays     = $days
+        InventoryChanges = @($diffs)
+        MetricDeltas     = @($deltas)
+        SsdWear          = $ssdWearObj
+        TrendFindings    = @($trendFindings)
+    }
+}
+
+# HTML-Abschnitt "Seit dem letzten Lauf" fÃ¼r den Diagnosebericht
+function New-RunHistoryHtml {
+    $comp = Get-DeviceRunComparison
+    if (-not $comp -or -not $comp.HasHistory) { return '' }
+
+    $sb = New-Object System.Text.StringBuilder
+    $timeNote = if ($comp.TimeSpanDays -gt 0) { ('vor {0:N0} Tagen am {1}' -f $comp.TimeSpanDays, $comp.PrevDate) } else { ('Lauf vom {0}' -f $comp.PrevDate) }
+    $compParam = [System.Uri]::EscapeDataString($env:COMPUTERNAME)
+
+    [void]$sb.Append('<section class="box" data-section="benchmark">')
+    [void]$sb.Append(('<div class="bar"><h2>Seit dem letzten Lauf ({0})</h2><a href="../Dashboard.html?mode=history&system={1}" class="tab-btn btn-dash" target="_blank" style="margin-left:auto; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:600; padding:4px 10px; border-radius:4px; font-size:12px;">Geräte-Verlauf im Dashboard öffnen &rarr;</a></div>' -f
+        (ConvertTo-HtmlText $timeNote), $compParam))
+
+    if ($comp.InventoryChanges.Count) {
+        [void]$sb.Append('<div style="margin:8px 0 14px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">')
+        [void]$sb.Append('<span style="font-size:12px; font-weight:600; color:var(--text-muted, #6B7280);">Geändert:</span>')
+        foreach ($d in $comp.InventoryChanges) {
+            [void]$sb.Append(('<span class="badge info" style="font-size:11px; text-transform:none; font-weight:normal; padding:3px 8px; border:1px solid rgba(0,120,212,0.3);">{0}</span>' -f $d.Text))
+        }
+        [void]$sb.Append('</div>')
+    }
+
+    if ($comp.MetricDeltas.Count) {
+        [void]$sb.Append('<div class="tw"><table><thead><tr><th>Kernmesswert</th><th class="r">Voriger Lauf</th><th class="r">Aktueller Lauf</th><th>Abweichung</th></tr></thead><tbody>')
+        foreach ($m in $comp.MetricDeltas) {
+            $badgeCls = switch ($m.BadgeCls) { 'ok' { 'badge ok' } 'warn' { 'badge warn' } default { 'badge neutral' } }
+            [void]$sb.Append(('<tr><td><b>{0}</b></td><td class="num r">{1}</td><td class="num r"><b>{2}</b></td><td><span class="{3}">{4}{5:N1} %</span></td></tr>' -f
+                (ConvertTo-HtmlText $m.Name), (ConvertTo-HtmlText $m.PrevText), (ConvertTo-HtmlText $m.CurrText), $badgeCls, $m.SignStr, $m.DiffPct))
+        }
+        [void]$sb.Append('</tbody></table></div>')
+    }
+
+    if ($comp.SsdWear -and $comp.SsdWear.ProjectionText) {
+        [void]$sb.Append(('<p class="note tight" style="margin-top:10px;"><em>{0}</em></p>' -f (ConvertTo-HtmlText $comp.SsdWear.ProjectionText)))
+    }
+
+    [void]$sb.Append('</section>')
+    return $sb.ToString()
+}
+#endregion

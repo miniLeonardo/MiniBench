@@ -2,6 +2,15 @@
 
 Alle wesentlichen Ã„nderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v3.87 (2026-10-29)
+
+### Neu
+* **ListViewGroup-Gruppierung in der Datenbank:** Die Datenbank-ListView (lvDb) gruppiert alle Läufe automatisch nach Geräten (ListViewGroup) über die Hardware-Signatur (Geraet.Id) oder den Computernamen. Gruppenköpfe zeigen Gerätename, Anzahl der Läufe und das Datum des jüngsten Laufs (z. B. TORRENT  •  4 Läufe  •  zuletzt 29.10.2026). Alle Referenzsysteme werden am Ende in einer geschlossenen Gruppe gebündelt. Spaltensortierung sortiert innerhalb der Gruppen; voller Kontrast im Hell- und Dunkelmodus.
+* **Verlauf-Aktionen in Datenbank & Startseite:** Neue Schaltfläche „Verlauf“ und Kontextmenüeintrag „Geräte-Verlauf im Dashboard öffnen“ in der Datenbankansicht öffnen das Dashboard direkt im Verlaufsmodus für das markierte Gerät. Kachel „Letzter Lauf“ auf der Startseite bietet direkten Zugriff auf den Verlauf und zeigt farbige Trend-Pfeile (↑ +X %, ↓ -X %) für die vier Kern-KPIs (Gesamt, CPU Mehrkern, RAM Lesen, Grafik) gegen den direkten Vorläufer desselben Rechners.
+* **Interaktiver Verlaufsmodus im Dashboard:** Timeline-Vergleich aller chronologischen Läufe eines PCs (Aufruf via -DashboardModus Verlauf oder ?mode=history). Spalten von links (ältester Lauf) nach rechts (neuester Lauf) mit relativen Delta-Badges zum vorherigen Lauf. Zeile „Geändert (Inventar)“ listet Modifikationen an BIOS, Grafiktreiber, Windows-Build und RAM-Takt übersichtlich auf. Zeitreihen-Liniendiagramme für Gesamtpunktzahl, CPU ST/MT, Grafik-FPS, SSD 4K, SSD- und Akku-Verschleiß sowie Höchsttemperaturen (mit striktem Vergleichbarkeitsfilter). Einzellauf-Faktenhinweis informiert sachlich, wenn noch keine Vergleichsläufe vorliegen.
+* **Neuer Berichtsabschnitt „Seit dem letzten Lauf“:** Kompakte Gegenüberstellung der Kernmesswerte und erkannten Hardware-/Systemänderungen zum vorigen Lauf im HTML-Diagnosebericht vor dem Benchmark sowie strukturierter Export in die anonymisierte KI-Zusammenfassung (KI-Datei.ps1).
+* **Strikte 3-Läufe-Regel für Trend-Befunde:** Warnbefunde zu schleichender Leistungsverschlechterung oder steigenden CPU-Temperaturen unter gleicher Last werden erst ab mindestens drei vorliegenden Läufen erzeugt, wenn der Temperaturanstieg die statistische Messstreuung signifikant übersteigt (> doppelte Standardabweichung und mindestens 8 K).
+* **Lineare SSD-Verschleiß-Hochrechnung:** Prognose der Restlebensdauer basierend auf SMART-Verschleißwerten (Percentage Used / TBW) und dem Zeitabstand zwischen den Läufen, transparent ausgewiesen als geschätzte Hochrechnung des bisherigen Schreibaufkommens.
 ## v3.86 (29.10.2026)
 
 ### Neu

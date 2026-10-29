@@ -28,9 +28,13 @@ function Out-Report {
 
 function Add-Finding {
     param([ValidateSet('KRITISCH', 'WARNUNG', 'INFO')][string]$Level, [string]$Area, [string]$Text)
+    if ($null -eq $script:Findings) { $script:Findings = [System.Collections.Generic.List[object]]::new() }
+    if ($null -eq $script:FindKeys) { $script:FindKeys = [System.Collections.Generic.HashSet[string]]::new() }
     if ($script:FindKeys -and -not $script:FindKeys.Add(('{0}|{1}|{2}' -f $Level, $Area, $Text))) { return }
     $script:Findings.Add([pscustomobject]@{ Stufe = $Level; Bereich = $Area; Befund = $Text })
-    Send-GuiEvent 'FIND' $Level $Area $Text
+    if (Get-Command 'Send-GuiEvent' -ErrorAction SilentlyContinue) {
+        Send-GuiEvent 'FIND' $Level $Area $Text
+    }
     $color = @{ KRITISCH = 'Red'; WARNUNG = 'Yellow'; INFO = 'DarkCyan' }[$Level]
     Write-Host ('    [{0}] {1}: {2}' -f $Level, $Area, $Text) -ForegroundColor $color
 }

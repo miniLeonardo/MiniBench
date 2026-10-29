@@ -30,8 +30,23 @@
     </div>
   </header>
 
+  <!-- MODUS-LEISTE (MULTI-SYSTEM-VERGLEICH VS. GERÄTE-VERLAUF) -->
+  <div class="dash-mode-bar" style="margin: 14px 0 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+    <div class="dash-mode-tabs" style="display: flex; gap: 8px;">
+      <button id="tabModeCompare" class="mode-tab-btn active" type="button" title="Systemübergreifender Multi-System-Vergleich">Multi-System-Vergleich</button>
+      <button id="tabModeHistory" class="mode-tab-btn" type="button" title="Chronologischer Verlauf aller Läufe eines Rechners">Geräte-Verlauf (Timeline)</button>
+    </div>
+    <div id="historyDeviceWrap" style="display: none; align-items: center; gap: 10px;">
+      <span class="selector-label" style="margin: 0; font-weight: 600;">Rechner:</span>
+      <div class="select-wrapper" style="min-width: 260px;">
+        <select id="deviceSelect"></select>
+        <span class="select-arrow">▼</span>
+      </div>
+    </div>
+  </div>
+
   <!-- MULTI-SYSTEM SELECTOR -->
-  <section class="selector-card">
+  <section id="compareSelectorCard" class="selector-card">
     <div class="selector-top">
       <div class="selector-base-wrap">
         <div class="selector-label">Basis- / Referenzsystem (100 % Bezugspunkt)</div>
@@ -109,10 +124,19 @@
         <h2>Lasttest-Telemetrie &amp; Multi-System-Sensorverlauf</h2>
         <p>Sensorverlauf über die Belastungsdauer mit Farbcodierung je System.</p>
       </div>
-      <div class="chart-controls">
+      <div id="chartControlsCompare" class="chart-controls">
         <button id="btnModeCpu" class="chart-btn active" type="button">CPU</button>
         <button id="btnModeGpu" class="chart-btn" type="button">GPU</button>
         <button id="btnModeWatt" class="chart-btn" type="button">Leistung (W)</button>
+      </div>
+      <div id="chartControlsHistory" class="chart-controls" style="display: none; flex-wrap: wrap;">
+        <button id="btnHistOverall" class="chart-btn active" type="button">Gesamt</button>
+        <button id="btnHistCpu" class="chart-btn" type="button">CPU</button>
+        <button id="btnHistGpu" class="chart-btn" type="button">Grafik (FPS)</button>
+        <button id="btnHistDisk" class="chart-btn" type="button">SSD 4K</button>
+        <button id="btnHistSsdWear" class="chart-btn" type="button">SSD-Verschleiß</button>
+        <button id="btnHistBatWear" class="chart-btn" type="button">Akku-Verschleiß</button>
+        <button id="btnHistTemp" class="chart-btn" type="button">Höchsttemperaturen</button>
       </div>
     </div>
 

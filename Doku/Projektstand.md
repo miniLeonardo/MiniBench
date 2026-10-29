@@ -2,7 +2,21 @@
 
 Gemeinsamer Stand fÃƒÂ¼r alle Agenten (Claude, Antigravity). Wird am Ende jeder Version aktualisiert (siehe AGENTS.md).
 
-## Stand: Version 3.86 (29.10.2026)
+## Stand: Version 3.87 (29.10.2026)
+Release-Commit "Release v3.87: Läufe je Gerät bündeln (Verlauf ohne eigene Seite)" (folgt) auf https://github.com/miniLeonardo/MiniBench (Zweig main).
+Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.
+
+Inhalt von 3.87 (Einzelheiten in Doku\Änderungen_v3.87.txt):
+1. ListViewGroup-Gruppierung in der Datenbank: Automatische Gruppierung nach Rechnern über Geraet.Id oder Computername mit Gerätename, Anzahl Läufe und jüngstem Messdatum. Referenzprofile in geschlossener Gruppe am Ende. Volle Farbschema-Unterstützung (Hell/Dunkel).
+2. Verlauf-Aktionen in Datenbank & Startseite: Schaltfläche 'Verlauf' und Kontextmenü in der Datenbankansicht; Kachel 'Letzter Lauf' auf der Startseite mit Trend-Pfeilen (↑ +X %, ↓ -X %) für 4 Kern-KPIs gegen den direkten Vorläufer.
+3. Interaktiver Verlaufsmodus im Dashboard: Chronologischer Timeline-Vergleich desselben Rechners (-DashboardModus Verlauf / ?mode=history), Delta-Badges zum Vorläufer, Zeile „Geändert (Inventar)“ für Modifikationen an BIOS, Treibern, OS-Build und RAM-Takt sowie Zeitreihenkurven mit Vergleichbarkeitsfilter.
+4. Neuer Berichtsabschnitt 'Seit dem letzten Lauf': Kernmesswerte-Deltas, Inventaränderungen und geschätzte lineare SSD-Verschleiß-Hochrechnung im HTML-Diagnosebericht und in der KI-Zusammenfassung.
+5. Strikte 3-Läufe-Regel für Trend-Befunde: Keine verfrühten Warnbefunde bei 1 oder 2 Läufen; Trend-Befunde (z. B. CPU-Temperaturanstieg) erst ab 3 Läufen bei signifikanter statistischer Überschreitung der Messstreuung (> doppelte Standardabweichung und >= 8 K).
+
+## Vorher: Version 3.86 (29.10.2026)
+Release-Commit "Release v3.86: Update-Prüfung, Grafiktreiber-Links, Resizable BAR, geprüfter System-Umzug mit WLAN & Gesamtläufe" (Commit abe9f83) auf https://github.com/miniLeonardo/MiniBench (Zweig main).
+Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.
+
 Release-Commit "Release v3.86: Update-Prüfung, Grafiktreiber-Links, Resizable BAR, geprüfter System-Umzug mit WLAN & Gesamtläufe" (Commit af875cb) auf https://github.com/miniLeonardo/MiniBench (Zweig main).
 Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.
 

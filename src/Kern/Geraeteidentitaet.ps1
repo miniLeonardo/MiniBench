@@ -58,15 +58,17 @@ function Get-DeviceIdentity {
 function Set-DbDeviceKeys($Entries) {
     $byName = @{}
     foreach ($e in @($Entries)) {
-        if ([string]$e.GeraetId) {
+        $gid = $(if ([string]$e.GeraetId) { [string]$e.GeraetId } elseif ($e.Geraet -and [string]$e.Geraet.Id) { [string]$e.Geraet.Id } else { '' })
+        if ($gid) {
             $n = ([string]$e.Computer).ToUpperInvariant()
             if (-not $byName.ContainsKey($n)) { $byName[$n] = New-Object 'System.Collections.Generic.HashSet[string]' }
-            [void]$byName[$n].Add([string]$e.GeraetId)
+            [void]$byName[$n].Add($gid)
         }
     }
     foreach ($e in @($Entries)) {
+        $gid = $(if ([string]$e.GeraetId) { [string]$e.GeraetId } elseif ($e.Geraet -and [string]$e.Geraet.Id) { [string]$e.Geraet.Id } else { '' })
         $n = ([string]$e.Computer).ToUpperInvariant()
-        $key = $(if ([string]$e.GeraetId) { [string]$e.GeraetId } elseif ($byName.ContainsKey($n) -and $byName[$n].Count -eq 1) { @($byName[$n])[0] } else { 'PC:' + $n })
+        $key = $(if ($gid) { $gid } elseif ($byName.ContainsKey($n) -and $byName[$n].Count -eq 1) { @($byName[$n])[0] } else { 'PC:' + $n })
         $e | Add-Member -NotePropertyName GeraetKey -NotePropertyValue $key -Force
     }
 }
@@ -74,8 +76,50 @@ function Set-DbDeviceKeys($Entries) {
 # Gehört ein Datenbankeintrag zu diesem Gerät? Über die Kennung, bei älteren Einträgen ohne Zuordnung über den Computernamen.
 function Test-SameDevice($Entry, [string]$DeviceId, [string]$ComputerName) {
     $key = [string]$Entry.GeraetKey
-    if (-not $key) { $key = $(if ([string]$Entry.GeraetId) { [string]$Entry.GeraetId } else { 'PC:' + ([string]$Entry.Computer).ToUpperInvariant() }) }
-    if ($key.StartsWith('G-')) { return ($DeviceId -and $key -eq $DeviceId) }
-    return ([string]$Entry.Computer -eq $ComputerName)
+    if (-not $key) {
+        $gid = $(if ([string]$Entry.GeraetId) { [string]$Entry.GeraetId } elseif ($Entry.Geraet -and [string]$Entry.Geraet.Id) { [string]$Entry.Geraet.Id } else { '' })
+        $key = $(if ($gid) { $gid } else { 'PC:' + ([string]$Entry.Computer).ToUpperInvariant() })
+    }
+    if ($key.StartsWith('G-')) { return [bool]($DeviceId -and $key -eq $DeviceId) }
+    return [bool]($ComputerName -and ([string]$Entry.Computer -ieq $ComputerName))
+}
+
+# Alle Läufe desselben Geräts chronologisch aufsteigend sortiert zurückgeben.
+# Schließt Referenzen grundsätzlich aus.
+function Get-DbDeviceRuns {
+    param(
+        [object[]]$Entries = @(),
+        [string]$DeviceId = '',
+        [string]$ComputerName = ''
+    )
+    if (-not $Entries -or -not $Entries.Count) {
+        if (Get-Command 'Get-DbEntries' -ErrorAction SilentlyContinue) {
+            $Entries = @(Get-DbEntries)
+        }
+    }
+    if (-not $DeviceId -and -not $ComputerName) {
+        try {
+            $dev = Get-DeviceIdentity
+            if ($dev) { $DeviceId = [string]$dev.Id }
+        } catch { }
+        $ComputerName = $env:COMPUTERNAME
+    }
+    if (-not $DeviceId -and -not $ComputerName) { return @() }
+
+    if (Get-Command 'Set-DbDeviceKeys' -ErrorAction SilentlyContinue) {
+        Set-DbDeviceKeys $Entries
+    }
+
+    $filtered = @($Entries | Where-Object {
+        if (-not $_) { return $false }
+        $q = [string]$_.Quelle
+        $f = [string]$_.Format
+        $p = [string]$_.Path
+        $t = [string]$_.Typ
+        if ($q -like '*Referenz*' -or $f -like '*Referenz*' -or $p -like '*Referenz*.json' -or $t -eq 'Referenz') { return $false }
+        Test-SameDevice $_ $DeviceId $ComputerName
+    })
+
+    return @($filtered | Sort-Object Datum)
 }
 #endregion

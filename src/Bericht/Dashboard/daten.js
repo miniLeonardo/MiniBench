@@ -2,7 +2,11 @@
   let baseSystem = null;
   let comparedSystems = [];
   let selectedCompareIds = new Set();
-  let chartMode = 'cpu'; // 'cpu', 'gpu'
+  let chartMode = 'cpu'; // 'cpu', 'gpu', 'watt'
+  let dashboardMode = (data && data.Mode === 'history') ? 'history' : 'compare';
+  let historyChartMetric = 'overall'; // 'overall', 'cpu', 'gpu', 'disk', 'ssdwear', 'batwear', 'temp'
+  let selectedDeviceKey = null;
+  let deviceGroups = new Map(); // key -> { name, runs: [] }
 
   function escapeHtml(str) {
     if (str === null || str === undefined) return '';
@@ -377,6 +381,33 @@
       }
     }
 
+    buildDeviceGroups();
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('mode') === 'history' || urlParams.get('mode') === 'verlauf') {
+        dashboardMode = 'history';
+      }
+      const devP = urlParams.get('device') || urlParams.get('system') || urlParams.get('pc');
+      if (devP) {
+        const tDev = devP.toLowerCase();
+        deviceGroups.forEach((grp, key) => {
+          if (key.toLowerCase() === tDev || grp.name.toLowerCase().includes(tDev) || grp.runs.some(r => (r.Computer && r.Computer.toLowerCase() === tDev) || (r.Id && r.Id.toLowerCase() === tDev))) {
+            selectedDeviceKey = key;
+          }
+        });
+      }
+    } catch(e) {}
+
+    if (tabModeCompare) tabModeCompare.addEventListener('click', () => setDashboardMode('compare'));
+    if (tabModeHistory) tabModeHistory.addEventListener('click', () => setDashboardMode('history'));
+    if (deviceSelect) {
+      deviceSelect.addEventListener('change', () => {
+        selectedDeviceKey = deviceSelect.value;
+        updateDashboard();
+      });
+    }
+
+    setDashboardMode(dashboardMode);
     renderCompareChips();
     updateDashboard();
 
@@ -424,6 +455,21 @@
     btnModeGpu.addEventListener('click', () => { setChartMode('gpu'); });
     if (btnModeWatt) btnModeWatt.addEventListener('click', () => { setChartMode('watt'); });
 
+    // History Metric Umschalter
+    const histBtns = [
+      { id: 'btnHistOverall', m: 'overall' },
+      { id: 'btnHistCpu', m: 'cpu' },
+      { id: 'btnHistGpu', m: 'gpu' },
+      { id: 'btnHistDisk', m: 'disk' },
+      { id: 'btnHistSsdWear', m: 'ssdwear' },
+      { id: 'btnHistBatWear', m: 'batwear' },
+      { id: 'btnHistTemp', m: 'temp' }
+    ];
+    histBtns.forEach(b => {
+      const el = document.getElementById(b.id);
+      if (el) el.addEventListener('click', () => setHistoryMetric(b.m));
+    });
+
     window.addEventListener('resize', renderChart);
   }
 
@@ -434,6 +480,125 @@
     if (btnModeWatt) btnModeWatt.classList.toggle('active', mode === 'watt');
     renderChartLegend();
     renderChart();
+  }
+
+  function setHistoryMetric(m) {
+    historyChartMetric = m;
+    const histIds = ['btnHistOverall', 'btnHistCpu', 'btnHistGpu', 'btnHistDisk', 'btnHistSsdWear', 'btnHistBatWear', 'btnHistTemp'];
+    histIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('active');
+    });
+    const map = {
+      overall: 'btnHistOverall',
+      cpu: 'btnHistCpu',
+      gpu: 'btnHistGpu',
+      disk: 'btnHistDisk',
+      ssdwear: 'btnHistSsdWear',
+      batwear: 'btnHistBatWear',
+      temp: 'btnHistTemp'
+    };
+    const act = document.getElementById(map[m]);
+    if (act) act.classList.add('active');
+    renderChartLegend();
+    renderChart();
+  }
+
+  function buildDeviceGroups() {
+    deviceGroups.clear();
+    const all = data.Systems || [];
+    all.forEach(s => {
+      if (s.IsReference) return;
+      const key = s.GeraetKey || s.GeraetId || ('PC:' + (s.Computer || 'SYSTEM').toUpperCase());
+      if (!deviceGroups.has(key)) {
+        deviceGroups.set(key, {
+          name: s.Computer || s.DisplayName || 'System',
+          runs: []
+        });
+      }
+      deviceGroups.get(key).runs.push(s);
+    });
+    deviceGroups.forEach(grp => {
+      grp.runs.sort((runA, runB) => String(runA.Datum || '').localeCompare(String(runB.Datum || '')));
+      if (grp.runs.length > 0) {
+        const newest = grp.runs[grp.runs.length - 1];
+        grp.name = newest.Computer || newest.DisplayName || grp.name;
+      }
+    });
+    populateDeviceSelect();
+  }
+
+  function populateDeviceSelect() {
+    const devSel = document.getElementById('deviceSelect');
+    if (!devSel) return;
+    devSel.innerHTML = '';
+    deviceGroups.forEach((grp, key) => {
+      const opt = document.createElement('option');
+      opt.value = key;
+      const count = grp.runs.length;
+      const lastRun = count > 0 ? grp.runs[count - 1] : null;
+      const lastDate = lastRun && lastRun.Datum ? ' (' + lastRun.Datum.split(' ')[0] + ')' : '';
+      opt.textContent = grp.name + ' (' + count + ' ' + (count === 1 ? 'Lauf' : 'Läufe') + lastDate + ')';
+      devSel.appendChild(opt);
+    });
+    if (selectedDeviceKey && deviceGroups.has(selectedDeviceKey)) {
+      devSel.value = selectedDeviceKey;
+    } else if (deviceGroups.size > 0) {
+      selectedDeviceKey = deviceGroups.keys().next().value;
+      devSel.value = selectedDeviceKey;
+    }
+  }
+
+  function getInventoryDiff(prev, curr) {
+    if (!prev || !curr) return null;
+    const diffs = [];
+    const prevBios = (prev.Hardware?.BiosVersion || '') + (prev.Hardware?.BiosDatum ? ' (' + prev.Hardware.BiosDatum + ')' : '');
+    const currBios = (curr.Hardware?.BiosVersion || '') + (curr.Hardware?.BiosDatum ? ' (' + curr.Hardware.BiosDatum + ')' : '');
+    if (prevBios && currBios && prevBios !== currBios) {
+      diffs.push('BIOS: ' + escapeHtml(prevBios) + ' &rarr; <b>' + escapeHtml(currBios) + '</b>');
+    } else if (!prevBios && currBios) {
+      diffs.push('BIOS: <b>' + escapeHtml(currBios) + '</b>');
+    }
+    const prevDrv = prev.Hardware?.GpuDriver || '';
+    const currDrv = curr.Hardware?.GpuDriver || '';
+    if (prevDrv && currDrv && prevDrv !== currDrv) {
+      diffs.push('Grafiktreiber: ' + escapeHtml(prevDrv) + ' &rarr; <b>' + escapeHtml(currDrv) + '</b>');
+    } else if (!prevDrv && currDrv) {
+      diffs.push('Grafiktreiber: <b>' + escapeHtml(currDrv) + '</b>');
+    }
+    const prevBuild = prev.Hardware?.WinBuild || '';
+    const currBuild = curr.Hardware?.WinBuild || '';
+    if (prevBuild && currBuild && prevBuild !== currBuild) {
+      diffs.push('Windows: Build ' + escapeHtml(prevBuild) + ' &rarr; <b>Build ' + escapeHtml(currBuild) + '</b>');
+    }
+    const prevRam = prev.Hardware?.RamSpeed || prev.Hardware?.RAM || '';
+    const currRam = curr.Hardware?.RamSpeed || curr.Hardware?.RAM || '';
+    if (prevRam && currRam && prevRam !== currRam) {
+      diffs.push('RAM: ' + escapeHtml(prevRam) + ' &rarr; <b>' + escapeHtml(currRam) + '</b>');
+    }
+    const prevDisk = prev.Hardware?.Datentraeger || '';
+    const currDisk = curr.Hardware?.Datentraeger || '';
+    if (prevDisk && currDisk && prevDisk !== currDisk) {
+      diffs.push('Laufwerke aktualisiert');
+    }
+    return diffs;
+  }
+
+  function setDashboardMode(mode) {
+    dashboardMode = mode;
+    const tabC = document.getElementById('tabModeCompare');
+    const tabH = document.getElementById('tabModeHistory');
+    const selCard = document.getElementById('compareSelectorCard');
+    const devWrap = document.getElementById('historyDeviceWrap');
+    const ctrlC = document.getElementById('chartControlsCompare');
+    const ctrlH = document.getElementById('chartControlsHistory');
+    if (tabC) tabC.classList.toggle('active', mode === 'compare');
+    if (tabH) tabH.classList.toggle('active', mode === 'history');
+    if (selCard) selCard.style.display = (mode === 'compare') ? 'block' : 'none';
+    if (devWrap) devWrap.style.display = (mode === 'history') ? 'flex' : 'none';
+    if (ctrlC) ctrlC.style.display = (mode === 'compare') ? 'flex' : 'none';
+    if (ctrlH) ctrlH.style.display = (mode === 'history') ? 'flex' : 'none';
+    updateDashboard();
   }
 
   function populateBaseSelect() {
@@ -508,23 +673,32 @@
   }
 
   function updateDashboard() {
-    baseSystem = getSystemById(baseSelect.value);
-    if (!baseSystem && getAllSystems().length > 0) {
-      baseSystem = getAllSystems()[0];
-      baseSelect.value = String(baseSystem.Id);
+    const countBadge = document.getElementById('comparedCountBadge');
+    if (dashboardMode === 'history') {
+      const grp = deviceGroups.get(selectedDeviceKey);
+      comparedSystems = grp ? grp.runs.slice() : [];
+      baseSystem = comparedSystems.length > 0 ? comparedSystems[0] : null;
+      if (countBadge) {
+        const n = comparedSystems.length;
+        countBadge.textContent = n + (n === 1 ? ' Lauf für diesen Rechner' : ' Läufe für diesen Rechner (chronologisch)');
+      }
+    } else {
+      baseSystem = getSystemById(baseSelect.value);
+      if (!baseSystem && getAllSystems().length > 0) {
+        baseSystem = getAllSystems()[0];
+        baseSelect.value = String(baseSystem.Id);
+      }
+      comparedSystems = [];
+      if (baseSystem) comparedSystems.push(baseSystem);
+      selectedCompareIds.forEach(id => {
+        const s = getSystemById(id);
+        if (s && s !== baseSystem) comparedSystems.push(s);
+      });
+      if (countBadge) {
+        const totalN = comparedSystems.length;
+        countBadge.textContent = totalN + (totalN === 1 ? ' System' : ' Systeme im Vergleich');
+      }
     }
-
-    // Liste aller aktiven Systeme: Basissystem zuerst, dann die angehakten
-    comparedSystems = [];
-    if (baseSystem) comparedSystems.push(baseSystem);
-
-    selectedCompareIds.forEach(id => {
-      const s = getSystemById(id);
-      if (s && s !== baseSystem) comparedSystems.push(s);
-    });
-
-    const totalN = comparedSystems.length;
-    comparedCountBadge.textContent = totalN + (totalN === 1 ? ' System' : ' Systeme im Vergleich');
 
     renderSpecsTable();
     renderProfilesGrid();
@@ -562,6 +736,24 @@
       </th>`;
     });
     html += '</tr></thead><tbody>';
+
+    let geaendertRow = '';
+    if (dashboardMode === 'history') {
+      geaendertRow = '<tr style="background: var(--accent-subtle);"><td class="col-feature" style="font-weight: 700; color: var(--accent);">Geändert (Inventar)</td>';
+      comparedSystems.forEach((s, idx) => {
+        if (idx === 0) {
+          geaendertRow += '<td class="col-base" style="font-size:0.8rem; color:var(--text-muted); font-style:italic;">Erster erfasster Lauf (Basis)</td>';
+        } else {
+          const diffs = getInventoryDiff(comparedSystems[idx - 1], s);
+          if (diffs && diffs.length > 0) {
+            geaendertRow += '<td>' + diffs.map(d => '<span class="diff-badge">' + d + '</span>').join(' ') + '</td>';
+          } else {
+            geaendertRow += '<td style="font-size:0.8rem; color:var(--ok-text);">Keine Änderungen</td>';
+          }
+        }
+      });
+      geaendertRow += '</tr>';
+    }
 
     const rows = [
       { key: 'Computer', label: 'Rechnername', get: s => escapeHtml(s.Computer || '-') },
@@ -606,6 +798,7 @@
       html += '</tr>';
     });
 
+    if (geaendertRow) html = html.replace('<tbody>', '<tbody>' + geaendertRow);
     html += '</tbody>';
     specsTable.innerHTML = html;
   }
