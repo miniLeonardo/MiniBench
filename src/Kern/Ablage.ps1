@@ -717,12 +717,21 @@ if ($Entfernen) {
     Send-GuiEvent 'RESULT' $r.Entfernt $r.Fehler
     exit $(if ($r.Fehler) { 1 } else { 0 })
 }
-# Eintrag umbenennen: -Umbenennen "Pfad" -NeuerName "Name", @@RESULT|1 oder 0|neuer Pfad
+# Eintrag umbenennen: -Umbenennen "Pfad|Pfad" -NeuerName "Name", @@RESULT|1 oder 0|neuer Pfad
 if ($Umbenennen) {
-    $r = Rename-DbLauf ([string]$Umbenennen).Trim('"') $NeuerName $script:DataDir
-    Write-Host $r.Text
-    Send-GuiEvent 'RESULT' $(if ($r.Ok) { '1' } else { '0' }) $r.Pfad
-    exit $(if ($r.Ok) { 0 } else { 1 })
+    $pfade = @(([string]$Umbenennen) -split '\|' | ForEach-Object { $_.Trim().Trim('"') } | Where-Object { $_ })
+    $allOk = $true
+    $letzterPfad = ''
+    $texte = @()
+    foreach ($p in $pfade) {
+        $r = Rename-DbLauf $p $NeuerName $script:DataDir
+        $texte += $r.Text
+        if (-not $r.Ok) { $allOk = $false }
+        else { $letzterPfad = $r.Pfad }
+    }
+    Write-Host ($texte -join [Environment]::NewLine)
+    Send-GuiEvent 'RESULT' $(if ($allOk) { '1' } else { '0' }) $letzterPfad
+    exit $(if ($allOk) { 0 } else { 1 })
 }
 # Lauf exportieren: -ExportLauf "Pfad" [-ExportZiel "Ziel"], @@RESULT|1 oder 0|Pfad
 if ($ExportLauf) {

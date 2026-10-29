@@ -246,7 +246,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
 }
 #endregion
 
-$ScriptVersion = '3.881'
+$ScriptVersion = '3.882'
 $AppName       = 'Leos Minibench'
 # Eingebettete Referenzprofile für Leos Minibench (v3.0)
 $script:EmbeddedReferences = @{
@@ -2772,12 +2772,21 @@ if ($Entfernen) {
     Send-GuiEvent 'RESULT' $r.Entfernt $r.Fehler
     exit $(if ($r.Fehler) { 1 } else { 0 })
 }
-# Eintrag umbenennen: -Umbenennen "Pfad" -NeuerName "Name", @@RESULT|1 oder 0|neuer Pfad
+# Eintrag umbenennen: -Umbenennen "Pfad|Pfad" -NeuerName "Name", @@RESULT|1 oder 0|neuer Pfad
 if ($Umbenennen) {
-    $r = Rename-DbLauf ([string]$Umbenennen).Trim('"') $NeuerName $script:DataDir
-    Write-Host $r.Text
-    Send-GuiEvent 'RESULT' $(if ($r.Ok) { '1' } else { '0' }) $r.Pfad
-    exit $(if ($r.Ok) { 0 } else { 1 })
+    $pfade = @(([string]$Umbenennen) -split '\|' | ForEach-Object { $_.Trim().Trim('"') } | Where-Object { $_ })
+    $allOk = $true
+    $letzterPfad = ''
+    $texte = @()
+    foreach ($p in $pfade) {
+        $r = Rename-DbLauf $p $NeuerName $script:DataDir
+        $texte += $r.Text
+        if (-not $r.Ok) { $allOk = $false }
+        else { $letzterPfad = $r.Pfad }
+    }
+    Write-Host ($texte -join [Environment]::NewLine)
+    Send-GuiEvent 'RESULT' $(if ($allOk) { '1' } else { '0' }) $letzterPfad
+    exit $(if ($allOk) { 0 } else { 1 })
 }
 # Lauf exportieren: -ExportLauf "Pfad" [-ExportZiel "Ziel"], @@RESULT|1 oder 0|Pfad
 if ($ExportLauf) {
@@ -12847,10 +12856,38 @@ public partial class DiagGui
         ListViewItem lvi = null;
         if (lvDb != null && lvDb.SelectedItems.Count == 1) { lvi = lvDb.SelectedItems[0]; target = (DbEntry)lvi.Tag; }
         else if (lvDb != null && lvDb.CheckedItems.Count == 1) { lvi = lvDb.CheckedItems[0]; target = (DbEntry)lvi.Tag; }
-        if (target == null) return;
+        if (target == null || target.IsReference) return;
 
-        string currentName = target.DisplayName;
-        string newName = PromptInput("Anzeigename für dieses System eingeben (z. B. Vor Reinigung oder Neuer Treiber):\r\nRechnername bleibt: " + target.Computer, "Systemnamen bearbeiten", currentName);
+        bool isMasterGroup = lvi != null && (lvi.Text.StartsWith("\u25B6 ") || lvi.Text.StartsWith("\u25BC "));
+        List<string> pathsToRename = new List<string>();
+        string currentName = "";
+
+        if (isMasterGroup)
+        {
+            string devKey = !String.IsNullOrEmpty(target.GeraetKey) ? target.GeraetKey : "PC:" + (target.Computer ?? "").ToUpperInvariant();
+            foreach (DbEntry e in db)
+            {
+                if (e.IsReference) continue;
+                string ek = !String.IsNullOrEmpty(e.GeraetKey) ? e.GeraetKey : "PC:" + (e.Computer ?? "").ToUpperInvariant();
+                if (ek == devKey)
+                {
+                    if (!String.IsNullOrEmpty(e.Path) && !pathsToRename.Contains(e.Path)) pathsToRename.Add(e.Path);
+                    if (String.IsNullOrEmpty(currentName) && !String.IsNullOrEmpty(e.Name)) currentName = e.Name;
+                }
+            }
+        }
+
+        if (pathsToRename.Count == 0 && !String.IsNullOrEmpty(target.Path))
+        {
+            pathsToRename.Add(target.Path);
+        }
+        if (String.IsNullOrEmpty(currentName)) currentName = target.DisplayName;
+
+        string promptText = (isMasterGroup && pathsToRename.Count > 1)
+            ? "Anzeigename für dieses Gerät (" + pathsToRename.Count + " Läufe) eingeben:\r\nRechnername bleibt: " + target.Computer
+            : "Anzeigename für dieses System eingeben (z. B. Vor Reinigung oder Neuer Treiber):\r\nRechnername bleibt: " + target.Computer;
+
+        string newName = PromptInput(promptText, "Systemnamen bearbeiten", currentName);
         if (newName == null) return;
         newName = newName.Trim();
         if (newName.Length == 0 || newName == currentName) return;
@@ -12860,7 +12897,7 @@ public partial class DiagGui
         newName = newName.Replace("\"", "'").Replace("\r", " ").Replace("\n", " ").TrimEnd('\\').Trim().TrimStart('-', ' ');
         if (newName.Length == 0) return;
         List<string> lines;
-        string res = RunHelperPumped("-Umbenennen " + Q(target.Path) + " -NeuerName " + Q(newName), out lines, 120);
+        string res = RunHelperPumped("-Umbenennen " + Q(String.Join("|", pathsToRename.ToArray())) + " -NeuerName " + Q(newName), out lines, 120);
         ReloadDb();
         if (!res.StartsWith("1")) MessageBox.Show(this, "Der Name konnte nicht geändert werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Systemnamen bearbeiten", MessageBoxButtons.OK, MessageBoxIcon.Warning);
     }
@@ -12986,6 +13023,11 @@ public partial class DiagGui
                     else if (e.KeyCode == Keys.Left && it.Text.StartsWith("\u25BC ")) { ToggleGroup(k); e.Handled = true; }
                 }
             }
+            else if (e.KeyCode == Keys.F2 && lvDb.SelectedItems.Count == 1)
+            {
+                RenameSelectedEntry();
+                e.Handled = true;
+            }
             else if (e.KeyCode == Keys.Enter && lvDb.SelectedItems.Count > 0)
             {
                 OpenEntry((DbEntry)lvDb.SelectedItems[0].Tag);
@@ -13034,7 +13076,10 @@ public partial class DiagGui
             miHistory.Enabled = (GetSelectedDeviceTarget() != null);
             miSetRef.Enabled = selN == 1 || (selN == 0 && chkN == 1);
             miDashboardBase.Enabled = selN == 1 || (selN == 0 && chkN == 1);
-            miRename.Enabled = selN == 1 || (selN == 0 && chkN == 1);
+            DbEntry selTarget = null;
+            if (selN == 1) selTarget = lvDb.SelectedItems[0].Tag as DbEntry;
+            else if (chkN == 1) selTarget = lvDb.CheckedItems[0].Tag as DbEntry;
+            miRename.Enabled = (selTarget != null && !selTarget.IsReference && (selN == 1 || (selN == 0 && chkN == 1)));
             miOpen.Enabled = selN == 1;
             miExport.Enabled = selN == 1 || (selN == 0 && chkN == 1);
             miDelete.Enabled = chkN >= 1 || selN >= 1;
@@ -13254,8 +13299,19 @@ public partial class DiagGui
             else
             {
                 DbEntry newest = entries[0];
-                string devName = !String.IsNullOrEmpty(newest.Computer) ? newest.Computer : newest.DisplayName;
-                if (String.IsNullOrEmpty(devName)) devName = "System";
+                string devName = "";
+                foreach (DbEntry e in entries)
+                {
+                    if (!String.IsNullOrEmpty(e.Name))
+                    {
+                        devName = e.Name;
+                        break;
+                    }
+                }
+                if (String.IsNullOrEmpty(devName))
+                {
+                    devName = !String.IsNullOrEmpty(newest.DisplayName) ? newest.DisplayName : (!String.IsNullOrEmpty(newest.Computer) ? newest.Computer : "System");
+                }
 
                 if (entries.Count == 1)
                 {
@@ -13322,7 +13378,10 @@ public partial class DiagGui
         if (btnRename != null)
         {
             int selCount = (lvDb != null ? lvDb.SelectedItems.Count : 0);
-            btnRename.Enabled = (selCount == 1 || (selCount == 0 && n == 1));
+            DbEntry selTarget = null;
+            if (lvDb != null && lvDb.SelectedItems.Count == 1) selTarget = lvDb.SelectedItems[0].Tag as DbEntry;
+            else if (lvDb != null && lvDb.CheckedItems.Count == 1) selTarget = lvDb.CheckedItems[0].Tag as DbEntry;
+            btnRename.Enabled = (selTarget != null && !selTarget.IsReference && (selCount == 1 || (selCount == 0 && n == 1)));
         }
         if (btnOpenReport != null)
         {
@@ -15956,8 +16015,8 @@ public partial class DiagGui
         grid2x2.Height = UI.S(458);
         grid2x2.ColumnCount = 2;
         grid2x2.RowCount = 2;
-        grid2x2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52f));
-        grid2x2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48f));
+        grid2x2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55f));
+        grid2x2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45f));
         grid2x2.RowStyles.Add(new RowStyle(SizeType.Absolute, UI.S(217)));
         grid2x2.RowStyles.Add(new RowStyle(SizeType.Absolute, UI.S(217)));
         grid2x2.Margin = new Padding(0, 0, 0, UI.S(14));
@@ -16119,8 +16178,8 @@ public partial class DiagGui
         actGrid.ColumnCount = 2;
         actGrid.RowCount = 1;
         actGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-        actGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
         actGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        actGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
         actGrid.Margin = new Padding(0);
 
         FlowLayoutPanel pnlButtons = new FlowLayoutPanel();
@@ -16161,7 +16220,7 @@ public partial class DiagGui
         btnDash.FlatAppearance.MouseDownBackColor = UI.AccentActive;
         btnDash.Font = new Font("Segoe UI Semibold", 8.5f);
         btnDash.Padding = new Padding(UI.S(8), UI.S(3), UI.S(8), UI.S(3));
-        btnDash.Margin = new Padding(0, UI.S(2), 0, 0);
+        btnDash.Margin = new Padding(0, UI.S(2), UI.S(6), 0);
         btnDash.AutoSize = true;
         btnDash.Cursor = Cursors.Hand;
         btnDash.UseVisualStyleBackColor = false;
@@ -16181,7 +16240,7 @@ public partial class DiagGui
         btnVerlauf.FlatAppearance.MouseDownBackColor = UI.AccentActive;
         btnVerlauf.Font = new Font("Segoe UI Semibold", 8.5f);
         btnVerlauf.Padding = new Padding(UI.S(8), UI.S(3), UI.S(8), UI.S(3));
-        btnVerlauf.Margin = new Padding(UI.S(6), UI.S(2), 0, 0);
+        btnVerlauf.Margin = new Padding(0, UI.S(2), 0, 0);
         btnVerlauf.AutoSize = true;
         btnVerlauf.Cursor = Cursors.Hand;
         btnVerlauf.UseVisualStyleBackColor = false;
@@ -16202,9 +16261,8 @@ public partial class DiagGui
         }
         Label lblBef = Lbl(befundeText, 8.25f, true, befundeColor);
         lblBef.AutoSize = true;
-        lblBef.MinimumSize = new Size(UI.S(120), UI.S(22));
+        lblBef.Dock = DockStyle.Fill;
         lblBef.TextAlign = ContentAlignment.MiddleRight;
-        lblBef.Anchor = AnchorStyles.Right | AnchorStyles.Top;
         lblBef.Margin = new Padding(UI.S(6), UI.S(4), 0, 0);
         Tip(lblBef, "Befundzusammenfassung (Kritisch / Warnungen / Hinweise) des letzten Laufs.");
         actGrid.Controls.Add(lblBef, 1, 0);
@@ -17871,6 +17929,10 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("3.882", "29.10.2026", "Zusammengefasste Systemnamen & Startseiten-Verlaufsknopf",
+            "• Bearbeitung zusammengefasster Systemnamen: Das Umbenennen von Rechnern mit mehreren Läufen über 'Name ändern ...' (oder F2) aktualisiert alle Läufe des Systems in einem Schritt; benutzerdefinierte Gerätenamen werden in Spalte 1 (System) sowohl im eingeklappten Zustand als auch im Gruppenkopf zuverlässig anstelle des Computernamens angezeigt.\r\n" +
+            "• Startseiten-Aktionsleiste: Das Layout der Kachel 'Letzter Lauf' wurde flexibilisiert (55 % Spaltenbreite im 2x2-Grid, AutoSize für den Tastenbereich und DockStyle.Fill für die Befundanzeige); die Schaltfläche 'Verlauf' wird auf allen DPI-Skalierungen vollständig und unbeschnitten dargestellt.\r\n" +
+            "• Schnelltaste F2: Die Tabellenansicht der Datenbank unterstützt F2 zur sofortigen Bearbeitung des Anzeigenamens des ausgewählten Systems oder Einzellaufs."),
         new Eintrag("3.881", "29.10.2026", "Startseiten-Kachelrahmen & vollständige Datenbank-Systemdaten",
             "• Startseiten-Kachelrahmen & Layout: Saubere, unbeschnittene Umrandung aller vier Kacheln ('Letzter Lauf', 'Aufgaben', 'Schnell behebbar', 'Werkzeuge') durch PenAlignment.Inset mit 1-px-Anti-Aliasing-Sicherheitsabstand; harmonisierte Margins im 2x2-Grid (oben/unten UI.S(12)) und vergrößerter unterer Innenabstand verhindern Anstoßen an die Fußleiste.\r\n" +
             "• Vollständige Systemdaten im eingeklappten Zustand: Abkehr von nativen Win32-Gruppenköpfen (LVGS_COLLAPSED), die Datenzeilen versteckten; kompakte Master-Zeilen zeigen alle Hardware- und Benchmarkdaten des neuesten Laufs in den Spalten 2–10 (Datum, Gesamt, CPU, GPU, RAM, Mehrkern, RAM Lesen, GPU, Befunde).\r\n" +

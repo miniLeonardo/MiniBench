@@ -1,0 +1,53 @@
+﻿LEOS MINIBENCH 3.882: ÄNDERUNGEN
+================================
+
+Version 3.882 behebt zwei Detailbefunde aus der Praxis:
+1. Der Name von zusammengefassten Systemen in der Datenbank ließ sich nicht bearbeiten.
+2. Auf der Startseite war die Schaltfläche für „Verlauf“ bei normaler und höherer Skalierung rechts abgeschnitten.
+
+
+1. DATENBANK: BEARBEITUNG ZUSAMMENGEFASSTER SYSTEMNAMEN
+  Systemweite Umbenennung     Das Ausführen von „Name ändern ...“ auf einer Master-Zeile (zusammengefasstes
+                              System mit mehreren Durchläufen) ermittelt nun alle Läufe desselben Rechners
+                              anhand der Hardware-Gerätekennung (GeraetKey bzw. Computername). Über den
+                              Arbeitsprozess (-Umbenennen "Pfad1|Pfad2|...") werden sämtliche zugehörigen
+                              Datenbankdateien und Berichtsordner in einem einzigen Prozessaufruf umbenannt.
+  Vorrang von Anzeigenamen    In FillDbList wurde ein Fehler behoben, bei dem der technische Computername
+                              (newest.Computer) bedingungslos vor dem benutzerdefinierten Anzeigenamen
+                              (newest.DisplayName bzw. e.Name) bevorzugt wurde. Nun wird in allen Läufen
+                              des Systems nach einem vergebenen Anzeigenamen gesucht, sodass der Name sofort
+                              sowohl im kompakten Zustand („▶ Name (Anzahl)“) als auch im Gruppenkopf
+                              in Spalte 1 (System) wirksam angezeigt wird.
+  Schnelltaste F2             Ein Druck auf F2 bei markiertem Listeneintrag öffnet sofort den Dialog
+                              „Systemnamen bearbeiten“.
+  Referenzschutz              Referenzprofile (IsReference) können nicht versehentlich umbenannt werden;
+                              Schaltfläche und Kontextmenüpunkt bleiben für Referenzen deaktiviert.
+
+
+2. STARTSEITE: AKTIONSLEISTE & VERLAUFSKNOPF
+  Harmonisierte Spaltenbreite Die Spaltenaufteilung des 2x2-Kachelrasters (grid2x2) wurde von 52 % / 48 %
+                              auf 55 % (links) und 45 % (rechts) optimiert. Dadurch erhält die Kachel
+                              „Letzter Lauf“ zusätzliche 26 Pixel Breite, während die Aufgaben-Kachel
+                              ihre Zeilen weiterhin mit ausreichendem Freiraum abbildet.
+  AutoSize für Aktionsbuttons Das interne Raster actGrid in Kachel 1 reserviert für den Tastenbereich
+                              (pnlButtons) nun die Spalteneigenschaft SizeType.AutoSize statt SizeType.Percent,
+                              sodass alle drei Schaltflächen („Bericht öffnen“, „Dashboard“, „Verlauf“)
+                              unterbrechungsfrei nebeneinander Platz finden.
+  Rechtsbündige Befunde       Das Befund-Label (lblBef) nimmt über ColumnStyle Percent 100f und DockStyle.Fill
+                              den gesamten verbleibenden rechten Bereich ein und richtet die Befundanzeige
+                              sauber rechtsbündig aus.
+  Gleichmäßige Tastenabstände Die Abstände zwischen den drei Schaltflächen wurden auf einheitliche 6 Pixel
+                              normiert.
+
+
+GEFUNDEN UND BEHOBEN
+  - Bearbeitung zusammengefasster Systemnamen: devName in FillDbList ignorierte e.Name und newest.DisplayName;
+    zudem benannte -Umbenennen bisher nur die erste Datei um. Behoben durch Multitrack-Umbenennung und
+    saubere Namenspriorisierung.
+  - Verlauf-Schaltfläche abgeschnitten: Durch Percent 100f auf actGrid und MinimumSize auf lblBef wurde
+    pnlButtons auf 275 px zusammengestaucht, während die drei Buttons 280 px beanspruchten. Durch Spaltenanpassung
+    auf 55 % und AutoSize für pnlButtons vollständig beseitigt.
+
+
+GRENZEN UND OFFENE PUNKTE
+  - Keine. Kompatibel mit Windows PowerShell 5.1 und C# 5 (.NET Framework 4.x / Mono).

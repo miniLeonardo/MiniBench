@@ -317,10 +317,38 @@ public partial class DiagGui
         ListViewItem lvi = null;
         if (lvDb != null && lvDb.SelectedItems.Count == 1) { lvi = lvDb.SelectedItems[0]; target = (DbEntry)lvi.Tag; }
         else if (lvDb != null && lvDb.CheckedItems.Count == 1) { lvi = lvDb.CheckedItems[0]; target = (DbEntry)lvi.Tag; }
-        if (target == null) return;
+        if (target == null || target.IsReference) return;
 
-        string currentName = target.DisplayName;
-        string newName = PromptInput("Anzeigename für dieses System eingeben (z. B. Vor Reinigung oder Neuer Treiber):\r\nRechnername bleibt: " + target.Computer, "Systemnamen bearbeiten", currentName);
+        bool isMasterGroup = lvi != null && (lvi.Text.StartsWith("\u25B6 ") || lvi.Text.StartsWith("\u25BC "));
+        List<string> pathsToRename = new List<string>();
+        string currentName = "";
+
+        if (isMasterGroup)
+        {
+            string devKey = !String.IsNullOrEmpty(target.GeraetKey) ? target.GeraetKey : "PC:" + (target.Computer ?? "").ToUpperInvariant();
+            foreach (DbEntry e in db)
+            {
+                if (e.IsReference) continue;
+                string ek = !String.IsNullOrEmpty(e.GeraetKey) ? e.GeraetKey : "PC:" + (e.Computer ?? "").ToUpperInvariant();
+                if (ek == devKey)
+                {
+                    if (!String.IsNullOrEmpty(e.Path) && !pathsToRename.Contains(e.Path)) pathsToRename.Add(e.Path);
+                    if (String.IsNullOrEmpty(currentName) && !String.IsNullOrEmpty(e.Name)) currentName = e.Name;
+                }
+            }
+        }
+
+        if (pathsToRename.Count == 0 && !String.IsNullOrEmpty(target.Path))
+        {
+            pathsToRename.Add(target.Path);
+        }
+        if (String.IsNullOrEmpty(currentName)) currentName = target.DisplayName;
+
+        string promptText = (isMasterGroup && pathsToRename.Count > 1)
+            ? "Anzeigename für dieses Gerät (" + pathsToRename.Count + " Läufe) eingeben:\r\nRechnername bleibt: " + target.Computer
+            : "Anzeigename für dieses System eingeben (z. B. Vor Reinigung oder Neuer Treiber):\r\nRechnername bleibt: " + target.Computer;
+
+        string newName = PromptInput(promptText, "Systemnamen bearbeiten", currentName);
         if (newName == null) return;
         newName = newName.Trim();
         if (newName.Length == 0 || newName == currentName) return;
@@ -330,7 +358,7 @@ public partial class DiagGui
         newName = newName.Replace("\"", "'").Replace("\r", " ").Replace("\n", " ").TrimEnd('\\').Trim().TrimStart('-', ' ');
         if (newName.Length == 0) return;
         List<string> lines;
-        string res = RunHelperPumped("-Umbenennen " + Q(target.Path) + " -NeuerName " + Q(newName), out lines, 120);
+        string res = RunHelperPumped("-Umbenennen " + Q(String.Join("|", pathsToRename.ToArray())) + " -NeuerName " + Q(newName), out lines, 120);
         ReloadDb();
         if (!res.StartsWith("1")) MessageBox.Show(this, "Der Name konnte nicht geändert werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Systemnamen bearbeiten", MessageBoxButtons.OK, MessageBoxIcon.Warning);
     }
@@ -456,6 +484,11 @@ public partial class DiagGui
                     else if (e.KeyCode == Keys.Left && it.Text.StartsWith("\u25BC ")) { ToggleGroup(k); e.Handled = true; }
                 }
             }
+            else if (e.KeyCode == Keys.F2 && lvDb.SelectedItems.Count == 1)
+            {
+                RenameSelectedEntry();
+                e.Handled = true;
+            }
             else if (e.KeyCode == Keys.Enter && lvDb.SelectedItems.Count > 0)
             {
                 OpenEntry((DbEntry)lvDb.SelectedItems[0].Tag);
@@ -504,7 +537,10 @@ public partial class DiagGui
             miHistory.Enabled = (GetSelectedDeviceTarget() != null);
             miSetRef.Enabled = selN == 1 || (selN == 0 && chkN == 1);
             miDashboardBase.Enabled = selN == 1 || (selN == 0 && chkN == 1);
-            miRename.Enabled = selN == 1 || (selN == 0 && chkN == 1);
+            DbEntry selTarget = null;
+            if (selN == 1) selTarget = lvDb.SelectedItems[0].Tag as DbEntry;
+            else if (chkN == 1) selTarget = lvDb.CheckedItems[0].Tag as DbEntry;
+            miRename.Enabled = (selTarget != null && !selTarget.IsReference && (selN == 1 || (selN == 0 && chkN == 1)));
             miOpen.Enabled = selN == 1;
             miExport.Enabled = selN == 1 || (selN == 0 && chkN == 1);
             miDelete.Enabled = chkN >= 1 || selN >= 1;
@@ -724,8 +760,19 @@ public partial class DiagGui
             else
             {
                 DbEntry newest = entries[0];
-                string devName = !String.IsNullOrEmpty(newest.Computer) ? newest.Computer : newest.DisplayName;
-                if (String.IsNullOrEmpty(devName)) devName = "System";
+                string devName = "";
+                foreach (DbEntry e in entries)
+                {
+                    if (!String.IsNullOrEmpty(e.Name))
+                    {
+                        devName = e.Name;
+                        break;
+                    }
+                }
+                if (String.IsNullOrEmpty(devName))
+                {
+                    devName = !String.IsNullOrEmpty(newest.DisplayName) ? newest.DisplayName : (!String.IsNullOrEmpty(newest.Computer) ? newest.Computer : "System");
+                }
 
                 if (entries.Count == 1)
                 {
@@ -792,7 +839,10 @@ public partial class DiagGui
         if (btnRename != null)
         {
             int selCount = (lvDb != null ? lvDb.SelectedItems.Count : 0);
-            btnRename.Enabled = (selCount == 1 || (selCount == 0 && n == 1));
+            DbEntry selTarget = null;
+            if (lvDb != null && lvDb.SelectedItems.Count == 1) selTarget = lvDb.SelectedItems[0].Tag as DbEntry;
+            else if (lvDb != null && lvDb.CheckedItems.Count == 1) selTarget = lvDb.CheckedItems[0].Tag as DbEntry;
+            btnRename.Enabled = (selTarget != null && !selTarget.IsReference && (selCount == 1 || (selCount == 0 && n == 1)));
         }
         if (btnOpenReport != null)
         {

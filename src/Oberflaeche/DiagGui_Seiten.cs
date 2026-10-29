@@ -2221,8 +2221,8 @@ public partial class DiagGui
         grid2x2.Height = UI.S(458);
         grid2x2.ColumnCount = 2;
         grid2x2.RowCount = 2;
-        grid2x2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52f));
-        grid2x2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48f));
+        grid2x2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55f));
+        grid2x2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45f));
         grid2x2.RowStyles.Add(new RowStyle(SizeType.Absolute, UI.S(217)));
         grid2x2.RowStyles.Add(new RowStyle(SizeType.Absolute, UI.S(217)));
         grid2x2.Margin = new Padding(0, 0, 0, UI.S(14));
@@ -2384,8 +2384,8 @@ public partial class DiagGui
         actGrid.ColumnCount = 2;
         actGrid.RowCount = 1;
         actGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-        actGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
         actGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        actGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
         actGrid.Margin = new Padding(0);
 
         FlowLayoutPanel pnlButtons = new FlowLayoutPanel();
@@ -2426,7 +2426,7 @@ public partial class DiagGui
         btnDash.FlatAppearance.MouseDownBackColor = UI.AccentActive;
         btnDash.Font = new Font("Segoe UI Semibold", 8.5f);
         btnDash.Padding = new Padding(UI.S(8), UI.S(3), UI.S(8), UI.S(3));
-        btnDash.Margin = new Padding(0, UI.S(2), 0, 0);
+        btnDash.Margin = new Padding(0, UI.S(2), UI.S(6), 0);
         btnDash.AutoSize = true;
         btnDash.Cursor = Cursors.Hand;
         btnDash.UseVisualStyleBackColor = false;
@@ -2446,7 +2446,7 @@ public partial class DiagGui
         btnVerlauf.FlatAppearance.MouseDownBackColor = UI.AccentActive;
         btnVerlauf.Font = new Font("Segoe UI Semibold", 8.5f);
         btnVerlauf.Padding = new Padding(UI.S(8), UI.S(3), UI.S(8), UI.S(3));
-        btnVerlauf.Margin = new Padding(UI.S(6), UI.S(2), 0, 0);
+        btnVerlauf.Margin = new Padding(0, UI.S(2), 0, 0);
         btnVerlauf.AutoSize = true;
         btnVerlauf.Cursor = Cursors.Hand;
         btnVerlauf.UseVisualStyleBackColor = false;
@@ -2467,9 +2467,8 @@ public partial class DiagGui
         }
         Label lblBef = Lbl(befundeText, 8.25f, true, befundeColor);
         lblBef.AutoSize = true;
-        lblBef.MinimumSize = new Size(UI.S(120), UI.S(22));
+        lblBef.Dock = DockStyle.Fill;
         lblBef.TextAlign = ContentAlignment.MiddleRight;
-        lblBef.Anchor = AnchorStyles.Right | AnchorStyles.Top;
         lblBef.Margin = new Padding(UI.S(6), UI.S(4), 0, 0);
         Tip(lblBef, "Befundzusammenfassung (Kritisch / Warnungen / Hinweise) des letzten Laufs.");
         actGrid.Controls.Add(lblBef, 1, 0);

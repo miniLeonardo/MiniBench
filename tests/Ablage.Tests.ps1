@@ -574,6 +574,16 @@ Describe 'Läufe entfernen und umbenennen' {
         (MinibenchTest\Rename-DbLauf $draussen 'Neu' $x.Root).Ok | Should -BeFalse
         $x.Json | Should -Exist
     }
+    It 'Umbenennen mehrerer Läufe benennt jeden Lauf und Ordner ohne Konflikt um' {
+        $x = New-Lauf
+        $y = New-Lauf -Root $x.Root -Stamp '20261003_142536' -Ordner 'PC1_20261003_1422'
+        $r1 = MinibenchTest\Rename-DbLauf $x.Json 'Mein PC' $x.Root
+        $r2 = MinibenchTest\Rename-DbLauf $y.Json 'Mein PC' $x.Root
+        $r1.Ok | Should -BeTrue
+        $r2.Ok | Should -BeTrue
+        (Get-Content -LiteralPath $r1.Pfad -Raw -Encoding UTF8 | ConvertFrom-Json).Name | Should -Be 'Mein PC'
+        (Get-Content -LiteralPath $r2.Pfad -Raw -Encoding UTF8 | ConvertFrom-Json).Name | Should -Be 'Mein PC'
+    }
 }
 
 Describe 'Lauf exportieren und Austauschpaket (.minibench)' {

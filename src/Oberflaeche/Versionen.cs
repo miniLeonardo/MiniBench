@@ -11,6 +11,10 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("3.882", "29.10.2026", "Zusammengefasste Systemnamen & Startseiten-Verlaufsknopf",
+            "• Bearbeitung zusammengefasster Systemnamen: Das Umbenennen von Rechnern mit mehreren Läufen über 'Name ändern ...' (oder F2) aktualisiert alle Läufe des Systems in einem Schritt; benutzerdefinierte Gerätenamen werden in Spalte 1 (System) sowohl im eingeklappten Zustand als auch im Gruppenkopf zuverlässig anstelle des Computernamens angezeigt.\r\n" +
+            "• Startseiten-Aktionsleiste: Das Layout der Kachel 'Letzter Lauf' wurde flexibilisiert (55 % Spaltenbreite im 2x2-Grid, AutoSize für den Tastenbereich und DockStyle.Fill für die Befundanzeige); die Schaltfläche 'Verlauf' wird auf allen DPI-Skalierungen vollständig und unbeschnitten dargestellt.\r\n" +
+            "• Schnelltaste F2: Die Tabellenansicht der Datenbank unterstützt F2 zur sofortigen Bearbeitung des Anzeigenamens des ausgewählten Systems oder Einzellaufs."),
         new Eintrag("3.881", "29.10.2026", "Startseiten-Kachelrahmen & vollständige Datenbank-Systemdaten",
             "• Startseiten-Kachelrahmen & Layout: Saubere, unbeschnittene Umrandung aller vier Kacheln ('Letzter Lauf', 'Aufgaben', 'Schnell behebbar', 'Werkzeuge') durch PenAlignment.Inset mit 1-px-Anti-Aliasing-Sicherheitsabstand; harmonisierte Margins im 2x2-Grid (oben/unten UI.S(12)) und vergrößerter unterer Innenabstand verhindern Anstoßen an die Fußleiste.\r\n" +
             "• Vollständige Systemdaten im eingeklappten Zustand: Abkehr von nativen Win32-Gruppenköpfen (LVGS_COLLAPSED), die Datenzeilen versteckten; kompakte Master-Zeilen zeigen alle Hardware- und Benchmarkdaten des neuesten Laufs in den Spalten 2–10 (Datum, Gesamt, CPU, GPU, RAM, Mehrkern, RAM Lesen, GPU, Befunde).\r\n" +

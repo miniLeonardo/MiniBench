@@ -5,6 +5,12 @@ Neueste Version zuerst. Einzelheiten je Version in Doku\Änderungen_vX.Y.txt (ab
 keine Änderungsdateien mehr; die Einträge nennen nur, was im Quelltext und in den Ã„nderungen zu 2.2 belegt ist.
 Die Liste steht auch im Programm (Info-Knopf oben rechts, Quelle: src\Oberflaeche\Versionen.cs).
 
+VERSION 3.882  (29.10.2026)  ZUSAMMENGEFASSTE SYSTEMNAMEN & STARTSEITEN-VERLAUFSKNOPF
+====================================================================================================
+• Bearbeitung zusammengefasster Systemnamen: Das Umbenennen von Rechnern mit mehreren Läufen über 'Name ändern ...' (oder F2) aktualisiert alle Läufe des Systems in einem Schritt; benutzerdefinierte Gerätenamen werden in Spalte 1 (System) sowohl im eingeklappten Zustand als auch im Gruppenkopf zuverlässig anstelle des Computernamens angezeigt.
+• Startseiten-Aktionsleiste: Das Layout der Kachel 'Letzter Lauf' wurde flexibilisiert (55 % Spaltenbreite im 2x2-Grid, AutoSize für den Tastenbereich und DockStyle.Fill für die Befundanzeige); die Schaltfläche 'Verlauf' wird auf allen DPI-Skalierungen vollständig und unbeschnitten dargestellt.
+• Schnelltaste F2: Die Tabellenansicht der Datenbank unterstützt F2 zur sofortigen Bearbeitung des Anzeigenamens des ausgewählten Systems oder Einzellaufs.
+
 VERSION 3.881   (29.10.2026)  STARTSEITEN-KACHELRAHMEN & VOLLSTÄNDIGE DATENBANK-SYSTEMDATEN
 ====================================================================================================
 • Startseiten-Kachelrahmen & Layout: Saubere, unbeschnittene Umrandung aller vier Kacheln ('Letzter Lauf', 'Aufgaben', 'Schnell behebbar', 'Werkzeuge') durch PenAlignment.Inset mit 1-px-Anti-Aliasing-Sicherheitsabstand; harmonisierte Margins im 2x2-Grid (oben/unten UI.S(12)) und vergrößerter unterer Innenabstand verhindern Anstoßen an die Fußleiste.

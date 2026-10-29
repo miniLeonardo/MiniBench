@@ -2,6 +2,15 @@
 
 Alle wesentlichen Änderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v3.882 (29.10.2026)
+
+### Neu
+* **Bearbeitung zusammengefasster Systemnamen:** Das Umbenennen von Rechnern mit mehreren Läufen über 'Name ändern ...' (oder Taste F2) aktualisiert alle Läufe des jeweiligen Systems in einem Durchgang. Eigene Gerätenamen werden in Spalte 1 (System) sowohl im eingeklappten Zustand ('▶ Name (Anzahl)') als auch im aufgeklappten Master-Kopf bevorzugt vor dem technischen NetBIOS-/Computernamen dargestellt.
+* **Schnelltaste F2 in Datenbankansicht:** Drücken von F2 bei ausgewähltem System oder Einzellauf öffnet sofort den Umbenennen-Dialog.
+
+### Verbessert
+* **Startseiten-Layout & Verlauf-Schaltfläche:** Die Spaltenaufteilung im 2x2-Grid wurde auf 55 % (links) und 45 % (rechts) optimiert. Der Tastenbereich der Kachel 'Letzter Lauf' skaliert per AutoSize exakt auf den Platzbedarf der drei Schaltflächen ('Bericht öffnen', 'Dashboard', 'Verlauf'), während das Befund-Label den verbleibenden rechten Bereich per DockStyle.Fill einnimmt. Die Schaltfläche 'Verlauf' wird auf allen DPI-Skalierungsstufen vollständig und unbeschnitten dargestellt.
+
 ## v3.881 (29.10.2026)
 
 ### Neu
