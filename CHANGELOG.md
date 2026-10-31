@@ -2,6 +2,19 @@
 
 Alle wesentlichen Änderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v3.9 (31.10.2026)
+
+### Neu
+* **Master-Detail-Layout für Optimierung & Wartung:** Zweispaltige Benutzerführung (Kategoriewähler links, Detailkarte rechts) löst verschachtelte Akkordeons ab; dynamische Zähler-Badges zeigen für jede Kategorie sofort die Anzahl gewählter Einstellungen an (z. B. 4/9).
+* **Interaktive Schalter (ToggleSwitch):** Moderner Schalter mit Pillenform, weichem Anti-Aliasing und klarer Statusanzeige ersetzt veraltete WinForms-Checkboxen.
+* **Optionaler 1-Fenstermodus & In-App Dashboard:** Diagnose- und Benchmark-Ergebnisse können direkt im Programmfenster über ein natives Dashboard mit großer Gesamtwertung, Hardware-Steckbrief und 2x3 Kacheln betrachtet werden; ein Schalter in der Fußleiste steuert den Modus.
+* **Persistente Menüleiste:** Die linke Hauptnavigation bleibt auch während aktiver Durchläufe sichtbar; der aktive Arbeitsschritt wird mit einem cyanfarbenen Aktivitätsindikator hervorgehoben.
+* **Moderne Schnellwahl-Pills:** Die ComboBox für Voreinstellungen wurde durch intuitive Pill-Buttons ([Minimal], [Leos Empfehlung], [Erweitert], [Auswahl aufheben]) und dynamische Profil-Pills mit [x]-Löschfunktion abgelöst.
+* **Kein automatisches Browser-Popup bei Systempflege:** Reine Wartungs- oder Optimierungsdurchläufe öffnen nach Abschluss keinen Webbrowser mehr, sondern zeigen angewendete Tweaks direkt im Fenster an.
+
+### Behoben
+* **Resizable BAR / SAM-Erkennung auf AMD Radeon RX 6800:** Durch die Auswertung physischer PnP-Hardwareressourcen (pnputil) und 64-Bit-BAR1-Adressräume wird ReBAR/SAM nun zuverlässig als aktiv erkannt und mit der korrekten Größe (z. B. 16.384 MB) ausgewiesen, anstelle einer fehlerhaften Inaktivitätswarnung.
+
 ## v3.882 (29.10.2026)
 
 ### Neu

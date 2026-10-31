@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -49,7 +49,31 @@ public partial class DiagGui : Form
     List<DbEntry> db = new List<DbEntry>();
     Font wsBold;
 
-    Panel setupView, runView, content, head, body, contentHost;
+    Panel setupView, runView, content, head, body, contentHost, mainArea, resultDashboard;
+    TableLayoutPanel foot;
+    CheckBox chkSingleWindow;
+    PillButton pillPresetMin, pillPresetLeo, pillPresetAdv, pillPresetReset;
+    FlowLayoutPanel pnlPresetPills, pnlCustomPresets;
+    Button btnDashBack, btnDashOpenHtml, btnDashFolder, btnDashKi, btnDashVerlauf;
+    Label lblDashScore, lblDashClass, lblDashTitle, lblDashMeta;
+    Label lblDashCpuMT, lblDashCpuST, lblDashCpuAes;
+    Label lblDashGpuFps, lblDashGpuLow, lblDashGpuVmb;
+    Label lblDashRamRead, lblDashRamWrite, lblDashRamLat;
+    Label lblDashDiskRead, lblDashDiskWrite, lblDashDiskIops;
+    Label lblDashDpc, lblDashTimer, lblDashOutlier;
+    Label lblDashRebar, lblDashBefunde, lblDashNet;
+    FlowLayoutPanel pnlDashPills;
+
+    List<PillButton> optPresetPills = new List<PillButton>();
+    Dictionary<string, CategoryPickerItem> optPickers = new Dictionary<string, CategoryPickerItem>();
+    Dictionary<string, CategoryPickerItem> repPickers = new Dictionary<string, CategoryPickerItem>();
+    Dictionary<string, Control> optCatPanels = new Dictionary<string, Control>();
+    Dictionary<string, Control> repCatPanels = new Dictionary<string, Control>();
+    string curOptKey = "", curRepKey = "";
+    CardPanel optDetailCard, repDetailCard;
+    Label lblOptCatTitle, lblOptCatDesc, lblRepCatTitle, lblRepCatDesc;
+    LinkLabel lnkOptAll, lnkOptNone, lnkRepAll, lnkRepNone;
+    PillButton pillRepUsual, pillRepNone;
     FlowLayoutPanel left;
     Button btnThemeToggle;
     Badge badgeSensStatus;
@@ -362,7 +386,16 @@ public partial class DiagGui : Form
         head.Controls.Add(logo); head.Controls.Add(t1); head.Controls.Add(t2);
         FlowLayoutPanel hr = new FlowLayoutPanel(); hr.Dock = DockStyle.Right; hr.AutoSize = true; hr.FlowDirection = FlowDirection.RightToLeft; hr.WrapContents = false; hr.BackColor = Color.Transparent; hr.Padding = new Padding(0, UI.S(12), UI.S(14), 0);
         Button btnInfo = HeadButton(UI.IcoInfo);
-        btnInfo.Click += delegate { if (setupView != null && setupView.Visible && versionPage >= 0) ShowPage(versionPage); };
+        btnInfo.Click += delegate {
+            if (!running && versionPage >= 0) {
+                if (resultDashboard != null && resultDashboard.Visible) {
+                    resultDashboard.Visible = false;
+                    contentHost.Visible = true;
+                    if (foot != null) foot.Visible = true;
+                }
+                ShowPage(versionPage);
+            }
+        };
         Tip(btnInfo, "Info und Versionshistorie: was sich von Version 1.0 bis " + this.version + " geändert hat.");
         hr.Controls.Add(btnInfo);
         btnThemeToggle = HeadButton(UI.IsDark ? UI.IcoSonne : UI.IcoMond);
@@ -383,15 +416,29 @@ public partial class DiagGui : Form
         head.Controls.Add(hr);
 
         body = new Panel(); body.Dock = DockStyle.Fill; body.Padding = new Padding(UI.S(20), UI.S(16), UI.S(20), UI.S(14)); body.BackColor = UI.Bg;
+        mainArea = new Panel(); mainArea.Dock = DockStyle.Fill; mainArea.BackColor = UI.Bg;
         LoadDb();
         setupView = BuildSetup(); runView = BuildRun();
+        resultDashboard = (Panel)BuildResultDashboard();
         FillPresets(true);
         if (LoadStartPagePreference()) ShowPage(0);
         else if (curPage == 0) ShowPage(1);
         UpdateSensStatusBadge();
         StartUpdateCheck();
-        setupView.Dock = DockStyle.Fill; runView.Dock = DockStyle.Fill; runView.Visible = false;
-        body.Controls.Add(runView); body.Controls.Add(setupView);
+
+        left.Dock = DockStyle.Left;
+        body.Controls.Add(mainArea);
+        body.Controls.Add(left);
+
+        contentHost.Dock = DockStyle.Fill;
+        if (foot != null) foot.Dock = DockStyle.Bottom;
+        runView.Dock = DockStyle.Fill; runView.Visible = false;
+        resultDashboard.Dock = DockStyle.Fill; resultDashboard.Visible = false;
+
+        mainArea.Controls.Add(contentHost);
+        if (foot != null) mainArea.Controls.Add(foot);
+        mainArea.Controls.Add(runView);
+        mainArea.Controls.Add(resultDashboard);
         Controls.Add(body); Controls.Add(head);
 
         FormClosing += OnClosing;
@@ -1257,7 +1304,20 @@ public partial class DiagGui : Form
         for (int i = 0; i < nav.Count; i++)
         {
             int idx = i;
-            nav[i].Picked += delegate { ShowPage(idx); };
+            nav[i].Picked += delegate {
+                if (running)
+                {
+                    if (nav[idx] == navSens && tabs != null) tabs.Selected = 3;
+                    return;
+                }
+                if (resultDashboard != null && resultDashboard.Visible)
+                {
+                    resultDashboard.Visible = false;
+                    contentHost.Visible = true;
+                    if (foot != null) foot.Visible = true;
+                }
+                ShowPage(idx);
+            };
             nav[i].CheckedChanged += delegate { UpdateSummary(); };
         }
         // ab v2.8 acht Einträge: bei kleinem Fenster mit senkrechter Bildlaufleiste schmaler statt waagerecht zu scrollen
@@ -1274,44 +1334,67 @@ public partial class DiagGui : Form
 
         // ab v3.64 Fußleiste in zwei Zeilen: oben Module in Ablaufreihenfolge mit Gesamtschätzung, darunter Voreinstellung,
         // Ablage und KI-Datei; der Startknopf steht allein rechts und sagt, was er startet
-        TableLayoutPanel foot = new TableLayoutPanel(); foot.Dock = DockStyle.Bottom; foot.Height = UI.S(76); foot.ColumnCount = 2; foot.RowCount = 2; foot.BackColor = UI.Bg; foot.Padding = new Padding(0, UI.S(10), 0, 0);
+        foot = new TableLayoutPanel(); foot.Dock = DockStyle.Bottom; foot.Height = UI.S(76); foot.ColumnCount = 2; foot.RowCount = 2; foot.BackColor = UI.Bg; foot.Padding = new Padding(0, UI.S(10), 0, 0);
         foot.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); foot.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         foot.RowStyles.Add(new RowStyle(SizeType.AutoSize)); foot.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         lblSel = Lbl("", 10f, true, UI.Text); lblSel.Margin = new Padding(0, 0, 0, UI.S(6)); lblSel.AutoEllipsis = true;
         FlowLayoutPanel fo = new FlowLayoutPanel(); fo.AutoSize = true; fo.WrapContents = false; fo.BackColor = UI.Bg; fo.Margin = new Padding(0);
         Label lp = Lbl("Voreinstellung", UI.SchriftHinweis, false, UI.Muted); lp.Margin = new Padding(0, UI.S(6), UI.S(6), 0); fo.Controls.Add(lp);
-        cmbPreset = Combo(180, new string[0], 0); cmbPreset.Margin = new Padding(0, UI.S(2), UI.S(4), 0); fo.Controls.Add(cmbPreset);
-        btnPresetSave = UI.Secondary("Speichern ..."); btnPresetSave.Margin = new Padding(0, 0, UI.S(4), 0); fo.Controls.Add(btnPresetSave);
-        btnPresetDel = UI.Secondary("Löschen"); btnPresetDel.Margin = new Padding(0, 0, UI.S(UI.Abstand5), 0); fo.Controls.Add(btnPresetDel);
+
+        pnlPresetPills = new FlowLayoutPanel(); pnlPresetPills.AutoSize = true; pnlPresetPills.WrapContents = false; pnlPresetPills.BackColor = UI.Bg; pnlPresetPills.Margin = new Padding(0, UI.S(2), UI.S(2), 0);
+        pillPresetMin = new PillButton("Minimal", true);
+        pillPresetLeo = new PillButton("Leos Empfehlung", false);
+        pillPresetAdv = new PillButton("Erweitert", false);
+        pillPresetReset = new PillButton("Auswahl aufheben", false);
+
+        pillPresetMin.Picked += delegate { ApplyGlobalPreset("M"); };
+        pillPresetLeo.Picked += delegate { ApplyGlobalPreset("S"); };
+        pillPresetAdv.Picked += delegate { ApplyGlobalPreset("E"); };
+        pillPresetReset.Picked += delegate { ApplyGlobalPreset(""); };
+
+        pnlPresetPills.Controls.Add(pillPresetMin);
+        pnlPresetPills.Controls.Add(pillPresetLeo);
+        pnlPresetPills.Controls.Add(pillPresetAdv);
+        pnlPresetPills.Controls.Add(pillPresetReset);
+        fo.Controls.Add(pnlPresetPills);
+
+        pnlCustomPresets = new FlowLayoutPanel(); pnlCustomPresets.AutoSize = true; pnlCustomPresets.WrapContents = false; pnlCustomPresets.BackColor = UI.Bg; pnlCustomPresets.Margin = new Padding(0, UI.S(2), UI.S(2), 0);
+        fo.Controls.Add(pnlCustomPresets);
+
+        btnPresetSave = UI.Secondary("Speichern â€¦"); btnPresetSave.Margin = new Padding(0, UI.S(1), UI.S(6), 0); fo.Controls.Add(btnPresetSave);
+        btnPresetSave.Click += delegate { SavePresetDialog(); };
+
+        cmbPreset = new ComboBox(); cmbPreset.Visible = false;
+        btnPresetDel = new Button(); btnPresetDel.Visible = false;
+
         lnkAblage = new LinkLabel(); lnkAblage.AutoSize = true; lnkAblage.Font = new Font("Segoe UI", UI.SchriftHinweis); lnkAblage.LinkColor = UI.Accent; lnkAblage.ActiveLinkColor = UI.AccentHover;
         lnkAblage.Text = AblageKurz(this.dataDir); lnkAblage.Margin = new Padding(0, UI.S(7), UI.S(UI.Abstand4), 0); lnkAblage.AutoEllipsis = true; lnkAblage.LinkBehavior = LinkBehavior.HoverUnderline;
         lnkAblage.LinkClicked += delegate { if (this.dataDir.Length > 0) { try { Directory.CreateDirectory(this.dataDir); } catch { } OpenShell(this.dataDir); } };
         fo.Controls.Add(lnkAblage);
-        chkAnon = Chk("Personenbezogene Daten entfernen", true); chkAnon.Margin = new Padding(0, UI.S(5), 0, 0);
+
+        chkAnon = Chk("Personenbezogene Daten entfernen", true); chkAnon.Margin = new Padding(0, UI.S(5), UI.S(6), 0);
         fo.Controls.Add(chkAnon);
-        btnStart = UI.Primary("Ablauf wählen"); btnStart.Enabled = false; btnStart.Margin = new Padding(UI.S(UI.Abstand5), 0, 0, 0); btnStart.MinimumSize = new Size(UI.S(150), UI.S(44)); btnStart.Anchor = AnchorStyles.Right;
-        Tip(btnStart, "Erst eine Aufgabe wählen oder links ein Modul anhaken.");
+
+        chkSingleWindow = Chk("1-Fenstermodus", false); chkSingleWindow.Margin = new Padding(0, UI.S(5), 0, 0);
+        fo.Controls.Add(chkSingleWindow);
+
+        btnStart = UI.Primary("Ablauf wÃ¤hlen"); btnStart.Enabled = false; btnStart.Margin = new Padding(UI.S(UI.Abstand5), 0, 0, 0); btnStart.MinimumSize = new Size(UI.S(150), UI.S(44)); btnStart.Anchor = AnchorStyles.Right;
+        Tip(btnStart, "Erst eine Aufgabe wÃ¤hlen oder links ein Modul anhaken.");
         btnStart.Click += delegate { StartRun(); };
-        cmbPreset.SelectedIndexChanged += delegate { if (!presetFilling) PresetPicked(); };
-        btnPresetSave.Click += delegate { SavePresetDialog(); };
-        btnPresetDel.Click += delegate { DeletePreset(); };
         foot.Controls.Add(lblSel, 0, 0); foot.Controls.Add(fo, 0, 1); foot.Controls.Add(btnStart, 1, 0); foot.SetRowSpan(btnStart, 2);
         footLayout = delegate
         {
             int avail = foot.ClientSize.Width - btnStart.Width - btnStart.Margin.Horizontal - UI.S(8);
             if (avail <= UI.S(80)) return;
             lblSel.MaximumSize = new Size(avail, UI.S(24));
-            int rest = avail - lp.Width - lp.Margin.Horizontal - cmbPreset.Width - cmbPreset.Margin.Horizontal - btnPresetSave.Width - btnPresetSave.Margin.Horizontal - btnPresetDel.Width - btnPresetDel.Margin.Horizontal;
+            int rest = avail - lp.Width - lp.Margin.Horizontal - pnlPresetPills.Width - pnlPresetPills.Margin.Horizontal - pnlCustomPresets.Width - btnPresetSave.Width - btnPresetSave.Margin.Horizontal - chkSingleWindow.Width - chkSingleWindow.Margin.Horizontal;
             int anonW = TextRenderer.MeasureText(chkAnon.Text, chkAnon.Font).Width + UI.S(24);
-            // wird es eng, zuerst die Ablage kürzen, dann den Text der Anonymisierungs-Option
             int ablW = Math.Max(UI.S(60), Math.Min(TextRenderer.MeasureText(lnkAblage.Text, lnkAblage.Font).Width + UI.S(4), rest - anonW - lnkAblage.Margin.Horizontal));
             lnkAblage.AutoSize = false; lnkAblage.Size = new Size(ablW, UI.S(20));
             chkAnon.AutoSize = false; chkAnon.Size = new Size(Math.Max(UI.S(60), Math.Min(anonW, rest - ablW - lnkAblage.Margin.Horizontal)), UI.S(22)); chkAnon.AutoEllipsis = true;
         };
         foot.Resize += delegate { footLayout(); };
         btnStart.SizeChanged += delegate { footLayout(); };
-
-        p.Controls.Add(contentHost); p.Controls.Add(left); p.Controls.Add(foot);
         ShowPage(0);
         UpdateSummary();
         ApplySetupTips();
@@ -1413,6 +1496,13 @@ public partial class DiagGui : Form
         Tip(btnOptCheck, "Liest für jeden Eintrag, ob er auf diesem PC schon so eingestellt ist (aktiv, teilweise, offen). Verändert nichts, dauert bis zu einer Minute.");
         Tip(btnOptTools, "Holt Display Driver Uninstaller (aus dem Optimisation Pack, feste Prüfsumme) und NVIDIA Profile Inspector in den Tools-Ordner. Installiert wird nichts.");
         Tip(btnOptAll, "Alle Kategorien auf- oder zuklappen.");
+        if (btnRepAll == null) btnRepAll = UI.Secondary("");
+        Tip(btnRepAll, "Alle Gruppen auf- oder zuklappen.");
+        Tip(chkSingleWindow, "Ergebnisse im 1-Fenstermodus als natives Dashboard im Programmfenster anzeigen.");
+        Tip(lnkOptAll, "Alle Optionen dieser Kategorie aktivieren.");
+        Tip(lnkOptNone, "Alle Optionen dieser Kategorie deaktivieren.");
+        Tip(lnkRepAll, "Alle Maßnahmen dieser Gruppe aktivieren.");
+        Tip(lnkRepNone, "Alle Maßnahmen dieser Gruppe deaktivieren.");
         for (int i = 0; i < optPresetButtons.Count; i++) Tip(optPresetButtons[i], optPresetTips[i]);
         foreach (OptItem it in optItems) Tip(it.Box, OptTipText(it));
         Tip(cmbPreset, "Gespeicherte Auswahl aller Seiten laden (Voreinstellungen.json im Datenordner, weitergebbar).");
@@ -2109,79 +2199,196 @@ public partial class DiagGui : Form
 
     Control BuildRepairPage()
     {
-        FlowLayoutPanel f = Page("Wartung", "Führt die gewählten Wartungs- und Reparaturaufgaben nacheinander aus. Vorher wird auf Wunsch ein Wiederherstellungspunkt angelegt. Aufgaben mit dem Etikett Neustart werden erst danach vollständig wirksam.", 4);
+        FlowLayoutPanel f = Page("Wartung", "FÃ¼hrt die gewÃ¤hlten Wartungs- und Reparaturaufgaben nacheinander aus. Vorher wird auf Wunsch ein Wiederherstellungspunkt angelegt. Aufgaben mit dem Etikett Neustart werden erst danach vollstÃ¤ndig wirksam.", 4);
         f.Controls.Add(Section("Absicherung"));
         chkRestorePoint = Chk("Vorher einen Systemwiederherstellungspunkt anlegen", true); chkRestorePoint.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(2)); f.Controls.Add(chkRestorePoint);
         lblRestoreWarn = Lbl("", UI.SchriftText, true, UI.Warn); lblRestoreWarn.BackColor = UI.WarnBg; lblRestoreWarn.Padding = new Padding(UI.S(6)); lblRestoreWarn.Margin = new Padding(UI.S(4), UI.S(4), 0, UI.S(2));
         lblRestoreWarn.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); lblRestoreWarn.Visible = false; f.Controls.Add(lblRestoreWarn);
         chkRestorePoint.CheckedChanged += delegate { UpdateRestoreWarn(); UpdateSummary(); };
+
         f.Controls.Add(Section("Reparaturen"));
         FlowLayoutPanel b = Row(); b.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(UI.Abstand2));
-        Button all = UI.Secondary("Empfohlene Auswahl"); all.Margin = new Padding(0);
-        Tip(all, "Wählt in allen Gruppen die risikoarmen Routineaufgaben wie Bereinigungen und Cache-Leerungen aus.");
-        all.Click += delegate {
+        pillRepUsual = new PillButton("Empfohlene Auswahl", false); pillRepUsual.Margin = new Padding(0, 0, UI.S(8), 0);
+        pillRepUsual.Picked += delegate {
             for (int i = 0; i < repChk.Length; i++) repChk[i].Checked = repUsual[i];
             UpdateRepairCounts();
-            UpdateRepairGroupVisibility();
         };
-        Button none = UI.Secondary("Auswahl aufheben");
-        Tip(none, "Hebt die Auswahl in allen Gruppen auf.");
-        none.Click += delegate {
+        pillRepNone = new PillButton("Auswahl aufheben", false);
+        pillRepNone.Picked += delegate {
             foreach (CheckBox c in repChk) c.Checked = false;
             UpdateRepairCounts();
-            UpdateRepairGroupVisibility();
         };
-        btnRepAll = UI.Secondary("Alle aufklappen"); btnRepAll.Margin = new Padding(UI.S(16), 0, 0, 0);
-        btnRepAll.Click += delegate {
-            bool open = false;
-            foreach (Control c in repCatBody.Values) if (!c.Visible) { open = true; break; }
-            foreach (KeyValuePair<string, Control> kv in repCatBody) { kv.Value.Visible = open; repCatToggle[kv.Key].Expanded = open; }
-            btnRepAll.Text = open ? "Alle zuklappen" : "Alle aufklappen";
-        };
-        Tip(btnRepAll, "Alle Gruppen auf- oder zuklappen.");
-        b.Controls.Add(all); b.Controls.Add(none); b.Controls.Add(btnRepAll); f.Controls.Add(b);
-        // Reihenfolge wie auf der Seite Optimierung: Knöpfe, Legende, Gruppen
+        b.Controls.Add(pillRepUsual); b.Controls.Add(pillRepNone); f.Controls.Add(b);
         f.Controls.Add(RiskLegend());
 
         repChk = new CheckBox[repKeys.Length];
+        ToggleSwitch[] localRepToggles = new ToggleSwitch[repKeys.Length];
         for (int i = 0; i < repKeys.Length; i++)
         {
+            int idx = i;
             repChk[i] = Chk(SplitDetail(repText[i])[0], repDefault[i]);
-            repChk[i].CheckedChanged += delegate { UpdateRepairCounts(); UpdateRestoreWarn(); UpdateSummary(); };
+            localRepToggles[i] = new ToggleSwitch();
+            localRepToggles[i].Checked = repDefault[i];
+            localRepToggles[i].CheckedChanged += delegate {
+                if (repChk[idx].Checked != localRepToggles[idx].Checked) repChk[idx].Checked = localRepToggles[idx].Checked;
+            };
+            repChk[i].CheckedChanged += delegate {
+                if (localRepToggles[idx].Checked != repChk[idx].Checked) localRepToggles[idx].Checked = repChk[idx].Checked;
+                UpdateRepairCounts(); UpdateRestoreWarn(); UpdateSummary();
+            };
         }
 
-        repCatCount.Clear(); repCatBody.Clear(); repCatToggle.Clear();
+        TableLayoutPanel md = new TableLayoutPanel();
+        md.Width = UI.S(UI.Gruppenbreite);
+        md.AutoSize = true;
+        md.ColumnCount = 2;
+        md.RowCount = 1;
+        md.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(240)));
+        md.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        md.Margin = new Padding(UI.S(4), UI.S(6), 0, UI.S(8));
+
+        FlowLayoutPanel leftCol = new FlowLayoutPanel();
+        leftCol.Dock = DockStyle.Fill;
+        leftCol.AutoSize = true;
+        leftCol.FlowDirection = FlowDirection.TopDown;
+        leftCol.WrapContents = false;
+        leftCol.Margin = new Padding(0);
+
+        repDetailCard = new CardPanel();
+        repDetailCard.Dock = DockStyle.Fill;
+        repDetailCard.AutoSize = true;
+        repDetailCard.Padding = new Padding(UI.S(14));
+        repDetailCard.Margin = new Padding(UI.S(8), 0, 0, 0);
+
+        TableLayoutPanel cardContent = new TableLayoutPanel();
+        cardContent.Dock = DockStyle.Fill;
+        cardContent.AutoSize = true;
+        cardContent.ColumnCount = 1;
+
+        TableLayoutPanel headRow = new TableLayoutPanel();
+        headRow.Dock = DockStyle.Top;
+        headRow.AutoSize = true;
+        headRow.ColumnCount = 2;
+        headRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        headRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+        FlowLayoutPanel titleBox = new FlowLayoutPanel();
+        titleBox.AutoSize = true;
+        titleBox.FlowDirection = FlowDirection.TopDown;
+        titleBox.WrapContents = false;
+        lblRepCatTitle = Lbl("", 11f, true, UI.Text);
+        lblRepCatDesc = Lbl("", UI.SchriftHinweis, false, UI.Muted);
+        lblRepCatDesc.Margin = new Padding(0, UI.S(2), 0, 0);
+        titleBox.Controls.Add(lblRepCatTitle);
+        titleBox.Controls.Add(lblRepCatDesc);
+
+        FlowLayoutPanel linkBox = new FlowLayoutPanel();
+        linkBox.AutoSize = true;
+        linkBox.WrapContents = false;
+        linkBox.Anchor = AnchorStyles.Right | AnchorStyles.Top;
+        lnkRepAll = new LinkLabel(); lnkRepAll.Text = "Alle an"; lnkRepAll.AutoSize = true; lnkRepAll.LinkColor = UI.Accent; lnkRepAll.Margin = new Padding(0, UI.S(4), UI.S(10), 0);
+        lnkRepNone = new LinkLabel(); lnkRepNone.Text = "Alle aus"; lnkRepNone.AutoSize = true; lnkRepNone.LinkColor = UI.Accent; lnkRepNone.Margin = new Padding(0, UI.S(4), 0, 0);
+        linkBox.Controls.Add(lnkRepAll);
+        linkBox.Controls.Add(lnkRepNone);
+
+        headRow.Controls.Add(titleBox, 0, 0);
+        headRow.Controls.Add(linkBox, 1, 0);
+        cardContent.Controls.Add(headRow, 0, 0);
+
+        Panel div = new Panel(); div.Dock = DockStyle.Top; div.Height = 1; div.BackColor = UI.Line; div.Margin = new Padding(0, UI.S(8), 0, UI.S(8));
+        cardContent.Controls.Add(div, 0, 1);
+
+        Panel catHost = new Panel();
+        catHost.Dock = DockStyle.Fill;
+        catHost.AutoSize = true;
+        cardContent.Controls.Add(catHost, 0, 2);
+
+        repDetailCard.Controls.Add(cardContent);
+
+        repPickers.Clear();
+        repCatPanels.Clear();
+
+        string[] repIcons = new string[] { UI.IcoFolder, UI.IcoTrash, UI.IcoRefresh, UI.IcoGear };
+        int grpIdx = 0;
         foreach (string grp in repairGroupOrder)
         {
             List<int> indices = new List<int>();
             for (int i = 0; i < repKeys.Length; i++) if (GetRepairGroup(i) == grp) indices.Add(i);
             if (indices.Count == 0) continue;
+            string ico = grpIdx < repIcons.Length ? repIcons[grpIdx] : UI.IcoWartung;
+            grpIdx++;
             string gd; repairGroupText.TryGetValue(grp, out gd);
-            GroupHeader tg; LinkLabel lAll, lNone;
-            TableLayoutPanel body = CategoryBlock(f, grp, gd, out tg, out lAll, out lNone);
-            bool hasChecked = false;
-            int row = 0;
+
+            CategoryPickerItem picker = new CategoryPickerItem(grp, ico);
+            picker.Subtitle = gd ?? "";
+            picker.Width = UI.S(232);
+            string gKey = grp;
+            picker.Picked += delegate { SelectRepairCategory(gKey); };
+            repPickers[grp] = picker;
+            leftCol.Controls.Add(picker);
+
+            FlowLayoutPanel rowsPanel = new FlowLayoutPanel();
+            rowsPanel.Dock = DockStyle.Fill;
+            rowsPanel.AutoSize = true;
+            rowsPanel.FlowDirection = FlowDirection.TopDown;
+            rowsPanel.WrapContents = false;
+            rowsPanel.Margin = new Padding(0);
+
             foreach (int idx in indices)
             {
-                if (repChk[idx].Checked) hasChecked = true;
-                repChk[idx].Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(2));
-                body.Controls.Add(repChk[idx], 0, row);
-                body.Controls.Add(BadgeCell(RiskBadge(idx < repRisk.Length ? repRisk[idx] : ""), RestartBadge(idx < repRestart.Length ? repRestart[idx] : "")), 1, row);
-                row++;
+                string[] parts = SplitDetail(repText[idx]);
+                string tit = parts[0];
+                string desc = parts.Length > 1 && parts[1].Length > 0 ? parts[1] : (repKeys[idx]);
+                SettingRow row = new SettingRow(tit, desc, localRepToggles[idx]);
+                row.Width = UI.S(UI.Gruppenbreite - 270);
+                string rsk = idx < repRisk.Length ? repRisk[idx] : "";
+                if (rsk.Length > 0) row.AddBadge(RiskBadge(rsk));
+                string rst = idx < repRestart.Length ? repRestart[idx] : "";
+                if (rst.Length > 0) row.AddBadge(RestartBadge(rst));
+                rowsPanel.Controls.Add(row);
             }
-            body.Visible = hasChecked;
-            tg.Expanded = hasChecked;
-            repCatCount[grp] = tg; repCatBody[grp] = body; repCatToggle[grp] = tg;
-            List<int> mine = indices;
-            tg.Toggled += delegate { body.Visible = tg.Expanded; };
-            lAll.LinkClicked += delegate { foreach (int i in mine) repChk[i].Checked = true; UpdateRepairGroupVisibility(); };
-            lNone.LinkClicked += delegate { foreach (int i in mine) repChk[i].Checked = false; };
-            Tip(tg, (gd ?? grp) + "\r\nKlicken zeigt oder verbirgt die Maßnahmen dieser Gruppe.");
-            Tip(lAll, "Alle Maßnahmen dieser Gruppe wählen."); Tip(lNone, "Keine Maßnahme dieser Gruppe wählen.");
+            rowsPanel.Visible = false;
+            catHost.Controls.Add(rowsPanel);
+            repCatPanels[grp] = rowsPanel;
         }
+
+        md.Controls.Add(leftCol, 0, 0);
+        md.Controls.Add(repDetailCard, 1, 0);
+        f.Controls.Add(md);
+
+        lnkRepAll.LinkClicked += delegate {
+            if (curRepKey.Length > 0)
+            {
+                for (int i = 0; i < repKeys.Length; i++) if (GetRepairGroup(i) == curRepKey) repChk[i].Checked = true;
+            }
+        };
+        lnkRepNone.LinkClicked += delegate {
+            if (curRepKey.Length > 0)
+            {
+                for (int i = 0; i < repKeys.Length; i++) if (GetRepairGroup(i) == curRepKey) repChk[i].Checked = false;
+            }
+        };
+
+        if (repairGroupOrder.Length > 0) SelectRepairCategory(repairGroupOrder[0]);
         UpdateRepairCounts();
         UpdateRestoreWarn();
         return f;
+    }
+
+    void SelectRepairCategory(string grp)
+    {
+        curRepKey = grp;
+        foreach (KeyValuePair<string, CategoryPickerItem> kv in repPickers)
+        {
+            kv.Value.Selected = (kv.Key == grp);
+        }
+        foreach (KeyValuePair<string, Control> kv in repCatPanels)
+        {
+            kv.Value.Visible = (kv.Key == grp);
+        }
+        lblRepCatTitle.Text = grp;
+        string gd; repairGroupText.TryGetValue(grp, out gd);
+        lblRepCatDesc.Text = gd ?? "";
     }
 
     // ab v3.65 gemeinsamer Aufbau einer Kategorie für Wartung und Optimierung: Kopfzeile mit Zähler, rechts alle und
@@ -2282,7 +2489,6 @@ public partial class DiagGui : Form
     {
         foreach (string grp in repairGroupOrder)
         {
-            if (!repCatCount.ContainsKey(grp)) continue;
             int sel = 0, tot = 0;
             for (int i = 0; i < repKeys.Length; i++)
             {
@@ -2292,7 +2498,8 @@ public partial class DiagGui : Form
                     if (repChk[i] != null && repChk[i].Checked) sel++;
                 }
             }
-            repCatCount[grp].CountText = sel + " von " + tot + " gewählt";
+            if (repPickers.ContainsKey(grp)) repPickers[grp].SetCounts(sel, tot);
+            if (repCatCount.ContainsKey(grp)) repCatCount[grp].CountText = sel + " von " + tot + " gewÃ¤hlt";
         }
     }
 
@@ -2450,57 +2657,216 @@ public partial class DiagGui : Form
         f.Controls.Add(Section("Absicherung"));
         chkOptRestore = Chk("Vorher einen Systemwiederherstellungspunkt anlegen", true); f.Controls.Add(chkOptRestore);
         f.Controls.Add(Section("Vorlagen und Zustand"));
+
         FlowLayoutPanel b = Row(); b.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(4));
+        optPresetPills.Clear();
         string[] pn = new string[] { "Minimal", "Leos Empfehlung", "Erweitert", "Auswahl aufheben" };
+        string[] pkeys = new string[] { "M", "S", "E", "" };
         for (int i = 0; i < pn.Length; i++)
         {
-            string key = i == 0 ? "M" : i == 1 ? "S" : i == 2 ? "E" : "";
-            Button pb = UI.Secondary(pn[i]); pb.Margin = new Padding(i == 0 ? 0 : UI.S(8), 0, 0, 0);
-            pb.Click += delegate { ApplyOptPreset(key); };
-            optPresetButtons.Add(pb); b.Controls.Add(pb);
+            string key = pkeys[i];
+            PillButton pb = new PillButton(pn[i], i == 0);
+            pb.Margin = new Padding(i == 0 ? 0 : UI.S(8), 0, 0, 0);
+            pb.Picked += delegate {
+                for (int k = 0; k < optPresetPills.Count; k++) optPresetPills[k].Active = (optPresetPills[k] == pb);
+                ApplyOptPreset(key);
+            };
+            optPresetPills.Add(pb);
+            b.Controls.Add(pb);
         }
         f.Controls.Add(b);
-        // ab v3.65 zweite Zeile für die Werkzeugknöpfe (vorher ragte die Leiste über die Gruppenbreite hinaus)
+
         b = Row(); b.Margin = new Padding(UI.S(4), UI.S(6), 0, UI.S(4));
-        btnOptCheck = UI.Secondary("Zustand prüfen"); btnOptCheck.Margin = new Padding(0); btnOptCheck.Click += delegate { CheckOptState(); }; b.Controls.Add(btnOptCheck);
-        btnOptTools = UI.Secondary("Werkzeuge holen ..."); btnOptTools.Margin = new Padding(UI.S(8), 0, 0, 0); btnOptTools.Click += delegate { FetchOptTools(); }; b.Controls.Add(btnOptTools);
-        btnOptAll = UI.Secondary("Alle aufklappen"); btnOptAll.Margin = new Padding(UI.S(8), 0, 0, 0); btnOptAll.Click += delegate { ToggleOptAll(); }; b.Controls.Add(btnOptAll);
+        btnOptCheck = UI.Secondary("Zustand prÃ¼fen"); btnOptCheck.Margin = new Padding(0); btnOptCheck.Click += delegate { CheckOptState(); }; b.Controls.Add(btnOptCheck);
+        btnOptTools = UI.Secondary("Werkzeuge holen â€¦"); btnOptTools.Margin = new Padding(UI.S(8), 0, 0, 0); btnOptTools.Click += delegate { FetchOptTools(); }; b.Controls.Add(btnOptTools);
+        btnOptAll = UI.Secondary("Alle aufklappen"); btnOptAll.Visible = false;
         f.Controls.Add(b);
+
         lblOptInfo = Lbl("", 9f, false, UI.Muted); lblOptInfo.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); lblOptInfo.Margin = new Padding(UI.S(4), UI.S(4), UI.S(4), 0); f.Controls.Add(lblOptInfo);
         lblOptState = Lbl("", 9f, false, UI.Muted); lblOptState.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); lblOptState.Margin = new Padding(UI.S(4), UI.S(2), UI.S(4), UI.S(4)); f.Controls.Add(lblOptState);
         if (optItems.Count == 0) { lblOptInfo.Text = "Der Katalog der Optimierung fehlt (Skript ohne Modul Optimierung)."; return f; }
         f.Controls.Add(RiskLegend());
+
+        TableLayoutPanel md = new TableLayoutPanel();
+        md.Width = UI.S(UI.Gruppenbreite);
+        md.AutoSize = true;
+        md.ColumnCount = 2;
+        md.RowCount = 1;
+        md.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(240)));
+        md.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        md.Margin = new Padding(UI.S(4), UI.S(6), 0, UI.S(8));
+
+        FlowLayoutPanel leftCol = new FlowLayoutPanel();
+        leftCol.Dock = DockStyle.Fill;
+        leftCol.AutoSize = true;
+        leftCol.FlowDirection = FlowDirection.TopDown;
+        leftCol.WrapContents = false;
+        leftCol.Margin = new Padding(0);
+
+        optDetailCard = new CardPanel();
+        optDetailCard.Dock = DockStyle.Fill;
+        optDetailCard.AutoSize = true;
+        optDetailCard.Padding = new Padding(UI.S(14));
+        optDetailCard.Margin = new Padding(UI.S(8), 0, 0, 0);
+
+        TableLayoutPanel cardContent = new TableLayoutPanel();
+        cardContent.Dock = DockStyle.Fill;
+        cardContent.AutoSize = true;
+        cardContent.ColumnCount = 1;
+
+        TableLayoutPanel headRow = new TableLayoutPanel();
+        headRow.Dock = DockStyle.Top;
+        headRow.AutoSize = true;
+        headRow.ColumnCount = 2;
+        headRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        headRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+        FlowLayoutPanel titleBox = new FlowLayoutPanel();
+        titleBox.AutoSize = true;
+        titleBox.FlowDirection = FlowDirection.TopDown;
+        titleBox.WrapContents = false;
+        lblOptCatTitle = Lbl("", 11f, true, UI.Text);
+        lblOptCatDesc = Lbl("", UI.SchriftHinweis, false, UI.Muted);
+        lblOptCatDesc.Margin = new Padding(0, UI.S(2), 0, 0);
+        titleBox.Controls.Add(lblOptCatTitle);
+        titleBox.Controls.Add(lblOptCatDesc);
+
+        FlowLayoutPanel linkBox = new FlowLayoutPanel();
+        linkBox.AutoSize = true;
+        linkBox.WrapContents = false;
+        linkBox.Anchor = AnchorStyles.Right | AnchorStyles.Top;
+        lnkOptAll = new LinkLabel(); lnkOptAll.Text = "Alle an"; lnkOptAll.AutoSize = true; lnkOptAll.LinkColor = UI.Accent; lnkOptAll.Margin = new Padding(0, UI.S(4), UI.S(10), 0);
+        lnkOptNone = new LinkLabel(); lnkOptNone.Text = "Alle aus"; lnkOptNone.AutoSize = true; lnkOptNone.LinkColor = UI.Accent; lnkOptNone.Margin = new Padding(0, UI.S(4), 0, 0);
+        linkBox.Controls.Add(lnkOptAll);
+        linkBox.Controls.Add(lnkOptNone);
+
+        headRow.Controls.Add(titleBox, 0, 0);
+        headRow.Controls.Add(linkBox, 1, 0);
+        cardContent.Controls.Add(headRow, 0, 0);
+
+        Panel div = new Panel(); div.Dock = DockStyle.Top; div.Height = 1; div.BackColor = UI.Line; div.Margin = new Padding(0, UI.S(8), 0, UI.S(8));
+        cardContent.Controls.Add(div, 0, 1);
+
+        Panel catHost = new Panel();
+        catHost.Dock = DockStyle.Fill;
+        catHost.AutoSize = true;
+        cardContent.Controls.Add(catHost, 0, 2);
+
+        optDetailCard.Controls.Add(cardContent);
+
+        optPickers.Clear();
+        optCatPanels.Clear();
+
+        Dictionary<string, string> catIcons = new Dictionary<string, string>();
+        catIcons["Datenschutz"] = UI.IcoShield;
+        catIcons["Werbung"] = UI.IcoBell;
+        catIcons["Explorer"] = UI.IcoFolder;
+        catIcons["Leistung"] = UI.IcoFlame;
+        catIcons["Update"] = UI.IcoRefresh;
+        catIcons["Dienste"] = UI.IcoGear;
+        catIcons["Apps"] = UI.IcoApp;
+        catIcons["Features"] = UI.IcoCheck;
+        catIcons["Aufraeumen"] = UI.IcoTrash;
+
         foreach (string[] k in optCats)
         {
             string key = k[0];
             List<OptItem> items = optItems.FindAll(delegate(OptItem it) { return it.Kat == key; });
             if (items.Count == 0) continue;
-            // Kopfzeile, Beschreibung und Tabelle wie auf der Seite Wartung (CategoryBlock)
-            GroupHeader tg; LinkLabel all, none;
-            TableLayoutPanel body = CategoryBlock(f, k[1], k[2], out tg, out all, out none);
-            int row = 0;
+
+            string ico; if (!catIcons.TryGetValue(key, out ico)) ico = UI.IcoOpt;
+            CategoryPickerItem picker = new CategoryPickerItem(k[1], ico);
+            picker.Subtitle = k[2];
+            picker.Width = UI.S(232);
+            string gKey = key;
+            picker.Picked += delegate { SelectOptCategory(gKey); };
+            optPickers[key] = picker;
+            leftCol.Controls.Add(picker);
+
+            FlowLayoutPanel rowsPanel = new FlowLayoutPanel();
+            rowsPanel.Dock = DockStyle.Fill;
+            rowsPanel.AutoSize = true;
+            rowsPanel.FlowDirection = FlowDirection.TopDown;
+            rowsPanel.WrapContents = false;
+            rowsPanel.Margin = new Padding(0);
+
             foreach (OptItem it in items)
             {
-                it.Box = Chk(OptBoxText(it), false); it.Box.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(2)); it.Box.UseMnemonic = false;
-                it.Box.CheckedChanged += delegate { UpdateOptCounts(); };
+                it.Box = Chk(OptBoxText(it), false);
+                it.Box.UseMnemonic = false;
+                it.Toggle = new ToggleSwitch();
+                it.Toggle.Checked = false;
                 it.StateBadge = new Badge("", "ok"); it.StateBadge.Tag = "zustand";
                 Badge bv = it.Verwaltet && DomainPc ? new Badge("verwaltet", "warn") : null;
                 if (bv != null) bv.Tag = "verwaltet";
-                body.Controls.Add(it.Box, 0, row);
-                body.Controls.Add(BadgeCell(it.Risiko == "Eingriff" ? RiskBadge("Eingriff") : null, it.Neustart == "immer" ? RestartBadge("immer") : null, bv, it.StateBadge), 1, row);
-                row++;
+
+                OptItem itemRef = it;
+                it.Toggle.CheckedChanged += delegate {
+                    if (itemRef.Box.Checked != itemRef.Toggle.Checked) itemRef.Box.Checked = itemRef.Toggle.Checked;
+                };
+                it.Box.CheckedChanged += delegate {
+                    if (itemRef.Toggle.Checked != itemRef.Box.Checked) itemRef.Toggle.Checked = itemRef.Box.Checked;
+                    UpdateOptCounts();
+                };
+
+                SettingRow row = new SettingRow(it.Titel, it.Tip, it.Toggle);
+                row.Width = UI.S(UI.Gruppenbreite - 270);
+                if (it.Risiko == "Eingriff") row.AddBadge(RiskBadge("Eingriff"));
+                else if (it.Risiko.Length > 0 && it.Risiko != "Lesen") row.AddBadge(RiskBadge(it.Risiko));
+                if (it.Neustart == "immer") row.AddBadge(RestartBadge("immer"));
+                if (bv != null) row.AddBadge(bv);
+                if (it.StateBadge != null) row.AddBadge(it.StateBadge);
+
+                rowsPanel.Controls.Add(row);
             }
-            optCatCount[key] = tg; optCatBody[key] = body; optCatToggle[key] = tg;
-            tg.Toggled += delegate { body.Visible = tg.Expanded; };
-            all.LinkClicked += delegate { foreach (OptItem it in items) it.Box.Checked = true; };
-            none.LinkClicked += delegate { foreach (OptItem it in items) it.Box.Checked = false; };
-            Tip(tg, k[2] + "\r\nKlicken zeigt oder verbirgt die Einträge.");
-            Tip(all, "Alle Einträge dieser Kategorie wählen."); Tip(none, "Keinen Eintrag dieser Kategorie wählen.");
+            rowsPanel.Visible = false;
+            catHost.Controls.Add(rowsPanel);
+            optCatPanels[key] = rowsPanel;
         }
-        f.Controls.Add(Hint("verwaltet: berührt Gruppenrichtlinien, auf Domänen-PCs nicht in den Vorlagen. Benutzereinstellungen gelten für den angemeldeten Benutzer.", 4));
-        // Start-Vorauswahl: ab v3.5 ApplyOptPreset("M") (Minimal), früher ApplyOptPreset("S") (Leos Empfehlung)
+
+        md.Controls.Add(leftCol, 0, 0);
+        md.Controls.Add(optDetailCard, 1, 0);
+        f.Controls.Add(md);
+
+        lnkOptAll.LinkClicked += delegate {
+            if (curOptKey.Length > 0)
+            {
+                foreach (OptItem it in optItems) if (it.Kat == curOptKey && it.Box != null) it.Box.Checked = true;
+            }
+        };
+        lnkOptNone.LinkClicked += delegate {
+            if (curOptKey.Length > 0)
+            {
+                foreach (OptItem it in optItems) if (it.Kat == curOptKey && it.Box != null) it.Box.Checked = false;
+            }
+        };
+
+        f.Controls.Add(Hint("verwaltet: berÃ¼hrt Gruppenrichtlinien, auf DomÃ¤nen-PCs nicht in den Vorlagen. Benutzereinstellungen gelten fÃ¼r den angemeldeten Benutzer.", 4));
+        if (optCats.Count > 0) SelectOptCategory(optCats[0][0]);
         ApplyOptPreset("M");
         return f;
+    }
+
+    void SelectOptCategory(string key)
+    {
+        curOptKey = key;
+        foreach (KeyValuePair<string, CategoryPickerItem> kv in optPickers)
+        {
+            kv.Value.Selected = (kv.Key == key);
+        }
+        foreach (KeyValuePair<string, Control> kv in optCatPanels)
+        {
+            kv.Value.Visible = (kv.Key == key);
+        }
+        foreach (string[] k in optCats)
+        {
+            if (k[0] == key)
+            {
+                lblOptCatTitle.Text = k[1];
+                lblOptCatDesc.Text = k[2];
+                break;
+            }
+        }
     }
 
     void ApplyOptPreset(string key)
@@ -2546,13 +2912,14 @@ public partial class DiagGui : Form
 
     void UpdateOptCounts()
     {
-        foreach (KeyValuePair<string, GroupHeader> kv in optCatCount)
+        foreach (string[] k in optCats)
         {
+            string key = k[0];
             int a = 0, n = 0;
-            foreach (OptItem it in optItems) if (it.Kat == kv.Key) { a++; if (it.Box.Checked) n++; }
-            kv.Value.CountText = n + " von " + a + " gewählt";
+            foreach (OptItem it in optItems) if (it.Kat == key) { a++; if (it.Box != null && it.Box.Checked) n++; }
+            if (optPickers.ContainsKey(key)) optPickers[key].SetCounts(n, a);
+            if (optCatCount.ContainsKey(key)) optCatCount[key].CountText = n + " von " + a + " gewÃ¤hlt";
         }
-        UpdateSummary();
     }
 
     void ToggleOptAll()
@@ -3546,27 +3913,44 @@ public partial class DiagGui : Form
     void FillPresets(bool autoLoad)
     {
         cachedLeoIds = null;
-        if (cmbPreset == null) return;
         presetFilling = true;
         try
         {
-            cmbPreset.Items.Clear(); cmbPreset.Items.Add("(keine)");
+            if (pnlCustomPresets != null) pnlCustomPresets.Controls.Clear();
+            if (cmbPreset != null) { cmbPreset.Items.Clear(); cmbPreset.Items.Add("(keine)"); }
             Dictionary<string, object> d = ReadPresetFile();
             Dictionary<string, object> e = SubDict(d, "Eintraege");
             object st; string start = d != null && d.TryGetValue("BeimStart", out st) ? Convert.ToString(st) : "";
             List<string> names = new List<string>();
             if (e != null) names.AddRange(e.Keys);
             names.Sort(StringComparer.CurrentCultureIgnoreCase);
-            foreach (string n in names) cmbPreset.Items.Add(n == start ? n + "   (beim Start)" : n);
-            int sel = 0;
-            if (presetActive.Length > 0) { int i = names.IndexOf(presetActive); if (i >= 0) sel = i + 1; }
+            foreach (string n in names)
+            {
+                if (cmbPreset != null) cmbPreset.Items.Add(n == start ? n + "   (beim Start)" : n);
+                if (pnlCustomPresets != null)
+                {
+                    string pName = n;
+                    PillButton pill = new PillButton(n, presetActive == n);
+                    pill.Removable = true;
+                    pill.Picked += delegate {
+                        pillPresetMin.Active = false; pillPresetLeo.Active = false; pillPresetAdv.Active = false; pillPresetReset.Active = false;
+                        foreach (Control c in pnlCustomPresets.Controls) { PillButton pb = c as PillButton; if (pb != null) pb.Active = (pb == pill); }
+                        ApplyPreset(pName);
+                    };
+                    pill.RemoveClicked += delegate { DeletePresetByName(pName); };
+                    pnlCustomPresets.Controls.Add(pill);
+                }
+            }
             if (autoLoad && start.Length > 0)
             {
                 int i = names.IndexOf(start);
                 if (i >= 0)
                 {
-                    sel = i + 1;
                     ApplyPreset(start);
+                    if (pnlCustomPresets != null)
+                    {
+                        foreach (Control c in pnlCustomPresets.Controls) { PillButton pb = c as PillButton; if (pb != null) pb.Active = (pb.Text == start); }
+                    }
                     if (!LoadStartPagePreference())
                     {
                         int targetPage = 1;
@@ -3578,11 +3962,77 @@ public partial class DiagGui : Form
                     }
                 }
             }
-            cmbPreset.SelectedIndex = sel;
-            btnPresetDel.Enabled = sel > 0;
-            btnPresetSave.Enabled = PresetFile.Length > 0;
+            if (btnPresetSave != null) btnPresetSave.Enabled = PresetFile.Length > 0;
         }
         finally { presetFilling = false; }
+    }
+
+    void ApplyGlobalPreset(string key)
+    {
+        pillPresetMin.Active = (key == "M");
+        pillPresetLeo.Active = (key == "S");
+        pillPresetAdv.Active = (key == "E");
+        pillPresetReset.Active = (key == "");
+        if (pnlCustomPresets != null)
+        {
+            foreach (Control c in pnlCustomPresets.Controls) { PillButton pb = c as PillButton; if (pb != null) pb.Active = false; }
+        }
+        presetActive = "";
+        if (key == "")
+        {
+            for (int i = 1; i <= 5 && i < nav.Count; i++) nav[i].Checked = false;
+            foreach (CheckBox c in repChk) c.Checked = false;
+            foreach (OptItem it in optItems) if (it.Box != null) it.Box.Checked = false;
+        }
+        else if (key == "M")
+        {
+            nav[1].Checked = true; rbSchnell.Checked = true;
+            nav[2].Checked = true;
+            nav[3].Checked = false;
+            nav[4].Checked = false;
+            nav[5].Checked = false;
+            ApplyOptPreset("M");
+        }
+        else if (key == "S")
+        {
+            nav[1].Checked = true; rbVoll.Checked = true;
+            nav[2].Checked = true;
+            nav[3].Checked = false;
+            nav[4].Checked = true;
+            for (int i = 0; i < repChk.Length; i++) repChk[i].Checked = repUsual[i];
+            nav[5].Checked = true;
+            ApplyOptPreset("S");
+        }
+        else if (key == "E")
+        {
+            nav[1].Checked = true; rbVoll.Checked = true;
+            nav[2].Checked = true;
+            nav[3].Checked = true;
+            nav[4].Checked = true;
+            for (int i = 0; i < repChk.Length; i++) repChk[i].Checked = true;
+            nav[5].Checked = true;
+            ApplyOptPreset("E");
+        }
+        UpdateRepairCounts();
+        UpdateOptCounts();
+        UpdateSummary();
+    }
+
+    void DeletePresetByName(string n)
+    {
+        if (String.IsNullOrEmpty(n)) return;
+        if (MessageBox.Show(this, "Voreinstellung \"" + n + "\" lÃ¶schen?", "Leos Minibench", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        try
+        {
+            Dictionary<string, object> d = ReadPresetFile(); if (d == null) return;
+            Dictionary<string, object> e = SubDict(d, "Eintraege"); if (e != null) e.Remove(n);
+            object st; if (d.TryGetValue("BeimStart", out st) && Convert.ToString(st) == n) d["BeimStart"] = "";
+            System.Web.Script.Serialization.JavaScriptSerializer js = new System.Web.Script.Serialization.JavaScriptSerializer();
+            File.WriteAllText(PresetFile, js.Serialize(d), new UTF8Encoding(false));
+            if (presetActive == n) presetActive = "";
+            FillPresets(false); UpdateSummary();
+        }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Leos Minibench"); }
     }
 
     string PresetNameOf(int index)
@@ -3877,7 +4327,13 @@ public partial class DiagGui : Form
         btnFolder.Click += delegate { OpenShell(outDir); };
         btnKi.Click += delegate { OpenSelect(kiPath); };
         btnExportRun.Click += delegate { ExportCurrentRun(); };
-        btnNew.Click += delegate { ReloadDb(); runView.Visible = false; setupView.Visible = true; };
+        btnNew.Click += delegate {
+            ReloadDb();
+            runView.Visible = false;
+            if (resultDashboard != null) resultDashboard.Visible = false;
+            contentHost.Visible = true;
+            if (foot != null) foot.Visible = true;
+        };
         p.Controls.Add(t);
         ApplyRunTips();
         return p;
@@ -4082,7 +4538,11 @@ public partial class DiagGui : Form
         }
         catch (Exception ex) { MessageBox.Show(this, "PowerShell konnte nicht gestartet werden: " + ex.Message, "Leos Minibench", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
         running = true;
-        setupView.Visible = false; runView.Visible = true;
+        for (int i = 0; i < nav.Count; i++) { nav[i].Running = false; nav[i].Invalidate(); }
+        contentHost.Visible = false;
+        if (foot != null) foot.Visible = false;
+        if (resultDashboard != null) resultDashboard.Visible = false;
+        runView.Visible = true;
         btnCancel.Visible = true; btnCancel.Enabled = true;
         btnSkipStep.Visible = true; btnSkipStep.Enabled = false;
         btnStopWait.Visible = false; btnStopWait.Enabled = true;
@@ -4273,16 +4733,32 @@ public partial class DiagGui : Form
         btnCancel.Visible = false; btnStopWait.Visible = false; btnSkipStep.Visible = false; btnNew.Visible = true;
         if (chartRun.Count > 0) tabs.SetText(3, "Sensoren");
         int code = -1; try { code = proc.ExitCode; } catch { }
+        for (int i = 0; i < nav.Count; i++) { if (nav[i].Running) { nav[i].Running = false; nav[i].Invalidate(); } }
         if (gotDone)
         {
             barAll.Value = 100; barAll.Fill = nK > 0 ? UI.Crit : (nW > 0 ? Color.FromArgb(214, 140, 20) : UI.Ok); barAll.Invalidate();
             lblStep.Text = "Abgeschlossen";
             lblCounter.Text = "Bericht und KI-Dateien liegen im Datenordner";
-            lblResult.Text = nK > 0 ? "Kritische Befunde gefunden" : (nW > 0 ? "Warnungen vorhanden" : "Keine Auffälligkeiten");
+            lblResult.Text = nK > 0 ? "Kritische Befunde gefunden" : (nW > 0 ? "Warnungen vorhanden" : "Keine AuffÃ¤lligkeiten");
             lblResult.ForeColor = nK > 0 ? UI.Crit : (nW > 0 ? UI.Warn : UI.Ok);
             btnHtml.Visible = File.Exists(htmlPath); btnFolder.Visible = Directory.Exists(outDir); btnKi.Visible = File.Exists(kiPath);
             btnExportRun.Visible = Directory.Exists(outDir);
-            if (btnHtml.Visible) OpenShell(htmlPath);
+
+            bool pureMaintenance = !nav[1].Checked && !nav[2].Checked && !nav[3].Checked && (nav[4].Checked || nav[5].Checked);
+            if (pureMaintenance)
+            {
+                tabs.Selected = 1;
+            }
+            else if (chkSingleWindow != null && chkSingleWindow.Checked && File.Exists(htmlPath))
+            {
+                PopulateResultDashboard();
+                runView.Visible = false;
+                if (resultDashboard != null) resultDashboard.Visible = true;
+            }
+            else
+            {
+                if (btnHtml.Visible) OpenShell(htmlPath);
+            }
         }
         else
         {

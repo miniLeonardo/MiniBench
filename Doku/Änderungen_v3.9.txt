@@ -1,0 +1,87 @@
+﻿LEOS MINIBENCH 3.9: ÄNDERUNGEN (EXPERIMENTELL)
+==============================================
+
+Version 3.9 modernisiert die Benutzeroberfläche tiefgreifend und führt einen optionalen 1-Fenstermodus ein:
+Vollständig modernisiertes Master-Detail-Layout für Optimierung und Wartung mit interaktiven Schaltern
+(ToggleSwitch) statt Checkboxen, dynamischen Zählern und Schnellwahl pro Kategorie, persistente linke Navigationsleiste
+während des Durchlaufs, moderne Schnellwahl-Pills für Voreinstellungen, Unterdrückung unnötiger Browser-Popups bei
+reiner Systempflege sowie eine präzise PnP-basierte Hardware-Erkennung für Resizable BAR (AMD Smart Access Memory).
+
+Hinweis: Diese Version ist als experimentell eingestuft. Sie modernisiert die Oberfläche grundlegend; die bewährten
+Ablauf- und Testpfade bleiben als robuster Kern erhalten.
+
+
+1. RESIZABLE BAR / SAM-ERKENNUNG (AMD RADEON RX 6800 & CO.)
+  PnP-Hardwareressourcen      Die Erkennung in Test-RebarStatus wertet primär pnputil /enum-devices /class Display
+                              /resources aus. Dadurch werden rein softwarebasierte oder virtuelle Display-Treiber
+                              ausgefiltert und echte 64-Bit-Adressbereiche (Memory Resources >= 0x100000000 bzw. Spannen
+                              über 256 MB) der physischen PCIe-Grafikkarte zuverlässig erfasst.
+  Robuste Fallbacks           Als Absicherung dienen eine direkte Abfrage aller Win32_DeviceMemoryAddress-Instanzen
+                              sowie die Prüfung des AMD-Treiber-Schlüssels KMD_EnableSAM in der Windows-Registry.
+  Präziser Statustext         Aktives ReBAR/SAM wird mit exakter BAR1-Größe ausgewiesen (z. B. „aktiv (Großer
+                              Speicherbereich: 16.384 MB)“). Fehlwarnungen auf Systemen wie TORRENT gehören damit
+                              der Vergangenheit an.
+
+
+2. PERSISTENTE MENÜLEISTE WÄHREND DES DURCHLAUFS
+  Dauerhafte Navigation       Die linke Hauptnavigationsleiste (left) bleibt während der gesamten Programmausführung
+                              am linken Fensterrand sichtbar und bedienbar.
+  Laufzeit-Indikator          Der jeweils aktive Schritt des Durchlaufs wird in der linken Leiste durch einen cyan
+                              leuchtenden Aktivitätsindikator an der Modulschaltfläche hervorgehoben.
+  Sichere Führung             Unbeteiligte Einstellungsseiten sind während eines aktiven Laufs gesperrt; der direkte
+                              Wechsel zur Live-Sensoransicht oder zum Protokoll bleibt zur Beobachtung jederzeit möglich.
+
+
+3. MASTER-DETAIL-LAYOUT & INTERAKTIVE SCHALTER (TOGGLESWITCH)
+  Master-Detail-Aufbau        Die verschachtelten Akkordeon-Gruppen der Seiten Optimierung und Wartung weichen einem
+                              übersichtlichen zweispaltigen Layout (Kategoriewähler links, Detailkarte rechts).
+  Kategoriewähler mit Zähler  Jede Kategorie bietet ein klares Icon, den Namen und einen dynamischen Zähler-Badge
+                              (z. B. 4/9), der bei jeder Änderung sofort aktualisiert wird.
+  Detailkarte                 Moderner CardPanel-Container mit Titel, Erklärung und zwei Schnell-Links ([Alle an]
+                              und [Alle aus]).
+  Einstellungszeilen          Jede Option wird als sauber ausgerichtete SettingRow dargestellt: Titel in Fettschrift,
+                              verständliche deutsche Erklärung, Risikostufen-Badges (Ändern blau, Eingriff orange,
+                              Zerstörend rot) und ein leichtgängiger ToggleSwitch mit abgerundeter Pillenform und
+                              Anti-Aliasing.
+
+
+4. MODERNE PRESET-PILLS STATT DROPDOWN
+  Schnellwahl-Pills           Das frühere WinForms-Dropdown (cmbPreset) in der Fußleiste und auf der Optimierungsseite
+                              wird durch moderne Pill-Buttons ersetzt ([Minimal] [Leos Empfehlung] [Erweitert] [Auswahl aufheben]).
+  Eigene Vorlagen             Benutzerdefinierte Profile aus Voreinstellungen.json werden dynamisch als wiederverwendbare
+                              Pill-Buttons eingebunden und können über ein [x]-Symbol direkt entfernt werden.
+  Kompakte Verwaltung         Über die Schaltfläche [Speichern …] lässt sich die aktuelle Auswahl aller Seiten unter
+                              einem beliebigen Namen sichern.
+
+
+5. ERGEBNISANZEIGE IM PROGRAMM & 1-FENSTERMODUS
+  Kein Browser bei Pflege     Wurden ausschließlich Wartung oder Optimierung ausgeführt, schließt der Lauf ohne Öffnen
+                              eines externen Webbrowsers ab. Die Ergebnisse stehen direkt im Programmfenster.
+  Natives Ergebnis-Dashboard  Der neue 1-Fenstermodus schaltet nach Abschluss von Diagnose und Benchmark auf ein
+                              elegantes In-App Dashboard um: Große Gesamtwertung in Cyan, Leistungsklassifizierung,
+                              Hardware-Steckbrief und ein 2x3-Kachelraster für Prozessor, Grafik, Arbeitsspeicher,
+                              Datenträger, Latenz und Zusatzinfos.
+  HTML-Bericht bei Bedarf     Über die Schaltfläche [HTML-Bericht im Browser öffnen] lässt sich die vollständige
+                              Webansicht weiterhin jederzeit mit einem Klick aufrufen.
+
+
+GEFUNDEN UND BEHOBEN
+  - ReBAR-Fehlwarnung: AMD RX 6800 und Grafikkarten mit 64-Bit-Adressraum wurden durch die 32-Bit-WMI-Einschränkung
+    fälschlicherweise als <= 256 MB (inaktiv) diagnostiziert.
+  - Browser-Popup nach Wartung: Nach reiner Systempflege öffnete sich störend ein Browserfenster.
+  - Ausgeblendete Seitenleiste: Beim Starten eines Laufs verschwand die Hauptnavigation vollständig.
+  - Dropdown-Voreinstellungen: Die klassische Dropdown-Liste passte nicht mehr zum modernen Dark-Design.
+
+
+GRENZEN
+  - Das In-App Dashboard fasst die wichtigsten Leistungskennzahlen kompakt zusammen; tiefgehende Einzelprüfungen
+    (z. B. vollständige SMART-Attributtabellen) sind weiterhin im vollständigen HTML-Bericht einsehbar.
+
+
+UMSTIEG
+  - Bestehende Voreinstellungen (Voreinstellungen.json) und Messreihen werden unverändert weitergeführt.
+
+
+QUELLEN
+  - Microsoft Windows Hardware Developer: Display Device Memory Resources und pnputil.exe
+  - AMD Developer: Smart Access Memory Architecture

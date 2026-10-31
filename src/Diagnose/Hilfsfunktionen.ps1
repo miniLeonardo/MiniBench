@@ -78,6 +78,18 @@ function Get-GpuVendorLink([string]$GpuName, [bool]$IsLaptop = $false) {
     }
 }
 
+# PnP-Display-Ressourcen abfragen (fuer Resizable BAR und PnP-Erkennung)
+function Get-PnpDisplayResources {
+    try {
+        if (Get-Command pnputil.exe -ErrorAction SilentlyContinue) {
+            return @(pnputil.exe /enum-devices /class Display /resources 2>$null)
+        } elseif (Get-Command pnputil -ErrorAction SilentlyContinue) {
+            return @(pnputil /enum-devices /class Display /resources 2>$null)
+        }
+    } catch { }
+    return @()
+}
+
 # Resizable BAR / Smart Access Memory (SAM) Erkennung
 function Test-RebarStatus($GpuAdapter = $null, $CpuObj = $null, $BaseBoard = $null) {
     $getCim = {
@@ -89,7 +101,10 @@ function Test-RebarStatus($GpuAdapter = $null, $CpuObj = $null, $BaseBoard = $nu
         if (Get-Command Get-MainGpu -ErrorAction SilentlyContinue) { $GpuAdapter = Get-MainGpu }
     }
     if (-not $GpuAdapter) {
-        $gpus = & $getCim Win32_VideoController
+        $gpus = @(& $getCim Win32_VideoController | Where-Object {
+            $n = [string]$_.Name
+            $n -and $n -notmatch 'Virtual|Remote|RDP|IddSample|spacedesk|Parsec|Basic Display'
+        })
         $GpuAdapter = @($gpus | Where-Object { if (Get-Command Get-GpuKind -ErrorAction SilentlyContinue) { (Get-GpuKind $_.Name) -eq 'dGPU' } else { $true } }) | Select-Object -First 1
         if (-not $GpuAdapter) { $GpuAdapter = $gpus | Select-Object -First 1 }
     }
@@ -100,13 +115,13 @@ function Test-RebarStatus($GpuAdapter = $null, $CpuObj = $null, $BaseBoard = $nu
     $cpuName = if ($CpuObj) { [string]$CpuObj.Name } else { '' }
     $bbProd  = if ($BaseBoard) { [string]$BaseBoard.Product } else { '' }
 
-    # GPU Support: NVIDIA RTX 3000+, 4000+, 5000+; AMD RX 6000+, 7000+, 8000+; Intel Arc
+    # GPU Support: NVIDIA RTX 3000+, 4000+, 5000+; AMD RX 6000+, 7000+, 8000+, 9000+; Intel Arc
     $nvMatch = ($gpuName -match 'RTX\s+(30\d\d|40\d\d|50\d\d)' -or $gpuName -match 'RTX\s+[345]0\d\d' -or $gpuName -match 'RTX\s+A[2-6]\d{3}')
     $amdMatch = ($gpuName -match 'Radeon\s+RX\s+[6789]\d{3}')
     $intelMatch = ($gpuName -match 'Intel\(R\)\s+Arc|Arc\(TM\)')
     $gpuSupported = ($nvMatch -or $amdMatch -or $intelMatch)
 
-    # CPU/Plattform Support: AMD Ryzen 3000+ (außer 3200G/3400G), 5000+, 7000+; Intel Core 10th Gen+, Core Ultra
+    # CPU/Plattform Support: AMD Ryzen 3000+ (außer 3200G/3400G), 5000+, 7000+, 8000+, 9000+; Intel Core 10th Gen+, Core Ultra
     $amdCpuMatch = ($cpuName -match 'Ryzen\s+[3579]\s+(?!3[24]00G)[3-9]\d{3}' -or $cpuName -match 'Ryzen\s+Threadripper\s+[3-9]\d{3}')
     $intelCpuMatch = ($cpuName -match 'Core\(TM\)\s+i[3579]-(1[0-4]\d{3}|[2-9]\d{4})' -or $cpuName -match 'Core\(TM\)\s+Ultra')
 
@@ -115,6 +130,7 @@ function Test-RebarStatus($GpuAdapter = $null, $CpuObj = $null, $BaseBoard = $nu
 
     $active = $false
     $details = ''
+    $nvEvaluated = $false
 
     if ($supported) {
         if ($nvMatch) {
@@ -124,32 +140,107 @@ function Test-RebarStatus($GpuAdapter = $null, $CpuObj = $null, $BaseBoard = $nu
                     $memOut = Invoke-External -File $nvsmi -Arguments '-q -d MEMORY' -TimeoutSec 5
                     if ($memOut.Output -match 'BAR1 Memory Usage[\s\S]*?Total\s*:\s*(\d+)\s*MiB') {
                         $bar1Mb = [int]$Matches[1]
+                        $nvEvaluated = $true
                         if ($bar1Mb -gt 512) {
                             $active = $true
-                            $details = ('BAR1-Größe: {0} MiB' -f $bar1Mb)
+                            $details = ('BAR1: {0:N0} MB' -f $bar1Mb)
                         } else {
                             $active = $false
-                            $details = ('BAR1-Größe: {0} MiB (limitiert auf 256 MiB)' -f $bar1Mb)
+                            $details = ('BAR1: {0:N0} MB (limitiert auf 256 MiB)' -f $bar1Mb)
                         }
                     }
                 } catch { }
             }
-        } else {
+        }
+
+        # 1. Primäre PnP-Hardware-Erkennung via pnputil (Hardware-Grafikkarte & große Speicherressourcen)
+        if (-not $active -and -not $nvEvaluated) {
             try {
-                $memAddrs = @(Get-CimAssociatedInstance -InputObject $GpuAdapter -ResultClassName Win32_DeviceMemoryAddress -ErrorAction SilentlyContinue)
-                $maxBarBytes = 0L
-                foreach ($ma in $memAddrs) {
-                    $sz = [int64]$ma.EndingAddress - [int64]$ma.StartingAddress + 1
-                    if ($sz -gt $maxBarBytes) { $maxBarBytes = $sz }
+                $pnpOut = Get-PnpDisplayResources
+                $isTargetHw = $false
+                $maxPnpMb = 0L
+                $foundLarge = $false
+                foreach ($line in @($pnpOut)) {
+                    if ($line -match 'Instance ID:\s*(PCI\\VEN_(?:1002|10DE|8086)[^\r\n]*)') {
+                        $inst = $Matches[1]
+                        if ($amdMatch -and $inst -match 'VEN_1002') { $isTargetHw = $true }
+                        elseif ($intelMatch -and $inst -match 'VEN_8086') { $isTargetHw = $true }
+                        elseif ($nvMatch -and $inst -match 'VEN_10DE') { $isTargetHw = $true }
+                        else { $isTargetHw = $true }
+                        continue
+                    } elseif ($line -match 'Instance ID:') {
+                        $isTargetHw = $false
+                        continue
+                    }
+                    if ($isTargetHw) {
+                        if ($line -match '0x([0-9A-Fa-f]{8,16})\s*-\s*0x([0-9A-Fa-f]{8,16})') {
+                            $start = [Convert]::ToUInt64($Matches[1], 16)
+                            $end   = [Convert]::ToUInt64($Matches[2], 16)
+                            if ($end -ge $start) {
+                                $span = $end - $start + 1
+                                $mb = [int64][math]::Round($span / 1MB)
+                                if ($mb -gt $maxPnpMb) { $maxPnpMb = $mb }
+                                if ($span -gt 268435456 -or $start -ge [uint64]0x100000000) {
+                                    $foundLarge = $true
+                                }
+                            }
+                        }
+                    }
                 }
-                if ($maxBarBytes -gt 268435456) {
+                if ($foundLarge) {
                     $active = $true
-                    $details = ('PCI-Adressfenster: {0:N0} MB' -f ($maxBarBytes / 1MB))
-                } else {
-                    $active = $false
-                    $details = ('Max. PCI-Adressfenster: {0:N0} MB (<= 256 MB)' -f ($maxBarBytes / 1MB))
+                    if ($maxPnpMb -ge 1024) {
+                        $details = ('Großer Speicherbereich: {0:N0} MB' -f $maxPnpMb)
+                    } else {
+                        $details = 'Großer Speicherbereich (> 4 GB Adressierung)'
+                    }
                 }
             } catch { }
+        }
+
+        # 2. Fallback WMI: Alle Instanzen von Win32_DeviceMemoryAddress auf >= 1 GB prüfen
+        if (-not $active -and -not $nvEvaluated) {
+            try {
+                $allMem = & $getCim Win32_DeviceMemoryAddress
+                $maxWmiBytes = [uint64]0
+                foreach ($ma in $allMem) {
+                    $s = [uint64]$ma.StartingAddress
+                    $e = [uint64]$ma.EndingAddress
+                    if ($e -ge $s) {
+                        $sz = $e - $s + 1
+                        if ($sz -gt $maxWmiBytes) { $maxWmiBytes = $sz }
+                        if ($sz -ge 1073741824 -or $s -ge [uint64]0x100000000) {
+                            $active = $true
+                            $wmiMb = [int64][math]::Round($sz / 1MB)
+                            $details = ('Großer Speicherbereich: {0:N0} MB' -f $wmiMb)
+                            break
+                        }
+                    }
+                }
+            } catch { }
+        }
+
+        # 3. Fallback AMD Treiber-Registry: KMD_EnableSAM
+        if (-not $active -and -not $nvEvaluated -and $amdMatch) {
+            try {
+                $regClass = 'HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}'
+                if (Test-Path -LiteralPath $regClass) {
+                    $subKeys = @(Get-ChildItem -LiteralPath $regClass -ErrorAction SilentlyContinue | Where-Object { $_.PSChildName -match '^\d{4}$' })
+                    foreach ($sk in $subKeys) {
+                        $sam = (Get-ItemProperty -LiteralPath $sk.PSPath -Name 'KMD_EnableSAM' -ErrorAction SilentlyContinue).KMD_EnableSAM
+                        if ($sam -eq 1) {
+                            $active = $true
+                            if (-not $details) { $details = 'Smart Access Memory aktiv' }
+                            break
+                        }
+                    }
+                }
+            } catch { }
+        }
+
+        # 4. Falls inaktiv geblieben
+        if (-not $active -and -not $details) {
+            $details = 'Max. PCI-Adressfenster: <= 256 MB'
         }
     }
 
@@ -163,7 +254,6 @@ function Test-RebarStatus($GpuAdapter = $null, $CpuObj = $null, $BaseBoard = $nu
         CpuName       = $cpuName
     }
 }
-
 # WinSAT speichert die Treiberversion des gemessenen Adapters als 64-Bit-Zahl (4 x 16 Bit): 9007199261367216 = 32.0.101.7088
 function ConvertFrom-WinsatDriverVersion([string]$Text) {
     $v = [uint64]0
@@ -735,5 +825,3 @@ function Get-DisplayDiagnostics {
 
     return [pscustomobject]$res
 }
-
-

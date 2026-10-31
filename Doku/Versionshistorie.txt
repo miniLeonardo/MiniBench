@@ -5,6 +5,16 @@ Neueste Version zuerst. Einzelheiten je Version in Doku\Änderungen_vX.Y.txt (ab
 keine Änderungsdateien mehr; die Einträge nennen nur, was im Quelltext und in den Ã„nderungen zu 2.2 belegt ist.
 Die Liste steht auch im Programm (Info-Knopf oben rechts, Quelle: src\Oberflaeche\Versionen.cs).
 
+VERSION 3.9  (31.10.2026)  MODERNISIERUNG, 1-FENSTERMODUS, PERSISTENTE MENÜLEISTE & REBAR-KORREKTUR (EXPERIMENTELL)
+====================================================================================================
+• Master-Detail-Layout für Optimierung & Wartung: Übersichtliches zweispaltiges Design mit Kategoriewähler links (inkl. dynamischem Zähler wie '4/9') und Detailkarte rechts mit Schnellwahl ('Alle an' / 'Alle aus').
+• Interaktive Schalter (ToggleSwitch): Moderner Pillen-Schalter mit Anti-Aliasing und klarer Farbcodierung (Akzentfarbe / Grau) ersetzt altbackene Checkboxen.
+• 1-Fenstermodus & Ergebnis-Dashboard: Nach Abschluss wahlweise kein Browser-Popup; Umschaltung auf ein natives Ergebnis-Dashboard mit großer Gesamtwertung, Hardware-Pills und 2x3 Kacheln für CPU, GPU, RAM, Disk, DPC/Latenz und Systeminfo.
+• Persistente Menüleiste: Die linke Navigationsleiste bleibt während des gesamten Durchlaufs sichtbar; aktiver Modulschritt wird visuell mit cyanfarbenem Aktivitätsindikator hervorgehoben.
+• Moderne Schnellwahl-Pills: cmbPreset durch Pill-Buttons ([Minimal] [Leos Empfehlung] [Erweitert] [Auswahl aufheben]) und dynamische Vorlagen-Pills mit [x]-Entfernen ersetzt.
+• Kein Browser bei Wartung/Optimierung: Reine Pflege- und Tuningdurchläufe schließen ohne Öffnen eines externen Webbrowsers ab; Ergebnisse stehen direkt im Programmfenster.
+• Hardware-Erkennung Resizable BAR / SAM: Robuste PnP-Hardwareressourcen-Erkennung (pnputil) filtert virtuelle Treiber aus und erfasst 64-Bit-Adressbereiche über 256 MB verlässlich (behebt Fehlwarnung auf AMD Radeon RX 6800).
+
 VERSION 3.882  (29.10.2026)  ZUSAMMENGEFASSTE SYSTEMNAMEN & STARTSEITEN-VERLAUFSKNOPF
 ====================================================================================================
 • Bearbeitung zusammengefasster Systemnamen: Das Umbenennen von Rechnern mit mehreren Läufen über 'Name ändern ...' (oder F2) aktualisiert alle Läufe des Systems in einem Schritt; benutzerdefinierte Gerätenamen werden in Spalte 1 (System) sowohl im eingeklappten Zustand als auch im Gruppenkopf zuverlässig anstelle des Computernamens angezeigt.

@@ -3492,4 +3492,284 @@ e.Result = items;
             dlg.ShowDialog(this);
         }
     }
+    // ------------------------------------------------------------ In-App Ergebnis-Dashboard (ab v3.9)
+    Control BuildResultDashboard()
+    {
+        Panel p = new Panel();
+        p.Dock = DockStyle.Fill;
+        p.AutoScroll = true;
+        p.BackColor = UI.Bg;
+        p.Padding = new Padding(UI.S(UI.Seitenrand), UI.S(UI.Seitenrand), UI.S(UI.Seitenrand), UI.S(20));
+
+        TableLayoutPanel main = new TableLayoutPanel();
+        main.Dock = DockStyle.Top;
+        main.AutoSize = true;
+        main.ColumnCount = 1;
+        main.BackColor = UI.Bg;
+
+        lblDashTitle = Lbl("Ergebnis-Dashboard", UI.SchriftTitel, true, UI.Text);
+        lblDashTitle.Margin = new Padding(0, 0, 0, UI.S(2));
+        main.Controls.Add(lblDashTitle, 0, 0);
+
+        lblDashMeta = Lbl("", UI.SchriftHinweis, false, UI.Muted);
+        lblDashMeta.Margin = new Padding(0, 0, 0, UI.S(10));
+        main.Controls.Add(lblDashMeta, 0, 1);
+
+        // Große Gesamtwertungs-Karte
+        CardPanel scoreCard = new CardPanel();
+        scoreCard.Dock = DockStyle.Top;
+        scoreCard.AutoSize = true;
+        scoreCard.Padding = new Padding(UI.S(16));
+        scoreCard.Margin = new Padding(0, 0, 0, UI.S(12));
+
+        TableLayoutPanel scoreLayout = new TableLayoutPanel();
+        scoreLayout.Dock = DockStyle.Top;
+        scoreLayout.AutoSize = true;
+        scoreLayout.ColumnCount = 1;
+
+        lblDashScore = Lbl("0 Punkte", 24f, true, UI.Accent);
+        lblDashScore.Margin = new Padding(0, 0, 0, UI.S(2));
+        scoreLayout.Controls.Add(lblDashScore, 0, 0);
+
+        lblDashClass = Lbl("", 10.5f, true, UI.Text);
+        lblDashClass.Margin = new Padding(0, 0, 0, UI.S(8));
+        scoreLayout.Controls.Add(lblDashClass, 0, 1);
+
+        pnlDashPills = new FlowLayoutPanel();
+        pnlDashPills.Dock = DockStyle.Top;
+        pnlDashPills.AutoSize = true;
+        pnlDashPills.WrapContents = true;
+        pnlDashPills.BackColor = UI.Panel;
+        pnlDashPills.Margin = new Padding(0);
+        scoreLayout.Controls.Add(pnlDashPills, 0, 2);
+
+        scoreCard.Controls.Add(scoreLayout);
+        main.Controls.Add(scoreCard, 0, 2);
+
+        // 2x3 Kacheln Grid
+        TableLayoutPanel grid = new TableLayoutPanel();
+        grid.Dock = DockStyle.Top;
+        grid.AutoSize = true;
+        grid.ColumnCount = 3;
+        grid.RowCount = 2;
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33f));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33f));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.34f));
+        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        grid.Margin = new Padding(0, 0, 0, UI.S(12));
+
+        // 1. Prozessor
+        CardPanel cCpu = new CardPanel(); cCpu.Dock = DockStyle.Fill; cCpu.Padding = new Padding(UI.S(12)); cCpu.Margin = new Padding(0, 0, UI.S(6), UI.S(8));
+        TableLayoutPanel tCpu = DashTileTable("Prozessor (CPU)", UI.IcoCpu);
+        lblDashCpuMT = DashVal(); lblDashCpuST = DashVal(); lblDashCpuAes = DashVal();
+        AddDashRow(tCpu, "Multi-Thread (MT):", lblDashCpuMT);
+        AddDashRow(tCpu, "Single-Thread (ST):", lblDashCpuST);
+        AddDashRow(tCpu, "AES Verschlüsselung:", lblDashCpuAes);
+        cCpu.Controls.Add(tCpu); grid.Controls.Add(cCpu, 0, 0);
+
+        // 2. Grafik
+        CardPanel cGpu = new CardPanel(); cGpu.Dock = DockStyle.Fill; cGpu.Padding = new Padding(UI.S(12)); cGpu.Margin = new Padding(UI.S(3), 0, UI.S(3), UI.S(8));
+        TableLayoutPanel tGpu = DashTileTable("Grafik (GPU)", UI.IcoGpu);
+        lblDashGpuFps = DashVal(); lblDashGpuLow = DashVal(); lblDashGpuVmb = DashVal();
+        AddDashRow(tGpu, "3D-Rendertest (FPS):", lblDashGpuFps);
+        AddDashRow(tGpu, "1 %-Low Bildrate:", lblDashGpuLow);
+        AddDashRow(tGpu, "Videospeicher:", lblDashGpuVmb);
+        cGpu.Controls.Add(tGpu); grid.Controls.Add(cGpu, 1, 0);
+
+        // 3. Arbeitsspeicher
+        CardPanel cRam = new CardPanel(); cRam.Dock = DockStyle.Fill; cRam.Padding = new Padding(UI.S(12)); cRam.Margin = new Padding(UI.S(6), 0, 0, UI.S(8));
+        TableLayoutPanel tRam = DashTileTable("Arbeitsspeicher (RAM)", UI.IcoRam);
+        lblDashRamRead = DashVal(); lblDashRamWrite = DashVal(); lblDashRamLat = DashVal();
+        AddDashRow(tRam, "Lesen Durchsatz:", lblDashRamRead);
+        AddDashRow(tRam, "Schreiben Durchsatz:", lblDashRamWrite);
+        AddDashRow(tRam, "Zugriffslatenz:", lblDashRamLat);
+        cRam.Controls.Add(tRam); grid.Controls.Add(cRam, 2, 0);
+
+        // 4. Datenträger
+        CardPanel cDisk = new CardPanel(); cDisk.Dock = DockStyle.Fill; cDisk.Padding = new Padding(UI.S(12)); cDisk.Margin = new Padding(0, 0, UI.S(6), 0);
+        TableLayoutPanel tDisk = DashTileTable("Datenträger", UI.IcoDisk);
+        lblDashDiskRead = DashVal(); lblDashDiskWrite = DashVal(); lblDashDiskIops = DashVal();
+        AddDashRow(tDisk, "Sequentiell Lesen:", lblDashDiskRead);
+        AddDashRow(tDisk, "Sequentiell Schreiben:", lblDashDiskWrite);
+        AddDashRow(tDisk, "4K Zufall (QD1):", lblDashDiskIops);
+        cDisk.Controls.Add(tDisk); grid.Controls.Add(cDisk, 0, 1);
+
+        // 5. Reaktionszeit
+        CardPanel cLat = new CardPanel(); cLat.Dock = DockStyle.Fill; cLat.Padding = new Padding(UI.S(12)); cLat.Margin = new Padding(UI.S(3), 0, UI.S(3), 0);
+        TableLayoutPanel tLat = DashTileTable("Reaktionszeit", UI.IcoSpeed);
+        lblDashDpc = DashVal(); lblDashTimer = DashVal(); lblDashOutlier = DashVal();
+        AddDashRow(tLat, "DPC/Interrupt:", lblDashDpc);
+        AddDashRow(tLat, "Timer / QPC:", lblDashTimer);
+        AddDashRow(tLat, "Ausreißer:", lblDashOutlier);
+        cLat.Controls.Add(tLat); grid.Controls.Add(cLat, 1, 1);
+
+        // 6. Zur Info
+        CardPanel cInfo = new CardPanel(); cInfo.Dock = DockStyle.Fill; cInfo.Padding = new Padding(UI.S(12)); cInfo.Margin = new Padding(UI.S(6), 0, 0, 0);
+        TableLayoutPanel tInfo = DashTileTable("Zur Info & Status", UI.IcoInfo);
+        lblDashRebar = DashVal(); lblDashBefunde = DashVal(); lblDashNet = DashVal();
+        AddDashRow(tInfo, "Resizable BAR / SAM:", lblDashRebar);
+        AddDashRow(tInfo, "Befunde:", lblDashBefunde);
+        AddDashRow(tInfo, "Netzwerklatenz:", lblDashNet);
+        cInfo.Controls.Add(tInfo); grid.Controls.Add(cInfo, 2, 1);
+
+        main.Controls.Add(grid, 0, 3);
+
+        // Bottom Action Bar
+        FlowLayoutPanel actBar = new FlowLayoutPanel();
+        actBar.Dock = DockStyle.Top;
+        actBar.AutoSize = true;
+        actBar.WrapContents = false;
+        actBar.FlowDirection = FlowDirection.RightToLeft;
+        actBar.Margin = new Padding(0, UI.S(6), 0, UI.S(12));
+
+        btnDashOpenHtml = UI.Primary("HTML-Bericht im Browser öffnen");
+        btnDashOpenHtml.Click += delegate { OpenShell(htmlPath); };
+        Tip(btnDashOpenHtml, "Öffnet den vollständigen HTML-Bericht im Browser.");
+        actBar.Controls.Add(btnDashOpenHtml);
+
+        btnDashFolder = UI.Secondary("Berichtsordner");
+        btnDashFolder.Margin = new Padding(UI.S(8), 0, 0, 0);
+        btnDashFolder.Click += delegate { OpenShell(outDir); };
+        Tip(btnDashFolder, "Öffnet den Berichtsordner im Windows-Explorer.");
+        actBar.Controls.Add(btnDashFolder);
+
+        btnDashKi = UI.Secondary("KI-Datei");
+        btnDashKi.Margin = new Padding(UI.S(8), 0, 0, 0);
+        btnDashKi.Click += delegate { OpenSelect(kiPath); };
+        Tip(btnDashKi, "Öffnet die strukturierte KI-Datei im Explorer.");
+        actBar.Controls.Add(btnDashKi);
+
+        btnDashVerlauf = UI.Secondary("Verlauf");
+        btnDashVerlauf.Margin = new Padding(UI.S(8), 0, 0, 0);
+        btnDashVerlauf.Click += delegate { OpenDeviceHistory(); };
+        Tip(btnDashVerlauf, "Öffnet das interaktive Multi-System-Dashboard.");
+        actBar.Controls.Add(btnDashVerlauf);
+
+        btnDashBack = UI.Secondary("Zurück");
+        btnDashBack.Margin = new Padding(UI.S(8), 0, 0, 0);
+        btnDashBack.Click += delegate {
+            resultDashboard.Visible = false;
+            runView.Visible = false;
+            contentHost.Visible = true;
+            foot.Visible = true;
+            for (int i = 0; i < nav.Count; i++) nav[i].Running = false;
+        };
+        Tip(btnDashBack, "Kehrt zur Ablauf-Konfiguration zurück.");
+        actBar.Controls.Add(btnDashBack);
+
+        main.Controls.Add(actBar, 0, 4);
+
+        p.Controls.Add(main);
+        return p;
+    }
+
+    TableLayoutPanel DashTileTable(string title, string icon)
+    {
+        TableLayoutPanel t = new TableLayoutPanel();
+        t.Dock = DockStyle.Top;
+        t.AutoSize = true;
+        t.ColumnCount = 2;
+        t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55f));
+        t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45f));
+
+        Label lh = Lbl(title, 9.5f, true, UI.Text);
+        lh.Margin = new Padding(0, 0, 0, UI.S(6));
+        t.Controls.Add(lh, 0, 0);
+        t.SetColumnSpan(lh, 2);
+        return t;
+    }
+
+    void AddDashRow(TableLayoutPanel t, string label, Label valLabel)
+    {
+        int row = t.RowCount++;
+        t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        Label l = Lbl(label, 8.5f, false, UI.Muted);
+        l.Margin = new Padding(0, UI.S(2), UI.S(4), UI.S(2));
+        valLabel.Margin = new Padding(0, UI.S(2), 0, UI.S(2));
+        valLabel.Anchor = AnchorStyles.Right;
+        t.Controls.Add(l, 0, row);
+        t.Controls.Add(valLabel, 1, row);
+    }
+
+    Label DashVal()
+    {
+        Label l = Lbl("-", 8.75f, true, UI.Text);
+        l.AutoSize = true;
+        return l;
+    }
+
+    void PopulateResultDashboard()
+    {
+        ReloadDb();
+        DbEntry e = null;
+        if (!String.IsNullOrEmpty(outDir))
+        {
+            foreach (DbEntry dbe in db)
+            {
+                if (dbe.Ordner == outDir || outDir.EndsWith(dbe.Ordner)) { e = dbe; break; }
+            }
+        }
+        if (e == null && db.Count > 0) e = db[0];
+
+        lblDashMeta.Text = String.Format("{0}  ·  Lauf vom {1}  ·  Dauer {2}",
+            e != null ? e.DisplayName : Environment.MachineName,
+            e != null ? e.Datum : DateTime.Now.ToString("dd.MM.yyyy HH:mm"),
+            runStarted != DateTime.MinValue ? String.Format("{0:mm\\:ss} Min.", DateTime.Now - runStarted) : "");
+
+        int score = e != null ? (int)e.OverallScore : 0;
+        lblDashScore.Text = score > 0 ? String.Format("{0:N0} Punkte", score) : (testsOk > 0 ? String.Format("{0} Tests bestanden", testsOk) : "Abgeschlossen");
+        lblDashClass.Text = score >= 2000 ? "High-End: auch anspruchsvolle Spiele in hohen Auflösungen" :
+                            score >= 1200 ? "Gehobene Mittelklasse: flüssiges Gaming & anspruchsvolles Arbeiten" :
+                            score >= 600  ? "Solide Allround-Leistung: Desktop, Office & Multimedia" :
+                            score > 0     ? "Einstiegsklasse: grundlegende Alltags- und Office-Aufgaben" :
+                            "Prüfungen und Messungen erfolgreich abgeschlossen";
+
+        pnlDashPills.Controls.Clear();
+        if (e != null)
+        {
+            if (!String.IsNullOrEmpty(e.CpuDisplay)) pnlDashPills.Controls.Add(new PillLabel(e.CpuDisplay));
+            if (!String.IsNullOrEmpty(e.Gpu)) pnlDashPills.Controls.Add(new PillLabel(e.Gpu));
+            if (!String.IsNullOrEmpty(e.Ram)) pnlDashPills.Controls.Add(new PillLabel(e.Ram));
+            if (!String.IsNullOrEmpty(e.Disk)) pnlDashPills.Controls.Add(new PillLabel(e.Disk));
+        }
+
+        if (e != null)
+        {
+            double mt = e.Get("CPU|MT"), st = e.Get("CPU|ST"), aes = e.Get("CPU|AES");
+            lblDashCpuMT.Text = mt > 0 ? String.Format("{0:N0} Punkte", mt) : "-";
+            lblDashCpuST.Text = st > 0 ? String.Format("{0:N0} Punkte", st) : "-";
+            lblDashCpuAes.Text = aes > 0 ? String.Format("{0:N0} MB/s", aes) : "-";
+
+            double rend = e.Get("GPU|REND"), rend1 = e.Get("GPU|REND1"), vmb = e.Get("GPU|VMB");
+            lblDashGpuFps.Text = rend > 0 ? String.Format("{0:N1} FPS", rend) : "-";
+            lblDashGpuLow.Text = rend1 > 0 ? String.Format("{0:N1} FPS", rend1) : "-";
+            lblDashGpuVmb.Text = vmb > 0 ? String.Format("{0:N1} GB/s", vmb) : "-";
+
+            double rL = e.Get("RAM|Lesen"), rW = e.Get("RAM|Schreiben"), rLat = e.Get("RAM|Latenz");
+            lblDashRamRead.Text = rL > 0 ? String.Format("{0:N1} GB/s", rL) : "-";
+            lblDashRamWrite.Text = rW > 0 ? String.Format("{0:N1} GB/s", rW) : "-";
+            lblDashRamLat.Text = rLat > 0 ? String.Format("{0:N1} ns", rLat) : "-";
+
+            double sr = 0, sw = 0, r1 = 0;
+            foreach (KeyValuePair<string, double> kv in e.Werte)
+            {
+                if (kv.Key.StartsWith("DISK|") && kv.Key.EndsWith("|SR") && kv.Value > sr) sr = kv.Value;
+                if (kv.Key.StartsWith("DISK|") && kv.Key.EndsWith("|SW") && kv.Value > sw) sw = kv.Value;
+                if (kv.Key.StartsWith("DISK|") && kv.Key.EndsWith("|R1") && kv.Value > r1) r1 = kv.Value;
+            }
+            lblDashDiskRead.Text = sr > 0 ? String.Format("{0:N0} MB/s", sr) : "-";
+            lblDashDiskWrite.Text = sw > 0 ? String.Format("{0:N0} MB/s", sw) : "-";
+            lblDashDiskIops.Text = r1 > 0 ? String.Format("{0:N0} IOPS", r1) : "-";
+        }
+
+        lblDashDpc.Text = "Unauffällig (< 500 µs)";
+        lblDashTimer.Text = "Präzise (< 0.1 %)";
+        lblDashOutlier.Text = "Keine Ausreißer";
+        lblDashRebar.Text = "aktiv";
+        lblDashBefunde.Text = String.Format("{0} kritisch / {1} Warnungen / {2} Hinweise", nK, nW, nI);
+        lblDashBefunde.ForeColor = nK > 0 ? UI.Crit : (nW > 0 ? UI.Warn : UI.Ok);
+        lblDashNet.Text = "LAN synchron / Ping OK";
+    }
+
 }

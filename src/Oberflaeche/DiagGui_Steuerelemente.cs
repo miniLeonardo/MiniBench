@@ -1,4 +1,4 @@
-﻿// Grafische Oberflaeche: Steuerelemente
+// Grafische Oberflaeche: Steuerelemente
 public static class UI
 {
     public static bool IsDark { get; set; }
@@ -157,6 +157,14 @@ public static class UI
     public const string IcoHome = "\uE80F";
     public const string IcoSpeed = "\uEC4A";
     public const string IcoBackup = "\uEA35";
+    public const string IcoShield = "\uE730";
+    public const string IcoBell = "\uEA8F";
+    public const string IcoFolder = "\uE8B7";
+    public const string IcoRefresh = "\uE72C";
+    public const string IcoGear = "\uE713";
+    public const string IcoApp = "\uE71D";
+    public const string IcoCheck = "\uE73E";
+    public const string IcoTrash = "\uE74D";
 
     public static GraphicsPath Round(RectangleF r, float rad)
     {
@@ -840,7 +848,7 @@ public class DarkComboBox : ComboBox
     }
 }
 
-// Moderner Windows 11 Toggle-Switch (Wintoys-Look)
+// Moderner Windows 11 Toggle-Switch (Wintoys-Look, ab v3.9 mit UI.S(38) x UI.S(20))
 public class ToggleSwitch : Control
 {
     bool isChecked;
@@ -853,7 +861,7 @@ public class ToggleSwitch : Control
                  ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor | ControlStyles.Selectable, true);
         TabStop = true;
         Cursor = Cursors.Hand;
-        Size = new Size(UI.S(44), UI.S(24));
+        Size = new Size(UI.S(38), UI.S(20));
         BackColor = Color.Transparent;
     }
 
@@ -923,7 +931,7 @@ public class ToggleSwitch : Control
             else
             {
                 Color borderColor = hover ? (UI.IsDark ? Color.FromArgb(140, 140, 140) : Color.FromArgb(118, 118, 118)) : (UI.IsDark ? Color.FromArgb(80, 80, 80) : Color.FromArgb(209, 213, 219));
-                Color trackBg = UI.IsDark ? Color.FromArgb(45, 48, 52) : Color.White;
+                Color trackBg = UI.IsDark ? Color.FromArgb(50, 54, 62) : Color.FromArgb(226, 230, 236);
                 using (SolidBrush b = new SolidBrush(trackBg)) g.FillPath(b, trackPath);
                 using (Pen p = new Pen(borderColor, UI.SF(1.5f))) g.DrawPath(p, trackPath);
             }
@@ -936,9 +944,9 @@ public class ToggleSwitch : Control
             g.FillEllipse(sb, shadowRect);
         }
 
-        // Weißer Schieber-Knopf
+        // Knopffarbe
         RectangleF knobRect = new RectangleF(knobX, knobY, knobD, knobD);
-        Color knobColor = isChecked ? Color.White : (UI.IsDark ? Color.FromArgb(200, 205, 210) : Color.White);
+        Color knobColor = isChecked ? Color.White : (UI.IsDark ? Color.FromArgb(215, 220, 226) : Color.White);
         using (SolidBrush kb = new SolidBrush(knobColor))
         {
             g.FillEllipse(kb, knobRect);
@@ -964,6 +972,451 @@ public class ToggleSwitch : Control
         }
     }
 }
+
+// Moderner Pillen-Knopf (ab v3.9: Presets, Schnellwahl und Filter)
+public class PillButton : Control
+{
+    string text = "";
+    string icon = "";
+    bool active = false;
+    bool hover = false;
+    bool removable = false;
+    bool closeHover = false;
+    public event EventHandler RemoveClicked;
+    public event EventHandler Picked;
+
+    public PillButton(string text, bool active)
+    {
+        this.text = text ?? "";
+        this.active = active;
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable | ControlStyles.SupportsTransparentBackColor, true);
+        Cursor = Cursors.Hand;
+        BackColor = Color.Transparent;
+        Font = new Font("Segoe UI Semibold", 9f);
+        Height = UI.S(28);
+        Margin = new Padding(0, 0, UI.S(6), 0);
+        FitSize();
+    }
+    public PillButton(string text) : this(text, false) { }
+
+    public bool Active { get { return active; } set { if (active != value) { active = value; Invalidate(); } } }
+    public bool Removable { get { return removable; } set { if (removable != value) { removable = value; FitSize(); Invalidate(); } } }
+    public string Icon { get { return icon; } set { icon = value ?? ""; FitSize(); Invalidate(); } }
+    public override string Text { get { return text; } set { text = value ?? ""; FitSize(); Invalidate(); } }
+
+    void FitSize()
+    {
+        Size sz = TextRenderer.MeasureText(text, Font);
+        int w = sz.Width + UI.S(22);
+        if (!String.IsNullOrEmpty(icon)) w += UI.S(16);
+        if (removable) w += UI.S(18);
+        Size = new Size(Math.Max(UI.S(54), w), UI.S(28));
+    }
+
+    Rectangle CloseRect
+    {
+        get
+        {
+            int sz = UI.S(14);
+            return new Rectangle(Width - sz - UI.S(6), (Height - sz) / 2, sz, sz);
+        }
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        if (removable)
+        {
+            bool ch = CloseRect.Contains(e.Location);
+            if (ch != closeHover) { closeHover = ch; Invalidate(); }
+        }
+        base.OnMouseMove(e);
+    }
+
+    protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { hover = false; closeHover = false; Invalidate(); base.OnMouseLeave(e); }
+    protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
+    protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
+
+    protected override void OnMouseClick(MouseEventArgs e)
+    {
+        if (e.Button == MouseButtons.Left)
+        {
+            Focus();
+            if (removable && CloseRect.Contains(e.Location))
+            {
+                if (RemoveClicked != null) RemoveClicked(this, EventArgs.Empty);
+            }
+            else
+            {
+                if (Picked != null) Picked(this, EventArgs.Empty);
+            }
+        }
+        base.OnMouseClick(e);
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        if (e.KeyCode == Keys.Space || e.KeyCode == Keys.Enter)
+        {
+            if (Picked != null) Picked(this, EventArgs.Empty);
+            e.Handled = true;
+        }
+        base.OnKeyDown(e);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+        RectangleF r = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
+        float rad = (Height - 1.5f) / 2f;
+
+        Color bg = active ? (hover ? UI.AccentHover : UI.Accent) : (hover ? (UI.IsDark ? Color.FromArgb(48, 52, 58) : Color.FromArgb(235, 238, 243)) : (UI.IsDark ? Color.FromArgb(36, 38, 42) : Color.FromArgb(244, 246, 250)));
+        Color border = active ? UI.Accent : (hover ? UI.Accent : UI.Line);
+        Color fg = active ? UI.OnAccent : UI.Text;
+
+        using (GraphicsPath p = UI.Round(r, rad))
+        {
+            using (SolidBrush b = new SolidBrush(bg)) g.FillPath(b, p);
+            using (Pen pen = new Pen(border, 1f)) g.DrawPath(pen, p);
+        }
+
+        int x = UI.S(10);
+        if (!String.IsNullOrEmpty(icon))
+        {
+            int icoSize = UI.S(14);
+            using (Font ifont = UI.SymbolFont(UI.SF(9f)))
+            {
+                Rectangle icoR = new Rectangle(x, (Height - icoSize) / 2, icoSize, icoSize);
+                TextRenderer.DrawText(g, icon, ifont, icoR, fg, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            }
+            x += icoSize + UI.S(5);
+        }
+
+        int textW = Width - x - (removable ? UI.S(22) : UI.S(10));
+        TextRenderer.DrawText(g, text, Font, new Rectangle(x, 0, textW, Height), fg, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+
+        if (removable)
+        {
+            Rectangle cr = CloseRect;
+            if (closeHover)
+            {
+                using (GraphicsPath cp = UI.Round(new RectangleF(cr.X, cr.Y, cr.Width - 1, cr.Height - 1), (cr.Height - 1) / 2f))
+                using (SolidBrush cb = new SolidBrush(active ? Color.FromArgb(50, 0, 0, 0) : (UI.IsDark ? Color.FromArgb(70, 75, 80) : Color.FromArgb(210, 215, 220))))
+                    g.FillPath(cb, cp);
+            }
+            using (Font xf = new Font("Segoe UI", UI.SF(8f), FontStyle.Bold))
+            {
+                TextRenderer.DrawText(g, "×", xf, cr, active ? UI.OnAccent : UI.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            }
+        }
+    }
+}
+
+// Kategorien-Wähler für das Master-Detail-Layout (ab v3.9)
+public class CategoryPickerItem : Control
+{
+    string catKey = "";
+    string title = "";
+    string subtitle = "";
+    string icon = "";
+    int checkedCount = 0;
+    int totalCount = 0;
+    bool selected = false;
+    bool hover = false;
+    public event EventHandler Picked;
+
+    public CategoryPickerItem(string title, string icon) : this(title, title, icon) { }
+
+    public CategoryPickerItem(string key, string title, string icon)
+    {
+        this.catKey = key ?? "";
+        this.title = title ?? "";
+        this.icon = icon ?? "";
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
+        Cursor = Cursors.Hand;
+        Size = new Size(UI.S(218), UI.S(40));
+        Margin = new Padding(0, 0, 0, UI.S(4));
+        BackColor = UI.Panel;
+    }
+
+    public string CategoryKey { get { return catKey; } set { catKey = value ?? ""; } }
+    public string CategoryTitle { get { return title; } set { title = value ?? ""; Invalidate(); } }
+    public string Subtitle { get { return subtitle; } set { subtitle = value ?? ""; Invalidate(); } }
+    public string Icon { get { return icon; } set { icon = value ?? ""; Invalidate(); } }
+    public int CheckedCount { get { return checkedCount; } set { if (checkedCount != value) { checkedCount = value; Invalidate(); } } }
+    public int TotalCount { get { return totalCount; } set { if (totalCount != value) { totalCount = value; Invalidate(); } } }
+    public bool Selected { get { return selected; } set { if (selected != value) { selected = value; Invalidate(); } } }
+
+    public void SetCounts(int chk, int total)
+    {
+        checkedCount = chk;
+        totalCount = total;
+        Invalidate();
+    }
+
+    protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
+    protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
+    protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
+
+    protected override void OnMouseClick(MouseEventArgs e)
+    {
+        if (e.Button == MouseButtons.Left)
+        {
+            Focus();
+            if (Picked != null) Picked(this, EventArgs.Empty);
+        }
+        base.OnMouseClick(e);
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        if (e.KeyCode == Keys.Space || e.KeyCode == Keys.Enter)
+        {
+            if (Picked != null) Picked(this, EventArgs.Empty);
+            e.Handled = true;
+        }
+        base.OnKeyDown(e);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+        RectangleF r = new RectangleF(1, 1, Width - 3, Height - 3);
+        Color fill = selected ? UI.AccentSoft : (hover ? (UI.IsDark ? Color.FromArgb(44, 46, 50) : Color.FromArgb(242, 245, 249)) : UI.Panel);
+        Color borderPen = selected ? UI.Accent : (hover ? UI.Line : UI.Panel);
+
+        using (GraphicsPath p = UI.Round(r, UI.SF(6)))
+        {
+            using (SolidBrush b = new SolidBrush(fill)) g.FillPath(b, p);
+            using (Pen pen = new Pen(borderPen, 1f)) g.DrawPath(pen, p);
+        }
+
+        if (selected)
+        {
+            int barH = Height - UI.S(14);
+            RectangleF barR = new RectangleF(UI.S(3), (Height - barH) / 2f, UI.SF(3.5f), barH);
+            using (GraphicsPath bp = UI.Round(barR, UI.SF(1.5f)))
+            using (SolidBrush bb = new SolidBrush(UI.Accent))
+                g.FillPath(bb, bp);
+        }
+
+        int x = UI.S(12);
+        if (!String.IsNullOrEmpty(icon))
+        {
+            int icoSize = UI.S(20);
+            int icoY = (Height - icoSize) / 2;
+            using (Font ifont = UI.SymbolFont(UI.SF(11f)))
+            {
+                Rectangle icoR = new Rectangle(x, icoY, icoSize, icoSize);
+                TextRenderer.DrawText(g, icon, ifont, icoR, selected ? UI.Accent : UI.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            }
+            x += icoSize + UI.S(8);
+        }
+
+        string badgeText = String.Format("{0}/{1}", checkedCount, totalCount);
+        int badgeW = 0;
+        using (Font fb = new Font("Segoe UI Semibold", UI.SF(8f)))
+        {
+            Size bsz = TextRenderer.MeasureText(g, badgeText, fb, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding);
+            badgeW = bsz.Width + UI.S(12);
+            int badgeH = Math.Max(UI.S(18), bsz.Height + UI.S(4));
+            int badgeX = Width - badgeW - UI.S(8);
+            int badgeY = (Height - badgeH) / 2;
+            Rectangle br = new Rectangle(badgeX, badgeY, badgeW, badgeH);
+
+            Color bbg = checkedCount > 0 ? (selected ? UI.Accent : (UI.IsDark ? Color.FromArgb(20, 60, 55) : Color.FromArgb(220, 245, 240))) : (UI.IsDark ? Color.FromArgb(42, 45, 50) : Color.FromArgb(230, 233, 238));
+            Color bfg = checkedCount > 0 ? (selected ? UI.OnAccent : (UI.IsDark ? Color.FromArgb(0, 210, 180) : Color.FromArgb(0, 128, 110))) : UI.Muted;
+
+            using (GraphicsPath bp = UI.Round(new RectangleF(br.X, br.Y, br.Width - 1, br.Height - 1), (badgeH - 1) / 2f))
+            using (SolidBrush sb = new SolidBrush(bbg))
+                g.FillPath(sb, bp);
+
+            TextRenderer.DrawText(g, badgeText, fb, br, bfg, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+        }
+
+        int textW = Width - x - badgeW - UI.S(14);
+        using (Font ft = new Font("Segoe UI Semibold", UI.SF(9f)))
+        {
+            Color titleColor = selected ? (UI.IsDark ? UI.Accent : UI.AccentDark) : UI.Text;
+            TextRenderer.DrawText(g, title, ft, new Rectangle(x, 0, Math.Max(10, textW), Height), titleColor, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        }
+    }
+}
+
+// Einstellungs-Zeile in der Master-Detail-Ansicht (ab v3.9)
+public class SettingRow : Control
+{
+    string title = "";
+    string desc = "";
+    ToggleSwitch toggle;
+    List<Badge> badges = new List<Badge>();
+    bool hover;
+    public event EventHandler CheckedChanged;
+
+    public SettingRow(string title, string desc) : this(title, desc, null) { }
+
+    public SettingRow(string title, string desc, ToggleSwitch toggle)
+    {
+        this.title = title ?? "";
+        this.desc = desc ?? "";
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
+        Cursor = Cursors.Hand;
+        BackColor = UI.Panel;
+        Margin = new Padding(0, 0, 0, UI.S(4));
+
+        this.toggle = toggle ?? new ToggleSwitch();
+        this.toggle.CheckedChanged += delegate {
+            if (CheckedChanged != null) CheckedChanged(this, EventArgs.Empty);
+            Invalidate();
+        };
+        Controls.Add(this.toggle);
+        RecalcHeight();
+    }
+
+    public string Title { get { return title; } set { title = value ?? ""; Invalidate(); } }
+    public string Description { get { return desc; } set { desc = value ?? ""; RecalcHeight(); Invalidate(); } }
+    public ToggleSwitch Toggle { get { return toggle; } }
+    public bool Checked
+    {
+        get { return toggle != null && toggle.Checked; }
+        set { if (toggle != null) toggle.Checked = value; }
+    }
+
+    public void AddBadge(Badge b)
+    {
+        if (b == null) return;
+        badges.Add(b);
+        Controls.Add(b);
+        LayoutControls();
+    }
+
+    public void ClearBadges()
+    {
+        foreach (Badge b in badges) Controls.Remove(b);
+        badges.Clear();
+        LayoutControls();
+    }
+
+    void RecalcHeight()
+    {
+        using (Graphics g = CreateGraphics())
+        using (Font fd = new Font("Segoe UI", UI.SF(8.5f)))
+        {
+            int textW = Math.Max(UI.S(120), Width - UI.S(220));
+            Size dsz = TextRenderer.MeasureText(g, desc, fd, new Size(textW, int.MaxValue), TextFormatFlags.WordBreak);
+            Height = Math.Max(UI.S(46), UI.S(24) + dsz.Height);
+        }
+        LayoutControls();
+    }
+
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+        LayoutControls();
+    }
+
+    void LayoutControls()
+    {
+        int curRight = Width - UI.S(12);
+        if (toggle != null)
+        {
+            toggle.Location = new Point(curRight - toggle.Width, (Height - toggle.Height) / 2);
+            curRight -= toggle.Width + UI.S(10);
+        }
+        for (int i = badges.Count - 1; i >= 0; i--)
+        {
+            Badge b = badges[i];
+            if (b != null && b.Visible)
+            {
+                b.Location = new Point(curRight - b.Width, (Height - b.Height) / 2);
+                curRight -= b.Width + UI.S(6);
+            }
+        }
+    }
+
+    protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
+    protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
+    protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
+
+    protected override void OnMouseClick(MouseEventArgs e)
+    {
+        if (e.Button == MouseButtons.Left)
+        {
+            Focus();
+            if (toggle != null) toggle.Checked = !toggle.Checked;
+        }
+        base.OnMouseClick(e);
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        if (e.KeyCode == Keys.Space)
+        {
+            if (toggle != null) toggle.Checked = !toggle.Checked;
+            e.Handled = true;
+        }
+        base.OnKeyDown(e);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+        RectangleF r = new RectangleF(1, 1, Width - 3, Height - 3);
+        Color bg = hover ? (UI.IsDark ? Color.FromArgb(42, 44, 48) : Color.FromArgb(246, 248, 252)) : UI.Panel;
+        Color border = hover ? (UI.IsDark ? Color.FromArgb(70, 74, 80) : Color.FromArgb(215, 219, 226)) : UI.Line;
+
+        using (GraphicsPath p = UI.Round(r, UI.SF(6)))
+        {
+            using (SolidBrush b = new SolidBrush(bg)) g.FillPath(b, p);
+            using (Pen pen = new Pen(border, 1f)) g.DrawPath(pen, p);
+        }
+
+        int curX = UI.S(12);
+        int rightBound = Width - UI.S(16);
+        if (toggle != null) rightBound = Math.Min(rightBound, toggle.Left);
+        for (int i = 0; i < badges.Count; i++) if (badges[i] != null && badges[i].Visible) rightBound = Math.Min(rightBound, badges[i].Left);
+        rightBound -= UI.S(10);
+        int textW = Math.Max(UI.S(50), rightBound - curX);
+
+        using (Font ft = new Font("Segoe UI Semibold", UI.SF(9.5f)))
+        {
+            Size tsz = TextRenderer.MeasureText(g, title, ft);
+            int titleH = Math.Max(tsz.Height, UI.S(18));
+            int startY = String.IsNullOrEmpty(desc) ? (Height - titleH) / 2 : UI.S(8);
+            TextRenderer.DrawText(g, title, ft, new Rectangle(curX, startY, textW, titleH), UI.Text, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+
+            if (!String.IsNullOrEmpty(desc))
+            {
+                using (Font fd = new Font("Segoe UI", UI.SF(8.25f)))
+                {
+                    int descY = startY + titleH + UI.S(1);
+                    TextRenderer.DrawText(g, desc, fd, new Rectangle(curX, descY, textW, Height - descY - UI.S(2)), UI.Muted, TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);
+                }
+            }
+        }
+
+        if (Focused)
+        {
+            using (Pen fp = new Pen(UI.Accent, 1f))
+            {
+                fp.DashStyle = DashStyle.Dot;
+                g.DrawRectangle(fp, 2, 2, Width - 5, Height - 5);
+            }
+        }
+    }
+}
+
 
 // Moderne Fluent-Kartenansicht (Wintoys-Look)
 public class FluentCard : Control
@@ -1217,7 +1670,7 @@ class FlatBar : Control
 // Eintrag der Modulnavigation: moderner Windows 11-Sidebar-Stil
 class NavItem : Control
 {
-    bool sel, hover, chk;
+    bool sel, hover, chk, running;
     public string Title, Desc, Icon;
     // ab v3.64: kurzer Zusatz rechts im Eintrag, etwa die geschätzte Dauer eines angehakten Moduls
     public string Hint = "";
@@ -1231,6 +1684,7 @@ class NavItem : Control
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
         Cursor = Cursors.Hand; Size = new Size(UI.S(226), UI.S(40)); Margin = new Padding(0, 0, 0, UI.S(4)); BackColor = UI.Bg;
     }
+    public bool Running { get { return running; } set { if (running != value) { running = value; Invalidate(); } } }
     public bool Selected { get { return sel; } set { sel = value; Invalidate(); } }
     public bool Checked
     {
@@ -1269,6 +1723,13 @@ class NavItem : Control
         }
 
         // Bei Auswahl: Links ein 3 px breiter, abgerundeter blauer Akzentbalken
+        if (running)
+        {
+            int dotSz = UI.S(8);
+            int dotX = Width - UI.S(16);
+            int dotY = (Height - dotSz) / 2;
+            using (SolidBrush db = new SolidBrush(UI.Accent)) g.FillEllipse(db, dotX, dotY, dotSz, dotSz);
+        }
         if (sel)
         {
             int barH = Height - UI.S(16);

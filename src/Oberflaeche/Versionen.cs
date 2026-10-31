@@ -11,6 +11,14 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("3.9", "31.10.2026", "Modernisierung, 1-Fenstermodus, persistente Menüleiste & ReBAR-Korrektur (Experimentell)",
+            "• Master-Detail-Layout für Optimierung & Wartung: Übersichtliches zweispaltiges Design mit Kategoriewähler links (inkl. dynamischem Zähler wie '4/9') und Detailkarte rechts mit Schnellwahl ('Alle an' / 'Alle aus').\r\n" +
+            "• Interaktive Schalter (ToggleSwitch): Moderner Pillen-Schalter mit Anti-Aliasing und klarer Farbcodierung (Akzentfarbe / Grau) ersetzt altbackene Checkboxen.\r\n" +
+            "• 1-Fenstermodus & Ergebnis-Dashboard: Nach Abschluss wahlweise kein Browser-Popup; Umschaltung auf ein natives Ergebnis-Dashboard mit großer Gesamtwertung, Hardware-Pills und 2x3 Kacheln für CPU, GPU, RAM, Disk, DPC/Latenz und Systeminfo.\r\n" +
+            "• Persistente Menüleiste: Die linke Navigationsleiste bleibt während des gesamten Durchlaufs sichtbar; aktiver Modulschritt wird visuell mit cyanfarbenem Aktivitätsindikator hervorgehoben.\r\n" +
+            "• Moderne Schnellwahl-Pills: cmbPreset durch Pill-Buttons ([Minimal] [Leos Empfehlung] [Erweitert] [Auswahl aufheben]) und dynamische Vorlagen-Pills mit [x]-Entfernen ersetzt.\r\n" +
+            "• Kein Browser bei Wartung/Optimierung: Reine Pflege- und Tuningdurchläufe schließen ohne Öffnen eines externen Webbrowsers ab; Ergebnisse stehen direkt im Programmfenster.\r\n" +
+            "• Hardware-Erkennung Resizable BAR / SAM: Robuste PnP-Hardwareressourcen-Erkennung (pnputil) filtert virtuelle Treiber aus und erfasst 64-Bit-Adressbereiche über 256 MB verlässlich (behebt Fehlwarnung auf AMD Radeon RX 6800)."),
         new Eintrag("3.882", "29.10.2026", "Zusammengefasste Systemnamen & Startseiten-Verlaufsknopf",
             "• Bearbeitung zusammengefasster Systemnamen: Das Umbenennen von Rechnern mit mehreren Läufen über 'Name ändern ...' (oder F2) aktualisiert alle Läufe des Systems in einem Schritt; benutzerdefinierte Gerätenamen werden in Spalte 1 (System) sowohl im eingeklappten Zustand als auch im Gruppenkopf zuverlässig anstelle des Computernamens angezeigt.\r\n" +
             "• Startseiten-Aktionsleiste: Das Layout der Kachel 'Letzter Lauf' wurde flexibilisiert (55 % Spaltenbreite im 2x2-Grid, AutoSize für den Tastenbereich und DockStyle.Fill für die Befundanzeige); die Schaltfläche 'Verlauf' wird auf allen DPI-Skalierungen vollständig und unbeschnitten dargestellt.\r\n" +

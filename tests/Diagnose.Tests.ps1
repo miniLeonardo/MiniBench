@@ -1,4 +1,8 @@
 ﻿# Fachgebiet Diagnose: Startzeit-Analyse, schnell behebbare Konfigurationsfehler (v3.7)
+        if (-not (Get-Command Get-PnpDisplayResources -ErrorAction SilentlyContinue)) {
+            function global:Get-PnpDisplayResources { @() }
+        }
+        Mock Get-PnpDisplayResources { @() }
 
 BeforeAll {
     . (Join-Path $PSScriptRoot 'Hilfen.ps1')
@@ -234,6 +238,28 @@ Describe 'Resizable BAR / SAM Erkennung (Test-RebarStatus)' {
         $res = Test-RebarStatus -GpuAdapter $gpu -CpuObj $cpu -BaseBoard $bb
         $res.Supported | Should -BeTrue
         $res.Active | Should -BeTrue
+    }
+
+    It 'erkennt aktives ReBAR / SAM auf AMD Radeon RX 6800 mit pnputil (TORRENT)' {
+        $gpu = [pscustomobject]@{ Name = 'AMD Radeon RX 6800'; DriverVersion = '31.0.21029.1006' }
+        $cpu = [pscustomobject]@{ Name = 'AMD Ryzen 5 7600X 6-Core Processor' }
+        $bb  = [pscustomobject]@{ Product = 'B650 GAMING X AX' }
+
+        Mock Get-PnpDisplayResources {
+            @(
+                'Instance ID:                PCI\VEN_1002&DEV_73BF&SUBSYS_058B1002&REV_C1\6&3b610c5&0&00000019'
+                'Device Description:         AMD Radeon RX 6800'
+                'Class Name:                 Display'
+                'Memory Resources:           0x0000000800000000 - 0x0000000BFFFFFFFF'
+            )
+        }
+
+        $res = Test-RebarStatus -GpuAdapter $gpu -CpuObj $cpu -BaseBoard $bb
+        $res.Supported | Should -BeTrue
+        $res.GpuSupported | Should -BeTrue
+        $res.CpuSupported | Should -BeTrue
+        $res.Active | Should -BeTrue
+        $res.Details | Should -Match '16'
     }
 
     It 'meldet Nicht unterstuetzt bei aelterer Hardware (z.B. GTX 1080 + Core i7 7th Gen)' {

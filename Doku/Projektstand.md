@@ -2,7 +2,20 @@
 
 Gemeinsamer Stand für alle Agenten (Claude, Antigravity). Wird am Ende jeder Version aktualisiert (siehe AGENTS.md).
 
-## Stand: Version 3.882 (29.10.2026)
+## Stand: Version 3.9 (31.10.2026) - Experimentell
+Experimentelle Version. Modernisierung, 1-Fenstermodus, persistente Menüleiste & ReBAR-Korrektur auf https://github.com/miniLeonardo/MiniBench (Zweig main).
+Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.
+
+Inhalt von 3.9 (Einzelheiten in Doku\Änderungen_v3.9.txt):
+1. Master-Detail-Layout für Optimierung & Wartung: Übersichtliches zweispaltiges Design mit Kategoriewähler links (inkl. dynamischem Zähler wie '4/9') und Detailkarte rechts mit Schnellwahl ('Alle an' / 'Alle aus').
+2. Interaktive Schalter (ToggleSwitch): Moderner Pillen-Schalter mit Anti-Aliasing und klarer Farbcodierung (Akzentfarbe / Grau) ersetzt altbackene Checkboxen.
+3. 1-Fenstermodus & Ergebnis-Dashboard: Nach Abschluss wahlweise kein Browser-Popup; Umschaltung auf ein natives Ergebnis-Dashboard mit großer Gesamtwertung, Hardware-Pills und 2x3 Kacheln für CPU, GPU, RAM, Disk, DPC/Latenz und Systeminfo.
+4. Persistente Menüleiste: Die linke Navigationsleiste bleibt während des gesamten Durchlaufs sichtbar; aktiver Modulschritt wird visuell mit cyanfarbenem Aktivitätsindikator hervorgehoben.
+5. Moderne Schnellwahl-Pills: cmbPreset durch Pill-Buttons ([Minimal] [Leos Empfehlung] [Erweitert] [Auswahl aufheben]) und dynamische Vorlagen-Pills mit [x]-Entfernen ersetzt.
+6. Kein Browser bei Wartung/Optimierung: Reine Pflege- und Tuningdurchläufe schließen ohne Öffnen eines externen Webbrowsers ab; Ergebnisse stehen direkt im Programmfenster.
+7. Hardware-Erkennung Resizable BAR / SAM: Robuste PnP-Hardwareressourcen-Erkennung (pnputil) filtert virtuelle Treiber aus und erfasst 64-Bit-Adressbereiche über 256 MB verlässlich (behebt Fehlwarnung auf AMD Radeon RX 6800).
+
+## Vorher: Version 3.882 (29.10.2026)
 Release-Commit "Release v3.882: Zusammengefasste Systemnamen & Startseiten-Verlaufsknopf" (Commit b582625) auf https://github.com/miniLeonardo/MiniBench (Zweig main).
 Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.
 
