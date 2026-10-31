@@ -1,0 +1,66 @@
+﻿LEOS MINIBENCH 3.91: ÄNDERUNGEN
+===============================
+
+Version 3.91 optimiert die Benutzeroberfläche von Leos Minibench auf Basis von Praxistests und Rückmeldungen:
+Vergrößerung und Entflechtung der Kacheln auf dem Ergebnis-Dashboard (kein Abschneiden oder Überlaufen von Metriken mehr),
+Entfernung der subjektiven Leistungsklassifizierung, Verschlankung aller Einstellungszeilen auf den Seiten Optimierung
+und Wartung mit vollständiger Auslagerung technischer Registry-Pfade in Hover-Tooltips, Verlagerung der Master-Detail-
+Kategorieauswahl an den oberen Fensterrand sowie vollständige Beseitigung von Zeichensatz-Fehlern (Mojibake).
+
+
+1. ERGEBNIS-DASHBOARD: INFOBOXEN & GESTALTUNG
+  Vergrößerte Kacheln         Die sechs Infokacheln (Prozessor, Grafik, Arbeitsspeicher, Datenträger, Reaktionszeit,
+                              Zur Info) besitzen eine großzügige Mindesthöhe (UI.S(132)) und optimierte Innenabstände.
+  Überlaufschutz              Die linke Spalte jeder Kachel skaliert per AutoSize auf die genaue Breite der Metrik-
+                              Bezeichnung. Die rechte Wertspalte erhält 100 % der verbleibenden Breite, sodass auch längere
+                              Statustexte wie „0 kritisch / 0 Warnungen / 5 Hinweise“ oder Latenzangaben rechtsbündig
+                              ohne Umbruch oder Abschneiden dargestellt werden.
+  Klassifizierung entfernt    Die subjektive Einstufungszeile unter der Gesamtpunktzahl („High-End: auch anspruchsvolle
+                              Spiele in hohen Auflösungen“) wurde vollständig entfernt. Die Gesamtpunktzahl steht
+                              dominant und sachlich über den Hardware-Spezifikationen.
+
+
+2. SCHLANKES MASTER-DETAIL-LAYOUT (OPTIMIERUNG & WARTUNG)
+  Direkter Einstieg oben      Die zweispaltige Master-Detail-Auswahl (Kategoriewähler links, Detailkarte rechts) steht
+                              auf den Seiten Optimierung und Wartung unmittelbar nach der Seiteneinleitung ganz oben.
+  Schlanke Einstellungszeilen Technische Registry-Pfade, Befehlszeilen und Quellverweise wurden aus der Fließtextanzeige
+                              der Einstellungszeilen entfernt und in Hover-Tooltips ausgelagert. Jede Zeile zeigt nur noch
+                              den prägnanten Titel und eine einzeilige, verständliche Kurzerklärung.
+  Kompakte Zeilenhöhe         Die Zeilenhöhe ist auf 42 bis 52 px begrenzt. Dadurch sind sechs bis acht Optionen
+                              gleichzeitig im Sichtfeld, ohne dass der Nutzer scrollen muss.
+  Geordnete Fußbereiche       Vorlagen-Pills ([Minimal], [Leos Empfehlung], [Erweitert], [Auswahl aufheben]), Aktionen
+                              ([Zustand prüfen], [Werkzeuge holen …]), Absicherung (Systemwiederherstellungspunkt) und
+                              Risikolegende schließen geordnet und übersichtlich unterhalb des Master-Detail-Bereichs an.
+
+
+3. ZEICHENSATZ-BEREINIGUNG (MOJIBAKE-KORREKTUR)
+  Fehlerfreie Umlaute         Beseitigung aller UTF-8-Doppelkodierungen in der Fußleiste („Speichern …“), auf den
+                              Einstellungsseiten („Zustand prüfen“, „Werkzeuge holen …“, „gewählt“, „löschen“) und in den
+                              Laufzeit-Diagrammen (Verlaufs-Tooltips).
+  Robuste Sonderzeichen       Sonderzeichen (Auslassungspunkte, Aufzählungspunkte, Spiegelstriche) werden in der
+                              Oberfläche über standardisierte Unicode-Sequenzen bereitgestellt, um Plattform- und
+                              Kompilierungsinkonsistenzen dauerhaft auszuschließen.
+
+
+GEFUNDEN UND BEHOBEN
+  Überlappende Dashboard-Kacheln: Durch eine fehlerhafte Zeilenindizierung in TableLayoutPanel überlagerten sich die
+  Kachelüberschrift und die erste Metrikzeile in Zelle (0, 0), was zu horizontalen Verschiebungen und abgeschnittenem
+  Text führte.
+  Subjektive Klassifizierung: Die Textzeile unter der Punktzahl wirkte deplatziert und wurde entfernt.
+  Überfrachtete Einstellungszeilen: Lange Registry-Befehle blähten einzelne Einstellungszeilen auf über 200 px auf.
+  Ungünstige Layout-Reihenfolge: Vorlagen und Absicherung verdrängten die Master-Detail-Auswahl in die untere Fensterhälfte.
+  Zeichensatz-Artefakte: Doppelt kodierte Umlaute in Schaltflächen und Hinweistexten wurden behoben.
+
+
+GRENZEN
+  Die Kurzbeschreibungen in den Zeilen bieten einen schnellen Überblick; exakte Schlüssel, Pfade und Werte stehen
+  vollständig im Tooltip beim Überfahren mit der Maus zur Verfügung.
+
+
+UMSTIEG
+  Bestehende Voreinstellungen und gespeicherte Konfigurationen bleiben uneingeschränkt kompatibel.
+
+
+QUELLEN
+  Microsoft .NET Windows Forms: TableLayoutPanel AutoSize Layout Mechanics
+  Microsoft Windows Hardware Developer Documentation: User Interface Guidelines

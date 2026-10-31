@@ -1,4 +1,4 @@
-﻿// Seiten der grafischen Oberfläche: Versionen und Änderungen (Teilklasse DiagGui)
+// Seiten der grafischen Oberfläche: Versionen und Änderungen (Teilklasse DiagGui)
 public partial class DiagGui
 {
     Control BuildVersionPage()
@@ -3519,7 +3519,7 @@ e.Result = items;
         CardPanel scoreCard = new CardPanel();
         scoreCard.Dock = DockStyle.Top;
         scoreCard.AutoSize = true;
-        scoreCard.Padding = new Padding(UI.S(16));
+        scoreCard.Padding = new Padding(UI.S(16), UI.S(14), UI.S(16), UI.S(14));
         scoreCard.Margin = new Padding(0, 0, 0, UI.S(12));
 
         TableLayoutPanel scoreLayout = new TableLayoutPanel();
@@ -3528,12 +3528,8 @@ e.Result = items;
         scoreLayout.ColumnCount = 1;
 
         lblDashScore = Lbl("0 Punkte", 24f, true, UI.Accent);
-        lblDashScore.Margin = new Padding(0, 0, 0, UI.S(2));
+        lblDashScore.Margin = new Padding(0, 0, 0, UI.S(6));
         scoreLayout.Controls.Add(lblDashScore, 0, 0);
-
-        lblDashClass = Lbl("", 10.5f, true, UI.Text);
-        lblDashClass.Margin = new Padding(0, 0, 0, UI.S(8));
-        scoreLayout.Controls.Add(lblDashClass, 0, 1);
 
         pnlDashPills = new FlowLayoutPanel();
         pnlDashPills.Dock = DockStyle.Top;
@@ -3541,7 +3537,7 @@ e.Result = items;
         pnlDashPills.WrapContents = true;
         pnlDashPills.BackColor = UI.Panel;
         pnlDashPills.Margin = new Padding(0);
-        scoreLayout.Controls.Add(pnlDashPills, 0, 2);
+        scoreLayout.Controls.Add(pnlDashPills, 0, 1);
 
         scoreCard.Controls.Add(scoreLayout);
         main.Controls.Add(scoreCard, 0, 2);
@@ -3560,7 +3556,7 @@ e.Result = items;
         grid.Margin = new Padding(0, 0, 0, UI.S(12));
 
         // 1. Prozessor
-        CardPanel cCpu = new CardPanel(); cCpu.Dock = DockStyle.Fill; cCpu.Padding = new Padding(UI.S(12)); cCpu.Margin = new Padding(0, 0, UI.S(6), UI.S(8));
+        CardPanel cCpu = new CardPanel(); cCpu.Dock = DockStyle.Fill; cCpu.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12)); cCpu.MinimumSize = new Size(0, UI.S(132)); cCpu.Margin = new Padding(0, 0, UI.S(6), UI.S(8));
         TableLayoutPanel tCpu = DashTileTable("Prozessor (CPU)", UI.IcoCpu);
         lblDashCpuMT = DashVal(); lblDashCpuST = DashVal(); lblDashCpuAes = DashVal();
         AddDashRow(tCpu, "Multi-Thread (MT):", lblDashCpuMT);
@@ -3569,7 +3565,7 @@ e.Result = items;
         cCpu.Controls.Add(tCpu); grid.Controls.Add(cCpu, 0, 0);
 
         // 2. Grafik
-        CardPanel cGpu = new CardPanel(); cGpu.Dock = DockStyle.Fill; cGpu.Padding = new Padding(UI.S(12)); cGpu.Margin = new Padding(UI.S(3), 0, UI.S(3), UI.S(8));
+        CardPanel cGpu = new CardPanel(); cGpu.Dock = DockStyle.Fill; cGpu.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12)); cGpu.MinimumSize = new Size(0, UI.S(132)); cGpu.Margin = new Padding(UI.S(3), 0, UI.S(3), UI.S(8));
         TableLayoutPanel tGpu = DashTileTable("Grafik (GPU)", UI.IcoGpu);
         lblDashGpuFps = DashVal(); lblDashGpuLow = DashVal(); lblDashGpuVmb = DashVal();
         AddDashRow(tGpu, "3D-Rendertest (FPS):", lblDashGpuFps);
@@ -3578,7 +3574,7 @@ e.Result = items;
         cGpu.Controls.Add(tGpu); grid.Controls.Add(cGpu, 1, 0);
 
         // 3. Arbeitsspeicher
-        CardPanel cRam = new CardPanel(); cRam.Dock = DockStyle.Fill; cRam.Padding = new Padding(UI.S(12)); cRam.Margin = new Padding(UI.S(6), 0, 0, UI.S(8));
+        CardPanel cRam = new CardPanel(); cRam.Dock = DockStyle.Fill; cRam.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12)); cRam.MinimumSize = new Size(0, UI.S(132)); cRam.Margin = new Padding(UI.S(6), 0, 0, UI.S(8));
         TableLayoutPanel tRam = DashTileTable("Arbeitsspeicher (RAM)", UI.IcoRam);
         lblDashRamRead = DashVal(); lblDashRamWrite = DashVal(); lblDashRamLat = DashVal();
         AddDashRow(tRam, "Lesen Durchsatz:", lblDashRamRead);
@@ -3587,7 +3583,7 @@ e.Result = items;
         cRam.Controls.Add(tRam); grid.Controls.Add(cRam, 2, 0);
 
         // 4. Datenträger
-        CardPanel cDisk = new CardPanel(); cDisk.Dock = DockStyle.Fill; cDisk.Padding = new Padding(UI.S(12)); cDisk.Margin = new Padding(0, 0, UI.S(6), 0);
+        CardPanel cDisk = new CardPanel(); cDisk.Dock = DockStyle.Fill; cDisk.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12)); cDisk.MinimumSize = new Size(0, UI.S(132)); cDisk.Margin = new Padding(0, 0, UI.S(6), 0);
         TableLayoutPanel tDisk = DashTileTable("Datenträger", UI.IcoDisk);
         lblDashDiskRead = DashVal(); lblDashDiskWrite = DashVal(); lblDashDiskIops = DashVal();
         AddDashRow(tDisk, "Sequentiell Lesen:", lblDashDiskRead);
@@ -3596,7 +3592,7 @@ e.Result = items;
         cDisk.Controls.Add(tDisk); grid.Controls.Add(cDisk, 0, 1);
 
         // 5. Reaktionszeit
-        CardPanel cLat = new CardPanel(); cLat.Dock = DockStyle.Fill; cLat.Padding = new Padding(UI.S(12)); cLat.Margin = new Padding(UI.S(3), 0, UI.S(3), 0);
+        CardPanel cLat = new CardPanel(); cLat.Dock = DockStyle.Fill; cLat.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12)); cLat.MinimumSize = new Size(0, UI.S(132)); cLat.Margin = new Padding(UI.S(3), 0, UI.S(3), 0);
         TableLayoutPanel tLat = DashTileTable("Reaktionszeit", UI.IcoSpeed);
         lblDashDpc = DashVal(); lblDashTimer = DashVal(); lblDashOutlier = DashVal();
         AddDashRow(tLat, "DPC/Interrupt:", lblDashDpc);
@@ -3605,7 +3601,7 @@ e.Result = items;
         cLat.Controls.Add(tLat); grid.Controls.Add(cLat, 1, 1);
 
         // 6. Zur Info
-        CardPanel cInfo = new CardPanel(); cInfo.Dock = DockStyle.Fill; cInfo.Padding = new Padding(UI.S(12)); cInfo.Margin = new Padding(UI.S(6), 0, 0, 0);
+        CardPanel cInfo = new CardPanel(); cInfo.Dock = DockStyle.Fill; cInfo.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12)); cInfo.MinimumSize = new Size(0, UI.S(132)); cInfo.Margin = new Padding(UI.S(6), 0, 0, 0);
         TableLayoutPanel tInfo = DashTileTable("Zur Info & Status", UI.IcoInfo);
         lblDashRebar = DashVal(); lblDashBefunde = DashVal(); lblDashNet = DashVal();
         AddDashRow(tInfo, "Resizable BAR / SAM:", lblDashRebar);
@@ -3667,14 +3663,16 @@ e.Result = items;
     TableLayoutPanel DashTileTable(string title, string icon)
     {
         TableLayoutPanel t = new TableLayoutPanel();
-        t.Dock = DockStyle.Top;
+        t.Dock = DockStyle.Fill;
         t.AutoSize = true;
         t.ColumnCount = 2;
-        t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55f));
-        t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45f));
+        t.RowCount = 1;
+        t.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+        t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        Label lh = Lbl(title, 9.5f, true, UI.Text);
-        lh.Margin = new Padding(0, 0, 0, UI.S(6));
+        Label lh = Lbl(title, 10f, true, UI.Text);
+        lh.Margin = new Padding(0, 0, 0, UI.S(8));
         t.Controls.Add(lh, 0, 0);
         t.SetColumnSpan(lh, 2);
         return t;
@@ -3685,8 +3683,10 @@ e.Result = items;
         int row = t.RowCount++;
         t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         Label l = Lbl(label, 8.5f, false, UI.Muted);
-        l.Margin = new Padding(0, UI.S(2), UI.S(4), UI.S(2));
-        valLabel.Margin = new Padding(0, UI.S(2), 0, UI.S(2));
+        l.Margin = new Padding(0, UI.S(3), UI.S(6), UI.S(3));
+        l.AutoSize = true;
+        valLabel.Margin = new Padding(0, UI.S(3), 0, UI.S(3));
+        valLabel.AutoSize = true;
         valLabel.Anchor = AnchorStyles.Right;
         t.Controls.Add(l, 0, row);
         t.Controls.Add(valLabel, 1, row);
@@ -3718,12 +3718,8 @@ e.Result = items;
             runStarted != DateTime.MinValue ? String.Format("{0:mm\\:ss} Min.", DateTime.Now - runStarted) : "");
 
         int score = e != null ? (int)e.OverallScore : 0;
-        lblDashScore.Text = score > 0 ? String.Format("{0:N0} Punkte", score) : (testsOk > 0 ? String.Format("{0} Tests bestanden", testsOk) : "Abgeschlossen");
-        lblDashClass.Text = score >= 2000 ? "High-End: auch anspruchsvolle Spiele in hohen Auflösungen" :
-                            score >= 1200 ? "Gehobene Mittelklasse: flüssiges Gaming & anspruchsvolles Arbeiten" :
-                            score >= 600  ? "Solide Allround-Leistung: Desktop, Office & Multimedia" :
-                            score > 0     ? "Einstiegsklasse: grundlegende Alltags- und Office-Aufgaben" :
-                            "Prüfungen und Messungen erfolgreich abgeschlossen";
+        lblDashScore.Text = score > 0 ? String.Format(System.Globalization.CultureInfo.GetCultureInfo("de-DE"), "{0:N0} Punkte", score) : (testsOk > 0 ? String.Format("{0} Tests bestanden", testsOk) : "Abgeschlossen");
+        if (lblDashClass != null) lblDashClass.Text = "";
 
         pnlDashPills.Controls.Clear();
         if (e != null)

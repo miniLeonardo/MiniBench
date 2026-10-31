@@ -246,7 +246,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
 }
 #endregion
 
-$ScriptVersion = '3.9'
+$ScriptVersion = '3.91'
 $AppName       = 'Leos Minibench'
 # Eingebettete Referenzprofile für Leos Minibench (v3.0)
 $script:EmbeddedReferences = @{
@@ -7464,7 +7464,7 @@ public partial class DiagGui : Form
         pnlCustomPresets = new FlowLayoutPanel(); pnlCustomPresets.AutoSize = true; pnlCustomPresets.WrapContents = false; pnlCustomPresets.BackColor = UI.Bg; pnlCustomPresets.Margin = new Padding(0, UI.S(2), UI.S(2), 0);
         fo.Controls.Add(pnlCustomPresets);
 
-        btnPresetSave = UI.Secondary("Speichern â€¦"); btnPresetSave.Margin = new Padding(0, UI.S(1), UI.S(6), 0); fo.Controls.Add(btnPresetSave);
+        btnPresetSave = UI.Secondary("Speichern \u2026"); btnPresetSave.Margin = new Padding(0, UI.S(1), UI.S(6), 0); fo.Controls.Add(btnPresetSave);
         btnPresetSave.Click += delegate { SavePresetDialog(); };
 
         cmbPreset = new ComboBox(); cmbPreset.Visible = false;
@@ -7481,8 +7481,8 @@ public partial class DiagGui : Form
         chkSingleWindow = Chk("1-Fenstermodus", false); chkSingleWindow.Margin = new Padding(0, UI.S(5), 0, 0);
         fo.Controls.Add(chkSingleWindow);
 
-        btnStart = UI.Primary("Ablauf wÃ¤hlen"); btnStart.Enabled = false; btnStart.Margin = new Padding(UI.S(UI.Abstand5), 0, 0, 0); btnStart.MinimumSize = new Size(UI.S(150), UI.S(44)); btnStart.Anchor = AnchorStyles.Right;
-        Tip(btnStart, "Erst eine Aufgabe wÃ¤hlen oder links ein Modul anhaken.");
+        btnStart = UI.Primary("Ablauf wählen"); btnStart.Enabled = false; btnStart.Margin = new Padding(UI.S(UI.Abstand5), 0, 0, 0); btnStart.MinimumSize = new Size(UI.S(150), UI.S(44)); btnStart.Anchor = AnchorStyles.Right;
+        Tip(btnStart, "Erst eine Aufgabe wählen oder links ein Modul anhaken.");
         btnStart.Click += delegate { StartRun(); };
         foot.Controls.Add(lblSel, 0, 0); foot.Controls.Add(fo, 0, 1); foot.Controls.Add(btnStart, 1, 0); foot.SetRowSpan(btnStart, 2);
         footLayout = delegate
@@ -8302,27 +8302,7 @@ public partial class DiagGui : Form
 
     Control BuildRepairPage()
     {
-        FlowLayoutPanel f = Page("Wartung", "FÃ¼hrt die gewÃ¤hlten Wartungs- und Reparaturaufgaben nacheinander aus. Vorher wird auf Wunsch ein Wiederherstellungspunkt angelegt. Aufgaben mit dem Etikett Neustart werden erst danach vollstÃ¤ndig wirksam.", 4);
-        f.Controls.Add(Section("Absicherung"));
-        chkRestorePoint = Chk("Vorher einen Systemwiederherstellungspunkt anlegen", true); chkRestorePoint.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(2)); f.Controls.Add(chkRestorePoint);
-        lblRestoreWarn = Lbl("", UI.SchriftText, true, UI.Warn); lblRestoreWarn.BackColor = UI.WarnBg; lblRestoreWarn.Padding = new Padding(UI.S(6)); lblRestoreWarn.Margin = new Padding(UI.S(4), UI.S(4), 0, UI.S(2));
-        lblRestoreWarn.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); lblRestoreWarn.Visible = false; f.Controls.Add(lblRestoreWarn);
-        chkRestorePoint.CheckedChanged += delegate { UpdateRestoreWarn(); UpdateSummary(); };
-
-        f.Controls.Add(Section("Reparaturen"));
-        FlowLayoutPanel b = Row(); b.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(UI.Abstand2));
-        pillRepUsual = new PillButton("Empfohlene Auswahl", false); pillRepUsual.Margin = new Padding(0, 0, UI.S(8), 0);
-        pillRepUsual.Picked += delegate {
-            for (int i = 0; i < repChk.Length; i++) repChk[i].Checked = repUsual[i];
-            UpdateRepairCounts();
-        };
-        pillRepNone = new PillButton("Auswahl aufheben", false);
-        pillRepNone.Picked += delegate {
-            foreach (CheckBox c in repChk) c.Checked = false;
-            UpdateRepairCounts();
-        };
-        b.Controls.Add(pillRepUsual); b.Controls.Add(pillRepNone); f.Controls.Add(b);
-        f.Controls.Add(RiskLegend());
+        FlowLayoutPanel f = Page("Wartung", "Führt die gewählten Wartungs- und Reparaturaufgaben nacheinander aus. Vorher wird auf Wunsch ein Wiederherstellungspunkt angelegt. Aufgaben mit dem Etikett Neustart werden erst danach vollständig wirksam.", 4);
 
         repChk = new CheckBox[repKeys.Length];
         ToggleSwitch[] localRepToggles = new ToggleSwitch[repKeys.Length];
@@ -8348,7 +8328,7 @@ public partial class DiagGui : Form
         md.RowCount = 1;
         md.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(240)));
         md.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        md.Margin = new Padding(UI.S(4), UI.S(6), 0, UI.S(8));
+        md.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(8));
 
         FlowLayoutPanel leftCol = new FlowLayoutPanel();
         leftCol.Dock = DockStyle.Fill;
@@ -8427,6 +8407,7 @@ public partial class DiagGui : Form
             picker.Width = UI.S(232);
             string gKey = grp;
             picker.Picked += delegate { SelectRepairCategory(gKey); };
+            Tip(picker, gd ?? "");
             repPickers[grp] = picker;
             leftCol.Controls.Add(picker);
 
@@ -8441,13 +8422,26 @@ public partial class DiagGui : Form
             {
                 string[] parts = SplitDetail(repText[idx]);
                 string tit = parts[0];
-                string desc = parts.Length > 1 && parts[1].Length > 0 ? parts[1] : (repKeys[idx]);
+                string desc = parts.Length > 1 && parts[1].Length > 0 ? parts[1] : "";
                 SettingRow row = new SettingRow(tit, desc, localRepToggles[idx]);
                 row.Width = UI.S(UI.Gruppenbreite - 270);
                 string rsk = idx < repRisk.Length ? repRisk[idx] : "";
                 if (rsk.Length > 0) row.AddBadge(RiskBadge(rsk));
                 string rst = idx < repRestart.Length ? repRestart[idx] : "";
                 if (rst.Length > 0) row.AddBadge(RestartBadge(rst));
+
+                ContractStep cs = steps.Find(delegate(ContractStep c) { return (c.Module == "Reparatur" || c.Module == "Wartung") && c.Key == repKeys[idx]; });
+                StringBuilder t = new StringBuilder(repText[idx]);
+                if (cs != null)
+                {
+                    t.Append("\r\nRisikostufe: ").Append(ContractStep.RiskLabel(cs.Risiko)).Append(cs.Risiko == "Aendern" ? " (protokolliert, auf der Seite Änderungen rücknehmbar)" : cs.Risiko == "Eingriff" ? " (nicht automatisch umkehrbar, Absicherung über den Wiederherstellungspunkt)" : "");
+                    t.Append("\r\nNeustart: ").Append(cs.Neustart == "immer" ? "nötig" : cs.Neustart == "moeglich" ? "kann nötig sein" : "nicht nötig");
+                    if (cs.Minuten > 0) t.Append("\r\nDauer: etwa ").Append(cs.Minuten).Append(" Min.");
+                }
+                string repTip = t.ToString();
+                Tip(row, repTip);
+                Tip(localRepToggles[idx], repTip);
+
                 rowsPanel.Controls.Add(row);
             }
             rowsPanel.Visible = false;
@@ -8471,6 +8465,29 @@ public partial class DiagGui : Form
                 for (int i = 0; i < repKeys.Length; i++) if (GetRepairGroup(i) == curRepKey) repChk[i].Checked = false;
             }
         };
+
+        // --- Unterer Bereich: Vorlagen, Absicherung und Risikolegende ---
+        f.Controls.Add(Section("Vorlagen"));
+        FlowLayoutPanel b = Row(); b.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(UI.Abstand2));
+        pillRepUsual = new PillButton("Empfohlene Auswahl", false); pillRepUsual.Margin = new Padding(0, 0, UI.S(8), 0);
+        pillRepUsual.Picked += delegate {
+            for (int i = 0; i < repChk.Length; i++) repChk[i].Checked = repUsual[i];
+            UpdateRepairCounts();
+        };
+        pillRepNone = new PillButton("Auswahl aufheben", false);
+        pillRepNone.Picked += delegate {
+            foreach (CheckBox c in repChk) c.Checked = false;
+            UpdateRepairCounts();
+        };
+        b.Controls.Add(pillRepUsual); b.Controls.Add(pillRepNone); f.Controls.Add(b);
+
+        f.Controls.Add(Section("Absicherung"));
+        chkRestorePoint = Chk("Vorher einen Systemwiederherstellungspunkt anlegen", true); chkRestorePoint.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(2)); f.Controls.Add(chkRestorePoint);
+        lblRestoreWarn = Lbl("", UI.SchriftText, true, UI.Warn); lblRestoreWarn.BackColor = UI.WarnBg; lblRestoreWarn.Padding = new Padding(UI.S(6)); lblRestoreWarn.Margin = new Padding(UI.S(4), UI.S(4), 0, UI.S(2));
+        lblRestoreWarn.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); lblRestoreWarn.Visible = false; f.Controls.Add(lblRestoreWarn);
+        chkRestorePoint.CheckedChanged += delegate { UpdateRestoreWarn(); UpdateSummary(); };
+
+        f.Controls.Add(RiskLegend());
 
         if (repairGroupOrder.Length > 0) SelectRepairCategory(repairGroupOrder[0]);
         UpdateRepairCounts();
@@ -8602,7 +8619,7 @@ public partial class DiagGui : Form
                 }
             }
             if (repPickers.ContainsKey(grp)) repPickers[grp].SetCounts(sel, tot);
-            if (repCatCount.ContainsKey(grp)) repCatCount[grp].CountText = sel + " von " + tot + " gewÃ¤hlt";
+            if (repCatCount.ContainsKey(grp)) repCatCount[grp].CountText = sel + " von " + tot + " gewählt";
         }
     }
 
@@ -8738,7 +8755,7 @@ public partial class DiagGui : Form
 
     string OptTipText(OptItem it)
     {
-        StringBuilder t = new StringBuilder(it.Tip.Replace(" ¶", "\r\n"));
+        StringBuilder t = new StringBuilder((it.Tip ?? "").Replace(" ¶", "\r\n").Replace("¶", "\r\n"));
         t.Append("\r\nRisikostufe: ").Append(ContractStep.RiskLabel(it.Risiko)).Append(it.Risiko == "Aendern" ? " (protokolliert, auf der Seite Änderungen einzeln rücknehmbar)" : " (nicht automatisch umkehrbar, Absicherung über den Wiederherstellungspunkt)");
         t.Append("\r\nNeustart: ").Append(it.Neustart == "immer" ? "nötig" : it.Neustart == "moeglich" ? "kann nötig sein" : "nicht nötig");
         List<string> vList = new List<string>();
@@ -8757,38 +8774,7 @@ public partial class DiagGui : Form
     {
         ReadOptCatalog();
         FlowLayoutPanel f = Page("Optimierung", "Die Einstellungen des Windows Optimisation Pack mit seiner Sophia- und O&O-Auswahl, nativ umgesetzt und nach Kategorien gruppiert.", 5);
-        f.Controls.Add(Section("Absicherung"));
-        chkOptRestore = Chk("Vorher einen Systemwiederherstellungspunkt anlegen", true); f.Controls.Add(chkOptRestore);
-        f.Controls.Add(Section("Vorlagen und Zustand"));
-
-        FlowLayoutPanel b = Row(); b.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(4));
-        optPresetPills.Clear();
-        string[] pn = new string[] { "Minimal", "Leos Empfehlung", "Erweitert", "Auswahl aufheben" };
-        string[] pkeys = new string[] { "M", "S", "E", "" };
-        for (int i = 0; i < pn.Length; i++)
-        {
-            string key = pkeys[i];
-            PillButton pb = new PillButton(pn[i], i == 0);
-            pb.Margin = new Padding(i == 0 ? 0 : UI.S(8), 0, 0, 0);
-            pb.Picked += delegate {
-                for (int k = 0; k < optPresetPills.Count; k++) optPresetPills[k].Active = (optPresetPills[k] == pb);
-                ApplyOptPreset(key);
-            };
-            optPresetPills.Add(pb);
-            b.Controls.Add(pb);
-        }
-        f.Controls.Add(b);
-
-        b = Row(); b.Margin = new Padding(UI.S(4), UI.S(6), 0, UI.S(4));
-        btnOptCheck = UI.Secondary("Zustand prÃ¼fen"); btnOptCheck.Margin = new Padding(0); btnOptCheck.Click += delegate { CheckOptState(); }; b.Controls.Add(btnOptCheck);
-        btnOptTools = UI.Secondary("Werkzeuge holen â€¦"); btnOptTools.Margin = new Padding(UI.S(8), 0, 0, 0); btnOptTools.Click += delegate { FetchOptTools(); }; b.Controls.Add(btnOptTools);
-        btnOptAll = UI.Secondary("Alle aufklappen"); btnOptAll.Visible = false;
-        f.Controls.Add(b);
-
-        lblOptInfo = Lbl("", 9f, false, UI.Muted); lblOptInfo.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); lblOptInfo.Margin = new Padding(UI.S(4), UI.S(4), UI.S(4), 0); f.Controls.Add(lblOptInfo);
-        lblOptState = Lbl("", 9f, false, UI.Muted); lblOptState.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); lblOptState.Margin = new Padding(UI.S(4), UI.S(2), UI.S(4), UI.S(4)); f.Controls.Add(lblOptState);
-        if (optItems.Count == 0) { lblOptInfo.Text = "Der Katalog der Optimierung fehlt (Skript ohne Modul Optimierung)."; return f; }
-        f.Controls.Add(RiskLegend());
+        if (optItems.Count == 0) { lblOptInfo = Lbl("Der Katalog der Optimierung fehlt (Skript ohne Modul Optimierung).", 9f, false, UI.Muted); f.Controls.Add(lblOptInfo); return f; }
 
         TableLayoutPanel md = new TableLayoutPanel();
         md.Width = UI.S(UI.Gruppenbreite);
@@ -8797,7 +8783,7 @@ public partial class DiagGui : Form
         md.RowCount = 1;
         md.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(240)));
         md.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        md.Margin = new Padding(UI.S(4), UI.S(6), 0, UI.S(8));
+        md.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(8));
 
         FlowLayoutPanel leftCol = new FlowLayoutPanel();
         leftCol.Dock = DockStyle.Fill;
@@ -8883,6 +8869,7 @@ public partial class DiagGui : Form
             picker.Width = UI.S(232);
             string gKey = key;
             picker.Picked += delegate { SelectOptCategory(gKey); };
+            Tip(picker, k[2]);
             optPickers[key] = picker;
             leftCol.Controls.Add(picker);
 
@@ -8912,13 +8899,23 @@ public partial class DiagGui : Form
                     UpdateOptCounts();
                 };
 
-                SettingRow row = new SettingRow(it.Titel, it.Tip, it.Toggle);
+                string shortDesc = it.Tip ?? "";
+                int p = shortDesc.IndexOf(" \u00B6");
+                if (p < 0) p = shortDesc.IndexOf(" \u00B6");
+                if (p >= 0) shortDesc = shortDesc.Substring(0, p).Trim();
+
+                SettingRow row = new SettingRow(it.Titel, shortDesc, it.Toggle);
+                it.Row = row;
                 row.Width = UI.S(UI.Gruppenbreite - 270);
                 if (it.Risiko == "Eingriff") row.AddBadge(RiskBadge("Eingriff"));
                 else if (it.Risiko.Length > 0 && it.Risiko != "Lesen") row.AddBadge(RiskBadge(it.Risiko));
                 if (it.Neustart == "immer") row.AddBadge(RestartBadge("immer"));
                 if (bv != null) row.AddBadge(bv);
                 if (it.StateBadge != null) row.AddBadge(it.StateBadge);
+
+                string fullTip = OptTipText(it);
+                Tip(row, fullTip);
+                Tip(it.Toggle, fullTip);
 
                 rowsPanel.Controls.Add(row);
             }
@@ -8944,7 +8941,42 @@ public partial class DiagGui : Form
             }
         };
 
-        f.Controls.Add(Hint("verwaltet: berÃ¼hrt Gruppenrichtlinien, auf DomÃ¤nen-PCs nicht in den Vorlagen. Benutzereinstellungen gelten fÃ¼r den angemeldeten Benutzer.", 4));
+        // --- Unterer Bereich: Vorlagen, Werkzeuge, Absicherung und Risikolegende ---
+        f.Controls.Add(Section("Vorlagen und Zustand"));
+
+        FlowLayoutPanel bPills = Row(); bPills.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(4));
+        optPresetPills.Clear();
+        string[] pn = new string[] { "Minimal", "Leos Empfehlung", "Erweitert", "Auswahl aufheben" };
+        string[] pkeys = new string[] { "M", "S", "E", "" };
+        for (int i = 0; i < pn.Length; i++)
+        {
+            string key = pkeys[i];
+            PillButton pb = new PillButton(pn[i], i == 0);
+            pb.Margin = new Padding(i == 0 ? 0 : UI.S(8), 0, 0, 0);
+            pb.Picked += delegate {
+                for (int k = 0; k < optPresetPills.Count; k++) optPresetPills[k].Active = (optPresetPills[k] == pb);
+                ApplyOptPreset(key);
+            };
+            optPresetPills.Add(pb);
+            bPills.Controls.Add(pb);
+        }
+        f.Controls.Add(bPills);
+
+        FlowLayoutPanel bTools = Row(); bTools.Margin = new Padding(UI.S(4), UI.S(4), 0, UI.S(4));
+        btnOptCheck = UI.Secondary("Zustand pr\u00FCfen"); btnOptCheck.Margin = new Padding(0); btnOptCheck.Click += delegate { CheckOptState(); }; bTools.Controls.Add(btnOptCheck);
+        btnOptTools = UI.Secondary("Werkzeuge holen \u2026"); btnOptTools.Margin = new Padding(UI.S(8), 0, 0, 0); btnOptTools.Click += delegate { FetchOptTools(); }; bTools.Controls.Add(btnOptTools);
+        btnOptAll = UI.Secondary("Alle aufklappen"); btnOptAll.Visible = false;
+        f.Controls.Add(bTools);
+
+        lblOptInfo = Lbl("", 9f, false, UI.Muted); lblOptInfo.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); lblOptInfo.Margin = new Padding(UI.S(4), UI.S(2), UI.S(4), 0); f.Controls.Add(lblOptInfo);
+        lblOptState = Lbl("", 9f, false, UI.Muted); lblOptState.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); lblOptState.Margin = new Padding(UI.S(4), UI.S(2), UI.S(4), UI.S(4)); f.Controls.Add(lblOptState);
+
+        f.Controls.Add(Section("Absicherung"));
+        chkOptRestore = Chk("Vorher einen Systemwiederherstellungspunkt anlegen", true); f.Controls.Add(chkOptRestore);
+
+        f.Controls.Add(RiskLegend());
+        f.Controls.Add(Hint("verwaltet: ber\u00FChrt Gruppenrichtlinien, auf Dom\u00E4nen-PCs nicht in den Vorlagen. Benutzereinstellungen gelten f\u00FCr den angemeldeten Benutzer.", 4));
+
         if (optCats.Count > 0) SelectOptCategory(optCats[0][0]);
         ApplyOptPreset("M");
         return f;
@@ -9021,7 +9053,7 @@ public partial class DiagGui : Form
             int a = 0, n = 0;
             foreach (OptItem it in optItems) if (it.Kat == key) { a++; if (it.Box != null && it.Box.Checked) n++; }
             if (optPickers.ContainsKey(key)) optPickers[key].SetCounts(n, a);
-            if (optCatCount.ContainsKey(key)) optCatCount[key].CountText = n + " von " + a + " gewÃ¤hlt";
+            if (optCatCount.ContainsKey(key)) optCatCount[key].CountText = n + " von " + a + " gew\u00E4hlt";
         }
     }
 
@@ -10124,7 +10156,7 @@ public partial class DiagGui : Form
     void DeletePresetByName(string n)
     {
         if (String.IsNullOrEmpty(n)) return;
-        if (MessageBox.Show(this, "Voreinstellung \"" + n + "\" lÃ¶schen?", "Leos Minibench", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        if (MessageBox.Show(this, "Voreinstellung \"" + n + "\" l\u00F6schen?", "Leos Minibench", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
         try
         {
             Dictionary<string, object> d = ReadPresetFile(); if (d == null) return;
@@ -10215,7 +10247,7 @@ public partial class DiagGui : Form
     {
         string n = PresetNameOf(cmbPreset.SelectedIndex);
         if (n.Length == 0) return;
-        if (MessageBox.Show(this, "Voreinstellung \"" + n + "\" löschen?", "Leos Minibench", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        if (MessageBox.Show(this, "Voreinstellung \"" + n + "\" l\u00F6schen?", "Leos Minibench", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
         try
         {
             Dictionary<string, object> d = ReadPresetFile(); if (d == null) return;
@@ -10842,7 +10874,7 @@ public partial class DiagGui : Form
             barAll.Value = 100; barAll.Fill = nK > 0 ? UI.Crit : (nW > 0 ? Color.FromArgb(214, 140, 20) : UI.Ok); barAll.Invalidate();
             lblStep.Text = "Abgeschlossen";
             lblCounter.Text = "Bericht und KI-Dateien liegen im Datenordner";
-            lblResult.Text = nK > 0 ? "Kritische Befunde gefunden" : (nW > 0 ? "Warnungen vorhanden" : "Keine AuffÃ¤lligkeiten");
+            lblResult.Text = nK > 0 ? "Kritische Befunde gefunden" : (nW > 0 ? "Warnungen vorhanden" : "Keine Auff\u00E4lligkeiten");
             lblResult.ForeColor = nK > 0 ? UI.Crit : (nW > 0 ? UI.Warn : UI.Ok);
             btnHtml.Visible = File.Exists(htmlPath); btnFolder.Visible = Directory.Exists(outDir); btnKi.Visible = File.Exists(kiPath);
             btnExportRun.Visible = Directory.Exists(outDir);
@@ -12236,6 +12268,7 @@ public class SettingRow : Control
     {
         if (b == null) return;
         badges.Add(b);
+        b.SizeChanged += delegate { LayoutControls(); };
         Controls.Add(b);
         LayoutControls();
     }
@@ -12247,22 +12280,30 @@ public class SettingRow : Control
         LayoutControls();
     }
 
+    bool inRecalc = false;
     void RecalcHeight()
     {
-        using (Graphics g = CreateGraphics())
-        using (Font fd = new Font("Segoe UI", UI.SF(8.5f)))
+        if (inRecalc) return;
+        inRecalc = true;
+        try
         {
-            int textW = Math.Max(UI.S(120), Width - UI.S(220));
-            Size dsz = TextRenderer.MeasureText(g, desc, fd, new Size(textW, int.MaxValue), TextFormatFlags.WordBreak);
-            Height = Math.Max(UI.S(46), UI.S(24) + dsz.Height);
+            using (Graphics g = CreateGraphics())
+            using (Font fd = new Font("Segoe UI", UI.SF(8.25f)))
+            {
+                int textW = Math.Max(UI.S(120), Width - UI.S(220));
+                Size dsz = TextRenderer.MeasureText(g, desc, fd, new Size(textW, int.MaxValue), TextFormatFlags.WordBreak);
+                int targetH = String.IsNullOrEmpty(desc) ? UI.S(38) : Math.Min(UI.S(52), Math.Max(UI.S(42), UI.S(22) + dsz.Height));
+                if (Height != targetH) Height = targetH;
+            }
+            LayoutControls();
         }
-        LayoutControls();
+        finally { inRecalc = false; }
     }
 
     protected override void OnResize(EventArgs e)
     {
         base.OnResize(e);
-        LayoutControls();
+        RecalcHeight();
     }
 
     void LayoutControls()
@@ -12336,7 +12377,7 @@ public class SettingRow : Control
         {
             Size tsz = TextRenderer.MeasureText(g, title, ft);
             int titleH = Math.Max(tsz.Height, UI.S(18));
-            int startY = String.IsNullOrEmpty(desc) ? (Height - titleH) / 2 : UI.S(8);
+            int startY = String.IsNullOrEmpty(desc) ? (Height - titleH) / 2 : UI.S(5);
             TextRenderer.DrawText(g, title, ft, new Rectangle(curX, startY, textW, titleH), UI.Text, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
 
             if (!String.IsNullOrEmpty(desc))
@@ -13220,7 +13261,7 @@ public class ContractStep
 class OptItem
 {
     public string Id = "", Kat = "", Risiko = "", Neustart = "", Vorlagen = "", Bedingung = "", Titel = "", Tip = "", Zustand = "", ZustandText = "";
-    public bool Verwaltet; public int Minuten; public CheckBox Box; public ToggleSwitch Toggle;
+    public bool Verwaltet; public int Minuten; public CheckBox Box; public ToggleSwitch Toggle; public SettingRow Row;
     public Badge StateBadge;   // ab v3.64: Zustand auf diesem PC als Etikett neben dem Eintrag
 }
 
@@ -13860,7 +13901,7 @@ public partial class DiagGui
         Button btnNas = UI.Secondary("Netzlaufwerk ..."); btnNas.Margin = new Padding(UI.S(8), 0, 0, 0); btnNas.Click += delegate { ShowConnectNasDialog(); };
         Tip(btnNas, "Richtet ein Netzlaufwerk (NAS) als Spiegel der Berichte und der Datenbank ein oder entfernt es. Gearbeitet wird immer auf dem Stick.");
         btnToggleGroups = UI.Secondary("Alle aufklappen"); btnToggleGroups.Margin = new Padding(UI.S(8), 0, 0, 0); btnToggleGroups.Click += delegate { ToggleAllGroups(); };
-        Tip(btnToggleGroups, "Klappt alle GerÃ¤tegruppen in der Datenbank ein oder aus.");
+        Tip(btnToggleGroups, "Klappt alle Ger\u00E4tegruppen in der Datenbank ein oder aus.");
         topTools.Controls.Add(imp); topTools.Controls.Add(btnToggleGroups); topTools.Controls.Add(btnDbClean); topTools.Controls.Add(rel); topTools.Controls.Add(open); topTools.Controls.Add(btnNas);
         top.Controls.Add(topTools);
 
@@ -18250,7 +18291,7 @@ e.Result = items;
         CardPanel scoreCard = new CardPanel();
         scoreCard.Dock = DockStyle.Top;
         scoreCard.AutoSize = true;
-        scoreCard.Padding = new Padding(UI.S(16));
+        scoreCard.Padding = new Padding(UI.S(16), UI.S(14), UI.S(16), UI.S(14));
         scoreCard.Margin = new Padding(0, 0, 0, UI.S(12));
 
         TableLayoutPanel scoreLayout = new TableLayoutPanel();
@@ -18259,12 +18300,8 @@ e.Result = items;
         scoreLayout.ColumnCount = 1;
 
         lblDashScore = Lbl("0 Punkte", 24f, true, UI.Accent);
-        lblDashScore.Margin = new Padding(0, 0, 0, UI.S(2));
+        lblDashScore.Margin = new Padding(0, 0, 0, UI.S(6));
         scoreLayout.Controls.Add(lblDashScore, 0, 0);
-
-        lblDashClass = Lbl("", 10.5f, true, UI.Text);
-        lblDashClass.Margin = new Padding(0, 0, 0, UI.S(8));
-        scoreLayout.Controls.Add(lblDashClass, 0, 1);
 
         pnlDashPills = new FlowLayoutPanel();
         pnlDashPills.Dock = DockStyle.Top;
@@ -18272,7 +18309,7 @@ e.Result = items;
         pnlDashPills.WrapContents = true;
         pnlDashPills.BackColor = UI.Panel;
         pnlDashPills.Margin = new Padding(0);
-        scoreLayout.Controls.Add(pnlDashPills, 0, 2);
+        scoreLayout.Controls.Add(pnlDashPills, 0, 1);
 
         scoreCard.Controls.Add(scoreLayout);
         main.Controls.Add(scoreCard, 0, 2);
@@ -18291,7 +18328,7 @@ e.Result = items;
         grid.Margin = new Padding(0, 0, 0, UI.S(12));
 
         // 1. Prozessor
-        CardPanel cCpu = new CardPanel(); cCpu.Dock = DockStyle.Fill; cCpu.Padding = new Padding(UI.S(12)); cCpu.Margin = new Padding(0, 0, UI.S(6), UI.S(8));
+        CardPanel cCpu = new CardPanel(); cCpu.Dock = DockStyle.Fill; cCpu.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12)); cCpu.MinimumSize = new Size(0, UI.S(132)); cCpu.Margin = new Padding(0, 0, UI.S(6), UI.S(8));
         TableLayoutPanel tCpu = DashTileTable("Prozessor (CPU)", UI.IcoCpu);
         lblDashCpuMT = DashVal(); lblDashCpuST = DashVal(); lblDashCpuAes = DashVal();
         AddDashRow(tCpu, "Multi-Thread (MT):", lblDashCpuMT);
@@ -18300,7 +18337,7 @@ e.Result = items;
         cCpu.Controls.Add(tCpu); grid.Controls.Add(cCpu, 0, 0);
 
         // 2. Grafik
-        CardPanel cGpu = new CardPanel(); cGpu.Dock = DockStyle.Fill; cGpu.Padding = new Padding(UI.S(12)); cGpu.Margin = new Padding(UI.S(3), 0, UI.S(3), UI.S(8));
+        CardPanel cGpu = new CardPanel(); cGpu.Dock = DockStyle.Fill; cGpu.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12)); cGpu.MinimumSize = new Size(0, UI.S(132)); cGpu.Margin = new Padding(UI.S(3), 0, UI.S(3), UI.S(8));
         TableLayoutPanel tGpu = DashTileTable("Grafik (GPU)", UI.IcoGpu);
         lblDashGpuFps = DashVal(); lblDashGpuLow = DashVal(); lblDashGpuVmb = DashVal();
         AddDashRow(tGpu, "3D-Rendertest (FPS):", lblDashGpuFps);
@@ -18309,7 +18346,7 @@ e.Result = items;
         cGpu.Controls.Add(tGpu); grid.Controls.Add(cGpu, 1, 0);
 
         // 3. Arbeitsspeicher
-        CardPanel cRam = new CardPanel(); cRam.Dock = DockStyle.Fill; cRam.Padding = new Padding(UI.S(12)); cRam.Margin = new Padding(UI.S(6), 0, 0, UI.S(8));
+        CardPanel cRam = new CardPanel(); cRam.Dock = DockStyle.Fill; cRam.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12)); cRam.MinimumSize = new Size(0, UI.S(132)); cRam.Margin = new Padding(UI.S(6), 0, 0, UI.S(8));
         TableLayoutPanel tRam = DashTileTable("Arbeitsspeicher (RAM)", UI.IcoRam);
         lblDashRamRead = DashVal(); lblDashRamWrite = DashVal(); lblDashRamLat = DashVal();
         AddDashRow(tRam, "Lesen Durchsatz:", lblDashRamRead);
@@ -18318,7 +18355,7 @@ e.Result = items;
         cRam.Controls.Add(tRam); grid.Controls.Add(cRam, 2, 0);
 
         // 4. Datenträger
-        CardPanel cDisk = new CardPanel(); cDisk.Dock = DockStyle.Fill; cDisk.Padding = new Padding(UI.S(12)); cDisk.Margin = new Padding(0, 0, UI.S(6), 0);
+        CardPanel cDisk = new CardPanel(); cDisk.Dock = DockStyle.Fill; cDisk.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12)); cDisk.MinimumSize = new Size(0, UI.S(132)); cDisk.Margin = new Padding(0, 0, UI.S(6), 0);
         TableLayoutPanel tDisk = DashTileTable("Datenträger", UI.IcoDisk);
         lblDashDiskRead = DashVal(); lblDashDiskWrite = DashVal(); lblDashDiskIops = DashVal();
         AddDashRow(tDisk, "Sequentiell Lesen:", lblDashDiskRead);
@@ -18327,7 +18364,7 @@ e.Result = items;
         cDisk.Controls.Add(tDisk); grid.Controls.Add(cDisk, 0, 1);
 
         // 5. Reaktionszeit
-        CardPanel cLat = new CardPanel(); cLat.Dock = DockStyle.Fill; cLat.Padding = new Padding(UI.S(12)); cLat.Margin = new Padding(UI.S(3), 0, UI.S(3), 0);
+        CardPanel cLat = new CardPanel(); cLat.Dock = DockStyle.Fill; cLat.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12)); cLat.MinimumSize = new Size(0, UI.S(132)); cLat.Margin = new Padding(UI.S(3), 0, UI.S(3), 0);
         TableLayoutPanel tLat = DashTileTable("Reaktionszeit", UI.IcoSpeed);
         lblDashDpc = DashVal(); lblDashTimer = DashVal(); lblDashOutlier = DashVal();
         AddDashRow(tLat, "DPC/Interrupt:", lblDashDpc);
@@ -18336,7 +18373,7 @@ e.Result = items;
         cLat.Controls.Add(tLat); grid.Controls.Add(cLat, 1, 1);
 
         // 6. Zur Info
-        CardPanel cInfo = new CardPanel(); cInfo.Dock = DockStyle.Fill; cInfo.Padding = new Padding(UI.S(12)); cInfo.Margin = new Padding(UI.S(6), 0, 0, 0);
+        CardPanel cInfo = new CardPanel(); cInfo.Dock = DockStyle.Fill; cInfo.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12)); cInfo.MinimumSize = new Size(0, UI.S(132)); cInfo.Margin = new Padding(UI.S(6), 0, 0, 0);
         TableLayoutPanel tInfo = DashTileTable("Zur Info & Status", UI.IcoInfo);
         lblDashRebar = DashVal(); lblDashBefunde = DashVal(); lblDashNet = DashVal();
         AddDashRow(tInfo, "Resizable BAR / SAM:", lblDashRebar);
@@ -18398,14 +18435,16 @@ e.Result = items;
     TableLayoutPanel DashTileTable(string title, string icon)
     {
         TableLayoutPanel t = new TableLayoutPanel();
-        t.Dock = DockStyle.Top;
+        t.Dock = DockStyle.Fill;
         t.AutoSize = true;
         t.ColumnCount = 2;
-        t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55f));
-        t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45f));
+        t.RowCount = 1;
+        t.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+        t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        Label lh = Lbl(title, 9.5f, true, UI.Text);
-        lh.Margin = new Padding(0, 0, 0, UI.S(6));
+        Label lh = Lbl(title, 10f, true, UI.Text);
+        lh.Margin = new Padding(0, 0, 0, UI.S(8));
         t.Controls.Add(lh, 0, 0);
         t.SetColumnSpan(lh, 2);
         return t;
@@ -18416,8 +18455,10 @@ e.Result = items;
         int row = t.RowCount++;
         t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         Label l = Lbl(label, 8.5f, false, UI.Muted);
-        l.Margin = new Padding(0, UI.S(2), UI.S(4), UI.S(2));
-        valLabel.Margin = new Padding(0, UI.S(2), 0, UI.S(2));
+        l.Margin = new Padding(0, UI.S(3), UI.S(6), UI.S(3));
+        l.AutoSize = true;
+        valLabel.Margin = new Padding(0, UI.S(3), 0, UI.S(3));
+        valLabel.AutoSize = true;
         valLabel.Anchor = AnchorStyles.Right;
         t.Controls.Add(l, 0, row);
         t.Controls.Add(valLabel, 1, row);
@@ -18449,12 +18490,8 @@ e.Result = items;
             runStarted != DateTime.MinValue ? String.Format("{0:mm\\:ss} Min.", DateTime.Now - runStarted) : "");
 
         int score = e != null ? (int)e.OverallScore : 0;
-        lblDashScore.Text = score > 0 ? String.Format("{0:N0} Punkte", score) : (testsOk > 0 ? String.Format("{0} Tests bestanden", testsOk) : "Abgeschlossen");
-        lblDashClass.Text = score >= 2000 ? "High-End: auch anspruchsvolle Spiele in hohen Auflösungen" :
-                            score >= 1200 ? "Gehobene Mittelklasse: flüssiges Gaming & anspruchsvolles Arbeiten" :
-                            score >= 600  ? "Solide Allround-Leistung: Desktop, Office & Multimedia" :
-                            score > 0     ? "Einstiegsklasse: grundlegende Alltags- und Office-Aufgaben" :
-                            "Prüfungen und Messungen erfolgreich abgeschlossen";
+        lblDashScore.Text = score > 0 ? String.Format(System.Globalization.CultureInfo.GetCultureInfo("de-DE"), "{0:N0} Punkte", score) : (testsOk > 0 ? String.Format("{0} Tests bestanden", testsOk) : "Abgeschlossen");
+        if (lblDashClass != null) lblDashClass.Text = "";
 
         pnlDashPills.Controls.Clear();
         if (e != null)
@@ -19146,6 +19183,12 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("3.91", "31.10.2026", "Ergebnis-Dashboard, schlankes Optimierungs-Layout & Zeichensatz-Korrektur",
+            "\u2022 Infoboxen auf der Ergebnisseite vergr\u00F6\u00DFert: Gro\u00DFz\u00FCgige Kachel-Mindesth\u00F6he (UI.S(132)), AutoSize-Spalte f\u00FCr Metrikbezeichnungen und rechtsb\u00FCndige Werteverankerung verhindern jedes Abschneiden oder \u00DCberlaufen von Texten (z. B. Befundz\u00E4hler, DPC-Latenzen).\r\n" +
+            "\u2022 Klassifizierung entfernt: Die subjektive Klassifizierungszeile ('High-End', etc.) wurde vollst\u00E4ndig vom Ergebnis-Dashboard entfernt; die Gesamtpunktzahl steht dominant und klar gegliedert \u00FCber den Hardware-Spezifikationen.\r\n" +
+            "\u2022 Schlankes Layout f\u00FCr Optimierung & Wartung: Technische Registry-Pfade und Hintergrunddetails wurden vollst\u00E4ndig in Hover-Tooltips ausgelagert; jede Einstellungszeile ist kompakt (42\u201352 px) mit pr\u00E4gnanter deutscher Kurzbeschreibung, Risikostufen-Badge und interaktivem Schalter gestaltet.\r\n" +
+            "\u2022 Direkter Einstieg ohne Scrollen: Die Master-Detail-Auswahl mit Kategoriew\u00E4hler und Detailkarte wurde auf beiden Seiten ganz nach oben verlegt; Vorlagen-Pills, Aktionskn\u00F6pfe, Absicherung (Wiederherstellungspunkt) und Legende schlie\u00DFen \u00FCbersichtlich am Seitenende an.\r\n" +
+            "\u2022 Vollst\u00E4ndige Zeichensatz-Bereinigung: Beseitigung aller UTF-8-Doppelkodierungen (Mojibake) in der Fu\u00DFleiste ('Speichern \u2026'), auf den Einstellungsseiten ('Zustand pr\u00FCfen', 'Werkzeuge holen \u2026', 'gew\u00E4hlt') und in den Dashboard-Diagrammen."),
         new Eintrag("3.9", "31.10.2026", "Modernisierung, 1-Fenstermodus, persistente Menüleiste & ReBAR-Korrektur (Experimentell)",
             "• Master-Detail-Layout für Optimierung & Wartung: Übersichtliches zweispaltiges Design mit Kategoriewähler links (inkl. dynamischem Zähler wie '4/9') und Detailkarte rechts mit Schnellwahl ('Alle an' / 'Alle aus').\r\n" +
             "• Interaktive Schalter (ToggleSwitch): Moderner Pillen-Schalter mit Anti-Aliasing und klarer Farbcodierung (Akzentfarbe / Grau) ersetzt altbackene Checkboxen.\r\n" +
@@ -19166,12 +19209,12 @@ public static class Versionshistorie
             "• Intuitive Aufklapp-Mechanik: Klick auf den Pfeil oder Doppelklick klappt das System auf ('▼ Name (Anzahl)') und listet alle Einzelläufe eingerückt darunter auf; Toolbar-Schaltfläche und Kontextmenü ('Alle aufklappen' / 'Alle einklappen') sowie Pfeiltasten (Rechts/Links) schalten synchron um.\r\n" +
             "• Hoher Dark-Mode-Kontrast: Text in Spalte 1 und allen Datenfeldern behält mindestens 7:1-Kontrast im Hell- und Dunkelmodus; Pfeilsymbole in beiden Farbschemata klar sichtbar."),
         new Eintrag("3.88", "29.10.2026", "Einklappbare Datenbank-Gruppen, Dark-Mode-Kontrast, Startseiten-Layout & Zeichensatz-Korrektur",
-            "â€¢ Einklappbare GerÃ¤tegruppen in der Datenbank: Native Win32-UnterstÃ¼tzung (LVGS_COLLAPSIBLE) mit Windows-Chevrons; Systeme mit mehreren LÃ¤ufen und Referenzsysteme starten standardmÃ¤ÃŸig kompakt eingeklappt; neue Aktionen 'Alle aufklappen / Alle einklappen' in Toolbar und KontextmenÃ¼.\r\n" +
-            "â€¢ Dark-Mode-Kontrast fÃ¼r Gruppen: GruppenkÃ¶pfe der Datenbank-ListView werden im Dark Mode mit hohem Kontrast (>= 7:1) in UI.Accent/UI.Text gerendert (beseitigt unlesbares Windows-Theme-Dunkelblau auf schwarzem Grund).\r\n" +
-            "â€¢ Startseiten-Layout: Kachel 'Letzter Lauf' gegen Textumbruch abgesichert; Befundstatus (lblBef) bricht niemals vertikal oder zeichenweise um; Aktions-SchaltflÃ¤che prÃ¤gnant als 'Dashboard' benannt und Buttons kompakt ausgerichtet.\r\n" +
-            "â€¢ Robuste Hardware-Erkennung: Kopf-Steckbrief und SystemÃ¼bersicht filtern virtuelle Display-Adapter (Virtual Desktop, Parsec, spacedesk, IddSampleDriver, Remote Desktop) aus und zeigen bevorzugt die reale dedizierte Grafikkarte (dGPU, z. B. Radeon RX 6800) bzw. den physischen Grafikbeschleuniger.\r\n" +
-            "â€¢ StabilitÃ¤t des Mehrkern-Benchmarks: Mehrkern-Skalierungsbefund stuft LeistungsabfÃ¤lle bei erkannter Hintergrundlast (> 15 % CPU oder Hintergrunddienste) sachlich als INFO statt als irrefÃ¼hrende Warnung ein.\r\n" +
-            "â€¢ VollstÃ¤ndige Zeichensatz-Bereinigung: Beseitigung aller UTF-8-Doppelkodierungen (Mojibake) in HTML-Diagnoseberichten, Dashboard-Diagrammen und Vergleichsbausteinen; Unicode-Escape-Sequenzen fÃ¼r Pfeilsymbole der Startseiten-KPIs."),
+            "\u2022 Einklappbare Ger\u00E4tegruppen in der Datenbank: Native Win32-Unterst\u00FCtzung (LVGS_COLLAPSIBLE) mit Windows-Chevrons; Systeme mit mehreren L\u00E4ufen und Referenzsysteme starten standardm\u00E4\u00DFig kompakt eingeklappt; neue Aktionen 'Alle aufklappen / Alle einklappen' in Toolbar und Kontextmen\u00FC.\r\n" +
+            "\u2022 Dark-Mode-Kontrast f\u00FCr Gruppen: Gruppenk\u00F6pfe der Datenbank-ListView werden im Dark Mode mit hohem Kontrast (>= 7:1) in UI.Accent/UI.Text gerendert (beseitigt unlesbares Windows-Theme-Dunkelblau auf schwarzem Grund).\r\n" +
+            "\u2022 Startseiten-Layout: Kachel 'Letzter Lauf' gegen Textumbruch abgesichert; Befundstatus (lblBef) bricht niemals vertikal oder zeichenweise um; Aktions-Schaltfl\u00E4che pr\u00E4gnant als 'Dashboard' benannt und Buttons kompakt ausgerichtet.\r\n" +
+            "\u2022 Robuste Hardware-Erkennung: Kopf-Steckbrief und System\u00FCbersicht filtern virtuelle Display-Adapter (Virtual Desktop, Parsec, spacedesk, IddSampleDriver, Remote Desktop) aus und zeigen bevorzugt die reale dedizierte Grafikkarte (dGPU, z. B. Radeon RX 6800) bzw. den physischen Grafikbeschleuniger.\r\n" +
+            "\u2022 Stabilit\u00E4t des Mehrkern-Benchmarks: Mehrkern-Skalierungsbefund stuft Leistungsabf\u00E4lle bei erkannter Hintergrundlast (> 15 % CPU oder Hintergrunddienste) sachlich als INFO statt als irref\u00FChrende Warnung ein.\r\n" +
+            "\u2022 Vollst\u00E4ndige Zeichensatz-Bereinigung: Beseitigung aller UTF-8-Doppelkodierungen (Mojibake) in HTML-Diagnoseberichten, Dashboard-Diagrammen und Vergleichsbausteinen; Unicode-Escape-Sequenzen f\u00FCr Pfeilsymbole der Startseiten-KPIs."),
         new Eintrag("3.87", "29.10.2026", "Läufe je Gerät bündeln (Verlauf ohne eigene Seite)",
             "• ListViewGroup-Gruppierung in der Datenbank: Die Datenbank-ListView gruppiert alle Messungen automatisch nach Geräten (Hardware-Signatur über Geraet.Id oder Computername) mit Angabe von Gerätename, Laufanzahl und jüngstem Messdatum. Referenzprofile sind am Listenende in einer geschlossenen Gruppe gebündelt. Volle Farbschema-Unterstützung (Hell/Dunkel) ohne Kontrastfehler.\r\n" +
             "• Verlauf-Aktionen in Datenbank & Startseite: Neue Schaltfläche 'Verlauf' sowie Kontextmenüeintrag 'Geräte-Verlauf im Dashboard öffnen' in der Datenbankansicht; Kachel 'Letzter Lauf' auf der Startseite mit 'Verlauf'-Button und kompakten Trend-Pfeilen (↑ +X %, ↓ -X %) für die 4 Kern-KPIs (Gesamt, CPU Mehrkern, RAM Lesen, Grafik) gegen den direkten Vorläufer desselben PCs.\r\n" +
@@ -26387,15 +26430,15 @@ window.MINIBENCH_DASHBOARD_DATA = window.MINIBENCH_DASHBOARD_DATA || null;
       const curRun = runs[closestIdx];
       const prevRun = closestIdx > 0 ? runs[closestIdx - 1] : null;
 
-      let tipHtml = '<div style=\"font-weight:700; font-size:12px; margin-bottom:4px;\">' + escapeHtml(curRun.Computer || 'PC') + ' Â· ' + escapeHtml(curRun.Datum || '') + '</div>';
+      let tipHtml = '<div style=\"font-weight:700; font-size:12px; margin-bottom:4px;\">' + escapeHtml(curRun.Computer || 'PC') + ' \u00b7 ' + escapeHtml(curRun.Datum || '') + '</div>';
       if (curRun.Hardware?.BiosVersion) {
-        tipHtml += '<div style=\"font-size:10px; color:var(--text-muted); margin-bottom:6px;\">BIOS: ' + escapeHtml(curRun.Hardware.BiosVersion) + ' Â· Treiber: ' + escapeHtml(curRun.Hardware.GpuDriver || 'n/v') + '</div>';
+        tipHtml += '<div style=\"font-size:10px; color:var(--text-muted); margin-bottom:6px;\">BIOS: ' + escapeHtml(curRun.Hardware.BiosVersion) + ' \u00b7 Treiber: ' + escapeHtml(curRun.Hardware.GpuDriver || 'n/v') + '</div>';
       }
 
       series.forEach(sr => {
         const curVal = sr.data[closestIdx];
         if (curVal == null) {
-          tipHtml += '<div style=\"font-size:11px; margin-top:2px; color:var(--text-muted);\">â— ' + sr.name + ': nicht messbar/nicht vergleichbar</div>';
+          tipHtml += '<div style=\"font-size:11px; margin-top:2px; color:var(--text-muted);\">\u25cf ' + sr.name + ': nicht messbar/nicht vergleichbar</div>';
           return;
         }
         let deltaStr = '';
@@ -26412,7 +26455,7 @@ window.MINIBENCH_DASHBOARD_DATA = window.MINIBENCH_DASHBOARD_DATA || null;
           }
         }
         const vText = (curVal >= 100) ? Math.round(curVal).toString() : (curVal >= 10 ? curVal.toFixed(1) : curVal.toFixed(2));
-        tipHtml += '<div style=\"font-size:11px; margin-top:3px;\"><span style=\"color:' + sr.color + '; font-weight:600;\">â— ' + sr.name + ':</span> <b>' + vText + ' ' + sr.unit + '</b>' + deltaStr + '</div>';
+        tipHtml += '<div style=\"font-size:11px; margin-top:3px;\"><span style=\"color:' + sr.color + '; font-weight:600;\">\u25cf ' + sr.name + ':</span> <b>' + vText + ' ' + sr.unit + '</b>' + deltaStr + '</div>';
       });
 
       tooltip.innerHTML = tipHtml;

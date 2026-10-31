@@ -5,6 +5,14 @@ Neueste Version zuerst. Einzelheiten je Version in Doku\Änderungen_vX.Y.txt (ab
 keine Änderungsdateien mehr; die Einträge nennen nur, was im Quelltext und in den Ã„nderungen zu 2.2 belegt ist.
 Die Liste steht auch im Programm (Info-Knopf oben rechts, Quelle: src\Oberflaeche\Versionen.cs).
 
+VERSION 3.91  (31.10.2026)  ERGEBNIS-DASHBOARD, SCHLANKES OPTIMIERUNGS-LAYOUT & ZEICHENSATZ-KORREKTUR
+====================================================================================================
+• Infoboxen auf der Ergebnisseite vergrößert: Großzügige Kachel-Mindesthöhe (UI.S(132)), AutoSize-Spalte für Metrikbezeichnungen und rechtsbündige Werteverankerung verhindern jedes Abschneiden oder Überlaufen von Texten (z. B. Befundzähler, DPC-Latenzen).
+• Klassifizierung entfernt: Die subjektive Klassifizierungszeile ('High-End', etc.) wurde vollständig vom Ergebnis-Dashboard entfernt; die Gesamtpunktzahl steht dominant und klar gegliedert über den Hardware-Spezifikationen.
+• Schlankes Layout für Optimierung & Wartung: Technische Registry-Pfade und Hintergrunddetails wurden vollständig in Hover-Tooltips ausgelagert; jede Einstellungszeile ist kompakt (42–52 px) mit prägnanter deutscher Kurzbeschreibung, Risikostufen-Badge und interaktivem Schalter gestaltet.
+• Direkter Einstieg ohne Scrollen: Die Master-Detail-Auswahl mit Kategoriewähler und Detailkarte wurde auf beiden Seiten ganz nach oben verlegt; Vorlagen-Pills, Aktionsknöpfe, Absicherung (Wiederherstellungspunkt) und Legende schließen übersichtlich am Seitenende an.
+• Vollständige Zeichensatz-Bereinigung: Beseitigung aller UTF-8-Doppelkodierungen (Mojibake) in der Fußleiste ('Speichern …'), auf den Einstellungsseiten ('Zustand prüfen', 'Werkzeuge holen …', 'gewählt') und in den Dashboard-Diagrammen.
+
 VERSION 3.9  (31.10.2026)  MODERNISIERUNG, 1-FENSTERMODUS, PERSISTENTE MENÜLEISTE & REBAR-KORREKTUR (EXPERIMENTELL)
 ====================================================================================================
 • Master-Detail-Layout für Optimierung & Wartung: Übersichtliches zweispaltiges Design mit Kategoriewähler links (inkl. dynamischem Zähler wie '4/9') und Detailkarte rechts mit Schnellwahl ('Alle an' / 'Alle aus').

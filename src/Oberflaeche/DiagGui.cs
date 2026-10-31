@@ -1,4 +1,4 @@
-using System;
+﻿﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -1361,7 +1361,7 @@ public partial class DiagGui : Form
         pnlCustomPresets = new FlowLayoutPanel(); pnlCustomPresets.AutoSize = true; pnlCustomPresets.WrapContents = false; pnlCustomPresets.BackColor = UI.Bg; pnlCustomPresets.Margin = new Padding(0, UI.S(2), UI.S(2), 0);
         fo.Controls.Add(pnlCustomPresets);
 
-        btnPresetSave = UI.Secondary("Speichern â€¦"); btnPresetSave.Margin = new Padding(0, UI.S(1), UI.S(6), 0); fo.Controls.Add(btnPresetSave);
+        btnPresetSave = UI.Secondary("Speichern \u2026"); btnPresetSave.Margin = new Padding(0, UI.S(1), UI.S(6), 0); fo.Controls.Add(btnPresetSave);
         btnPresetSave.Click += delegate { SavePresetDialog(); };
 
         cmbPreset = new ComboBox(); cmbPreset.Visible = false;
@@ -1378,8 +1378,8 @@ public partial class DiagGui : Form
         chkSingleWindow = Chk("1-Fenstermodus", false); chkSingleWindow.Margin = new Padding(0, UI.S(5), 0, 0);
         fo.Controls.Add(chkSingleWindow);
 
-        btnStart = UI.Primary("Ablauf wÃ¤hlen"); btnStart.Enabled = false; btnStart.Margin = new Padding(UI.S(UI.Abstand5), 0, 0, 0); btnStart.MinimumSize = new Size(UI.S(150), UI.S(44)); btnStart.Anchor = AnchorStyles.Right;
-        Tip(btnStart, "Erst eine Aufgabe wÃ¤hlen oder links ein Modul anhaken.");
+        btnStart = UI.Primary("Ablauf wählen"); btnStart.Enabled = false; btnStart.Margin = new Padding(UI.S(UI.Abstand5), 0, 0, 0); btnStart.MinimumSize = new Size(UI.S(150), UI.S(44)); btnStart.Anchor = AnchorStyles.Right;
+        Tip(btnStart, "Erst eine Aufgabe wählen oder links ein Modul anhaken.");
         btnStart.Click += delegate { StartRun(); };
         foot.Controls.Add(lblSel, 0, 0); foot.Controls.Add(fo, 0, 1); foot.Controls.Add(btnStart, 1, 0); foot.SetRowSpan(btnStart, 2);
         footLayout = delegate
@@ -2199,27 +2199,7 @@ public partial class DiagGui : Form
 
     Control BuildRepairPage()
     {
-        FlowLayoutPanel f = Page("Wartung", "FÃ¼hrt die gewÃ¤hlten Wartungs- und Reparaturaufgaben nacheinander aus. Vorher wird auf Wunsch ein Wiederherstellungspunkt angelegt. Aufgaben mit dem Etikett Neustart werden erst danach vollstÃ¤ndig wirksam.", 4);
-        f.Controls.Add(Section("Absicherung"));
-        chkRestorePoint = Chk("Vorher einen Systemwiederherstellungspunkt anlegen", true); chkRestorePoint.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(2)); f.Controls.Add(chkRestorePoint);
-        lblRestoreWarn = Lbl("", UI.SchriftText, true, UI.Warn); lblRestoreWarn.BackColor = UI.WarnBg; lblRestoreWarn.Padding = new Padding(UI.S(6)); lblRestoreWarn.Margin = new Padding(UI.S(4), UI.S(4), 0, UI.S(2));
-        lblRestoreWarn.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); lblRestoreWarn.Visible = false; f.Controls.Add(lblRestoreWarn);
-        chkRestorePoint.CheckedChanged += delegate { UpdateRestoreWarn(); UpdateSummary(); };
-
-        f.Controls.Add(Section("Reparaturen"));
-        FlowLayoutPanel b = Row(); b.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(UI.Abstand2));
-        pillRepUsual = new PillButton("Empfohlene Auswahl", false); pillRepUsual.Margin = new Padding(0, 0, UI.S(8), 0);
-        pillRepUsual.Picked += delegate {
-            for (int i = 0; i < repChk.Length; i++) repChk[i].Checked = repUsual[i];
-            UpdateRepairCounts();
-        };
-        pillRepNone = new PillButton("Auswahl aufheben", false);
-        pillRepNone.Picked += delegate {
-            foreach (CheckBox c in repChk) c.Checked = false;
-            UpdateRepairCounts();
-        };
-        b.Controls.Add(pillRepUsual); b.Controls.Add(pillRepNone); f.Controls.Add(b);
-        f.Controls.Add(RiskLegend());
+        FlowLayoutPanel f = Page("Wartung", "Führt die gewählten Wartungs- und Reparaturaufgaben nacheinander aus. Vorher wird auf Wunsch ein Wiederherstellungspunkt angelegt. Aufgaben mit dem Etikett Neustart werden erst danach vollständig wirksam.", 4);
 
         repChk = new CheckBox[repKeys.Length];
         ToggleSwitch[] localRepToggles = new ToggleSwitch[repKeys.Length];
@@ -2245,7 +2225,7 @@ public partial class DiagGui : Form
         md.RowCount = 1;
         md.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(240)));
         md.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        md.Margin = new Padding(UI.S(4), UI.S(6), 0, UI.S(8));
+        md.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(8));
 
         FlowLayoutPanel leftCol = new FlowLayoutPanel();
         leftCol.Dock = DockStyle.Fill;
@@ -2324,6 +2304,7 @@ public partial class DiagGui : Form
             picker.Width = UI.S(232);
             string gKey = grp;
             picker.Picked += delegate { SelectRepairCategory(gKey); };
+            Tip(picker, gd ?? "");
             repPickers[grp] = picker;
             leftCol.Controls.Add(picker);
 
@@ -2338,13 +2319,26 @@ public partial class DiagGui : Form
             {
                 string[] parts = SplitDetail(repText[idx]);
                 string tit = parts[0];
-                string desc = parts.Length > 1 && parts[1].Length > 0 ? parts[1] : (repKeys[idx]);
+                string desc = parts.Length > 1 && parts[1].Length > 0 ? parts[1] : "";
                 SettingRow row = new SettingRow(tit, desc, localRepToggles[idx]);
                 row.Width = UI.S(UI.Gruppenbreite - 270);
                 string rsk = idx < repRisk.Length ? repRisk[idx] : "";
                 if (rsk.Length > 0) row.AddBadge(RiskBadge(rsk));
                 string rst = idx < repRestart.Length ? repRestart[idx] : "";
                 if (rst.Length > 0) row.AddBadge(RestartBadge(rst));
+
+                ContractStep cs = steps.Find(delegate(ContractStep c) { return (c.Module == "Reparatur" || c.Module == "Wartung") && c.Key == repKeys[idx]; });
+                StringBuilder t = new StringBuilder(repText[idx]);
+                if (cs != null)
+                {
+                    t.Append("\r\nRisikostufe: ").Append(ContractStep.RiskLabel(cs.Risiko)).Append(cs.Risiko == "Aendern" ? " (protokolliert, auf der Seite Änderungen rücknehmbar)" : cs.Risiko == "Eingriff" ? " (nicht automatisch umkehrbar, Absicherung über den Wiederherstellungspunkt)" : "");
+                    t.Append("\r\nNeustart: ").Append(cs.Neustart == "immer" ? "nötig" : cs.Neustart == "moeglich" ? "kann nötig sein" : "nicht nötig");
+                    if (cs.Minuten > 0) t.Append("\r\nDauer: etwa ").Append(cs.Minuten).Append(" Min.");
+                }
+                string repTip = t.ToString();
+                Tip(row, repTip);
+                Tip(localRepToggles[idx], repTip);
+
                 rowsPanel.Controls.Add(row);
             }
             rowsPanel.Visible = false;
@@ -2368,6 +2362,29 @@ public partial class DiagGui : Form
                 for (int i = 0; i < repKeys.Length; i++) if (GetRepairGroup(i) == curRepKey) repChk[i].Checked = false;
             }
         };
+
+        // --- Unterer Bereich: Vorlagen, Absicherung und Risikolegende ---
+        f.Controls.Add(Section("Vorlagen"));
+        FlowLayoutPanel b = Row(); b.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(UI.Abstand2));
+        pillRepUsual = new PillButton("Empfohlene Auswahl", false); pillRepUsual.Margin = new Padding(0, 0, UI.S(8), 0);
+        pillRepUsual.Picked += delegate {
+            for (int i = 0; i < repChk.Length; i++) repChk[i].Checked = repUsual[i];
+            UpdateRepairCounts();
+        };
+        pillRepNone = new PillButton("Auswahl aufheben", false);
+        pillRepNone.Picked += delegate {
+            foreach (CheckBox c in repChk) c.Checked = false;
+            UpdateRepairCounts();
+        };
+        b.Controls.Add(pillRepUsual); b.Controls.Add(pillRepNone); f.Controls.Add(b);
+
+        f.Controls.Add(Section("Absicherung"));
+        chkRestorePoint = Chk("Vorher einen Systemwiederherstellungspunkt anlegen", true); chkRestorePoint.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(2)); f.Controls.Add(chkRestorePoint);
+        lblRestoreWarn = Lbl("", UI.SchriftText, true, UI.Warn); lblRestoreWarn.BackColor = UI.WarnBg; lblRestoreWarn.Padding = new Padding(UI.S(6)); lblRestoreWarn.Margin = new Padding(UI.S(4), UI.S(4), 0, UI.S(2));
+        lblRestoreWarn.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); lblRestoreWarn.Visible = false; f.Controls.Add(lblRestoreWarn);
+        chkRestorePoint.CheckedChanged += delegate { UpdateRestoreWarn(); UpdateSummary(); };
+
+        f.Controls.Add(RiskLegend());
 
         if (repairGroupOrder.Length > 0) SelectRepairCategory(repairGroupOrder[0]);
         UpdateRepairCounts();
@@ -2499,7 +2516,7 @@ public partial class DiagGui : Form
                 }
             }
             if (repPickers.ContainsKey(grp)) repPickers[grp].SetCounts(sel, tot);
-            if (repCatCount.ContainsKey(grp)) repCatCount[grp].CountText = sel + " von " + tot + " gewÃ¤hlt";
+            if (repCatCount.ContainsKey(grp)) repCatCount[grp].CountText = sel + " von " + tot + " gewählt";
         }
     }
 
@@ -2635,7 +2652,7 @@ public partial class DiagGui : Form
 
     string OptTipText(OptItem it)
     {
-        StringBuilder t = new StringBuilder(it.Tip.Replace(" ¶", "\r\n"));
+        StringBuilder t = new StringBuilder((it.Tip ?? "").Replace(" ¶", "\r\n").Replace("¶", "\r\n"));
         t.Append("\r\nRisikostufe: ").Append(ContractStep.RiskLabel(it.Risiko)).Append(it.Risiko == "Aendern" ? " (protokolliert, auf der Seite Änderungen einzeln rücknehmbar)" : " (nicht automatisch umkehrbar, Absicherung über den Wiederherstellungspunkt)");
         t.Append("\r\nNeustart: ").Append(it.Neustart == "immer" ? "nötig" : it.Neustart == "moeglich" ? "kann nötig sein" : "nicht nötig");
         List<string> vList = new List<string>();
@@ -2654,38 +2671,7 @@ public partial class DiagGui : Form
     {
         ReadOptCatalog();
         FlowLayoutPanel f = Page("Optimierung", "Die Einstellungen des Windows Optimisation Pack mit seiner Sophia- und O&O-Auswahl, nativ umgesetzt und nach Kategorien gruppiert.", 5);
-        f.Controls.Add(Section("Absicherung"));
-        chkOptRestore = Chk("Vorher einen Systemwiederherstellungspunkt anlegen", true); f.Controls.Add(chkOptRestore);
-        f.Controls.Add(Section("Vorlagen und Zustand"));
-
-        FlowLayoutPanel b = Row(); b.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(4));
-        optPresetPills.Clear();
-        string[] pn = new string[] { "Minimal", "Leos Empfehlung", "Erweitert", "Auswahl aufheben" };
-        string[] pkeys = new string[] { "M", "S", "E", "" };
-        for (int i = 0; i < pn.Length; i++)
-        {
-            string key = pkeys[i];
-            PillButton pb = new PillButton(pn[i], i == 0);
-            pb.Margin = new Padding(i == 0 ? 0 : UI.S(8), 0, 0, 0);
-            pb.Picked += delegate {
-                for (int k = 0; k < optPresetPills.Count; k++) optPresetPills[k].Active = (optPresetPills[k] == pb);
-                ApplyOptPreset(key);
-            };
-            optPresetPills.Add(pb);
-            b.Controls.Add(pb);
-        }
-        f.Controls.Add(b);
-
-        b = Row(); b.Margin = new Padding(UI.S(4), UI.S(6), 0, UI.S(4));
-        btnOptCheck = UI.Secondary("Zustand prÃ¼fen"); btnOptCheck.Margin = new Padding(0); btnOptCheck.Click += delegate { CheckOptState(); }; b.Controls.Add(btnOptCheck);
-        btnOptTools = UI.Secondary("Werkzeuge holen â€¦"); btnOptTools.Margin = new Padding(UI.S(8), 0, 0, 0); btnOptTools.Click += delegate { FetchOptTools(); }; b.Controls.Add(btnOptTools);
-        btnOptAll = UI.Secondary("Alle aufklappen"); btnOptAll.Visible = false;
-        f.Controls.Add(b);
-
-        lblOptInfo = Lbl("", 9f, false, UI.Muted); lblOptInfo.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); lblOptInfo.Margin = new Padding(UI.S(4), UI.S(4), UI.S(4), 0); f.Controls.Add(lblOptInfo);
-        lblOptState = Lbl("", 9f, false, UI.Muted); lblOptState.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); lblOptState.Margin = new Padding(UI.S(4), UI.S(2), UI.S(4), UI.S(4)); f.Controls.Add(lblOptState);
-        if (optItems.Count == 0) { lblOptInfo.Text = "Der Katalog der Optimierung fehlt (Skript ohne Modul Optimierung)."; return f; }
-        f.Controls.Add(RiskLegend());
+        if (optItems.Count == 0) { lblOptInfo = Lbl("Der Katalog der Optimierung fehlt (Skript ohne Modul Optimierung).", 9f, false, UI.Muted); f.Controls.Add(lblOptInfo); return f; }
 
         TableLayoutPanel md = new TableLayoutPanel();
         md.Width = UI.S(UI.Gruppenbreite);
@@ -2694,7 +2680,7 @@ public partial class DiagGui : Form
         md.RowCount = 1;
         md.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(240)));
         md.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        md.Margin = new Padding(UI.S(4), UI.S(6), 0, UI.S(8));
+        md.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(8));
 
         FlowLayoutPanel leftCol = new FlowLayoutPanel();
         leftCol.Dock = DockStyle.Fill;
@@ -2780,6 +2766,7 @@ public partial class DiagGui : Form
             picker.Width = UI.S(232);
             string gKey = key;
             picker.Picked += delegate { SelectOptCategory(gKey); };
+            Tip(picker, k[2]);
             optPickers[key] = picker;
             leftCol.Controls.Add(picker);
 
@@ -2809,13 +2796,23 @@ public partial class DiagGui : Form
                     UpdateOptCounts();
                 };
 
-                SettingRow row = new SettingRow(it.Titel, it.Tip, it.Toggle);
+                string shortDesc = it.Tip ?? "";
+                int p = shortDesc.IndexOf(" \u00B6");
+                if (p < 0) p = shortDesc.IndexOf(" \u00B6");
+                if (p >= 0) shortDesc = shortDesc.Substring(0, p).Trim();
+
+                SettingRow row = new SettingRow(it.Titel, shortDesc, it.Toggle);
+                it.Row = row;
                 row.Width = UI.S(UI.Gruppenbreite - 270);
                 if (it.Risiko == "Eingriff") row.AddBadge(RiskBadge("Eingriff"));
                 else if (it.Risiko.Length > 0 && it.Risiko != "Lesen") row.AddBadge(RiskBadge(it.Risiko));
                 if (it.Neustart == "immer") row.AddBadge(RestartBadge("immer"));
                 if (bv != null) row.AddBadge(bv);
                 if (it.StateBadge != null) row.AddBadge(it.StateBadge);
+
+                string fullTip = OptTipText(it);
+                Tip(row, fullTip);
+                Tip(it.Toggle, fullTip);
 
                 rowsPanel.Controls.Add(row);
             }
@@ -2841,7 +2838,42 @@ public partial class DiagGui : Form
             }
         };
 
-        f.Controls.Add(Hint("verwaltet: berÃ¼hrt Gruppenrichtlinien, auf DomÃ¤nen-PCs nicht in den Vorlagen. Benutzereinstellungen gelten fÃ¼r den angemeldeten Benutzer.", 4));
+        // --- Unterer Bereich: Vorlagen, Werkzeuge, Absicherung und Risikolegende ---
+        f.Controls.Add(Section("Vorlagen und Zustand"));
+
+        FlowLayoutPanel bPills = Row(); bPills.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(4));
+        optPresetPills.Clear();
+        string[] pn = new string[] { "Minimal", "Leos Empfehlung", "Erweitert", "Auswahl aufheben" };
+        string[] pkeys = new string[] { "M", "S", "E", "" };
+        for (int i = 0; i < pn.Length; i++)
+        {
+            string key = pkeys[i];
+            PillButton pb = new PillButton(pn[i], i == 0);
+            pb.Margin = new Padding(i == 0 ? 0 : UI.S(8), 0, 0, 0);
+            pb.Picked += delegate {
+                for (int k = 0; k < optPresetPills.Count; k++) optPresetPills[k].Active = (optPresetPills[k] == pb);
+                ApplyOptPreset(key);
+            };
+            optPresetPills.Add(pb);
+            bPills.Controls.Add(pb);
+        }
+        f.Controls.Add(bPills);
+
+        FlowLayoutPanel bTools = Row(); bTools.Margin = new Padding(UI.S(4), UI.S(4), 0, UI.S(4));
+        btnOptCheck = UI.Secondary("Zustand pr\u00FCfen"); btnOptCheck.Margin = new Padding(0); btnOptCheck.Click += delegate { CheckOptState(); }; bTools.Controls.Add(btnOptCheck);
+        btnOptTools = UI.Secondary("Werkzeuge holen \u2026"); btnOptTools.Margin = new Padding(UI.S(8), 0, 0, 0); btnOptTools.Click += delegate { FetchOptTools(); }; bTools.Controls.Add(btnOptTools);
+        btnOptAll = UI.Secondary("Alle aufklappen"); btnOptAll.Visible = false;
+        f.Controls.Add(bTools);
+
+        lblOptInfo = Lbl("", 9f, false, UI.Muted); lblOptInfo.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); lblOptInfo.Margin = new Padding(UI.S(4), UI.S(2), UI.S(4), 0); f.Controls.Add(lblOptInfo);
+        lblOptState = Lbl("", 9f, false, UI.Muted); lblOptState.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); lblOptState.Margin = new Padding(UI.S(4), UI.S(2), UI.S(4), UI.S(4)); f.Controls.Add(lblOptState);
+
+        f.Controls.Add(Section("Absicherung"));
+        chkOptRestore = Chk("Vorher einen Systemwiederherstellungspunkt anlegen", true); f.Controls.Add(chkOptRestore);
+
+        f.Controls.Add(RiskLegend());
+        f.Controls.Add(Hint("verwaltet: ber\u00FChrt Gruppenrichtlinien, auf Dom\u00E4nen-PCs nicht in den Vorlagen. Benutzereinstellungen gelten f\u00FCr den angemeldeten Benutzer.", 4));
+
         if (optCats.Count > 0) SelectOptCategory(optCats[0][0]);
         ApplyOptPreset("M");
         return f;
@@ -2918,7 +2950,7 @@ public partial class DiagGui : Form
             int a = 0, n = 0;
             foreach (OptItem it in optItems) if (it.Kat == key) { a++; if (it.Box != null && it.Box.Checked) n++; }
             if (optPickers.ContainsKey(key)) optPickers[key].SetCounts(n, a);
-            if (optCatCount.ContainsKey(key)) optCatCount[key].CountText = n + " von " + a + " gewÃ¤hlt";
+            if (optCatCount.ContainsKey(key)) optCatCount[key].CountText = n + " von " + a + " gew\u00E4hlt";
         }
     }
 
@@ -4021,7 +4053,7 @@ public partial class DiagGui : Form
     void DeletePresetByName(string n)
     {
         if (String.IsNullOrEmpty(n)) return;
-        if (MessageBox.Show(this, "Voreinstellung \"" + n + "\" lÃ¶schen?", "Leos Minibench", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        if (MessageBox.Show(this, "Voreinstellung \"" + n + "\" l\u00F6schen?", "Leos Minibench", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
         try
         {
             Dictionary<string, object> d = ReadPresetFile(); if (d == null) return;
@@ -4112,7 +4144,7 @@ public partial class DiagGui : Form
     {
         string n = PresetNameOf(cmbPreset.SelectedIndex);
         if (n.Length == 0) return;
-        if (MessageBox.Show(this, "Voreinstellung \"" + n + "\" löschen?", "Leos Minibench", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        if (MessageBox.Show(this, "Voreinstellung \"" + n + "\" l\u00F6schen?", "Leos Minibench", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
         try
         {
             Dictionary<string, object> d = ReadPresetFile(); if (d == null) return;
@@ -4739,7 +4771,7 @@ public partial class DiagGui : Form
             barAll.Value = 100; barAll.Fill = nK > 0 ? UI.Crit : (nW > 0 ? Color.FromArgb(214, 140, 20) : UI.Ok); barAll.Invalidate();
             lblStep.Text = "Abgeschlossen";
             lblCounter.Text = "Bericht und KI-Dateien liegen im Datenordner";
-            lblResult.Text = nK > 0 ? "Kritische Befunde gefunden" : (nW > 0 ? "Warnungen vorhanden" : "Keine AuffÃ¤lligkeiten");
+            lblResult.Text = nK > 0 ? "Kritische Befunde gefunden" : (nW > 0 ? "Warnungen vorhanden" : "Keine Auff\u00E4lligkeiten");
             lblResult.ForeColor = nK > 0 ? UI.Crit : (nW > 0 ? UI.Warn : UI.Ok);
             btnHtml.Visible = File.Exists(htmlPath); btnFolder.Visible = Directory.Exists(outDir); btnKi.Visible = File.Exists(kiPath);
             btnExportRun.Visible = Directory.Exists(outDir);

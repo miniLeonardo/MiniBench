@@ -1293,6 +1293,7 @@ public class SettingRow : Control
     {
         if (b == null) return;
         badges.Add(b);
+        b.SizeChanged += delegate { LayoutControls(); };
         Controls.Add(b);
         LayoutControls();
     }
@@ -1304,22 +1305,30 @@ public class SettingRow : Control
         LayoutControls();
     }
 
+    bool inRecalc = false;
     void RecalcHeight()
     {
-        using (Graphics g = CreateGraphics())
-        using (Font fd = new Font("Segoe UI", UI.SF(8.5f)))
+        if (inRecalc) return;
+        inRecalc = true;
+        try
         {
-            int textW = Math.Max(UI.S(120), Width - UI.S(220));
-            Size dsz = TextRenderer.MeasureText(g, desc, fd, new Size(textW, int.MaxValue), TextFormatFlags.WordBreak);
-            Height = Math.Max(UI.S(46), UI.S(24) + dsz.Height);
+            using (Graphics g = CreateGraphics())
+            using (Font fd = new Font("Segoe UI", UI.SF(8.25f)))
+            {
+                int textW = Math.Max(UI.S(120), Width - UI.S(220));
+                Size dsz = TextRenderer.MeasureText(g, desc, fd, new Size(textW, int.MaxValue), TextFormatFlags.WordBreak);
+                int targetH = String.IsNullOrEmpty(desc) ? UI.S(38) : Math.Min(UI.S(52), Math.Max(UI.S(42), UI.S(22) + dsz.Height));
+                if (Height != targetH) Height = targetH;
+            }
+            LayoutControls();
         }
-        LayoutControls();
+        finally { inRecalc = false; }
     }
 
     protected override void OnResize(EventArgs e)
     {
         base.OnResize(e);
-        LayoutControls();
+        RecalcHeight();
     }
 
     void LayoutControls()
@@ -1393,7 +1402,7 @@ public class SettingRow : Control
         {
             Size tsz = TextRenderer.MeasureText(g, title, ft);
             int titleH = Math.Max(tsz.Height, UI.S(18));
-            int startY = String.IsNullOrEmpty(desc) ? (Height - titleH) / 2 : UI.S(8);
+            int startY = String.IsNullOrEmpty(desc) ? (Height - titleH) / 2 : UI.S(5);
             TextRenderer.DrawText(g, title, ft, new Rectangle(curX, startY, textW, titleH), UI.Text, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
 
             if (!String.IsNullOrEmpty(desc))

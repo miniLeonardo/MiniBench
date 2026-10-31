@@ -1,4 +1,4 @@
-﻿// Vergleichsdatenbank und Systemvergleich (Teilklasse DiagGui)
+﻿﻿// Vergleichsdatenbank und Systemvergleich (Teilklasse DiagGui)
 public partial class DiagGui
 {
     class DbItemComparer : System.Collections.IComparer
@@ -384,7 +384,7 @@ public partial class DiagGui
         Button btnNas = UI.Secondary("Netzlaufwerk ..."); btnNas.Margin = new Padding(UI.S(8), 0, 0, 0); btnNas.Click += delegate { ShowConnectNasDialog(); };
         Tip(btnNas, "Richtet ein Netzlaufwerk (NAS) als Spiegel der Berichte und der Datenbank ein oder entfernt es. Gearbeitet wird immer auf dem Stick.");
         btnToggleGroups = UI.Secondary("Alle aufklappen"); btnToggleGroups.Margin = new Padding(UI.S(8), 0, 0, 0); btnToggleGroups.Click += delegate { ToggleAllGroups(); };
-        Tip(btnToggleGroups, "Klappt alle GerÃ¤tegruppen in der Datenbank ein oder aus.");
+        Tip(btnToggleGroups, "Klappt alle Ger\u00E4tegruppen in der Datenbank ein oder aus.");
         topTools.Controls.Add(imp); topTools.Controls.Add(btnToggleGroups); topTools.Controls.Add(btnDbClean); topTools.Controls.Add(rel); topTools.Controls.Add(open); topTools.Controls.Add(btnNas);
         top.Controls.Add(topTools);
 

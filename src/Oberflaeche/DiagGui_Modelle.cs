@@ -1,4 +1,4 @@
-﻿// Datenmodelle der grafischen Oberfläche
+// Datenmodelle der grafischen Oberfläche
 
 // Ein System aus der Vergleichsdatenbank (eine JSON-Datei je Lauf)
 public class DbEntry
@@ -226,7 +226,7 @@ public class ContractStep
 class OptItem
 {
     public string Id = "", Kat = "", Risiko = "", Neustart = "", Vorlagen = "", Bedingung = "", Titel = "", Tip = "", Zustand = "", ZustandText = "";
-    public bool Verwaltet; public int Minuten; public CheckBox Box; public ToggleSwitch Toggle;
+    public bool Verwaltet; public int Minuten; public CheckBox Box; public ToggleSwitch Toggle; public SettingRow Row;
     public Badge StateBadge;   // ab v3.64: Zustand auf diesem PC als Etikett neben dem Eintrag
 }
 

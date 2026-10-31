@@ -2,6 +2,15 @@
 
 Alle wesentlichen Änderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v3.91 (31.10.2026)
+
+### Verbessert
+* **Ergebnis-Dashboard:** Kachel-Mindesthöhe auf 132 px vergrößert und Tabellenlayout auf zweispaltig mit automatischer Beschriftungsbreite und rechtsbündigen Werten umgestellt; verhindert jegliches Abschneiden von Messwerten und Befundtexten.
+* **Klassifizierung entfernt:** Die subjektive Einstufung ('High-End: auch anspruchsvolle Spiele ...') wurde unter dem Gesamtergebnis entfernt; der Score steht nun sauber und ungestört im Zentrum.
+* **Schlankes Master-Detail-Layout:** Zeilenhöhe auf den Seiten Optimierung und Wartung auf 42–52 px gestrafft; technische Registry-Pfade und Hintergrunddetails wurden in Tooltips ausgelagert.
+* **Layout-Reihenfolge:** Kategoriewahl und Einstellungskarte stehen ab sofort ganz oben auf den Seiten Optimierung und Wartung; Voreinstellungen, Werkzeug-Aktionen und Systemwiederherstellungspunkt befinden sich aufgeräumt am Fuß der Seite.
+* **Zeichensatz-Korrektur:** Sämtliche UTF-8-Darstellungsfehler (Mojibake wie 'prÃ¼fen', 'Speichern â€¦') in Fußleiste, Einstellungsseiten und Dashboard-Grafiken wurden behoben.
+
 ## v3.9 (31.10.2026)
 
 ### Neu

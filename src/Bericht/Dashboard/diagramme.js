@@ -1,4 +1,4 @@
-﻿  function renderFindingsGrid() {
+﻿﻿  function renderFindingsGrid() {
     if (!findingsGrid) return;
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
@@ -852,15 +852,15 @@
       const curRun = runs[closestIdx];
       const prevRun = closestIdx > 0 ? runs[closestIdx - 1] : null;
 
-      let tipHtml = '<div style=\"font-weight:700; font-size:12px; margin-bottom:4px;\">' + escapeHtml(curRun.Computer || 'PC') + ' Â· ' + escapeHtml(curRun.Datum || '') + '</div>';
+      let tipHtml = '<div style=\"font-weight:700; font-size:12px; margin-bottom:4px;\">' + escapeHtml(curRun.Computer || 'PC') + ' \u00b7 ' + escapeHtml(curRun.Datum || '') + '</div>';
       if (curRun.Hardware?.BiosVersion) {
-        tipHtml += '<div style=\"font-size:10px; color:var(--text-muted); margin-bottom:6px;\">BIOS: ' + escapeHtml(curRun.Hardware.BiosVersion) + ' Â· Treiber: ' + escapeHtml(curRun.Hardware.GpuDriver || 'n/v') + '</div>';
+        tipHtml += '<div style=\"font-size:10px; color:var(--text-muted); margin-bottom:6px;\">BIOS: ' + escapeHtml(curRun.Hardware.BiosVersion) + ' \u00b7 Treiber: ' + escapeHtml(curRun.Hardware.GpuDriver || 'n/v') + '</div>';
       }
 
       series.forEach(sr => {
         const curVal = sr.data[closestIdx];
         if (curVal == null) {
-          tipHtml += '<div style=\"font-size:11px; margin-top:2px; color:var(--text-muted);\">â— ' + sr.name + ': nicht messbar/nicht vergleichbar</div>';
+          tipHtml += '<div style=\"font-size:11px; margin-top:2px; color:var(--text-muted);\">\u25cf ' + sr.name + ': nicht messbar/nicht vergleichbar</div>';
           return;
         }
         let deltaStr = '';
@@ -877,7 +877,7 @@
           }
         }
         const vText = (curVal >= 100) ? Math.round(curVal).toString() : (curVal >= 10 ? curVal.toFixed(1) : curVal.toFixed(2));
-        tipHtml += '<div style=\"font-size:11px; margin-top:3px;\"><span style=\"color:' + sr.color + '; font-weight:600;\">â— ' + sr.name + ':</span> <b>' + vText + ' ' + sr.unit + '</b>' + deltaStr + '</div>';
+        tipHtml += '<div style=\"font-size:11px; margin-top:3px;\"><span style=\"color:' + sr.color + '; font-weight:600;\">\u25cf ' + sr.name + ':</span> <b>' + vText + ' ' + sr.unit + '</b>' + deltaStr + '</div>';
       });
 
       tooltip.innerHTML = tipHtml;
