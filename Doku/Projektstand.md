@@ -3,7 +3,7 @@
 Gemeinsamer Stand für alle Agenten (Claude, Antigravity). Wird am Ende jeder Version aktualisiert (siehe AGENTS.md).
 
 ## Stand: Version 3.9 (31.10.2026) - Experimentell
-Experimentelle Version. Modernisierung, 1-Fenstermodus, persistente Menüleiste & ReBAR-Korrektur auf https://github.com/miniLeonardo/MiniBench (Zweig main).
+Release-Commit "Release v3.9: Modernisierung, 1-Fenstermodus, persistente Menüleiste & ReBAR-Korrektur (Experimentell)" (Commit 0dfbb40) auf https://github.com/miniLeonardo/MiniBench (Zweig main).
 Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.
 
 Inhalt von 3.9 (Einzelheiten in Doku\Änderungen_v3.9.txt):
