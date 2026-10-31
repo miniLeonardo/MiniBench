@@ -3,15 +3,15 @@
 Gemeinsamer Stand für alle Agenten (Claude, Antigravity). Wird am Ende jeder Version aktualisiert (siehe AGENTS.md).
 
 ## Stand: Version 3.91 (31.10.2026)
-Release-Commit \"Release v3.91: Ergebnis-Dashboard, schlankes Optimierungs-Layout & Zeichensatz-Korrektur\" auf https://github.com/miniLeonardo/MiniBench (Zweig main).
+Release-Commit "Release v3.91: Ergebnis-Dashboard, schlankes Optimierungs-Layout & Zeichensatz-Korrektur" (Commit e7d9a18) auf https://github.com/miniLeonardo/MiniBench (Zweig main).
 Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.
 
 Inhalt von 3.91 (Einzelheiten in Doku\Änderungen_v3.91.txt):
 1. Ergebnis-Dashboard: Infoboxen/Kacheln vergrößert (Mindesthöhe 132 px, Innenabstand 16/12 px), Tabellenlayout mit AutoSize für Beschriftungen und rechtsbündigen Werten; kein Textabschneiden mehr bei Befundhinweisen oder DPC-Latenzen.
-2. Klassifizierung entfernt: Subjektive Klassifizierungszeile (\"High-End...\", etc.) ersatzlos gestrichen; Gesamtscore steht prominent im Mittelpunkt.
+2. Klassifizierung entfernt: Subjektive Klassifizierungszeile ('High-End...', etc.) ersatzlos gestrichen; Gesamtscore steht prominent im Mittelpunkt.
 3. Schlankes Optimierungs- und Wartungs-Layout: Technische Registry-Pfade und Hintergrunddetails vollständig in Tooltips ausgelagert; kompakte Zeilenhöhe (42–52 px) mit Kurzbeschreibung, Risikostufen-Badge und Schalter.
 4. Seitenaufbau optimiert: Master-Detail-Bereich steht ab sofort an oberster Stelle ohne Scrollen; Voreinstellungen, Werkzeug-Aktionen, Wiederherstellungspunkt und Legende sauber am Seitenende platziert.
-5. Vollständige Zeichensatz-Bereinigung: Beseitigung aller UTF-8-Mojibake-Artefakte (\"prÃ¼fen\", \"Speichern â€¦\") in Fußleiste, Modulseiten und Dashboard-Diagrammen.
+5. Vollständige Zeichensatz-Bereinigung: Beseitigung aller UTF-8-Mojibake-Artefakte ('prüfen', 'Speichern …') in Fußleiste, Modulseiten und Dashboard-Diagrammen.
 
 ## Vorher: Version 3.9 (31.10.2026) - Experimentell
 Release-Commit "Release v3.9: Modernisierung, 1-Fenstermodus, persistente Menüleiste & ReBAR-Korrektur (Experimentell)" (Commit 0dfbb40) auf https://github.com/miniLeonardo/MiniBench (Zweig main).
