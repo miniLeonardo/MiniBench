@@ -11,6 +11,13 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.0", "05.11.2026", "Aufgeräumt: Ganzheitliche Vereinheitlichung und Bereinigung der Oberfläche",
+            "\u2022 Ganzheitliche Vereinheitlichung der Oberfl\u00E4che: Bereinigung aller Inkonsistenzen, einheitliche Begrifflichkeiten (Lauf, System, Modul, Aufgabe, Einstellung, Vorlage, Ablauf) und Beseitigung s\u00E4mtlicher Entwicklersprache.\r\n" +
+            "\u2022 Globales Einstellungs-Men\u00FC: Zentraler Zahnrad-Knopf in der Kopfzeile b\u00FCndelt alle globalen Einstellungen (Darstellung, Startseite, 1-Fenstermodus, Datenschutz/Anonymisierung, Speicherorte & Netzlaufwerk, Updates, Danksagung/Lizenzen); die Fu\u00DFleiste wurde aufger\u00E4umt und fokussiert.\r\n" +
+            "\u2022 Einheitliche Einstellungszeilen (SettingRow): Dynamische H\u00F6henberechnung verhindert Textabschneiden, deterministisches Spaltenraster [Zustand] \u2192 [Risiko] \u2192 [Neustart] \u2192 [Schalter] schlie\u00DFt \u00DCberlappungen aus.\r\n" +
+            "\u2022 Kategorielisten mit Kurztiteln & Symbolen: Optimierung und Wartung nutzen sprechende Kategorie-Symbole und Kurztitel gegen Text\u00FCberl\u00E4ufe; Pillen-Z\u00E4hler einheitlich in Akzentfarbe (X/Y).\r\n" +
+            "\u2022 Entflechtete Datenbank-Bedienung: Strikte Trennung zwischen Haken f\u00FCr den Mehrfachvergleich im Dashboard ('Im Dashboard vergleichen') und Zeilen-Markierung f\u00FCr Einzelaktionen; neue Suchleiste, leere Zustandskarte und dynamische Spaltenbreiten.\r\n" +
+            "\u2022 Dezimale Versionspr\u00FCfung & Barrierefreiheit: Korrekter dezimaler Versionsvergleich (3.882 < 3.9 < 3.91 < 4.0), vollst\u00E4ndige Tastatur-Bedienung (F5, Strg+F, Strg+Enter) und Screenreader-Attribute (AccessibleRole/AccessibleName) f\u00FCr alle interaktiven Steuerelemente."),
         new Eintrag("3.91", "31.10.2026", "Ergebnis-Dashboard, schlankes Optimierungs-Layout & Zeichensatz-Korrektur",
             "\u2022 Infoboxen auf der Ergebnisseite vergr\u00F6\u00DFert: Gro\u00DFz\u00FCgige Kachel-Mindesth\u00F6he (UI.S(132)), AutoSize-Spalte f\u00FCr Metrikbezeichnungen und rechtsb\u00FCndige Werteverankerung verhindern jedes Abschneiden oder \u00DCberlaufen von Texten (z. B. Befundz\u00E4hler, DPC-Latenzen).\r\n" +
             "\u2022 Klassifizierung entfernt: Die subjektive Klassifizierungszeile ('High-End', etc.) wurde vollst\u00E4ndig vom Ergebnis-Dashboard entfernt; die Gesamtpunktzahl steht dominant und klar gegliedert \u00FCber den Hardware-Spezifikationen.\r\n" +

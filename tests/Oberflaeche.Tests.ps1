@@ -57,6 +57,10 @@ Describe 'Selbsttest der Oberfläche' {
         @{ Fall = 'Etikett.Schreibweise' }
         @{ Fall = 'Karte' }
         @{ Fall = 'StartseitenElemente' }
+        @{ Fall = 'UI.VersionNumber' }
+        @{ Fall = 'SettingRow.Dynamik' }
+        @{ Fall = 'CategoryPickerItem.Kurztitel' }
+        @{ Fall = 'UI.SkalierungDpi' }
     ) {
         Assert-GuiSelbsttest $Fall
     }

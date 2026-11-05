@@ -14,19 +14,19 @@
 @{
     Katalog     = 1
     Kategorien  = @(
-        @{ Key = 'Datenschutz';  Titel = 'Datenschutz und Telemetrie'; Text = 'Diagnosedaten, Fehlerberichte, Werbe-ID und andere Datenübertragungen an Microsoft.' }
-        @{ Key = 'Werbung';      Titel = 'Werbung, Tipps und Vorschläge'; Text = 'Empfehlungen, Tipps, App-Vorschläge und automatisch installierte Apps.' }
-        @{ Key = 'KI';           Titel = 'Suche, Cortana, Copilot und KI'; Text = 'Websuche im Startmenü, Cortana, Copilot, Recall und KI-Funktionen in Paint.' }
-        @{ Key = 'Berechtigung'; Titel = 'App-Berechtigungen, Verlauf und Synchronisierung'; Text = 'Zugriff von Apps auf Konto, Diagnose, Standort und Bewegung, Aktivitätsverlauf, Zwischenablage und Synchronisierung.' }
-        @{ Key = 'Hintergrund';  Titel = 'Dienste und geplante Aufgaben'; Text = 'Dienste und Aufgaben, die im Hintergrund laufen und auf den meisten PCs nicht gebraucht werden.' }
-        @{ Key = 'Funktionen';   Titel = 'Windows-Funktionen und Zusatzfeatures'; Text = 'Optionale Windows-Funktionen abschalten und selten gebrauchte Zusatzfeatures entfernen.' }
-        @{ Key = 'Apps';         Titel = 'Vorinstallierte Apps entfernen'; Text = 'Apps aus dem Microsoft Store, die Windows mitbringt. Zurück nur über den Store.' }
-        @{ Key = 'Bedienung';    Titel = 'Explorer, Taskleiste und Start'; Text = 'Dateiendungen, Schnellzugriff, Taskleiste, Startmenü und Kontextmenüs.' }
-        @{ Key = 'Darstellung';  Titel = 'Darstellung und persönliche Vorlieben'; Text = 'Geschmackssache: dunkler Modus, Taskleiste links, Laufwerksname und Ähnliches.' }
-        @{ Key = 'Leistung';     Titel = 'Leistung, Spiele und Energie'; Text = 'Indizierung, Maus, Spiele-Prioritäten, Grafikplanung, Energieplan und Ruhezustand.' }
-        @{ Key = 'Update';       Titel = 'Windows Update, Edge und OneDrive'; Text = 'Übermittlungsoptimierung, Neustartverhalten, Updates anderer Microsoft-Produkte, Edge im Hintergrund und OneDrive.' }
-        @{ Key = 'Sicherheit';   Titel = 'Sicherheit und Fernzugriff'; Text = 'Netzwerkschutz, unerwünschte Apps, Remoteunterstützung, Remotedesktop und verschlüsseltes DNS.' }
-        @{ Key = 'Grafik';       Titel = 'Grafiktreiber'; Text = 'Grafiktreiber restlos entfernen (DDU) und NVIDIA-Profil setzen.' }
+        @{ Key = 'Datenschutz';  Titel = 'Datenschutz und Telemetrie'; Kurztitel = 'Datenschutz'; Symbol = 'IcoShield'; Text = 'Diagnosedaten, Fehlerberichte, Werbe-ID und andere Datenübertragungen an Microsoft.' }
+        @{ Key = 'Werbung';      Titel = 'Werbung, Tipps und Vorschläge'; Kurztitel = 'Werbung & Tipps'; Symbol = 'IcoBell'; Text = 'Empfehlungen, Tipps, App-Vorschläge und automatisch installierte Apps.' }
+        @{ Key = 'KI';           Titel = 'Suche, Cortana, Copilot und KI'; Kurztitel = 'Suche & KI'; Symbol = 'IcoSearch'; Text = 'Websuche im Startmenü, Cortana, Copilot, Recall und KI-Funktionen in Paint.' }
+        @{ Key = 'Berechtigung'; Titel = 'App-Berechtigungen, Verlauf und Synchronisierung'; Kurztitel = 'Berechtigungen'; Symbol = 'IcoLock'; Text = 'Zugriff von Apps auf Konto, Diagnose, Standort und Bewegung, Aktivitätsverlauf, Zwischenablage und Synchronisierung.' }
+        @{ Key = 'Hintergrund';  Titel = 'Dienste und geplante Aufgaben'; Kurztitel = 'Hintergrunddienste'; Symbol = 'IcoGear'; Text = 'Dienste und Aufgaben, die im Hintergrund laufen und auf den meisten PCs nicht gebraucht werden.' }
+        @{ Key = 'Funktionen';   Titel = 'Windows-Funktionen und Zusatzfeatures'; Kurztitel = 'Funktionen'; Symbol = 'IcoCheck'; Text = 'Optionale Windows-Funktionen abschalten und selten gebrauchte Zusatzfeatures entfernen.' }
+        @{ Key = 'Apps';         Titel = 'Vorinstallierte Apps entfernen'; Kurztitel = 'Apps entfernen'; Symbol = 'IcoApp'; Text = 'Apps aus dem Microsoft Store, die Windows mitbringt. Zurück nur über den Store.' }
+        @{ Key = 'Bedienung';    Titel = 'Explorer, Taskleiste und Start'; Kurztitel = 'Bedienung & Start'; Symbol = 'IcoFolder'; Text = 'Dateiendungen, Schnellzugriff, Taskleiste, Startmenü und Kontextmenüs.' }
+        @{ Key = 'Darstellung';  Titel = 'Darstellung und persönliche Vorlieben'; Kurztitel = 'Darstellung'; Symbol = 'IcoSun'; Text = 'Geschmackssache: dunkler Modus, Taskleiste links, Laufwerksname und Ähnliches.' }
+        @{ Key = 'Leistung';     Titel = 'Leistung, Spiele und Energie'; Kurztitel = 'Leistung & Spiele'; Symbol = 'IcoFlame'; Text = 'Indizierung, Maus, Spiele-Prioritäten, Grafikplanung, Energieplan und Ruhezustand.' }
+        @{ Key = 'Update';       Titel = 'Windows Update, Edge und OneDrive'; Kurztitel = 'Update & Edge'; Symbol = 'IcoRefresh'; Text = 'Übermittlungsoptimierung, Neustartverhalten, Updates anderer Microsoft-Produkte, Edge im Hintergrund und OneDrive.' }
+        @{ Key = 'Sicherheit';   Titel = 'Sicherheit und Fernzugriff'; Kurztitel = 'Sicherheit'; Symbol = 'IcoShield'; Text = 'Netzwerkschutz, unerwünschte Apps, Remoteunterstützung, Remotedesktop und verschlüsseltes DNS.' }
+        @{ Key = 'Grafik';       Titel = 'Grafiktreiber'; Kurztitel = 'Grafiktreiber'; Symbol = 'IcoGpu'; Text = 'Grafiktreiber restlos entfernen (DDU) und NVIDIA-Profil setzen.' }
     )
     Eintraege   = @(
         # ------------------------------------------------------------------ Datenschutz und Telemetrie

@@ -2,7 +2,19 @@
 
 Gemeinsamer Stand für alle Agenten (Claude, Antigravity). Wird am Ende jeder Version aktualisiert (siehe AGENTS.md).
 
-## Stand: Version 3.91 (31.10.2026)
+## Stand: Version 4.0 (05.11.2026)
+Release-Commit "Release v4.0: Aufgeräumt: Ganzheitliche Vereinheitlichung und Bereinigung der Oberfläche" auf https://github.com/miniLeonardo/MiniBench (Zweig main).
+Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.
+
+Inhalt von 4.0 (Einzelheiten in Doku\Änderungen_v4.0.txt):
+1. Globales Einstellungs-Menü: Zahnrad-Knopf in der Kopfzeile bündelt alle übergeordneten Konfigurationen (Darstellung, Startseite, 1-Fenstermodus, Datenschutz/Anonymisierung, Pfade & Netzlaufwerk, automatische Updates sowie Über/Danksagungen); die Fußleiste ist radikal auf Vorlagen und Startknopf entschlackt.
+2. Einheitliche Einstellungszeilen (SettingRow): Dynamische Höhenberechnung ohne starren Deckel beseitigt abgeschnittene Zeilentexte; deterministisches Spaltenraster [Zustand] → [Risiko] → [Neustart] → [Schalter] verhindert Überlappungen von Badges und Titeln verlässlich.
+3. Kategorielisten & Kurztitel: Kategorien in Wartung und Optimierung führen Kurztitel gegen Spaltenüberläufe und sprechende Fachsymbole (UI.IcoShield, UI.IcoClean etc.); einheitliche Pillen-Zähler in Akzentfarbe (X/Y).
+4. Entflechtete Datenbank-Bedienung: Haken steuern ausschließlich den Mehrfachvergleich im Dashboard; Zeilenmarkierung steuert Einzelaktionen; neue Filter-Suchleiste, leere Zustandskarte und dynamische Spaltenbreiten.
+5. Verbindliches Glossar & Sprache: Bereinigung jeglicher Entwicklersprache (Versionsbezüge, Skriptnamen); verbindliche Begriffe (Lauf, System, Modul, Aufgabe, Einstellung, Vorlage, Ablauf).
+6. Dezimale Versionsprüfung & Barrierefreiheit: UI.VersionNumber verhindert Fehlalarme bei Update-Badges (3.882 < 3.91 < 4.0); Screenreader-Attribute (AccessibleRole/AccessibleName) auf allen interaktiven Steuerelementen; Tastatursteuerung mit F5, Strg+F, Strg+Enter.
+
+## Vorher: Version 3.91 (31.10.2026)
 Release-Commit "Release v3.91: Ergebnis-Dashboard, schlankes Optimierungs-Layout & Zeichensatz-Korrektur" (Commit e7d9a18) auf https://github.com/miniLeonardo/MiniBench (Zweig main).
 Getestet und gebaut unter Windows mit Windows PowerShell 5.1 und Pester 6.2.0.
 
@@ -225,4 +237,4 @@ Inhalt von 3.64 (Einzelheiten in Doku\Ãƒâ€žnderungen_v3.64.txt):
 Keine offenen Befunde.
 
 ## Letzter Commit
-Release-Commit v3.88: Einklappbare Datenbank-Gruppen, Dark-Mode-Kontrast, Startseiten-Layout & Zeichensatz-Korrektur (Commit 16a08c2)
+Release-Commit v4.0: Aufgeräumt: Ganzheitliche Vereinheitlichung und Bereinigung der Oberfläche

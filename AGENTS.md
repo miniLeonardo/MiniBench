@@ -68,6 +68,10 @@ Minibench-Daten     Datenordner neben der exe: Berichte, Datenbank (JSON, PC-Dia
 18. Als Referenz für Vergleiche und Prozentwerte dient eine gespeicherte Referenzdatei (z.B. Referenz.json, Referenz_Desktop.json,
     Referenz_Notebook.json), nicht ein dynamischer Medianwert zur Laufzeit. Die Aktualisierung erfolgt kontrolliert auf
     Knopfdruck oder über `-MedianAktualisieren`.
+19. Einheitliche Fachbegriffe (Glossar): *Lauf* = eine Programmausführung; *System / Gerät* = ein physischer PC;
+    *Modul* = Hauptbestandteil (Diagnose, Benchmark, Lasttest, Wartung, Optimierung); *Aufgabe* = Einzelschritt in der Wartung;
+    *Einstellung* = Option in der Optimierung; *Vorlage* = gespeicherte Gesamtauswahl (der Begriff „Voreinstellung“ entfällt);
+    *Ablauf* = gewählte Module in Ausführungsreihenfolge.
 
 ## Regeln für Tests
 1. Nach Fachgebiet, nicht nach Version. Verhaltenstests (Funktion im Testmodul aufrufen, Ergebnis prüfen) vor Regex auf

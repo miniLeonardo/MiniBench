@@ -1,9 +1,18 @@
-﻿LEOS MINIBENCH: VERSIONSHISTORIE
+LEOS MINIBENCH: VERSIONSHISTORIE
 ================================
 
 Neueste Version zuerst. Einzelheiten je Version in Doku\Änderungen_vX.Y.txt (ab 2.2). Für 1.0 bis 2.1 gibt es
 keine Änderungsdateien mehr; die Einträge nennen nur, was im Quelltext und in den Ã„nderungen zu 2.2 belegt ist.
 Die Liste steht auch im Programm (Info-Knopf oben rechts, Quelle: src\Oberflaeche\Versionen.cs).
+
+VERSION 4.0  (05.11.2026)  AUFGERÄUMT: GANZHEITLICHE VEREINHEITLICHUNG UND BEREINIGUNG DER OBERFLÄCHE
+====================================================================================================
+• Ganzheitliche Vereinheitlichung der Oberfläche: Bereinigung aller Inkonsistenzen, einheitliche Begrifflichkeiten (Lauf, System, Modul, Aufgabe, Einstellung, Vorlage, Ablauf) und Beseitigung sämtlicher Entwicklersprache.
+• Globales Einstellungs-Menü: Zentraler Zahnrad-Knopf in der Kopfzeile bündelt alle globalen Optionen (Darstellung, Startseite, 1-Fenstermodus, Datenschutz/Anonymisierung, Speicherorte & Netzlaufwerk, Updates, Danksagung/Lizenzen); die Fußleiste wurde deutlich entschlackt.
+• Einheitliche Einstellungszeilen (SettingRow): Dynamische Höhenberechnung verhindert Textabschneiden, deterministisches Spaltenraster [Zustand] → [Risiko] → [Neustart] → [Schalter] schließt Überlappungen aus.
+• Kategorielisten mit Kurztiteln & Symbolen: Optimierung und Wartung nutzen sprechende Kategorie-Symbole und Kurztitel gegen Textüberläufe; Pillen-Zähler einheitlich in Akzentfarbe (X/Y).
+• Entflechtete Datenbank-Bedienung: Strikte Trennung zwischen Haken für den Mehrfachvergleich im Dashboard ('Im Dashboard vergleichen') und Zeilen-Markierung für Einzelaktionen; neue Suchleiste, leere Zustandskarte und dynamische Spaltenbreiten.
+• Dezimale Versionsprüfung & Barrierefreiheit: Korrekter dezimaler Versionsvergleich (3.882 < 3.9 < 3.91 < 4.0), vollständige Tastatur-Bedienung (F5, Strg+F, Strg+Enter) und Screenreader-Attribute (AccessibleRole/AccessibleName) für alle interaktiven Steuerelemente.
 
 VERSION 3.91  (31.10.2026)  ERGEBNIS-DASHBOARD, SCHLANKES OPTIMIERUNGS-LAYOUT & ZEICHENSATZ-KORREKTUR
 ====================================================================================================

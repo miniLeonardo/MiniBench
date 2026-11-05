@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -75,7 +75,9 @@ public partial class DiagGui : Form
     LinkLabel lnkOptAll, lnkOptNone, lnkRepAll, lnkRepNone;
     PillButton pillRepUsual, pillRepNone;
     FlowLayoutPanel left;
-    Button btnThemeToggle;
+    Button btnThemeToggle, btnSettings;
+    FlowLayoutPanel fo;
+    Panel[] modBanners = new Panel[6];
     Badge badgeSensStatus;
     List<NavItem> nav = new List<NavItem>();
     List<Control> pages = new List<Control>();
@@ -398,6 +400,10 @@ public partial class DiagGui : Form
         };
         Tip(btnInfo, "Info und Versionshistorie: was sich von Version 1.0 bis " + this.version + " geändert hat.");
         hr.Controls.Add(btnInfo);
+        btnSettings = HeadButton(UI.IcoGear);
+        btnSettings.Click += delegate { ShowSettingsDialog(); };
+        Tip(btnSettings, "Globale Einstellungen für Darstellung, Startverhalten, Ergebnisanzeige, Datenschutz und Speicherorte.");
+        hr.Controls.Add(btnSettings);
         btnThemeToggle = HeadButton(UI.IsDark ? UI.IcoSonne : UI.IcoMond);
         btnThemeToggle.Click += delegate { ToggleTheme(); };
         Tip(btnThemeToggle, UI.IsDark ? "Zu hellem Farbschema wechseln." : "Zu dunklem Farbschema wechseln.");
@@ -872,7 +878,7 @@ public partial class DiagGui : Form
 
         string msg = "Möchten Sie das Update auf Version " + AvailableUpdateVersion + " jetzt herunterladen und LMB.exe automatisch austauschen?\r\n\r\n" +
                      "Die bisherige Programmdatei wird im Archiv gesichert und die Anwendung anschlie\u00DFend neu gestartet.";
-        if (MessageBox.Show(this, msg, "Minibench Update", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+        if (!UI.Ask(msg, "Minibench Update", this))
             return;
 
         try
@@ -924,7 +930,7 @@ public partial class DiagGui : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, "Fehler beim Herunterladen des Updates:\r\n\r\n" + ex.Message, "Update Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            UI.Hinweis("Fehler beim Herunterladen des Updates:\r\n\r\n" + ex.Message, "Update Fehler", this);
         }
         finally
         {
@@ -975,10 +981,231 @@ public partial class DiagGui : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, "Fehler beim Vorbereiten des Programmaustauschs:\r\n\r\n" + ex.Message, "Update Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            UI.Hinweis("Fehler beim Vorbereiten des Programmaustauschs:\r\n\r\n" + ex.Message, "Update Fehler", this);
         }
     }
 
+    void ShowSettingsDialog()
+    {
+        using (Form dlg = new Form())
+        {
+            dlg.Text = "Einstellungen";
+            dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+            dlg.MaximizeBox = false;
+            dlg.MinimizeBox = false;
+            dlg.StartPosition = FormStartPosition.CenterParent;
+            dlg.ClientSize = new Size(UI.S(540), UI.S(560));
+            dlg.Font = new Font("Segoe UI", UI.SF(9.5f));
+
+            Panel bodyPnl = new Panel();
+            bodyPnl.Dock = DockStyle.Fill;
+            bodyPnl.AutoScroll = true;
+            bodyPnl.Padding = new Padding(UI.S(24), UI.S(16), UI.S(24), UI.S(16));
+
+            FlowLayoutPanel flow = new FlowLayoutPanel();
+            flow.FlowDirection = FlowDirection.TopDown;
+            flow.WrapContents = false;
+            flow.AutoSize = true;
+            flow.Dock = DockStyle.Top;
+            flow.BackColor = Color.Transparent;
+
+            // 1. Darstellung
+            Label secTheme = Section("Darstellung");
+            secTheme.Margin = new Padding(0, 0, 0, UI.S(4));
+            flow.Controls.Add(secTheme);
+
+            FlowLayoutPanel rowTheme = Row();
+            RadioButton rbDark = new RadioButton(); rbDark.Text = "Dunkel"; rbDark.AutoSize = true; rbDark.Checked = UI.IsDark; rbDark.ForeColor = UI.Text;
+            RadioButton rbLight = new RadioButton(); rbLight.Text = "Hell"; rbLight.AutoSize = true; rbLight.Checked = !UI.IsDark; rbLight.ForeColor = UI.Text;
+            rbDark.Margin = new Padding(0, 0, UI.S(16), 0);
+            rowTheme.Controls.Add(rbDark); rowTheme.Controls.Add(rbLight);
+            flow.Controls.Add(rowTheme);
+
+            // 2. Startverhalten
+            Label secStart = Section("Startverhalten");
+            flow.Controls.Add(secStart);
+            CheckBox chkShowStart = Chk("Beim Programmstart die Startseite anzeigen", LoadStartPagePreference());
+            flow.Controls.Add(chkShowStart);
+
+            // 3. Ergebnisanzeige
+            Label secResults = Section("Ergebnisanzeige");
+            flow.Controls.Add(secResults);
+            CheckBox chkRes1Window = Chk("Ergebnisse direkt im Programmfenster anzeigen (1-Fenstermodus)", chkSingleWindow != null && chkSingleWindow.Checked);
+            flow.Controls.Add(chkRes1Window);
+
+            // 4. Datenschutz
+            Label secPrivacy = Section("Datenschutz");
+            flow.Controls.Add(secPrivacy);
+            CheckBox chkPrivAnon = Chk("Personenbezogene Daten fÃ¼r KI-Auswertung entfernen", chkAnon != null && chkAnon.Checked);
+            flow.Controls.Add(chkPrivAnon);
+
+            // 5. Speicherorte & Daten
+            Label secData = Section("Speicherorte und Daten");
+            flow.Controls.Add(secData);
+            Label lblDataDir = Hint("Datenordner: " + (dataDir.Length > 0 ? dataDir : "Nicht verfÃ¼gbar"), 0);
+            flow.Controls.Add(lblDataDir);
+
+            FlowLayoutPanel rowDataBtns = Row();
+            rowDataBtns.Margin = new Padding(0, UI.S(6), 0, 0);
+            Button btnOpenData = UI.Secondary("Datenordner Ã¶ffnen");
+            btnOpenData.Click += delegate { if (dataDir.Length > 0) OpenShell(dataDir); };
+            Button btnNasDlg = UI.Secondary("Netzlaufwerk ...");
+            btnNasDlg.Margin = new Padding(UI.S(8), 0, 0, 0);
+            btnNasDlg.Click += delegate { ShowConnectNasDialog(); };
+            Button btnCleanDlg = UI.Secondary("Datenbereinigung ...");
+            btnCleanDlg.Margin = new Padding(UI.S(8), 0, 0, 0);
+            btnCleanDlg.Click += delegate { CleanData(); };
+            rowDataBtns.Controls.Add(btnOpenData); rowDataBtns.Controls.Add(btnNasDlg); rowDataBtns.Controls.Add(btnCleanDlg);
+            flow.Controls.Add(rowDataBtns);
+
+            // 6. Updates
+            Label secUpdates = Section("Updates");
+            flow.Controls.Add(secUpdates);
+            CheckBox chkAutoUpd = Chk("Automatisch nach Updates suchen", LoadUpdateCheckPreference());
+            flow.Controls.Add(chkAutoUpd);
+            FlowLayoutPanel rowUpdBtn = Row();
+            rowUpdBtn.Margin = new Padding(0, UI.S(6), 0, 0);
+            Button btnCheckUpd = UI.Secondary("Jetzt nach Updates suchen");
+            btnCheckUpd.Click += delegate {
+                StartUpdateCheck();
+                UI.Hinweis("Die Update-PrÃ¼fung wurde gestartet.", "Updates", dlg);
+            };
+            rowUpdBtn.Controls.Add(btnCheckUpd);
+            flow.Controls.Add(rowUpdBtn);
+
+            // 7. Ãœber
+            Label secAbout = Section("Ãœber Leos Minibench");
+            flow.Controls.Add(secAbout);
+            Label lblAboutVer = Lbl("Leos Minibench v" + this.version + " \"AufgerÃ¤umt\"", 9.5f, true, UI.Text);
+            Label lblAboutThanks = Hint("Danksagungen & Komponenten:\r\nSophia Script (Dmitry Nefedov), O&O ShutUp10++, Windows Optimisation Pack,\r\nsmartmontools, LibreHardwareMonitor, PawnIO.", 0);
+            flow.Controls.Add(lblAboutVer);
+            flow.Controls.Add(lblAboutThanks);
+
+            bodyPnl.Controls.Add(flow);
+
+            Panel bottomBar = new Panel();
+            bottomBar.Dock = DockStyle.Bottom;
+            bottomBar.Height = UI.S(54);
+            bottomBar.BackColor = UI.Panel;
+
+            Button btnOk = UI.Primary("SchlieÃŸen");
+            btnOk.DialogResult = DialogResult.OK;
+            btnOk.Location = new Point(dlg.ClientSize.Width - btnOk.Width - UI.S(24), UI.S(10));
+            bottomBar.Controls.Add(btnOk);
+
+            dlg.Controls.Add(bodyPnl);
+            dlg.Controls.Add(bottomBar);
+            dlg.AcceptButton = btnOk;
+
+            UI.ThemeDialog(dlg);
+
+            dlg.ShowDialog(this);
+
+            if (rbDark.Checked != UI.IsDark)
+            {
+                ToggleTheme();
+            }
+            SaveStartPagePreference(chkShowStart.Checked);
+            SaveUpdateCheckPreference(chkAutoUpd.Checked);
+            if (chkSingleWindow != null) chkSingleWindow.Checked = chkRes1Window.Checked;
+            if (chkAnon != null) chkAnon.Checked = chkPrivAnon.Checked;
+        }
+    }
+
+    void SaveWindowPreferences()
+    {
+        try
+        {
+            if (SettingsFile.Length == 0) return;
+            Dictionary<string, object> d = null;
+            System.Web.Script.Serialization.JavaScriptSerializer js = new System.Web.Script.Serialization.JavaScriptSerializer();
+            if (File.Exists(SettingsFile))
+            {
+                try { d = js.DeserializeObject(File.ReadAllText(SettingsFile, Encoding.UTF8)) as Dictionary<string, object>; } catch { }
+            }
+            if (d == null) d = new Dictionary<string, object>();
+
+            Rectangle b = (WindowState == FormWindowState.Normal) ? Bounds : RestoreBounds;
+            if (b.Width > 0 && b.Height > 0)
+            {
+                d["WindowX"] = b.X;
+                d["WindowY"] = b.Y;
+                d["WindowW"] = b.Width;
+                d["WindowH"] = b.Height;
+            }
+            d["WindowState"] = (int)WindowState;
+            d["LastPage"] = curPage;
+            File.WriteAllText(SettingsFile, js.Serialize(d), Encoding.UTF8);
+        }
+        catch { }
+    }
+
+    void LoadWindowPreferences()
+    {
+        try
+        {
+            if (SettingsFile.Length > 0 && File.Exists(SettingsFile))
+            {
+                System.Web.Script.Serialization.JavaScriptSerializer js = new System.Web.Script.Serialization.JavaScriptSerializer();
+                Dictionary<string, object> d = js.DeserializeObject(File.ReadAllText(SettingsFile, Encoding.UTF8)) as Dictionary<string, object>;
+                if (d != null)
+                {
+                    if (d.ContainsKey("WindowX") && d.ContainsKey("WindowY") && d.ContainsKey("WindowW") && d.ContainsKey("WindowH"))
+                    {
+                        int x = Convert.ToInt32(d["WindowX"]);
+                        int y = Convert.ToInt32(d["WindowY"]);
+                        int w = Convert.ToInt32(d["WindowW"]);
+                        int h = Convert.ToInt32(d["WindowH"]);
+                        Rectangle r = new Rectangle(x, y, w, h);
+                        bool onScreen = false;
+                        foreach (Screen s in Screen.AllScreens)
+                        {
+                            if (s.WorkingArea.IntersectsWith(r)) { onScreen = true; break; }
+                        }
+                        if (onScreen && w >= UI.S(600) && h >= UI.S(400))
+                        {
+                            StartPosition = FormStartPosition.Manual;
+                            Bounds = r;
+                        }
+                    }
+                    if (d.ContainsKey("WindowState"))
+                    {
+                        int ws = Convert.ToInt32(d["WindowState"]);
+                        if (ws == (int)FormWindowState.Maximized) WindowState = FormWindowState.Maximized;
+                    }
+                }
+            }
+        }
+        catch { }
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.KeyCode == Keys.F5)
+        {
+            if (curPage == 9) RefreshAndSync();
+            else FillPresets(false);
+            e.Handled = true;
+        }
+        else if (e.Control && e.KeyCode == Keys.F)
+        {
+            if (curPage == 9 && txtDbFilter != null)
+            {
+                txtDbFilter.Focus();
+                txtDbFilter.SelectAll();
+                e.Handled = true;
+            }
+        }
+        else if (e.Control && e.KeyCode == Keys.Enter)
+        {
+            if (btnStart != null && btnStart.Enabled && btnStart.Visible)
+            {
+                btnStart.PerformClick();
+                e.Handled = true;
+            }
+        }
+    }
     void ToggleTheme()
     {
         SetAppTheme(!UI.IsDark);
@@ -1287,7 +1514,7 @@ public partial class DiagGui : Form
         nav.Add(ModNav("Benchmark", "Benchmark", "Wählbare Messungen mit Vergleich", UI.IcoCpu));
         nav.Add(ModNav("Lasttest", "Lasttest", "Komponenten und Dauer wählbar", UI.IcoFlame));
         nav.Add(ModNav("Wartung", "Wartung", "SFC, DISM, Bereinigung und Systempflege", UI.IcoWartung));
-        nav.Add(ModNav("Optimierung", "Optimierung", "Windows Optimisation Pack, gruppiert", UI.IcoOpt));
+        nav.Add(ModNav("Optimierung", "Optimierung", "Datenschutz und Systemanpassungen", UI.IcoOpt));
         navTools = ModNav("Tools", "Tools", "Portable Werkzeuge und Schnellstarter", UI.IcoTools); navTools.HasCheck = false; nav.Add(navTools);
         navSens = ModNav("Sensoren", "Sensoren live", "Temperatur, Takt, Lüfter, Leistung", UI.IcoSens); navSens.HasCheck = false; nav.Add(navSens);
         navUmzug = ModNav("Umzug", "System-Umzug", "Daten, Desktop & Programme für Neuinstallation sichern", UI.IcoBackup); navUmzug.HasCheck = false; nav.Add(navUmzug);
@@ -2547,9 +2774,9 @@ public partial class DiagGui : Form
     Button btnOptCheck, btnOptTools, btnOptAll;
     List<Button> optPresetButtons = new List<Button>();
     static readonly string[] optPresetTips = new string[] {
-        "Minimal wie im Optimisation Pack: Datenschutz-Einstellungen (O&O-Auswahl), Dienste und Aufgaben, Indizierung aus, Caches leeren.",
+        "Minimal: Grundlegende Datenschutz-Einstellungen, Dienste und Aufgaben, Indizierung aus, Caches leeren.",
         "Leos Empfehlung: Wie die Voreinstellung beim Start ausgewählt (empfohlene Optimierungen für Datenschutz, Apps, Dienste und System).",
-        "Erweitert wie im Optimisation Pack: Leos Empfehlung plus Windows-Funktionen, Zusatzfeatures, vorinstallierte Apps und Darstellung.",
+        "VollstÃ¤ndig: Leos Empfehlung plus Windows-Funktionen, Zusatzfeatures, vorinstallierte Apps und Darstellung.",
         "Hebt die Auswahl in allen Kategorien auf." };
 
     static readonly string[] defaultMinimal = new string[] {
@@ -2670,7 +2897,7 @@ public partial class DiagGui : Form
     Control BuildOptPage()
     {
         ReadOptCatalog();
-        FlowLayoutPanel f = Page("Optimierung", "Die Einstellungen des Windows Optimisation Pack mit seiner Sophia- und O&O-Auswahl, nativ umgesetzt und nach Kategorien gruppiert.", 5);
+        FlowLayoutPanel f = Page("Optimierung", "BewÃ¤hrte Systemeinstellungen fÃ¼r Datenschutz, Telemetrie, Apps und Leistung, Ã¼bersichtlich nach Kategorien gruppiert.", 5);
         if (optItems.Count == 0) { lblOptInfo = Lbl("Der Katalog der Optimierung fehlt (Skript ohne Modul Optimierung).", 9f, false, UI.Muted); f.Controls.Add(lblOptInfo); return f; }
 
         TableLayoutPanel md = new TableLayoutPanel();

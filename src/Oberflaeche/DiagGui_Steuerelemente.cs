@@ -1,4 +1,4 @@
-// Grafische Oberflaeche: Steuerelemente
+﻿// Grafische Oberflaeche: Steuerelemente
 public static class UI
 {
     public static bool IsDark { get; set; }
@@ -165,6 +165,71 @@ public static class UI
     public const string IcoApp = "\uE71D";
     public const string IcoCheck = "\uE73E";
     public const string IcoTrash = "\uE74D";
+    public const string IcoSearch = "\uE721";
+    public const string IcoLock = "\uE72E";
+    public const string IcoSun = "\uE706";
+
+    // ab v4.0: Dezimale Versionsnummer zur verlaesslichen Groessenordnung (z. B. 3.882 < 3.9 < 3.91 < 4.0)
+    public static double VersionNumber(string v)
+    {
+        if (string.IsNullOrEmpty(v)) return 0.0;
+        string s = v.Trim();
+        if (s.StartsWith("v", StringComparison.OrdinalIgnoreCase))
+            s = s.Substring(1).Trim();
+        int dot = s.IndexOf('.');
+        if (dot < 0)
+        {
+            double res;
+            if (double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out res)) return res;
+            return 0.0;
+        }
+        string majStr = s.Substring(0, dot);
+        string minStr = s.Substring(dot + 1).Replace(".", "");
+        StringBuilder minDigits = new StringBuilder();
+        for (int i = 0; i < minStr.Length; i++)
+        {
+            if (char.IsDigit(minStr[i])) minDigits.Append(minStr[i]);
+            else break;
+        }
+        double maj = 0.0, frac = 0.0;
+        double.TryParse(majStr, NumberStyles.Float, CultureInfo.InvariantCulture, out maj);
+        if (minDigits.Length > 0)
+        {
+            double.TryParse("0." + minDigits.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out frac);
+        }
+        return maj + frac;
+    }
+
+    // ab v4.0: Kategoriesymbol aufloesen fuer Katalog- und Vertragsdefinitionen
+    public static string SymbolByName(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return IcoOpt;
+        string n = name.Trim().ToLowerInvariant();
+        if (n.StartsWith("ico")) n = n.Substring(3);
+        if (n == "shield" || n == "sicherheit" || n == "datenschutz") return IcoShield;
+        if (n == "bell" || n == "werbung") return IcoBell;
+        if (n == "search" || n == "ki" || n == "suche") return IcoSearch;
+        if (n == "lock" || n == "berechtigung") return IcoLock;
+        if (n == "gear" || n == "hintergrund" || n == "dienste" || n == "opt") return IcoGear;
+        if (n == "check" || n == "funktionen") return IcoCheck;
+        if (n == "app" || n == "apps") return IcoApp;
+        if (n == "folder" || n == "ordner" || n == "bedienung" || n == "systemdateien") return IcoFolder;
+        if (n == "sun" || n == "sonne" || n == "darstellung") return IcoSun;
+        if (n == "flame" || n == "leistung") return IcoFlame;
+        if (n == "refresh" || n == "update") return IcoRefresh;
+        if (n == "gpu" || n == "grafik") return IcoGpu;
+        if (n == "trash" || n == "entfernen" || n == "bereinigung") return IcoTrash;
+        if (n == "cpu") return IcoCpu;
+        if (n == "ram") return IcoRam;
+        if (n == "disk") return IcoDisk;
+        if (n == "diag") return IcoDiag;
+        if (n == "wartung") return IcoWartung;
+        if (n == "tools") return IcoTools;
+        if (n == "home") return IcoHome;
+        if (n == "speed") return IcoSpeed;
+        if (n == "backup") return IcoBackup;
+        return IcoOpt;
+    }
 
     public static GraphicsPath Round(RectangleF r, float rad)
     {
@@ -266,7 +331,7 @@ public static class UI
     {
         Button b = new PrimaryButton(); b.Text = text; b.FlatStyle = FlatStyle.Flat; b.FlatAppearance.BorderSize = 0;
         b.BackColor = Accent; b.ForeColor = OnAccent; b.FlatAppearance.MouseOverBackColor = AccentHover; b.FlatAppearance.MouseDownBackColor = AccentActive;
-        b.Font = new Font("Segoe UI Semibold", 10.5f); b.AutoSize = true; b.Padding = new Padding(S(18), S(6), S(18), S(6)); b.Cursor = Cursors.Hand; b.UseVisualStyleBackColor = false;
+        b.Font = new Font("Segoe UI Semibold", SF(10.5f)); b.AutoSize = true; b.Padding = new Padding(S(18), S(6), S(18), S(6)); b.Cursor = Cursors.Hand; b.UseVisualStyleBackColor = false;
         return b;
     }
 
@@ -274,7 +339,7 @@ public static class UI
     {
         Button b = new Button(); b.Text = text; b.FlatStyle = FlatStyle.Flat; b.FlatAppearance.BorderColor = Line;
         b.BackColor = Panel; b.ForeColor = Text; b.FlatAppearance.MouseOverBackColor = IsDark ? Color.FromArgb(45, 48, 52) : Color.FromArgb(243, 244, 246); b.FlatAppearance.MouseDownBackColor = IsDark ? Color.FromArgb(55, 58, 62) : Color.FromArgb(235, 237, 240);
-        b.Font = new Font("Segoe UI", 9.75f); b.AutoSize = true; b.Padding = new Padding(S(10), S(3), S(10), S(3)); b.Margin = new Padding(S(8), 0, 0, 0); b.Cursor = Cursors.Hand; b.UseVisualStyleBackColor = false;
+        b.Font = new Font("Segoe UI", SF(9.75f)); b.AutoSize = true; b.Padding = new Padding(S(10), S(3), S(10), S(3)); b.Margin = new Padding(S(8), 0, 0, 0); b.Cursor = Cursors.Hand; b.UseVisualStyleBackColor = false;
         b.Paint += delegate(object s, PaintEventArgs pe) {
             if (!b.Enabled) {
                 Graphics g = pe.Graphics;
@@ -301,7 +366,7 @@ public static class UI
         f.ForeColor = Text;
         if (f.Font == null || f.Font.Name != "Segoe UI")
         {
-            f.Font = new Font("Segoe UI", 9.5f);
+            f.Font = new Font("Segoe UI", SF(9.5f));
         }
         ThemeDialogControls(f.Controls);
     }
@@ -373,6 +438,158 @@ public static class UI
             ThemeDialogControls(c.Controls);
         }
     }
+
+    // ab v4.0: Thematisierte Rueckfragedialoge fuer konsistenten Hell- und Dunkelmodus (ohne ungestyltes MessageBox.Show)
+    public static bool Ask(string text, string title = "Frage", IWin32Window owner = null)
+    {
+        using (Form f = new Form())
+        {
+            f.Text = title ?? "Frage";
+            f.FormBorderStyle = FormBorderStyle.FixedDialog;
+            f.MaximizeBox = false;
+            f.MinimizeBox = false;
+            f.ShowInTaskbar = false;
+            f.StartPosition = owner != null ? FormStartPosition.CenterParent : FormStartPosition.CenterScreen;
+
+            int w = S(450);
+            Font mf = new Font("Segoe UI", SF(9.5f));
+            Size textSize = TextRenderer.MeasureText(text ?? "", mf, new Size(w - S(40), int.MaxValue), TextFormatFlags.WordBreak);
+            int textH = Math.Max(S(40), Math.Min(S(420), textSize.Height + S(10)));
+            int clientH = textH + S(74);
+            f.ClientSize = new Size(w, clientH);
+
+            Label lbl = new Label();
+            lbl.Text = text ?? "";
+            lbl.Font = mf;
+            lbl.Location = new Point(S(20), S(16));
+            lbl.Size = new Size(w - S(40), textH);
+            lbl.TextAlign = ContentAlignment.TopLeft;
+
+            Button btnOk = Primary("Ja");
+            btnOk.DialogResult = DialogResult.Yes;
+            Button btnNo = Secondary("Nein");
+            btnNo.DialogResult = DialogResult.No;
+
+            int btnY = clientH - btnOk.Height - S(14);
+            btnNo.Location = new Point(w - btnNo.Width - S(20), btnY);
+            btnOk.Location = new Point(btnNo.Left - btnOk.Width - S(10), btnY);
+
+            f.Controls.Add(lbl);
+            f.Controls.Add(btnOk);
+            f.Controls.Add(btnNo);
+            f.AcceptButton = btnOk;
+            f.CancelButton = btnNo;
+
+            UI.ThemeDialog(f);
+            return f.ShowDialog(owner) == DialogResult.Yes;
+        }
+    }
+    public static bool Ask(IWin32Window owner, string text, string title)
+    {
+        return Ask(text, title, owner);
+    }
+
+    // ab v4.0: Thematisierter Hinweisdialog fuer konsistenten Hell- und Dunkelmodus
+    public static void Hinweis(string text, string title = "Hinweis", IWin32Window owner = null)
+    {
+        using (Form f = new Form())
+        {
+            f.Text = title ?? "Hinweis";
+            f.FormBorderStyle = FormBorderStyle.FixedDialog;
+            f.MaximizeBox = false;
+            f.MinimizeBox = false;
+            f.ShowInTaskbar = false;
+            f.StartPosition = owner != null ? FormStartPosition.CenterParent : FormStartPosition.CenterScreen;
+
+            int w = S(450);
+            Font mf = new Font("Segoe UI", SF(9.5f));
+            Size textSize = TextRenderer.MeasureText(text ?? "", mf, new Size(w - S(40), int.MaxValue), TextFormatFlags.WordBreak);
+            int textH = Math.Max(S(40), Math.Min(S(420), textSize.Height + S(10)));
+            int clientH = textH + S(74);
+            f.ClientSize = new Size(w, clientH);
+
+            Label lbl = new Label();
+            lbl.Text = text ?? "";
+            lbl.Font = mf;
+            lbl.Location = new Point(S(20), S(16));
+            lbl.Size = new Size(w - S(40), textH);
+            lbl.TextAlign = ContentAlignment.TopLeft;
+
+            Button btnOk = Primary("OK");
+            btnOk.DialogResult = DialogResult.OK;
+            int btnY = clientH - btnOk.Height - S(14);
+            btnOk.Location = new Point(w - btnOk.Width - S(20), btnY);
+
+            f.Controls.Add(lbl);
+            f.Controls.Add(btnOk);
+            f.AcceptButton = btnOk;
+
+            UI.ThemeDialog(f);
+            f.ShowDialog(owner);
+        }
+    }
+    public static void Hinweis(IWin32Window owner, string text, string title)
+    {
+        Hinweis(text, title, owner);
+    }
+    public static void ShowInfo(string text, string title = "Hinweis", IWin32Window owner = null)
+    {
+        Hinweis(text, title, owner);
+    }
+    public static void ShowInfo(IWin32Window owner, string text, string title)
+    {
+        Hinweis(text, title, owner);
+    }
+
+    // ab v4.0: Thematisierter 3-Wege-Dialog (Ja / Nein / Abbrechen)
+    public static DialogResult Ask3(string text, string title = "Frage", IWin32Window owner = null)
+    {
+        using (Form f = new Form())
+        {
+            f.Text = title ?? "Frage";
+            f.FormBorderStyle = FormBorderStyle.FixedDialog;
+            f.MaximizeBox = false;
+            f.MinimizeBox = false;
+            f.ShowInTaskbar = false;
+            f.StartPosition = owner != null ? FormStartPosition.CenterParent : FormStartPosition.CenterScreen;
+
+            int w = S(500);
+            Font mf = new Font("Segoe UI", SF(9.5f));
+            Size textSize = TextRenderer.MeasureText(text ?? "", mf, new Size(w - S(40), int.MaxValue), TextFormatFlags.WordBreak);
+            int textH = Math.Max(S(40), Math.Min(S(420), textSize.Height + S(10)));
+            int clientH = textH + S(74);
+            f.ClientSize = new Size(w, clientH);
+
+            Label lbl = new Label();
+            lbl.Text = text ?? "";
+            lbl.Font = mf;
+            lbl.Location = new Point(S(20), S(16));
+            lbl.Size = new Size(w - S(40), textH);
+            lbl.TextAlign = ContentAlignment.TopLeft;
+
+            Button btnCancel = Secondary("Abbrechen");
+            btnCancel.DialogResult = DialogResult.Cancel;
+            Button btnNo = Secondary("Nein");
+            btnNo.DialogResult = DialogResult.No;
+            Button btnYes = Primary("Ja");
+            btnYes.DialogResult = DialogResult.Yes;
+
+            int btnY = clientH - btnYes.Height - S(14);
+            btnCancel.Location = new Point(w - btnCancel.Width - S(20), btnY);
+            btnNo.Location = new Point(btnCancel.Left - btnNo.Width - S(10), btnY);
+            btnYes.Location = new Point(btnNo.Left - btnYes.Width - S(10), btnY);
+
+            f.Controls.Add(lbl);
+            f.Controls.Add(btnYes);
+            f.Controls.Add(btnNo);
+            f.Controls.Add(btnCancel);
+            f.AcceptButton = btnYes;
+            f.CancelButton = btnCancel;
+
+            UI.ThemeDialog(f);
+            return f.ShowDialog(owner);
+        }
+    }
 }
 
 // ab v3.65: Karte mit abgerundetem Rahmen für Gruppen auf allen Seiten (wie FluentCard), Inhalt als Kindelemente
@@ -407,14 +624,16 @@ public class Badge : Control
     {
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor, true);
         BackColor = Color.Transparent;
-        Font = new Font("Segoe UI Semibold", 8.25f);
+        Font = new Font("Segoe UI Semibold", UI.SF(8.25f));
+        AccessibleRole = AccessibleRole.StaticText;
         Margin = new Padding(UI.S(6), UI.S(4), 0, 0);
         this.level = level ?? "skip";
         Text = text ?? "";
+        AccessibleName = Text;
         FitSize();
     }
     public string Level { get { return level; } set { level = value ?? "skip"; Invalidate(); } }
-    protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); FitSize(); Invalidate(); }
+    protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); AccessibleName = Text; FitSize(); Invalidate(); }
     void FitSize()
     {
         Size t = TextRenderer.MeasureText(Text.Length > 0 ? Text : " ", Font, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding);
@@ -439,8 +658,10 @@ public class PillLabel : Control
     {
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor, true);
         BackColor = Color.Transparent;
-        Font = new Font("Segoe UI", 8.75f);
+        Font = new Font("Segoe UI", UI.SF(8.75f));
+        AccessibleRole = AccessibleRole.StaticText;
         Text = text ?? "";
+        AccessibleName = Text;
         Margin = new Padding(0, 0, UI.S(6), UI.S(6));
         FitSize();
     }
@@ -449,7 +670,7 @@ public class PillLabel : Control
         Size sz = TextRenderer.MeasureText(Text, Font);
         Size = new Size(sz.Width + UI.S(16), Math.Max(UI.S(24), sz.Height + UI.S(6)));
     }
-    protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); FitSize(); Invalidate(); }
+    protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); AccessibleName = Text; FitSize(); Invalidate(); }
     protected override void OnPaint(PaintEventArgs e)
     {
         Graphics g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
@@ -487,7 +708,7 @@ public class StartTaskCard : Control
         Margin = new Padding(0, 0, UI.S(10), UI.S(14));
     }
 
-    public string Title { get { return title; } set { title = value ?? ""; Invalidate(); } }
+    public string Title { get { return title; } set { title = value ?? ""; AccessibleName = title; Invalidate(); } }
     public string Description { get { return desc; } set { desc = value ?? ""; Invalidate(); } }
     public string FootText { get { return footText; } set { footText = value ?? ""; Invalidate(); } }
     public string BadgeText { get { return badgeText; } set { badgeText = value ?? ""; Invalidate(); } }
@@ -614,7 +835,7 @@ public class StartTaskRow : Control
         Margin = new Padding(0, 0, 0, UI.S(4));
     }
 
-    public string Title { get { return title; } set { title = value ?? ""; Invalidate(); } }
+    public string Title { get { return title; } set { title = value ?? ""; AccessibleName = title; Invalidate(); } }
     public string Subtitle { get { return subtitle; } set { subtitle = value ?? ""; Invalidate(); } }
     public string BadgeText { get { return badgeText; } set { badgeText = value ?? ""; Invalidate(); } }
     public string BadgeLevel { get { return badgeLevel; } set { badgeLevel = value ?? "ok"; Invalidate(); } }
@@ -701,7 +922,7 @@ public class KpiBox : Control
     }
     public KpiBox(string title, string val) : this(title, val, null) { }
 
-    public string Title { get { return title; } set { title = value ?? ""; Invalidate(); } }
+    public string Title { get { return title; } set { title = value ?? ""; AccessibleName = title; Invalidate(); } }
     public string Value { get { return val; } set { val = value ?? ""; Invalidate(); } }
     public string Delta { get { return delta; } set { delta = value ?? ""; Invalidate(); } }
 
@@ -759,7 +980,7 @@ public class GroupHeader : Control
         Size = new Size(UI.S(UI.Gruppenbreite), UI.S(32));
         Margin = new Padding(0, UI.S(UI.Abstand2), 0, 0);
     }
-    public string Title { get { return title; } set { title = value ?? ""; Invalidate(); } }
+    public string Title { get { return title; } set { title = value ?? ""; AccessibleName = title; Invalidate(); } }
     public string CountText { get { return count; } set { if (count == (value ?? "")) return; count = value ?? ""; Invalidate(); } }
     public bool Expanded { get { return expanded; } set { if (expanded == value) return; expanded = value; Invalidate(); } }
     void Flip() { Expanded = !Expanded; if (Toggled != null) Toggled(this, EventArgs.Empty); }
@@ -803,7 +1024,7 @@ public class DarkComboBox : ComboBox
         DrawMode = DrawMode.OwnerDrawFixed;
         DropDownStyle = ComboBoxStyle.DropDownList;
         ItemHeight = UI.S(24);
-        Font = new Font("Segoe UI", 9.5f);
+        Font = new Font("Segoe UI", UI.SF(9.5f));
         Cursor = Cursors.Hand;
         BackColor = UI.Panel;
         ForeColor = UI.Text;
@@ -861,6 +1082,8 @@ public class ToggleSwitch : Control
                  ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor | ControlStyles.Selectable, true);
         TabStop = true;
         Cursor = Cursors.Hand;
+        AccessibleRole = AccessibleRole.CheckButton;
+        AccessibleName = "Schalter";
         Size = new Size(UI.S(38), UI.S(20));
         BackColor = Color.Transparent;
     }
@@ -992,7 +1215,9 @@ public class PillButton : Control
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable | ControlStyles.SupportsTransparentBackColor, true);
         Cursor = Cursors.Hand;
         BackColor = Color.Transparent;
-        Font = new Font("Segoe UI Semibold", 9f);
+        Font = new Font("Segoe UI Semibold", UI.SF(9f));
+        AccessibleRole = AccessibleRole.PushButton;
+        AccessibleName = text;
         Height = UI.S(28);
         Margin = new Padding(0, 0, UI.S(6), 0);
         FitSize();
@@ -1002,7 +1227,7 @@ public class PillButton : Control
     public bool Active { get { return active; } set { if (active != value) { active = value; Invalidate(); } } }
     public bool Removable { get { return removable; } set { if (removable != value) { removable = value; FitSize(); Invalidate(); } } }
     public string Icon { get { return icon; } set { icon = value ?? ""; FitSize(); Invalidate(); } }
-    public override string Text { get { return text; } set { text = value ?? ""; FitSize(); Invalidate(); } }
+    public override string Text { get { return text; } set { text = value ?? ""; AccessibleName = text; FitSize(); Invalidate(); } }
 
     void FitSize()
     {
@@ -1120,6 +1345,7 @@ public class CategoryPickerItem : Control
 {
     string catKey = "";
     string title = "";
+    string shortTitle = "";
     string subtitle = "";
     string icon = "";
     int checkedCount = 0;
@@ -1128,22 +1354,31 @@ public class CategoryPickerItem : Control
     bool hover = false;
     public event EventHandler Picked;
 
-    public CategoryPickerItem(string title, string icon) : this(title, title, icon) { }
+    public CategoryPickerItem(string title, string icon) : this(title, icon, title) { }
 
-    public CategoryPickerItem(string key, string title, string icon)
+    public CategoryPickerItem(string title, string icon, string shortTitle)
     {
-        this.catKey = key ?? "";
+        this.catKey = title ?? "";
         this.title = title ?? "";
         this.icon = icon ?? "";
+        this.shortTitle = !string.IsNullOrEmpty(shortTitle) ? shortTitle : this.title;
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
         Cursor = Cursors.Hand;
         Size = new Size(UI.S(218), UI.S(40));
         Margin = new Padding(0, 0, 0, UI.S(4));
         BackColor = UI.Panel;
+        AccessibleRole = AccessibleRole.ListItem;
+        AccessibleName = this.shortTitle;
+    }
+
+    public CategoryPickerItem(string key, string title, string icon, string shortTitle) : this(title, icon, shortTitle)
+    {
+        this.catKey = key ?? "";
     }
 
     public string CategoryKey { get { return catKey; } set { catKey = value ?? ""; } }
-    public string CategoryTitle { get { return title; } set { title = value ?? ""; Invalidate(); } }
+    public string CategoryTitle { get { return title; } set { title = value ?? ""; AccessibleName = !String.IsNullOrEmpty(shortTitle) ? shortTitle : title; Invalidate(); } }
+    public string ShortTitle { get { return !String.IsNullOrEmpty(shortTitle) ? shortTitle : title; } set { shortTitle = value ?? ""; AccessibleName = !String.IsNullOrEmpty(shortTitle) ? shortTitle : title; Invalidate(); } }
     public string Subtitle { get { return subtitle; } set { subtitle = value ?? ""; Invalidate(); } }
     public string Icon { get { return icon; } set { icon = value ?? ""; Invalidate(); } }
     public int CheckedCount { get { return checkedCount; } set { if (checkedCount != value) { checkedCount = value; Invalidate(); } } }
@@ -1242,10 +1477,13 @@ public class CategoryPickerItem : Control
         }
 
         int textW = Width - x - badgeW - UI.S(14);
+        string displayTitle = !String.IsNullOrEmpty(shortTitle) ? shortTitle : title;
         using (Font ft = new Font("Segoe UI Semibold", UI.SF(9f)))
         {
             Color titleColor = selected ? (UI.IsDark ? UI.Accent : UI.AccentDark) : UI.Text;
-            TextRenderer.DrawText(g, title, ft, new Rectangle(x, 0, Math.Max(10, textW), Height), titleColor, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            Size tsz = TextRenderer.MeasureText(g, displayTitle, ft, new Size(Math.Max(10, textW), int.MaxValue), TextFormatFlags.WordBreak);
+            int ty = Math.Max(0, (Height - tsz.Height) / 2);
+            TextRenderer.DrawText(g, displayTitle, ft, new Rectangle(x, ty, Math.Max(10, textW), tsz.Height), titleColor, TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);
         }
     }
 }
@@ -1269,6 +1507,8 @@ public class SettingRow : Control
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
         Cursor = Cursors.Hand;
         BackColor = UI.Panel;
+        AccessibleRole = AccessibleRole.ListItem;
+        AccessibleName = this.title;
         Margin = new Padding(0, 0, 0, UI.S(4));
 
         this.toggle = toggle ?? new ToggleSwitch();
@@ -1280,7 +1520,7 @@ public class SettingRow : Control
         RecalcHeight();
     }
 
-    public string Title { get { return title; } set { title = value ?? ""; Invalidate(); } }
+    public string Title { get { return title; } set { title = value ?? ""; AccessibleName = title; Invalidate(); } }
     public string Description { get { return desc; } set { desc = value ?? ""; RecalcHeight(); Invalidate(); } }
     public ToggleSwitch Toggle { get { return toggle; } }
     public bool Checked
@@ -1293,9 +1533,12 @@ public class SettingRow : Control
     {
         if (b == null) return;
         badges.Add(b);
-        b.SizeChanged += delegate { LayoutControls(); };
+        b.SizeChanged += delegate { LayoutControls(); RecalcHeight(); };
+        b.VisibleChanged += delegate { LayoutControls(); RecalcHeight(); };
+        b.TextChanged += delegate { LayoutControls(); RecalcHeight(); };
         Controls.Add(b);
         LayoutControls();
+        RecalcHeight();
     }
 
     public void ClearBadges()
@@ -1303,6 +1546,18 @@ public class SettingRow : Control
         foreach (Badge b in badges) Controls.Remove(b);
         badges.Clear();
         LayoutControls();
+        RecalcHeight();
+    }
+
+    // Spaltenordnung von rechts nach links (Regel 3.1): [ Zustand ] -> [ Risiko ] -> [ Neustart ] -> [ ToggleSwitch ]
+    static int BadgeOrder(Badge b)
+    {
+        if (b == null) return 0;
+        string t = (b.Text ?? "").ToLowerInvariant();
+        if (t.Contains("neustart")) return 4;
+        if (t == "eingriff" || t == "zerstrend" || t == "zerstoerend" || t == "ndern" || t == "aendern" || t == "lesen") return 3;
+        if (t == "empfohlen" || t == "standard") return 2;
+        return 1; // Zustand z. B. "gesetzt", "aktiv"
     }
 
     bool inRecalc = false;
@@ -1312,12 +1567,36 @@ public class SettingRow : Control
         inRecalc = true;
         try
         {
+            if (Width <= 0) return;
+            int curX = UI.S(12);
+            int rightBound = Width - UI.S(16);
+            if (toggle != null) rightBound = Math.Min(rightBound, toggle.Left > 0 ? toggle.Left : (Width - UI.S(54)));
+            for (int i = 0; i < badges.Count; i++)
+            {
+                if (badges[i] != null && badges[i].Visible && !string.IsNullOrEmpty(badges[i].Text) && badges[i].Left > 0 && badges[i].Left < Width)
+                    rightBound = Math.Min(rightBound, badges[i].Left);
+            }
+            rightBound -= UI.S(10);
+            int textW = Math.Max(UI.S(100), rightBound - curX);
+
             using (Graphics g = CreateGraphics())
+            using (Font ft = new Font("Segoe UI Semibold", UI.SF(9.5f)))
             using (Font fd = new Font("Segoe UI", UI.SF(8.25f)))
             {
-                int textW = Math.Max(UI.S(120), Width - UI.S(220));
-                Size dsz = TextRenderer.MeasureText(g, desc, fd, new Size(textW, int.MaxValue), TextFormatFlags.WordBreak);
-                int targetH = String.IsNullOrEmpty(desc) ? UI.S(38) : Math.Min(UI.S(52), Math.Max(UI.S(42), UI.S(22) + dsz.Height));
+                Size tsz = TextRenderer.MeasureText(g, title ?? "", ft, new Size(textW, int.MaxValue), TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+                int titleH = Math.Max(tsz.Height, UI.S(18));
+                int targetH;
+                if (string.IsNullOrEmpty(desc))
+                {
+                    targetH = Math.Max(UI.S(42), titleH + UI.S(14));
+                }
+                else
+                {
+                    Size dsz = TextRenderer.MeasureText(g, desc, fd, new Size(textW, int.MaxValue), TextFormatFlags.WordBreak);
+                    int maxDescH = (int)Math.Ceiling(fd.GetHeight(g) * 2.2f) + UI.S(2);
+                    int descH = Math.Min(dsz.Height, maxDescH);
+                    targetH = Math.Max(UI.S(42), UI.S(8) + titleH + UI.S(2) + descH + UI.S(8));
+                }
                 if (Height != targetH) Height = targetH;
             }
             LayoutControls();
@@ -1333,21 +1612,35 @@ public class SettingRow : Control
 
     void LayoutControls()
     {
-        int curRight = Width - UI.S(12);
+        int curRight = Width - UI.S(16);
         if (toggle != null)
         {
             toggle.Location = new Point(curRight - toggle.Width, (Height - toggle.Height) / 2);
             curRight -= toggle.Width + UI.S(10);
         }
-        for (int i = badges.Count - 1; i >= 0; i--)
+        List<Badge> visibleBadges = new List<Badge>();
+        for (int i = 0; i < badges.Count; i++)
         {
             Badge b = badges[i];
-            if (b != null && b.Visible)
+            if (b != null && b.Visible && !string.IsNullOrEmpty(b.Text))
             {
-                b.Location = new Point(curRight - b.Width, (Height - b.Height) / 2);
-                curRight -= b.Width + UI.S(6);
+                visibleBadges.Add(b);
+            }
+            else if (b != null)
+            {
+                b.Location = new Point(Width + 100, 0);
             }
         }
+        visibleBadges.Sort(delegate(Badge a, Badge b) {
+            return BadgeOrder(b).CompareTo(BadgeOrder(a));
+        });
+        for (int i = 0; i < visibleBadges.Count; i++)
+        {
+            Badge b = visibleBadges[i];
+            b.Location = new Point(curRight - b.Width, (Height - b.Height) / 2);
+            curRight -= b.Width + UI.S(8);
+        }
+        Invalidate();
     }
 
     protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
@@ -1394,23 +1687,28 @@ public class SettingRow : Control
         int curX = UI.S(12);
         int rightBound = Width - UI.S(16);
         if (toggle != null) rightBound = Math.Min(rightBound, toggle.Left);
-        for (int i = 0; i < badges.Count; i++) if (badges[i] != null && badges[i].Visible) rightBound = Math.Min(rightBound, badges[i].Left);
+        for (int i = 0; i < badges.Count; i++)
+        {
+            if (badges[i] != null && badges[i].Visible && !string.IsNullOrEmpty(badges[i].Text))
+                rightBound = Math.Min(rightBound, badges[i].Left);
+        }
         rightBound -= UI.S(10);
-        int textW = Math.Max(UI.S(50), rightBound - curX);
+        int textW = Math.Max(UI.S(100), rightBound - curX);
 
         using (Font ft = new Font("Segoe UI Semibold", UI.SF(9.5f)))
         {
-            Size tsz = TextRenderer.MeasureText(g, title, ft);
+            Size tsz = TextRenderer.MeasureText(g, title ?? "", ft, new Size(textW, int.MaxValue), TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
             int titleH = Math.Max(tsz.Height, UI.S(18));
-            int startY = String.IsNullOrEmpty(desc) ? (Height - titleH) / 2 : UI.S(5);
-            TextRenderer.DrawText(g, title, ft, new Rectangle(curX, startY, textW, titleH), UI.Text, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+            int startY = string.IsNullOrEmpty(desc) ? (Height - titleH) / 2 : UI.S(7);
+            TextRenderer.DrawText(g, title ?? "", ft, new Rectangle(curX, startY, textW, titleH), UI.Text, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
 
-            if (!String.IsNullOrEmpty(desc))
+            if (!string.IsNullOrEmpty(desc))
             {
                 using (Font fd = new Font("Segoe UI", UI.SF(8.25f)))
                 {
-                    int descY = startY + titleH + UI.S(1);
-                    TextRenderer.DrawText(g, desc, fd, new Rectangle(curX, descY, textW, Height - descY - UI.S(2)), UI.Muted, TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);
+                    int descY = startY + titleH + UI.S(2);
+                    int descAvailH = Math.Max(UI.S(12), Height - descY - UI.S(6));
+                    TextRenderer.DrawText(g, desc, fd, new Rectangle(curX, descY, textW, descAvailH), UI.Muted, TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);
                 }
             }
         }
@@ -1460,7 +1758,7 @@ public class FluentCard : Control
         Controls.Add(toggle);
     }
 
-    public string Title { get { return title; } set { title = value ?? ""; Invalidate(); } }
+    public string Title { get { return title; } set { title = value ?? ""; AccessibleName = title; Invalidate(); } }
     public string Description { get { return desc; } set { desc = value ?? ""; Invalidate(); } }
     public string Icon { get { return icon; } set { icon = value ?? ""; Invalidate(); } }
     public ToggleSwitch Toggle { get { return toggle; } }

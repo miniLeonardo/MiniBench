@@ -249,7 +249,11 @@ function Format-OptAction($A) {
 function Get-OptGuiLines {
     $l = New-Object System.Collections.Generic.List[string]
     $clean = { param($v) (([string]$v) -replace '[\r\n|]+', ' ').Trim() }
-    foreach ($k in (Get-OptCategories)) { $l.Add(('K|{0}|{1}|{2}' -f $k.Key, (& $clean $k.Titel), (& $clean $k.Text))) }
+    foreach ($k in (Get-OptCategories)) {
+        $kt = if ($k.Kurztitel) { $k.Kurztitel } else { $k.Titel }
+        $sym = if ($k.Symbol) { $k.Symbol } else { 'IcoOpt' }
+        $l.Add(('K|{0}|{1}|{2}|{3}|{4}' -f $k.Key, (& $clean $k.Titel), (& $clean $k.Text), (& $clean $kt), (& $clean $sym)))
+    }
     foreach ($e in (Get-OptEntries)) {
         $tip = New-Object System.Text.StringBuilder
         [void]$tip.Append($e.Text)

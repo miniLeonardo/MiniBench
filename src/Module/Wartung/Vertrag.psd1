@@ -9,6 +9,12 @@
     Neustart        = 'immer'
     Parameter       = @('Wartung', 'Reparaturen', 'OhneWiederherstellungspunkt')
     Datenbankfelder = @()
+    Kategorien      = @(
+        @{ Key = 'Systemdateien und Komponentenspeicher'; Titel = 'Systemdateien und Komponentenspeicher'; Kurztitel = 'Systemdateien'; Symbol = 'IcoFolder'; Text = 'Komponentenspeicher und Systemdateien mit DISM und SFC prüfen und reparieren.' }
+        @{ Key = 'Bereinigung und Speicherplatz'; Titel = 'Bereinigung und Speicherplatz'; Kurztitel = 'Bereinigung'; Symbol = 'IcoTrash'; Text = 'Dateibereinigung, temporäre Daten, Caches und alte Schattenkopien leeren.' }
+        @{ Key = 'Windows Update, Netzwerk und Zeit'; Titel = 'Windows Update, Netzwerk und Zeit'; Kurztitel = 'Windows Update'; Symbol = 'IcoRefresh'; Text = 'Windows-Update-Komponenten und Netzwerk zurücksetzen, Systemzeit synchronisieren.' }
+        @{ Key = 'Dienste, Geräte und Energie'; Titel = 'Dienste, Geräte und Energie'; Kurztitel = 'Dienste & Energie'; Symbol = 'IcoGear'; Text = 'WMI, Druckwarteschlange, Energiesparpläne, Schnellstart und Geräteerkennung.' }
+    )
     Schritte        = @(
         @{ Key = 'DismRestore'; Typ = 'Massnahme'; Risiko = 'Eingriff'; Neustart = 'moeglich'; Rueckgaengig = 'Wiederherstellungspunkt'; Minuten = 20; Vorauswahl = $true; Ueblich = $false; Gruppe = 'Systemdateien und Komponentenspeicher'
            Titel = 'Komponentenspeicher prüfen und reparieren (DISM)'

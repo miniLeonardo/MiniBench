@@ -1,4 +1,4 @@
-﻿﻿// Vergleichsdatenbank und Systemvergleich (Teilklasse DiagGui)
+﻿// Vergleichsdatenbank und Systemvergleich (Teilklasse DiagGui)
 public partial class DiagGui
 {
     class DbItemComparer : System.Collections.IComparer
@@ -255,7 +255,12 @@ public partial class DiagGui
     int dbSortCol = -1;
     bool dbSortAsc = true;
     Button btnRename;
-    Button btnCompare, btnDashboard, btnVerlauf, btnDelete, btnOpenReport, btnExport, btnSetRef, btnToggleGroups;
+    Button btnCompare, btnDashboard, btnVerlauf, btnDelete, btnOpenReport, btnExport, btnSetRef, btnToggleGroups, btnActions, btnMore;
+    TextBox txtDbFilter;
+    CardPanel pnlDbEmpty;
+    Label lblEmptyIco, lblEmptyText, lblEmptySub;
+    Button btnEmptyAction;
+    bool filterActive = false;
 
     void OnDbColumnClick(object sender, ColumnClickEventArgs e)
     {
@@ -360,84 +365,175 @@ public partial class DiagGui
         List<string> lines;
         string res = RunHelperPumped("-Umbenennen " + Q(String.Join("|", pathsToRename.ToArray())) + " -NeuerName " + Q(newName), out lines, 120);
         ReloadDb();
-        if (!res.StartsWith("1")) MessageBox.Show(this, "Der Name konnte nicht geändert werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Systemnamen bearbeiten", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        if (!res.StartsWith("1")) UI.Hinweis("Der Name konnte nicht geändert werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Systemnamen bearbeiten", this);
+    }
+
+    void LayoutDbEmpty()
+    {
+        if (pnlDbEmpty == null || lblEmptyIco == null) return;
+        int cx = pnlDbEmpty.ClientSize.Width / 2;
+        int cy = Math.Max(UI.S(30), pnlDbEmpty.ClientSize.Height / 3);
+        lblEmptyIco.Location = new Point(cx - lblEmptyIco.Width / 2, cy);
+        lblEmptyText.Location = new Point(cx - lblEmptyText.Width / 2, lblEmptyIco.Bottom + UI.S(10));
+        lblEmptySub.Location = new Point(cx - lblEmptySub.Width / 2, lblEmptyText.Bottom + UI.S(6));
+        btnEmptyAction.Location = new Point(cx - btnEmptyAction.Width / 2, lblEmptySub.Bottom + UI.S(16));
     }
 
     Control BuildDbPage()
     {
         Panel f = new Panel(); f.Dock = DockStyle.Fill; f.BackColor = UI.Panel;
-        FlowLayoutPanel top = Page("Datenbank", "Jeder Lauf wird als System gespeichert. Hier lassen sich bereits geprüfte Systeme ohne neuen Benchmark im interaktiven Multi-System-Dashboard gegenüberstellen: Systeme anhaken und \"Im Dashboard vergleichen\" klicken. Ältere Ausgabeordner lassen sich importieren. Ein Klick auf die Spaltenköpfe sortiert die Einträge.", -1);
+        FlowLayoutPanel top = Page("Datenbank", "Jeder Lauf wird als System gespeichert. Hier lassen sich bereits geprÃ¼fte Systeme ohne neuen Benchmark im interaktiven Multi-System-Dashboard gegenÃ¼berstellen: Systeme anhaken und \"Im Dashboard vergleichen\" klicken. Ã„ltere Ausgabeordner lassen sich importieren. Ein Klick auf die SpaltenkÃ¶pfe sortiert die EintrÃ¤ge.", -1);
         top.Dock = DockStyle.Top;
         top.AutoSize = true;
         lblDbPath = Lbl(NasAblage.AblageText(dataDir), 9f, false, UI.Muted); lblDbPath.Margin = new Padding(UI.S(4), 0, UI.S(4), UI.S(4)); top.Controls.Add(lblDbPath);
 
         FlowLayoutPanel topTools = Row();
         topTools.Margin = new Padding(UI.S(4), 0, UI.S(4), UI.S(8));
+        txtDbFilter = new TextBox();
+        txtDbFilter.Size = new Size(UI.S(160), UI.S(24));
+        txtDbFilter.BackColor = UI.Panel;
+        txtDbFilter.ForeColor = UI.Text;
+        txtDbFilter.BorderStyle = BorderStyle.FixedSingle;
+        txtDbFilter.Margin = new Padding(0, UI.S(2), UI.S(8), 0);
+        Tip(txtDbFilter, "Filtert die Liste nach Systemname, Prozessor oder Grafikkarte.");
+        txtDbFilter.TextChanged += delegate {
+            filterActive = !String.IsNullOrEmpty(txtDbFilter.Text.Trim());
+            FillDbList();
+        };
+
         Button imp = UI.Secondary("Importieren ..."); imp.Margin = new Padding(0); imp.Click += delegate { ImportRuns(); };
-        Tip(imp, "Importiert Durchläufe aus .minibench-Paketen, .zip-Archiven, .json-Dateien oder Ausgabeordnern früherer Läufe in die Datenbank samt Bericht.");
-        btnDbClean = UI.Secondary("Aufräumen ..."); btnDbClean.Margin = new Padding(UI.S(8), 0, 0, 0); btnDbClean.Click += delegate { CleanData(); }; btnDbClean.Enabled = dataDir.Length > 0;
-        Tip(btnDbClean, "Räumt nicht vergleichbare oder abgebrochene Läufe auf und verschiebt sie ins Archiv.");
-        Button rel = UI.Secondary("Aktualisieren"); rel.Margin = new Padding(UI.S(8), 0, 0, 0); rel.Click += delegate { RefreshAndSync(); };
-        Tip(rel, "Liest Datenbank und Referenz neu ein. Ist ein Netzlaufwerk eingerichtet und erreichbar, werden Berichte, Datenbank und Änderungsprotokolle vorher in beide Richtungen abgeglichen.");
-        Button open = UI.Secondary("Datenordner"); open.Margin = new Padding(UI.S(8), 0, 0, 0); open.Click += delegate { if (dataDir.Length > 0) OpenShell(dataDir); };
-        Tip(open, "Öffnet den Datenordner (Berichte, Datenbank, Tools, Archiv).");
-        Button btnNas = UI.Secondary("Netzlaufwerk ..."); btnNas.Margin = new Padding(UI.S(8), 0, 0, 0); btnNas.Click += delegate { ShowConnectNasDialog(); };
-        Tip(btnNas, "Richtet ein Netzlaufwerk (NAS) als Spiegel der Berichte und der Datenbank ein oder entfernt es. Gearbeitet wird immer auf dem Stick.");
+        Tip(imp, "Importiert DurchlÃ¤ufe aus .minibench-Paketen, .zip-Archiven, .json-Dateien oder Ausgabeordnern frÃ¼herer LÃ¤ufe in die Datenbank samt Bericht.");
         btnToggleGroups = UI.Secondary("Alle aufklappen"); btnToggleGroups.Margin = new Padding(UI.S(8), 0, 0, 0); btnToggleGroups.Click += delegate { ToggleAllGroups(); };
-        Tip(btnToggleGroups, "Klappt alle Ger\u00E4tegruppen in der Datenbank ein oder aus.");
-        topTools.Controls.Add(imp); topTools.Controls.Add(btnToggleGroups); topTools.Controls.Add(btnDbClean); topTools.Controls.Add(rel); topTools.Controls.Add(open); topTools.Controls.Add(btnNas);
+        Tip(btnToggleGroups, "Klappt alle GerÃ¤tegruppen in der Datenbank ein oder aus.");
+        Button rel = UI.Secondary("Aktualisieren"); rel.Margin = new Padding(UI.S(8), 0, 0, 0); rel.Click += delegate { RefreshAndSync(); };
+        Tip(rel, "Liest Datenbank und Referenz neu ein. Ist ein Netzlaufwerk eingerichtet und erreichbar, werden Berichte, Datenbank und Ã„nderungsprotokolle vorher in beide Richtungen abgeglichen.");
+
+        ContextMenu cmMore = new ContextMenu();
+        cmMore.MenuItems.Add("AufrÃ¤umen ...", delegate { CleanData(); });
+        cmMore.MenuItems.Add("Datenordner", delegate { if (dataDir.Length > 0) OpenShell(dataDir); });
+        cmMore.MenuItems.Add("Netzlaufwerk ...", delegate { ShowConnectNasDialog(); });
+        btnMore = UI.Secondary("Mehr \u25BE"); btnMore.Margin = new Padding(UI.S(8), 0, 0, 0);
+        btnMore.Click += delegate { cmMore.Show(btnMore, new Point(0, btnMore.Height)); };
+        Tip(btnMore, "Weitere Aktionen fÃ¼r Datenpflege, Datenordner und Netzlaufwerk-Spiegel.");
+
+        btnDbClean = UI.Secondary("AufrÃ¤umen ...");
+        Tip(btnDbClean, "RÃ¤umt nicht vergleichbare oder abgebrochene LÃ¤ufe auf und verschiebt sie ins Archiv.");
+
+        topTools.Controls.Add(txtDbFilter);
+        topTools.Controls.Add(imp);
+        topTools.Controls.Add(btnToggleGroups);
+        topTools.Controls.Add(rel);
+        topTools.Controls.Add(btnMore);
         top.Controls.Add(topTools);
 
         FlowLayoutPanel bottom = new FlowLayoutPanel(); bottom.FlowDirection = FlowDirection.TopDown; bottom.WrapContents = false; bottom.AutoSize = true; bottom.BackColor = UI.Panel; bottom.Dock = DockStyle.Bottom;
-        Label hint = Lbl("Doppelklick öffnet den Bericht des Laufs. Graue Einträge enthalten keine Benchmark-Werte. Klick auf Spaltenkopf sortiert die Tabelle.", 8.75f, false, UI.Muted); hint.Margin = new Padding(UI.S(4), UI.S(4), UI.S(4), 0); bottom.Controls.Add(hint);
+        Label hint = Lbl("Doppelklick Ã¶ffnet den Bericht des Laufs. Graue EintrÃ¤ge enthalten keine Benchmark-Werte. Klick auf Spaltenkopf sortiert die Tabelle.", 8.75f, false, UI.Muted); hint.Margin = new Padding(UI.S(4), UI.S(4), UI.S(4), 0); bottom.Controls.Add(hint);
         FlowLayoutPanel b = Row(); b.Margin = new Padding(UI.S(4), UI.S(10), 0, 0);
-        // Hinweis: Der statische Bericht "Vergleichen (Klassisch)" ist ab v3.32 vollständig durch das interaktive Dashboard abgelöst
-        btnDashboard = UI.Primary("Interaktives Dashboard"); btnDashboard.Margin = new Padding(0); btnDashboard.Padding = new Padding(UI.S(14), UI.S(3), UI.S(14), UI.S(3)); btnDashboard.Font = new Font("Segoe UI Semibold", 9.75f);
+
+        btnDashboard = UI.Primary("Im Dashboard vergleichen"); btnDashboard.Margin = new Padding(0); btnDashboard.Padding = new Padding(UI.S(14), UI.S(3), UI.S(14), UI.S(3)); btnDashboard.Font = new Font("Segoe UI Semibold", 9.75f);
         btnDashboard.Click += delegate { OpenDashboard(); };
-        Tip(btnDashboard, "Öffnet das interaktive HTML5-Dashboard für detaillierten System- und Benchmark-Vergleich.");
-        btnVerlauf = UI.Secondary("Verlauf"); btnVerlauf.Margin = new Padding(UI.S(8), 0, 0, 0);
-        btnVerlauf.Click += delegate { OpenDeviceHistory(); };
-        btnVerlauf.Enabled = false;
-        Tip(btnVerlauf, "Öffnet das interaktive Dashboard im Verlaufsmodus für alle Läufe des ausgewählten Geräts.");
-        btnOpenReport = UI.Secondary("Bericht öffnen"); btnOpenReport.Margin = new Padding(UI.S(8), 0, 0, 0);
+        btnDashboard.Enabled = false;
+        Tip(btnDashboard, "Ã–ffnet das interaktive HTML5-Dashboard fÃ¼r detaillierten System- und Benchmark-Vergleich der ausgewÃ¤hlten LÃ¤ufe.");
+
+        btnOpenReport = UI.Secondary("Bericht Ã¶ffnen"); btnOpenReport.Margin = new Padding(UI.S(8), 0, 0, 0);
         btnOpenReport.Click += delegate {
             DbEntry target = null;
             if (lvDb != null && lvDb.SelectedItems.Count > 0) target = (DbEntry)lvDb.SelectedItems[0].Tag;
-            else if (lvDb != null && lvDb.CheckedItems.Count == 1) target = (DbEntry)lvDb.CheckedItems[0].Tag;
             if (target != null) OpenEntry(target);
         };
         btnOpenReport.Enabled = false;
-        Tip(btnOpenReport, "Öffnet den vollständigen HTML-Diagnosebericht des ausgewählten Systems.");
-        btnSetRef = UI.Secondary("Als Referenz ..."); btnSetRef.Margin = new Padding(UI.S(8), 0, 0, 0);
-        btnSetRef.Click += delegate { ShowSetRefMenu(); };
-        btnSetRef.Enabled = false;
-        Tip(btnSetRef, "Legt das ausgewählte System als dauerhafte Vergleichsreferenz (Referenz.json) fest oder öffnet das Dashboard mit diesem System als Basis.");
-        btnRename = UI.Secondary("Name ändern ..."); btnRename.Margin = new Padding(UI.S(8), 0, 0, 0);
-        btnRename.Click += delegate { RenameSelectedEntry(); };
-        btnRename.Enabled = false;
-        Tip(btnRename, "Ändert den Anzeigenamen des ausgewählten Systems (z. B. Vor Reinigung) und benennt Datenbankdatei und Berichtsordner passend um. Rechnername und Hardware-Erkennung bleiben.");
-        btnExport = UI.Secondary("Lauf exportieren ..."); btnExport.Margin = new Padding(UI.S(8), 0, 0, 0);
-        btnExport.Click += delegate { ExportSelected(); };
-        btnExport.Enabled = false;
-        Tip(btnExport, "Exportiert den ausgewählten Lauf als eigenständiges .minibench-Austauschpaket mit Datenbankeintrag und Bericht.");
-        btnDelete = UI.Secondary("Entfernen"); btnDelete.Margin = new Padding(UI.S(8), 0, 0, 0); btnDelete.Click += delegate { DeleteSelected(); };
-        Tip(btnDelete, "Verschiebt die angehakten Läufe samt Berichtsordner nach Minibench-Daten\\Archiv\\Entfernt. Beim nächsten Abgleich verschwinden sie auch vom Netzlaufwerk.");
-        b.Controls.Add(btnDashboard); b.Controls.Add(btnVerlauf); b.Controls.Add(btnOpenReport); b.Controls.Add(btnSetRef); b.Controls.Add(btnRename); b.Controls.Add(btnExport); b.Controls.Add(btnDelete); bottom.Controls.Add(b);
-        lblDbClean = Lbl(DatenpflegeInfo.Length > 0 ? DatenpflegeInfo : "Lasttests vor v2.67 (nicht vergleichbar), abgebrochene und kurze Läufe verschiebt die Datenpflege beim Start nach Minibench-Daten\\Archiv.", 8.75f, false, UI.Muted);
+        Tip(btnOpenReport, "Ã–ffnet den vollstÃ¤ndigen HTML-Diagnosebericht des markierten Systems.");
+
+        btnVerlauf = UI.Secondary("Verlauf"); btnVerlauf.Margin = new Padding(UI.S(8), 0, 0, 0);
+        btnVerlauf.Click += delegate { OpenDeviceHistory(); };
+        btnVerlauf.Enabled = false;
+        Tip(btnVerlauf, "Ã–ffnet das interaktive Dashboard im Verlaufsmodus fÃ¼r alle LÃ¤ufe des markierten GerÃ¤ts.");
+
+        ContextMenu cmActions = new ContextMenu();
+        cmActions.MenuItems.Add("Als Referenz festlegen (persistent)", delegate { SetSelectedAsReference(); });
+        cmActions.MenuItems.Add("Als Basis im Dashboard Ã¶ffnen (temporÃ¤r)", delegate { OpenDashboardWithBase(); });
+        cmActions.MenuItems.Add("-");
+        cmActions.MenuItems.Add("Name Ã¤ndern ...", delegate { RenameSelectedEntry(); });
+        cmActions.MenuItems.Add("Lauf exportieren ...", delegate { ExportSelected(); });
+
+        btnActions = UI.Secondary("Aktionen \u25BE"); btnActions.Margin = new Padding(UI.S(8), 0, 0, 0);
+        btnActions.Click += delegate { cmActions.Show(btnActions, new Point(0, btnActions.Height)); };
+        btnActions.Enabled = false;
+        Tip(btnActions, "Weitere Aktionen fÃ¼r den markierten Lauf: Als Referenz festlegen, Name Ã¤ndern oder exportieren.");
+
+        btnSetRef = UI.Secondary("Als Referenz ..."); Tip(btnSetRef, "Legt das markierte System als dauerhafte Vergleichsreferenz fest.");
+        btnRename = UI.Secondary("Name Ã¤ndern ..."); Tip(btnRename, "Ã„ndert den Anzeigenamen des markierten Systems.");
+        btnExport = UI.Secondary("Lauf exportieren ..."); Tip(btnExport, "Exportiert den markierten Lauf als eigenstÃ¤ndiges Paket.");
+        btnCompare = UI.Secondary("Vergleichen"); Tip(btnCompare, "Systeme vergleichen.");
+
+        btnDelete = UI.Secondary("Lauf lÃ¶schen"); btnDelete.Margin = new Padding(UI.S(8), 0, 0, 0); btnDelete.Click += delegate { DeleteSelected(); };
+        btnDelete.Enabled = false;
+        Tip(btnDelete, "Verschiebt die markierten oder angehakten LÃ¤ufe nach Minibench-Daten\\Archiv\\Entfernt. Beim nÃ¤chsten Abgleich verschwinden sie auch vom Netzlaufwerk.");
+
+        b.Controls.Add(btnDashboard); b.Controls.Add(btnOpenReport); b.Controls.Add(btnVerlauf); b.Controls.Add(btnActions); b.Controls.Add(btnDelete); bottom.Controls.Add(b);
+
+        lblDbClean = Lbl(DatenpflegeInfo.Length > 0 ? DatenpflegeInfo : "Nicht vergleichbare, abgebrochene und unvollstÃ¤ndige LÃ¤ufe verschiebt die Datenpflege nach Minibench-Daten\\Archiv.", 8.75f, false, UI.Muted);
         lblDbClean.Margin = new Padding(UI.S(4), UI.S(8), UI.S(4), 0); bottom.Controls.Add(lblDbClean);
         bottom.Resize += delegate { lblDbClean.MaximumSize = new Size(Math.Max(UI.S(200), bottom.ClientSize.Width - UI.S(10)), 0); };
+
+        pnlDbEmpty = new CardPanel();
+        pnlDbEmpty.Dock = DockStyle.Fill;
+        pnlDbEmpty.Visible = false;
+
+        lblEmptyIco = new Label();
+        lblEmptyIco.Text = UI.IcoSearch;
+        lblEmptyIco.Font = new Font("Segoe UI", 28f);
+        lblEmptyIco.ForeColor = UI.Muted;
+        lblEmptyIco.AutoSize = true;
+
+        lblEmptyText = new Label();
+        lblEmptyText.Text = "Keine passenden LÃ¤ufe gefunden.";
+        lblEmptyText.Font = new Font("Segoe UI Semibold", 10.5f);
+        lblEmptyText.ForeColor = UI.Text;
+        lblEmptyText.AutoSize = true;
+
+        lblEmptySub = new Label();
+        lblEmptySub.Text = "PrÃ¼fen Sie den Suchbegriff oder setzen Sie den Filter zurÃ¼ck.";
+        lblEmptySub.Font = new Font("Segoe UI", 9f);
+        lblEmptySub.ForeColor = UI.Muted;
+        lblEmptySub.AutoSize = true;
+
+        btnEmptyAction = UI.Secondary("Filter zurÃ¼cksetzen");
+        btnEmptyAction.Click += delegate {
+            if (txtDbFilter != null && txtDbFilter.Text.Length > 0) txtDbFilter.Text = "";
+            else ImportRuns();
+        };
+        Tip(btnEmptyAction, "Setzt den Suchfilter zurÃ¼ck oder Ã¶ffnet den Import-Dialog.");
+
+        pnlDbEmpty.Controls.Add(lblEmptyIco);
+        pnlDbEmpty.Controls.Add(lblEmptyText);
+        pnlDbEmpty.Controls.Add(lblEmptySub);
+        pnlDbEmpty.Controls.Add(btnEmptyAction);
+
+        pnlDbEmpty.Resize += delegate { LayoutDbEmpty(); };
 
         DbListView dlv = new DbListView();
         dlv.GroupStateChanged += delegate { UpdateToggleGroupsButton(); };
         lvDb = dlv; lvDb.View = View.Details; lvDb.FullRowSelect = true; lvDb.CheckBoxes = true; lvDb.Dock = DockStyle.Fill; lvDb.BorderStyle = BorderStyle.FixedSingle; lvDb.HideSelection = false; lvDb.ShowItemToolTips = true;
         EnableDarkListView(lvDb);
-        string[] cols = new string[] { "System", "Datum", "Gesamt", "Prozessor", "Grafik", "Arbeitsspeicher", "CPU Mehrkern", "RAM Lesen", "GPU", "Befunde K/W/I" };
-        int[] w = new int[] { UI.S(135), UI.S(95), UI.S(65), UI.S(125), UI.S(115), UI.S(105), UI.S(80), UI.S(70), UI.S(70), UI.S(62) };
+        string[] cols = new string[] { "System", "Datum", "Punkte", "CPU", "GPU", "RAM", "CPU Multi", "RAM Lesen", "FPS", "Befunde" };
+        int[] w = new int[] { UI.S(140), UI.S(95), UI.S(65), UI.S(130), UI.S(120), UI.S(100), UI.S(80), UI.S(75), UI.S(70), UI.S(65) };
         for (int i = 0; i < cols.Length; i++) lvDb.Columns.Add(cols[i], w[i]);
         lvDb.Resize += delegate {
-            int rem = lvDb.ClientSize.Width;
-            for (int i = 0; i < lvDb.Columns.Count - 1; i++) rem -= lvDb.Columns[i].Width;
-            if (rem > UI.S(60)) lvDb.Columns[lvDb.Columns.Count - 1].Width = rem - 2;
+            if (lvDb.Columns.Count < 10) return;
+            int clientW = lvDb.ClientSize.Width;
+            int fixedW = lvDb.Columns[1].Width + lvDb.Columns[2].Width + lvDb.Columns[5].Width +
+                         lvDb.Columns[6].Width + lvDb.Columns[7].Width + lvDb.Columns[8].Width + lvDb.Columns[9].Width;
+            int avail = clientW - fixedW - UI.S(4);
+            if (avail > UI.S(300))
+            {
+                int wSys = (int)(avail * 0.36);
+                int wCpu = (int)(avail * 0.34);
+                int wGpu = avail - wSys - wCpu;
+                lvDb.Columns[0].Width = Math.Max(UI.S(130), wSys);
+                lvDb.Columns[3].Width = Math.Max(UI.S(110), wCpu);
+                lvDb.Columns[4].Width = Math.Max(UI.S(100), wGpu);
+            }
         };
         lvDb.DoubleClick += delegate {
             if (lvDb.SelectedItems.Count == 0) return;
@@ -649,8 +745,9 @@ public partial class DiagGui
             e.Befunde
         });
         it.Tag = e;
-        it.ToolTipText = e.DisplayName + (e.Disk.Length > 0 ? "\r\n" + e.Disk : "") + (e.HasBench ? "" : "\r\n(ohne Benchmark-Werte)");
-        if (!e.HasBench) it.ForeColor = UI.Muted;
+        bool hasBench = e.HasBench || e.OverallScore > 0;
+        it.ToolTipText = e.DisplayName + (e.Disk.Length > 0 ? "\r\n" + e.Disk : "") + (hasBench ? "" : "\r\n(ohne Benchmark-Werte)");
+        if (!hasBench) it.ForeColor = UI.Muted;
         return it;
     }
 
@@ -820,47 +917,36 @@ public partial class DiagGui
 
     void UpdateDbButtons()
     {
-        if (btnDashboard == null && btnCompare == null) return;
-        int n = CheckedEntries().Count;
-        if (btnDelete != null) btnDelete.Enabled = n >= 1;
-        if (btnCompare != null)
+        if (btnDashboard == null) return;
+        int chkN = CheckedEntries().Count;
+        int selN = (lvDb != null ? lvDb.SelectedItems.Count : 0);
+
+        btnDashboard.Enabled = (chkN >= 1);
+        btnDashboard.Text = (chkN >= 1 ? String.Format("Im Dashboard vergleichen ({0})", chkN) : "Im Dashboard vergleichen");
+
+        if (btnOpenReport != null) btnOpenReport.Enabled = (selN == 1);
+        if (btnVerlauf != null) btnVerlauf.Enabled = (selN == 1 && GetSelectedDeviceTarget() != null);
+        if (btnActions != null) btnActions.Enabled = (selN == 1);
+
+        if (btnDelete != null)
         {
-            btnCompare.Enabled = n >= 2;
-            btnCompare.Text = n >= 2 ? n + " Systeme vergleichen (Klassisch)" : "Vergleichen (Klassisch)";
-        }
-        if (btnDashboard != null)
-        {
-            btnDashboard.Text = n >= 2 ? n + " Systeme im Dashboard vergleichen" : (n == 1 ? "1 System im Dashboard anzeigen" : "Interaktives Dashboard");
-        }
-        if (btnVerlauf != null)
-        {
-            btnVerlauf.Enabled = (GetSelectedDeviceTarget() != null);
-        }
-        if (btnRename != null)
-        {
-            int selCount = (lvDb != null ? lvDb.SelectedItems.Count : 0);
-            DbEntry selTarget = null;
-            if (lvDb != null && lvDb.SelectedItems.Count == 1) selTarget = lvDb.SelectedItems[0].Tag as DbEntry;
-            else if (lvDb != null && lvDb.CheckedItems.Count == 1) selTarget = lvDb.CheckedItems[0].Tag as DbEntry;
-            btnRename.Enabled = (selTarget != null && !selTarget.IsReference && (selCount == 1 || (selCount == 0 && n == 1)));
-        }
-        if (btnOpenReport != null)
-        {
-            int selCount = (lvDb != null ? lvDb.SelectedItems.Count : 0);
-            btnOpenReport.Enabled = (selCount == 1 || (selCount == 0 && n == 1));
-        }
-        if (btnExport != null)
-        {
-            int selCount = (lvDb != null ? lvDb.SelectedItems.Count : 0);
-            btnExport.Enabled = (selCount == 1 || (selCount == 0 && n == 1));
-        }
-        if (btnSetRef != null)
-        {
-            int selCount = (lvDb != null ? lvDb.SelectedItems.Count : 0);
-            btnSetRef.Enabled = (selCount == 1 || (selCount == 0 && n == 1));
+            if (chkN > 0)
+            {
+                btnDelete.Enabled = true;
+                btnDelete.Text = (chkN > 1 ? String.Format("AusgewÃ¤hlte LÃ¤ufe lÃ¶schen ({0})", chkN) : "AusgewÃ¤hlten Lauf lÃ¶schen");
+            }
+            else if (selN == 1)
+            {
+                btnDelete.Enabled = true;
+                btnDelete.Text = "Lauf lÃ¶schen";
+            }
+            else
+            {
+                btnDelete.Enabled = false;
+                btnDelete.Text = "Lauf lÃ¶schen";
+            }
         }
     }
-
     void ShowSetRefMenu()
     {
         ContextMenu m = new ContextMenu();
@@ -876,18 +962,18 @@ public partial class DiagGui
         else if (lvDb != null && lvDb.CheckedItems.Count == 1) target = (DbEntry)lvDb.CheckedItems[0].Tag;
         if (target == null || !target.HasBench)
         {
-            MessageBox.Show(this, "Bitte wählen Sie ein System mit Benchmark-Werten aus.", "Referenz festlegen", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UI.Hinweis("Bitte wählen Sie ein System mit Benchmark-Werten aus.", "Referenz festlegen", this);
             return;
         }
 
         string msg = String.Format("Möchten Sie das System \"{0}\" ({1})\r\nals dauerhafte Vergleichsreferenz (100 %) festlegen?\r\n\r\nDie Werte werden in Minibench-Daten\\Referenz.json gespeichert.", target.DisplayName, target.Datum);
-        if (MessageBox.Show(this, msg, "Referenz festlegen", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        if (!UI.Ask(msg, "Referenz festlegen", this)) return;
 
         try
         {
             if (String.IsNullOrEmpty(dataDir) || !Directory.Exists(dataDir))
             {
-                MessageBox.Show(this, "Der Datenordner ist nicht verfügbar.", "Referenz festlegen", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                UI.Hinweis("Der Datenordner ist nicht verfügbar.", "Referenz festlegen", this);
                 return;
             }
             string dest = Path.Combine(dataDir, "Referenz.json");
@@ -895,13 +981,13 @@ public partial class DiagGui
             {
                 string raw = File.ReadAllText(target.Path, Encoding.UTF8);
                 File.WriteAllText(dest, raw, new UTF8Encoding(false));
-                MessageBox.Show(this, "Das System \"" + target.DisplayName + "\" wurde als Referenz gespeichert.", "Referenz festgelegt", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                UI.Hinweis("Das System \"" + target.DisplayName + "\" wurde als Referenz gespeichert.", "Referenz festgelegt", this);
                 ReloadDb();
             }
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, "Fehler beim Speichern der Referenz: " + ex.Message, "Referenz festlegen", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UI.Hinweis("Fehler beim Speichern der Referenz: " + ex.Message, "Referenz festlegen", this);
         }
     }
 
@@ -931,7 +1017,7 @@ public partial class DiagGui
         {
             string dashPath = System.IO.Path.Combine(dataDir, "Berichte\\Dashboard.html");
             if (File.Exists(dashPath)) OpenShell(dashPath);
-            else MessageBox.Show(this, "Das Dashboard konnte nicht geöffnet werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Leos Minibench", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            else UI.Hinweis("Das Dashboard konnte nicht geöffnet werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Leos Minibench", this);
         }
     }
 
@@ -1018,7 +1104,7 @@ public partial class DiagGui
         {
             string dashPath = System.IO.Path.Combine(dataDir, "Berichte\\Dashboard.html");
             if (File.Exists(dashPath)) OpenShell(dashPath);
-            else MessageBox.Show(this, "Das Dashboard konnte nicht geöffnet werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Leos Minibench", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            else UI.Hinweis("Das Dashboard konnte nicht geöffnet werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Leos Minibench", this);
         }
     }
 
@@ -1046,32 +1132,35 @@ public partial class DiagGui
         {
             string dashPath = System.IO.Path.Combine(dataDir, "Berichte\\Dashboard.html");
             if (File.Exists(dashPath)) OpenShell(dashPath);
-            else MessageBox.Show(this, "Das Dashboard konnte nicht geöffnet werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Leos Minibench", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            else UI.Hinweis("Das Dashboard konnte nicht geöffnet werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Leos Minibench", this);
         }
     }
 
     // ab 3.54: Eintrag und Berichtsordner ins Archiv (Minibench-Daten\Archiv\Entfernt), über den Arbeitsprozess
+    // ab 3.54: Eintrag und Berichtsordner ins Archiv (Minibench-Daten\Archiv\Entfernt), Ã¼ber den Arbeitsprozess
     void DeleteSelected()
     {
         List<DbEntry> sel = CheckedEntries();
+        if (sel.Count == 0 && lvDb != null && lvDb.SelectedItems.Count == 1)
+        {
+            DbEntry e = lvDb.SelectedItems[0].Tag as DbEntry;
+            if (e != null) sel.Add(e);
+        }
         if (sel.Count == 0) return;
         StringBuilder sb = new StringBuilder();
-        foreach (DbEntry e in sel) sb.AppendLine("·  " + e.DisplayName + "  " + e.Datum);
+        foreach (DbEntry e in sel) sb.AppendLine("Â·  " + e.DisplayName + "  " + e.Datum);
         string nas, ben; bool mitNas = NasAblage.LeseKonfig(dataDir, out nas, out ben);
-        string msg = "Diese Läufe entfernen?\r\n\r\n" + sb.ToString() + "\r\nDatenbankeintrag und Berichtsordner werden nach Minibench-Daten\\Archiv\\Entfernt verschoben und lassen sich von dort zurückholen."
-            + (mitNas ? " Auf dem Netzlaufwerk verschwinden sie beim nächsten Aktualisieren (dort ebenfalls ins Archiv)." : "");
-        if (MessageBox.Show(this, msg, "Läufe entfernen", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        string msg = (sel.Count > 1 ? "Diese " + sel.Count + " LÃ¤ufe entfernen?" : "Diesen Lauf entfernen?") + "\r\n\r\n" + sb.ToString() + "\r\nDatenbankeintrag und Berichtsordner werden nach Minibench-Daten\\Archiv\\Entfernt verschoben und lassen sich von dort zurÃ¼ckholen."
+            + (mitNas ? " Auf dem Netzlaufwerk verschwinden sie beim nÃ¤chsten Aktualisieren (dort ebenfalls ins Archiv)." : "");
+        if (!UI.Ask(msg, "LÃ¤ufe entfernen", this)) return;
         List<string> paths = new List<string>();
         foreach (DbEntry e in sel) paths.Add(e.Path);
         List<string> lines;
         string res = RunHelperPumped("-Entfernen " + Q(String.Join("|", paths.ToArray())), out lines, 300);
         ReloadDb();
         string[] r = res.Split('|');
-        if (r.Length < 2 || r[1] != "0") MessageBox.Show(this, lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Keine Rückmeldung vom Arbeitsprozess.", "Läufe entfernen", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        if (r.Length < 2 || r[1] != "0") UI.Hinweis(lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Keine RÃ¼ckmeldung vom Arbeitsprozess.", "LÃ¤ufe entfernen", this);
     }
-
-    // Aktualisieren (ab 3.54): mit eingerichtetem und erreichbarem Netzlaufwerk erst abgleichen, dann neu einlesen.
-    // Ohne Netzlaufwerk oder unterwegs nur neu einlesen; alles auf dem Stick bleibt nutzbar.
     bool abgleichLaeuft = false;
     void RefreshAndSync()
     {
@@ -1085,7 +1174,7 @@ public partial class DiagGui
         string pfad, benutzer;
         if (dataDir.Length == 0 || !NasAblage.LeseKonfig(dataDir, out pfad, out benutzer)) { ReloadDb(); return; }
         string fehler = NasAblage.PfadFehler(pfad);
-        if (fehler.Length > 0) { ReloadDb(); MessageBox.Show(this, "Der gespeicherte Pfad des Netzlaufwerks ist nicht verwendbar: " + fehler + "\r\n\r\nBitte unter \"Netzlaufwerk ...\" korrigieren.", "Aktualisieren", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+        if (fehler.Length > 0) { ReloadDb(); UI.Hinweis("Der gespeicherte Pfad des Netzlaufwerks ist nicht verwendbar: " + fehler + "\r\n\r\nBitte unter \"Netzlaufwerk ...\" korrigieren.", "Aktualisieren", this); return; }
         SetText(lblDbPath, "Netzlaufwerk " + pfad + " wird geprüft ...");
         bool warAn = Enabled; Enabled = false;
         bool da;
@@ -1098,7 +1187,7 @@ public partial class DiagGui
                 string err = NasAblage.Verbinden(pfad, benutzer, pw);
                 Enabled = false;
                 try { da = err.Length == 0 && NasAblage.Erreichbar(pfad, 6000); } finally { Enabled = warAn; }
-                if (!da && err.Length > 0) MessageBox.Show(this, err, "Netzlaufwerk verbinden", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                if (!da && err.Length > 0) UI.Hinweis(err, "Netzlaufwerk verbinden", this);
             }
         }
         if (!da)
@@ -1116,7 +1205,7 @@ public partial class DiagGui
             string frage = "Die Freigabe ist erreichbar, der Ordner " + pfad + " aber nicht, obwohl schon abgeglichen wurde.\r\n\r\n"
                 + "Ist die Freigabe richtig eingehängt und der Ordner nicht verschoben? Nur wenn das Netzlaufwerk neu eingerichtet wurde: "
                 + "Ordner neu anlegen und beide Seiten zusammenführen? Dabei wird nichts gelöscht.";
-            if (MessageBox.Show(this, frage, "Abgleich mit dem Netzlaufwerk", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.Yes)
+            if (UI.Ask(frage, "Abgleich mit dem Netzlaufwerk", this))
                 res = RunHelperPumped("-Abgleich -AbgleichNeu", out lines, 3600, lblDbPath);
             else { ReloadDb(); SetText(lblDbPath, NasAblage.AblageText(dataDir) + "   ·   Ordner auf dem Netzlaufwerk fehlt, nichts geändert"); return; }
         }
@@ -1128,7 +1217,7 @@ public partial class DiagGui
                 + "Ja: Die Daten wurden bewusst entfernt. Die fehlenden Dateien werden auf der anderen Seite ins Archiv verschoben (Archiv\\Abgleich).\r\n"
                 + "Nein: Beide Seiten zusammenführen, nichts entfernen (z. B. Netzlaufwerk neu eingerichtet oder geleert).\r\n"
                 + "Abbrechen: nichts tun.";
-            DialogResult wahl = MessageBox.Show(this, frage, "Abgleich mit dem Netzlaufwerk", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button3);
+            DialogResult wahl = UI.Ask3(frage, "Abgleich mit dem Netzlaufwerk", this);
             if (wahl == DialogResult.Yes) res = RunHelperPumped("-Abgleich -AbgleichLoeschen", out lines, 3600, lblDbPath);
             else if (wahl == DialogResult.No) res = RunHelperPumped("-Abgleich -AbgleichNeu", out lines, 3600, lblDbPath);
             else { ReloadDb(); SetText(lblDbPath, NasAblage.AblageText(dataDir) + "   ·   Abgleich angehalten, nichts geändert"); return; }
@@ -1140,13 +1229,13 @@ public partial class DiagGui
         // Konflikte, Fehler und Abbrüche anzeigen; ein reiner Abgleich ohne Besonderheiten steht nur in der Zeile
         string[] x = res.Split('|');
         bool besonders = !ok || !erreichbar || (x.Length >= 6 && (x[4] != "0" || x[5] != "0"));
-        if (besonders) MessageBox.Show(this, kurz + (lines.Count > 0 ? "\r\n\r\n" + String.Join("\r\n", lines.ToArray()) : "") + "\r\n\r\nProtokoll: Minibench-Daten\\Abgleich\\Abgleich.log", "Abgleich mit dem Netzlaufwerk", MessageBoxButtons.OK, ok ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+        if (besonders) UI.Hinweis(kurz + (lines.Count > 0 ? "\r\n\r\n" + String.Join("\r\n", lines.ToArray()) : "") + "\r\n\r\nProtokoll: Minibench-Daten\\Abgleich\\Abgleich.log", "Abgleich mit dem Netzlaufwerk", this);
     }
 
     void CleanData()
     {
         if (dataDir.Length == 0) return;
-        if (MessageBox.Show(this, "Lasttests vor v2.67 (andere Last, nicht vergleichbar), abgebrochene Läufe ohne Bericht und kurze Läufe (Funktionstest, von Hand nach wenigen Sekunden beendeter Lasttest, Lauf ohne Messwert) sowie ungenutzte Teile von smartmontools nach Minibench-Daten\\Archiv verschieben?\r\n\r\nGelöscht wird nichts außer älteren Übersetzungen im Cache. Das Protokoll steht in Archiv\\Datenpflege.log.", "Daten aufräumen", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        if (!UI.Ask("Nicht vergleichbare, abgebrochene und unvollständige Läufe nach Minibench-Daten\\Archiv verschieben?\r\n\r\nGelöscht wird nichts außer älteren Übersetzungen im Cache. Das Protokoll steht in Archiv\\Datenpflege.log.", "Daten aufräumen", this)) return;
         Cursor = Cursors.WaitCursor;
         List<string> lines = new List<string>(); string res = "";
         try { res = RunHelper("-Datenpflege", out lines); }
@@ -1154,7 +1243,7 @@ public partial class DiagGui
         Cursor = Cursors.Default;
         ReloadDb();
         if (res.Length > 0) SetText(lblDbClean, "Datenpflege: " + res.Split('|')[0]);
-        MessageBox.Show(this, lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Nichts zu archivieren.", "Daten aufräumen", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        UI.Hinweis(lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Nichts zu archivieren.", "Daten aufräumen", this);
     }
 
     void ExportSelected()
@@ -1177,13 +1266,13 @@ public partial class DiagGui
             List<string> lines;
             string res = RunHelper("-ExportLauf " + Q(target.Path) + " -ExportZiel " + Q(sfd.FileName), out lines);
             Cursor = Cursors.Default;
-            MessageBox.Show(this, lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Export abgeschlossen.", "Lauf exportieren", MessageBoxButtons.OK, res.StartsWith("1") ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+            UI.Hinweis(lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Export abgeschlossen.", "Lauf exportieren", this);
         }
     }
 
     void ImportRuns()
     {
-        if (dbDir.Length == 0) { MessageBox.Show(this, "Kein Datenordner verfügbar.", "Leos Minibench"); return; }
+        if (dbDir.Length == 0) { UI.Hinweis("Kein Datenordner verfügbar.", "Leos Minibench", this); return; }
         Form dlg = new Form();
         dlg.Text = "Durchläufe importieren";
         dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -1250,6 +1339,6 @@ public partial class DiagGui
         catch (Exception ex) { lines.Add("Import fehlgeschlagen: " + ex.Message); }
         Cursor = Cursors.Default;
         ReloadDb();
-        MessageBox.Show(this, lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Nichts importiert.", "Import", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        UI.Hinweis(lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Nichts importiert.", "Import", this);
     }
 }

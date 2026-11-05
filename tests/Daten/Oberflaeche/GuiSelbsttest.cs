@@ -42,6 +42,10 @@ public static class GuiSelbsttest
         Fall("Etikett.Schreibweise", EtikettSchreibweise);
         Fall("Karte", KarteRahmen);
         Fall("StartseitenElemente", StartseitenElemente);
+        Fall("UI.VersionNumber", UiVersionsvergleich);
+        Fall("SettingRow.Dynamik", SettingRowDynamik);
+        Fall("CategoryPickerItem.Kurztitel", CategoryPickerKurztitel);
+        Fall("UI.SkalierungDpi", UiSkalierungDpi);
         foreach (string l in outLines) System.Console.WriteLine(l);
         return 0;
     }
@@ -519,5 +523,58 @@ public static class GuiSelbsttest
         {
             DiagGui.GpuNames = origGpu;
         }
+    }
+
+    // ab v4.0: Dezimale Versionsnummer zur verlässlichen Größenordnung (z. B. 3.882 < 3.9 < 3.91 < 4.0)
+    static void UiVersionsvergleich()
+    {
+        Ist(UI.VersionNumber("3.882") < UI.VersionNumber("3.9"), "3.882 < 3.9");
+        Ist(UI.VersionNumber("3.9") < UI.VersionNumber("3.91"), "3.9 < 3.91");
+        Ist(UI.VersionNumber("3.91") < UI.VersionNumber("4.0"), "3.91 < 4.0");
+        Ist(UI.VersionNumber("v3.91") == UI.VersionNumber("3.91"), "v3.91 == 3.91");
+        Ist(UI.VersionNumber("4.0") == 4.0, "4.0 == 4.0");
+    }
+
+    // ab v4.0: SettingRow Dynamik (deterministische Spalten, kein 52px-Deckel, Badge nicht bei 0,0)
+    static void SettingRowDynamik()
+    {
+        using (ToggleSwitch sw = new ToggleSwitch())
+        using (SettingRow row = new SettingRow("Langer Titel für dynamische Prüfung", "Eine längere Beschreibung für dynamische Höhenberechnung.", sw))
+        {
+            row.Width = 500;
+            Badge b = new Badge("", "ok");
+            row.AddBadge(b);
+            b.Text = "gesetzt";
+            Ist(b.Left > 100, "Badge sitzt rechts");
+            Ist(row.Height >= UI.S(42), "Mindesthöhe");
+        }
+    }
+
+    // ab v4.0: CategoryPickerItem nutzt Kurztitel falls vorhanden
+    static void CategoryPickerKurztitel()
+    {
+        using (CategoryPickerItem c = new CategoryPickerItem("Systemdateien und Komponentenspeicher", UI.IcoFolder, "Systemdateien"))
+        {
+            Ist(c.ShortTitle == "Systemdateien", "Kurztitel bevorzugt");
+        }
+        using (CategoryPickerItem c = new CategoryPickerItem("Datenschutz", UI.IcoShield))
+        {
+            Ist(c.ShortTitle == "Datenschutz", "Fallback auf Titel");
+        }
+    }
+
+    // ab v4.0: UI.SkalierungDpi verifiziert Skalierung bei 100 % und 150 %
+    static void UiSkalierungDpi()
+    {
+        float alt = UI.DpiScale;
+        try
+        {
+            UI.DpiScale = 1.0f;
+            int s100 = UI.S(200);
+            UI.DpiScale = 1.5f;
+            int s150 = UI.S(200);
+            Ist(s100 == 200 && s150 == 300, "150 % entspricht dem 1.5-fachen");
+        }
+        finally { UI.DpiScale = alt; }
     }
 }

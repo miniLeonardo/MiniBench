@@ -1,0 +1,106 @@
+﻿LEOS MINIBENCH 4.0: ÄNDERUNGEN
+==============================
+
+Version 4.0 („Aufgeräumt“) führt eine ganzheitliche Harmonisierung, Bereinigung und Entflechtung der Benutzeroberfläche
+durch: Beseitigung aller Inkonsistenzen, verbindliche Einführung einheitlicher Fachbegriffe (Lauf, System, Modul, Aufgabe,
+Einstellung, Vorlage, Ablauf), Auslagerung aller globalen Programmoptionen in ein dezentes Einstellungs-Menü in der Kopfzeile
+bei gleichzeitiger Entschlackung der Fußleiste, deterministisches Spaltenraster und dynamische Texthöhen für Einstellungszeilen,
+Kategorie-Kurztitel und eigene Symbole gegen Textüberläufe, entflochtene Datenbank-Aktionen mit Volltextsuche sowie barrierefreie
+Bedienbarkeit und dezimaler Versionsvergleich.
+
+
+1. GLOBALER EINSTELLUNGS-DIALOG & ENTSCHLACKTE FUSSLEISTE
+  Zahnrad-Menü                Ein dezenter Zahnrad-Knopf in der Kopfzeile (neben dem Farbschema-Umschalter) öffnet einen
+                              vollständig thematisierten Einstellungsdialog (UI.ThemeDialog) mit den sieben Bereichen
+                              Darstellung (Hell/Dunkel), Startverhalten, Ergebnisanzeige (1-Fenstermodus), Datenschutz
+                              (Anonymisierung), Speicherorte & Netzlaufwerk, Updates sowie Über / Danksagungen.
+  Entschlackte Fußleiste      Die Schalter für den 1-Fenstermodus, die Anonymisierung und der Netzlaufwerks-Link wurden aus
+                              der Fußleiste entfernt. Die Fußleiste konzentriert sich ab sofort ausschließlich auf die Vorlagen-
+                              Steuerung (Minimal, Leos Empfehlung, Vollständig, Alles abwählen, Als Vorlage speichern) und den
+                              Hauptstartknopf.
+  Hilfsseiten-Einkürzung      Auf Datenbank-, Verlauf- und Hilfsseiten wird der Startbereich ausgeblendet und die Fußleiste auf
+                              38 px kompakte Höhe verkleinert.
+
+
+2. EINHEITLICHE EINSTELLUNGSZEILEN (SETTINGROW) & KATEGORIELISTEN
+  Deterministisches Raster    Die Einstellungszeilen auf den Seiten Wartung und Optimierung ordnen ihre Status- und
+                              Bedienelemente in einem festen, rechtsbündigen Spaltenraster an:
+                              [ Zustand („gesetzt“) ] → [ Risiko („Eingriff“ / „Zerstörend“) ] → [ Neustart ] → [ Schalter ].
+  Dynamische Höhenberechnung  Der starre 52-px-Höhendeckel wurde entfernt. Die Zeilenhöhe passt sich dynamisch an bis zu zwei
+                              Textzeilen an (Mindesthöhe 42 px); Textmessung und Zeichenbereich fluchten exakt.
+  Keine Badge-Überlagerung    Zustands-Badges („bereits aktiv“, „gesetzt“) aktualisieren über Ereignis-Abonnements sofort das
+                              Zeilenlayout und werden im inaktiven Zustand außerhalb des Sichtfelds platziert, sodass Titel
+                              niemals überdeckt oder zusammengeschoben werden.
+  Kategorie-Kurztitel         Wartungs- und Optimierungskategorien führen im Modulvertrag bzw. Katalog ein Attribut Kurztitel
+                              (z. B. „Systemdateien“, „Bereinigung“, „Datenschutz“), das Textüberläufe in der 232 px breiten
+                              Auswahlspalte verlässlich verhindert. Fehlt ein Kurztitel, wird zweizeilig umgebrochen.
+  Sprechende Symbole          Jede Kategorie besitzt ein fachlich passendes Symbol (z. B. UI.IcoShield, UI.IcoClean, UI.IcoNet),
+                              sodass das allgemeine Zahnrad-Icon nicht mehr mehrfach wiederholt wird.
+  Pillen-Zähler               Die Zähler-Pills im Kategoriewähler zeigen einheitlich „X/Y“ und heben sich bei X > 0 in Akzentfarbe
+                              klar vom Hintergrund ab.
+
+
+3. ENTFLECHTETE DATENBANK-BEDIENUNG & DYNAMISCHE TABELLE
+  Trennung Haken & Selektion  Die Checkboxen in der Datenbank-ListView dienen ausschließlich dem Mehrfachvergleich im Dashboard
+                              (Schaltfläche: „Im Dashboard vergleichen (n)“). Die Zeilen-Markierung (Selektion) steuert alle
+                              Einzelaktionen („Bericht öffnen“, „Verlauf“, „Als Referenz“, „Name ändern“, „Lauf exportieren“).
+  Löschen mit Schutz          Die Löschfunktion unterscheidet eindeutig zwischen dem markierten Einzellauf („Lauf löschen“) und
+                              mehreren ausgewählten Durchläufen („Ausgewählte Läufe löschen (n)“) mit jeweiliger Sicherheitsabfrage.
+  Suchleiste                  Eine neue Filter-Suchleiste oberhalb der Tabelle ermöglicht die sofortige Filterung der Rechner- und
+                              Lauf-Liste nach Systemname, Prozessor oder Grafikkarte.
+  Leere Zustandskarte         Ist die Datenbank leer oder liefert die Suche keine Treffer, informiert eine zentrierte Hinweiskarte
+                              mit direkter Hilfsaktion („Filter zurücksetzen“ bzw. „Durchläufe importieren …“).
+  Dynamische Breiten          Bei Breitenänderung des Fensters verteilen sich überschüssige Pixel prozentual auf System (36 %),
+                              Prozessor (34 %) und Grafikkarte (30 %).
+
+
+4. GLOSSAR, SPRACHE & MODUL-STEUERUNG
+  Verbindliches Glossar       Oberfläche und Dokumentation nutzen einheitliche Fachbegriffe: Lauf (Programmausführung),
+                              System / Gerät (physischer PC), Modul (Hauptbestandteil), Aufgabe (Einzelschritt Wartung),
+                              Einstellung (Option Optimierung), Vorlage (gespeicherte Gesamtauswahl), Ablauf (Ausführungsreihenfolge).
+  Keine Entwicklersprache     Versionsbezüge („ab v2.8“, „vor v2.67“) und externe Skriptnamen (Sophia, O&O, Pack) wurden von allen
+                              Anwenderseiten entfernt. Danksagungen und Projektverweise sind unter Einstellungen > Über gebündelt.
+  Modul-Hinweisband           Der Schalter „beim Start ausführen“ auf den Modulseiten entfällt; die Modulauswahl erfolgt
+                              ausschließlich über die Navigationsleiste. Sind auf einer Modulseite Einstellungen gewählt, das Modul
+                              jedoch in der Leiste deaktiviert, weist ein dezentes Hinweisband mit Klick-Aktion („In den Ablauf
+                              aufnehmen“) darauf hin.
+
+
+5. DEZIMALE VERSIONSPRÜFUNG & BARRIEREFREIHEIT
+  Numerische Versionsprüfung  Die neue Hilfsfunktion UI.VersionNumber wertet Versionsnummern mathematisch-dezimal aus. Dadurch
+                              wird 3.882 korrekt als kleiner als 3.9 und 3.91 eingestuft, was Fehlalarme des Update-Badges ausschließt.
+  Tastaturnavigation          F5 aktualisiert die Datenbank, Strg+F fokussiert das Suchfeld, Strg+Enter startet den Ablauf.
+  Screenreader & Dialoge      Alle Bedienelemente besitzen AccessibleRole- und AccessibleName-Attribute sowie Tooltips. Sämtliche
+                              Dialoge und Rückfragen wurden von nativen MessageBoxen auf UI.ThemeDialog umgestellt.
+
+
+GEFUNDEN UND BEHOBEN
+  Fehlalarm beim Update-Badge: System.Version verglich 882 > 91, wodurch auf Version 3.91 fälschlich Version 3.882 als Update
+  gemeldet wurde. Behoben durch UI.VersionNumber.
+  Überdeckte Titel durch Badges in SettingRow: Nachträgliche Textänderungen oder Sichtbarkeit an Badges lösten kein Layout aus;
+  Badges lagen bei (0, 0) über dem Titel. Behoben durch Ereignis-Abonnements und Offscreen-Platzierung inaktiver Badges.
+  Abgeschnittene Beschreibungen: Zeilentexte in der Wartung wurden durch einen starren 52-px-Höhendeckel beschnitten. Behoben
+  durch dynamische Höhenmessung.
+  Kategorie-Textüberläufe: Lange Kategorietitel stießen an die 232 px Spaltenbegrenzung. Behoben durch Kurztitel und Zweizeilen-
+  Umbruch.
+  Falsche Kategoriesymbole: Kategorien fielen auf das Standard-Zahnrad zurück. Behoben durch direkte Zuweisung in Katalog und Vertrag.
+  Verquickte Datenbank-Bedienung: Das Löschen bezog sich auf Haken, während Berichte für die Selektion geöffnet wurden. Behoben
+  durch vollständige Entflechtung.
+  Fälschlich ausgegraute Datenbankzeilen: Läufe mit gültigen Benchmark-Ergebnissen wurden gelegentlich grau gerendert. Behoben
+  durch kombinierte Prüfung von HasBench und OverallScore > 0.
+  Native MessageBoxen im Dunkelmodus: Mehrere Dialoge poppten im ungestylten Windows-Standard auf. Behoben durch UI.Ask / UI.Hinweis.
+
+
+GRENZEN
+  Die Auslagerung technischer Registry-Pfade in Tooltips setzt eine Mausbedienung oder das Öffnen der Berichtsansicht voraus,
+  um exakte Schlüsselwerte im Detail nachzuvollziehen.
+
+
+UMSTIEG
+  Bestehende Voreinstellungen, Profildateien und Datenbanken bleiben ohne Anpassung vollständig kompatibel. Gespeicherte Fenster-
+  maße werden ab sofort in der Sitzungskonfiguration gesichert.
+
+
+QUELLEN
+  Microsoft .NET Windows Forms: AccessibleObject & Screen Reader Integration Guidelines
+  Microsoft Windows User Experience Interaction Guidelines: Master-Detail and Settings Layouts

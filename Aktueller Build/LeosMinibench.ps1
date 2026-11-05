@@ -246,7 +246,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
 }
 #endregion
 
-$ScriptVersion = '3.91'
+$ScriptVersion = '4.0'
 $AppName       = 'Leos Minibench'
 # Eingebettete Referenzprofile für Leos Minibench (v3.0)
 $script:EmbeddedReferences = @{
@@ -3028,6 +3028,12 @@ $script:ModuleContracts = @(
     Neustart        = 'immer'
     Parameter       = @('Wartung', 'Reparaturen', 'OhneWiederherstellungspunkt')
     Datenbankfelder = @()
+    Kategorien      = @(
+        @{ Key = 'Systemdateien und Komponentenspeicher'; Titel = 'Systemdateien und Komponentenspeicher'; Kurztitel = 'Systemdateien'; Symbol = 'IcoFolder'; Text = 'Komponentenspeicher und Systemdateien mit DISM und SFC prüfen und reparieren.' }
+        @{ Key = 'Bereinigung und Speicherplatz'; Titel = 'Bereinigung und Speicherplatz'; Kurztitel = 'Bereinigung'; Symbol = 'IcoTrash'; Text = 'Dateibereinigung, temporäre Daten, Caches und alte Schattenkopien leeren.' }
+        @{ Key = 'Windows Update, Netzwerk und Zeit'; Titel = 'Windows Update, Netzwerk und Zeit'; Kurztitel = 'Windows Update'; Symbol = 'IcoRefresh'; Text = 'Windows-Update-Komponenten und Netzwerk zurücksetzen, Systemzeit synchronisieren.' }
+        @{ Key = 'Dienste, Geräte und Energie'; Titel = 'Dienste, Geräte und Energie'; Kurztitel = 'Dienste & Energie'; Symbol = 'IcoGear'; Text = 'WMI, Druckwarteschlange, Energiesparpläne, Schnellstart und Geräteerkennung.' }
+    )
     Schritte        = @(
         @{ Key = 'DismRestore'; Typ = 'Massnahme'; Risiko = 'Eingriff'; Neustart = 'moeglich'; Rueckgaengig = 'Wiederherstellungspunkt'; Minuten = 20; Vorauswahl = $true; Ueblich = $false; Gruppe = 'Systemdateien und Komponentenspeicher'
            Titel = 'Komponentenspeicher prüfen und reparieren (DISM)'
@@ -4053,19 +4059,19 @@ $script:OptKatalog = (
 @{
     Katalog     = 1
     Kategorien  = @(
-        @{ Key = 'Datenschutz';  Titel = 'Datenschutz und Telemetrie'; Text = 'Diagnosedaten, Fehlerberichte, Werbe-ID und andere Datenübertragungen an Microsoft.' }
-        @{ Key = 'Werbung';      Titel = 'Werbung, Tipps und Vorschläge'; Text = 'Empfehlungen, Tipps, App-Vorschläge und automatisch installierte Apps.' }
-        @{ Key = 'KI';           Titel = 'Suche, Cortana, Copilot und KI'; Text = 'Websuche im Startmenü, Cortana, Copilot, Recall und KI-Funktionen in Paint.' }
-        @{ Key = 'Berechtigung'; Titel = 'App-Berechtigungen, Verlauf und Synchronisierung'; Text = 'Zugriff von Apps auf Konto, Diagnose, Standort und Bewegung, Aktivitätsverlauf, Zwischenablage und Synchronisierung.' }
-        @{ Key = 'Hintergrund';  Titel = 'Dienste und geplante Aufgaben'; Text = 'Dienste und Aufgaben, die im Hintergrund laufen und auf den meisten PCs nicht gebraucht werden.' }
-        @{ Key = 'Funktionen';   Titel = 'Windows-Funktionen und Zusatzfeatures'; Text = 'Optionale Windows-Funktionen abschalten und selten gebrauchte Zusatzfeatures entfernen.' }
-        @{ Key = 'Apps';         Titel = 'Vorinstallierte Apps entfernen'; Text = 'Apps aus dem Microsoft Store, die Windows mitbringt. Zurück nur über den Store.' }
-        @{ Key = 'Bedienung';    Titel = 'Explorer, Taskleiste und Start'; Text = 'Dateiendungen, Schnellzugriff, Taskleiste, Startmenü und Kontextmenüs.' }
-        @{ Key = 'Darstellung';  Titel = 'Darstellung und persönliche Vorlieben'; Text = 'Geschmackssache: dunkler Modus, Taskleiste links, Laufwerksname und Ähnliches.' }
-        @{ Key = 'Leistung';     Titel = 'Leistung, Spiele und Energie'; Text = 'Indizierung, Maus, Spiele-Prioritäten, Grafikplanung, Energieplan und Ruhezustand.' }
-        @{ Key = 'Update';       Titel = 'Windows Update, Edge und OneDrive'; Text = 'Übermittlungsoptimierung, Neustartverhalten, Updates anderer Microsoft-Produkte, Edge im Hintergrund und OneDrive.' }
-        @{ Key = 'Sicherheit';   Titel = 'Sicherheit und Fernzugriff'; Text = 'Netzwerkschutz, unerwünschte Apps, Remoteunterstützung, Remotedesktop und verschlüsseltes DNS.' }
-        @{ Key = 'Grafik';       Titel = 'Grafiktreiber'; Text = 'Grafiktreiber restlos entfernen (DDU) und NVIDIA-Profil setzen.' }
+        @{ Key = 'Datenschutz';  Titel = 'Datenschutz und Telemetrie'; Kurztitel = 'Datenschutz'; Symbol = 'IcoShield'; Text = 'Diagnosedaten, Fehlerberichte, Werbe-ID und andere Datenübertragungen an Microsoft.' }
+        @{ Key = 'Werbung';      Titel = 'Werbung, Tipps und Vorschläge'; Kurztitel = 'Werbung & Tipps'; Symbol = 'IcoBell'; Text = 'Empfehlungen, Tipps, App-Vorschläge und automatisch installierte Apps.' }
+        @{ Key = 'KI';           Titel = 'Suche, Cortana, Copilot und KI'; Kurztitel = 'Suche & KI'; Symbol = 'IcoSearch'; Text = 'Websuche im Startmenü, Cortana, Copilot, Recall und KI-Funktionen in Paint.' }
+        @{ Key = 'Berechtigung'; Titel = 'App-Berechtigungen, Verlauf und Synchronisierung'; Kurztitel = 'Berechtigungen'; Symbol = 'IcoLock'; Text = 'Zugriff von Apps auf Konto, Diagnose, Standort und Bewegung, Aktivitätsverlauf, Zwischenablage und Synchronisierung.' }
+        @{ Key = 'Hintergrund';  Titel = 'Dienste und geplante Aufgaben'; Kurztitel = 'Hintergrunddienste'; Symbol = 'IcoGear'; Text = 'Dienste und Aufgaben, die im Hintergrund laufen und auf den meisten PCs nicht gebraucht werden.' }
+        @{ Key = 'Funktionen';   Titel = 'Windows-Funktionen und Zusatzfeatures'; Kurztitel = 'Funktionen'; Symbol = 'IcoCheck'; Text = 'Optionale Windows-Funktionen abschalten und selten gebrauchte Zusatzfeatures entfernen.' }
+        @{ Key = 'Apps';         Titel = 'Vorinstallierte Apps entfernen'; Kurztitel = 'Apps entfernen'; Symbol = 'IcoApp'; Text = 'Apps aus dem Microsoft Store, die Windows mitbringt. Zurück nur über den Store.' }
+        @{ Key = 'Bedienung';    Titel = 'Explorer, Taskleiste und Start'; Kurztitel = 'Bedienung & Start'; Symbol = 'IcoFolder'; Text = 'Dateiendungen, Schnellzugriff, Taskleiste, Startmenü und Kontextmenüs.' }
+        @{ Key = 'Darstellung';  Titel = 'Darstellung und persönliche Vorlieben'; Kurztitel = 'Darstellung'; Symbol = 'IcoSun'; Text = 'Geschmackssache: dunkler Modus, Taskleiste links, Laufwerksname und Ähnliches.' }
+        @{ Key = 'Leistung';     Titel = 'Leistung, Spiele und Energie'; Kurztitel = 'Leistung & Spiele'; Symbol = 'IcoFlame'; Text = 'Indizierung, Maus, Spiele-Prioritäten, Grafikplanung, Energieplan und Ruhezustand.' }
+        @{ Key = 'Update';       Titel = 'Windows Update, Edge und OneDrive'; Kurztitel = 'Update & Edge'; Symbol = 'IcoRefresh'; Text = 'Übermittlungsoptimierung, Neustartverhalten, Updates anderer Microsoft-Produkte, Edge im Hintergrund und OneDrive.' }
+        @{ Key = 'Sicherheit';   Titel = 'Sicherheit und Fernzugriff'; Kurztitel = 'Sicherheit'; Symbol = 'IcoShield'; Text = 'Netzwerkschutz, unerwünschte Apps, Remoteunterstützung, Remotedesktop und verschlüsseltes DNS.' }
+        @{ Key = 'Grafik';       Titel = 'Grafiktreiber'; Kurztitel = 'Grafiktreiber'; Symbol = 'IcoGpu'; Text = 'Grafiktreiber restlos entfernen (DDU) und NVIDIA-Profil setzen.' }
     )
     Eintraege   = @(
         # ------------------------------------------------------------------ Datenschutz und Telemetrie
@@ -5340,7 +5346,11 @@ function Format-OptAction($A) {
 function Get-OptGuiLines {
     $l = New-Object System.Collections.Generic.List[string]
     $clean = { param($v) (([string]$v) -replace '[\r\n|]+', ' ').Trim() }
-    foreach ($k in (Get-OptCategories)) { $l.Add(('K|{0}|{1}|{2}' -f $k.Key, (& $clean $k.Titel), (& $clean $k.Text))) }
+    foreach ($k in (Get-OptCategories)) {
+        $kt = if ($k.Kurztitel) { $k.Kurztitel } else { $k.Titel }
+        $sym = if ($k.Symbol) { $k.Symbol } else { 'IcoOpt' }
+        $l.Add(('K|{0}|{1}|{2}|{3}|{4}' -f $k.Key, (& $clean $k.Titel), (& $clean $k.Text), (& $clean $kt), (& $clean $sym)))
+    }
     foreach ($e in (Get-OptEntries)) {
         $tip = New-Object System.Text.StringBuilder
         [void]$tip.Append($e.Text)
@@ -6178,7 +6188,9 @@ public partial class DiagGui : Form
     LinkLabel lnkOptAll, lnkOptNone, lnkRepAll, lnkRepNone;
     PillButton pillRepUsual, pillRepNone;
     FlowLayoutPanel left;
-    Button btnThemeToggle;
+    Button btnThemeToggle, btnSettings;
+    FlowLayoutPanel fo;
+    Panel[] modBanners = new Panel[6];
     Badge badgeSensStatus;
     List<NavItem> nav = new List<NavItem>();
     List<Control> pages = new List<Control>();
@@ -6501,6 +6513,10 @@ public partial class DiagGui : Form
         };
         Tip(btnInfo, "Info und Versionshistorie: was sich von Version 1.0 bis " + this.version + " geändert hat.");
         hr.Controls.Add(btnInfo);
+        btnSettings = HeadButton(UI.IcoGear);
+        btnSettings.Click += delegate { ShowSettingsDialog(); };
+        Tip(btnSettings, "Globale Einstellungen für Darstellung, Startverhalten, Ergebnisanzeige, Datenschutz und Speicherorte.");
+        hr.Controls.Add(btnSettings);
         btnThemeToggle = HeadButton(UI.IsDark ? UI.IcoSonne : UI.IcoMond);
         btnThemeToggle.Click += delegate { ToggleTheme(); };
         Tip(btnThemeToggle, UI.IsDark ? "Zu hellem Farbschema wechseln." : "Zu dunklem Farbschema wechseln.");
@@ -6975,7 +6991,7 @@ public partial class DiagGui : Form
 
         string msg = "Möchten Sie das Update auf Version " + AvailableUpdateVersion + " jetzt herunterladen und LMB.exe automatisch austauschen?\r\n\r\n" +
                      "Die bisherige Programmdatei wird im Archiv gesichert und die Anwendung anschlie\u00DFend neu gestartet.";
-        if (MessageBox.Show(this, msg, "Minibench Update", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+        if (!UI.Ask(msg, "Minibench Update", this))
             return;
 
         try
@@ -7027,7 +7043,7 @@ public partial class DiagGui : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, "Fehler beim Herunterladen des Updates:\r\n\r\n" + ex.Message, "Update Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            UI.Hinweis("Fehler beim Herunterladen des Updates:\r\n\r\n" + ex.Message, "Update Fehler", this);
         }
         finally
         {
@@ -7078,10 +7094,231 @@ public partial class DiagGui : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, "Fehler beim Vorbereiten des Programmaustauschs:\r\n\r\n" + ex.Message, "Update Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            UI.Hinweis("Fehler beim Vorbereiten des Programmaustauschs:\r\n\r\n" + ex.Message, "Update Fehler", this);
         }
     }
 
+    void ShowSettingsDialog()
+    {
+        using (Form dlg = new Form())
+        {
+            dlg.Text = "Einstellungen";
+            dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+            dlg.MaximizeBox = false;
+            dlg.MinimizeBox = false;
+            dlg.StartPosition = FormStartPosition.CenterParent;
+            dlg.ClientSize = new Size(UI.S(540), UI.S(560));
+            dlg.Font = new Font("Segoe UI", UI.SF(9.5f));
+
+            Panel bodyPnl = new Panel();
+            bodyPnl.Dock = DockStyle.Fill;
+            bodyPnl.AutoScroll = true;
+            bodyPnl.Padding = new Padding(UI.S(24), UI.S(16), UI.S(24), UI.S(16));
+
+            FlowLayoutPanel flow = new FlowLayoutPanel();
+            flow.FlowDirection = FlowDirection.TopDown;
+            flow.WrapContents = false;
+            flow.AutoSize = true;
+            flow.Dock = DockStyle.Top;
+            flow.BackColor = Color.Transparent;
+
+            // 1. Darstellung
+            Label secTheme = Section("Darstellung");
+            secTheme.Margin = new Padding(0, 0, 0, UI.S(4));
+            flow.Controls.Add(secTheme);
+
+            FlowLayoutPanel rowTheme = Row();
+            RadioButton rbDark = new RadioButton(); rbDark.Text = "Dunkel"; rbDark.AutoSize = true; rbDark.Checked = UI.IsDark; rbDark.ForeColor = UI.Text;
+            RadioButton rbLight = new RadioButton(); rbLight.Text = "Hell"; rbLight.AutoSize = true; rbLight.Checked = !UI.IsDark; rbLight.ForeColor = UI.Text;
+            rbDark.Margin = new Padding(0, 0, UI.S(16), 0);
+            rowTheme.Controls.Add(rbDark); rowTheme.Controls.Add(rbLight);
+            flow.Controls.Add(rowTheme);
+
+            // 2. Startverhalten
+            Label secStart = Section("Startverhalten");
+            flow.Controls.Add(secStart);
+            CheckBox chkShowStart = Chk("Beim Programmstart die Startseite anzeigen", LoadStartPagePreference());
+            flow.Controls.Add(chkShowStart);
+
+            // 3. Ergebnisanzeige
+            Label secResults = Section("Ergebnisanzeige");
+            flow.Controls.Add(secResults);
+            CheckBox chkRes1Window = Chk("Ergebnisse direkt im Programmfenster anzeigen (1-Fenstermodus)", chkSingleWindow != null && chkSingleWindow.Checked);
+            flow.Controls.Add(chkRes1Window);
+
+            // 4. Datenschutz
+            Label secPrivacy = Section("Datenschutz");
+            flow.Controls.Add(secPrivacy);
+            CheckBox chkPrivAnon = Chk("Personenbezogene Daten fÃ¼r KI-Auswertung entfernen", chkAnon != null && chkAnon.Checked);
+            flow.Controls.Add(chkPrivAnon);
+
+            // 5. Speicherorte & Daten
+            Label secData = Section("Speicherorte und Daten");
+            flow.Controls.Add(secData);
+            Label lblDataDir = Hint("Datenordner: " + (dataDir.Length > 0 ? dataDir : "Nicht verfÃ¼gbar"), 0);
+            flow.Controls.Add(lblDataDir);
+
+            FlowLayoutPanel rowDataBtns = Row();
+            rowDataBtns.Margin = new Padding(0, UI.S(6), 0, 0);
+            Button btnOpenData = UI.Secondary("Datenordner Ã¶ffnen");
+            btnOpenData.Click += delegate { if (dataDir.Length > 0) OpenShell(dataDir); };
+            Button btnNasDlg = UI.Secondary("Netzlaufwerk ...");
+            btnNasDlg.Margin = new Padding(UI.S(8), 0, 0, 0);
+            btnNasDlg.Click += delegate { ShowConnectNasDialog(); };
+            Button btnCleanDlg = UI.Secondary("Datenbereinigung ...");
+            btnCleanDlg.Margin = new Padding(UI.S(8), 0, 0, 0);
+            btnCleanDlg.Click += delegate { CleanData(); };
+            rowDataBtns.Controls.Add(btnOpenData); rowDataBtns.Controls.Add(btnNasDlg); rowDataBtns.Controls.Add(btnCleanDlg);
+            flow.Controls.Add(rowDataBtns);
+
+            // 6. Updates
+            Label secUpdates = Section("Updates");
+            flow.Controls.Add(secUpdates);
+            CheckBox chkAutoUpd = Chk("Automatisch nach Updates suchen", LoadUpdateCheckPreference());
+            flow.Controls.Add(chkAutoUpd);
+            FlowLayoutPanel rowUpdBtn = Row();
+            rowUpdBtn.Margin = new Padding(0, UI.S(6), 0, 0);
+            Button btnCheckUpd = UI.Secondary("Jetzt nach Updates suchen");
+            btnCheckUpd.Click += delegate {
+                StartUpdateCheck();
+                UI.Hinweis("Die Update-PrÃ¼fung wurde gestartet.", "Updates", dlg);
+            };
+            rowUpdBtn.Controls.Add(btnCheckUpd);
+            flow.Controls.Add(rowUpdBtn);
+
+            // 7. Ãœber
+            Label secAbout = Section("Ãœber Leos Minibench");
+            flow.Controls.Add(secAbout);
+            Label lblAboutVer = Lbl("Leos Minibench v" + this.version + " \"AufgerÃ¤umt\"", 9.5f, true, UI.Text);
+            Label lblAboutThanks = Hint("Danksagungen & Komponenten:\r\nSophia Script (Dmitry Nefedov), O&O ShutUp10++, Windows Optimisation Pack,\r\nsmartmontools, LibreHardwareMonitor, PawnIO.", 0);
+            flow.Controls.Add(lblAboutVer);
+            flow.Controls.Add(lblAboutThanks);
+
+            bodyPnl.Controls.Add(flow);
+
+            Panel bottomBar = new Panel();
+            bottomBar.Dock = DockStyle.Bottom;
+            bottomBar.Height = UI.S(54);
+            bottomBar.BackColor = UI.Panel;
+
+            Button btnOk = UI.Primary("SchlieÃŸen");
+            btnOk.DialogResult = DialogResult.OK;
+            btnOk.Location = new Point(dlg.ClientSize.Width - btnOk.Width - UI.S(24), UI.S(10));
+            bottomBar.Controls.Add(btnOk);
+
+            dlg.Controls.Add(bodyPnl);
+            dlg.Controls.Add(bottomBar);
+            dlg.AcceptButton = btnOk;
+
+            UI.ThemeDialog(dlg);
+
+            dlg.ShowDialog(this);
+
+            if (rbDark.Checked != UI.IsDark)
+            {
+                ToggleTheme();
+            }
+            SaveStartPagePreference(chkShowStart.Checked);
+            SaveUpdateCheckPreference(chkAutoUpd.Checked);
+            if (chkSingleWindow != null) chkSingleWindow.Checked = chkRes1Window.Checked;
+            if (chkAnon != null) chkAnon.Checked = chkPrivAnon.Checked;
+        }
+    }
+
+    void SaveWindowPreferences()
+    {
+        try
+        {
+            if (SettingsFile.Length == 0) return;
+            Dictionary<string, object> d = null;
+            System.Web.Script.Serialization.JavaScriptSerializer js = new System.Web.Script.Serialization.JavaScriptSerializer();
+            if (File.Exists(SettingsFile))
+            {
+                try { d = js.DeserializeObject(File.ReadAllText(SettingsFile, Encoding.UTF8)) as Dictionary<string, object>; } catch { }
+            }
+            if (d == null) d = new Dictionary<string, object>();
+
+            Rectangle b = (WindowState == FormWindowState.Normal) ? Bounds : RestoreBounds;
+            if (b.Width > 0 && b.Height > 0)
+            {
+                d["WindowX"] = b.X;
+                d["WindowY"] = b.Y;
+                d["WindowW"] = b.Width;
+                d["WindowH"] = b.Height;
+            }
+            d["WindowState"] = (int)WindowState;
+            d["LastPage"] = curPage;
+            File.WriteAllText(SettingsFile, js.Serialize(d), Encoding.UTF8);
+        }
+        catch { }
+    }
+
+    void LoadWindowPreferences()
+    {
+        try
+        {
+            if (SettingsFile.Length > 0 && File.Exists(SettingsFile))
+            {
+                System.Web.Script.Serialization.JavaScriptSerializer js = new System.Web.Script.Serialization.JavaScriptSerializer();
+                Dictionary<string, object> d = js.DeserializeObject(File.ReadAllText(SettingsFile, Encoding.UTF8)) as Dictionary<string, object>;
+                if (d != null)
+                {
+                    if (d.ContainsKey("WindowX") && d.ContainsKey("WindowY") && d.ContainsKey("WindowW") && d.ContainsKey("WindowH"))
+                    {
+                        int x = Convert.ToInt32(d["WindowX"]);
+                        int y = Convert.ToInt32(d["WindowY"]);
+                        int w = Convert.ToInt32(d["WindowW"]);
+                        int h = Convert.ToInt32(d["WindowH"]);
+                        Rectangle r = new Rectangle(x, y, w, h);
+                        bool onScreen = false;
+                        foreach (Screen s in Screen.AllScreens)
+                        {
+                            if (s.WorkingArea.IntersectsWith(r)) { onScreen = true; break; }
+                        }
+                        if (onScreen && w >= UI.S(600) && h >= UI.S(400))
+                        {
+                            StartPosition = FormStartPosition.Manual;
+                            Bounds = r;
+                        }
+                    }
+                    if (d.ContainsKey("WindowState"))
+                    {
+                        int ws = Convert.ToInt32(d["WindowState"]);
+                        if (ws == (int)FormWindowState.Maximized) WindowState = FormWindowState.Maximized;
+                    }
+                }
+            }
+        }
+        catch { }
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.KeyCode == Keys.F5)
+        {
+            if (curPage == 9) RefreshAndSync();
+            else FillPresets(false);
+            e.Handled = true;
+        }
+        else if (e.Control && e.KeyCode == Keys.F)
+        {
+            if (curPage == 9 && txtDbFilter != null)
+            {
+                txtDbFilter.Focus();
+                txtDbFilter.SelectAll();
+                e.Handled = true;
+            }
+        }
+        else if (e.Control && e.KeyCode == Keys.Enter)
+        {
+            if (btnStart != null && btnStart.Enabled && btnStart.Visible)
+            {
+                btnStart.PerformClick();
+                e.Handled = true;
+            }
+        }
+    }
     void ToggleTheme()
     {
         SetAppTheme(!UI.IsDark);
@@ -7390,7 +7627,7 @@ public partial class DiagGui : Form
         nav.Add(ModNav("Benchmark", "Benchmark", "Wählbare Messungen mit Vergleich", UI.IcoCpu));
         nav.Add(ModNav("Lasttest", "Lasttest", "Komponenten und Dauer wählbar", UI.IcoFlame));
         nav.Add(ModNav("Wartung", "Wartung", "SFC, DISM, Bereinigung und Systempflege", UI.IcoWartung));
-        nav.Add(ModNav("Optimierung", "Optimierung", "Windows Optimisation Pack, gruppiert", UI.IcoOpt));
+        nav.Add(ModNav("Optimierung", "Optimierung", "Datenschutz und Systemanpassungen", UI.IcoOpt));
         navTools = ModNav("Tools", "Tools", "Portable Werkzeuge und Schnellstarter", UI.IcoTools); navTools.HasCheck = false; nav.Add(navTools);
         navSens = ModNav("Sensoren", "Sensoren live", "Temperatur, Takt, Lüfter, Leistung", UI.IcoSens); navSens.HasCheck = false; nav.Add(navSens);
         navUmzug = ModNav("Umzug", "System-Umzug", "Daten, Desktop & Programme für Neuinstallation sichern", UI.IcoBackup); navUmzug.HasCheck = false; nav.Add(navUmzug);
@@ -8650,9 +8887,9 @@ public partial class DiagGui : Form
     Button btnOptCheck, btnOptTools, btnOptAll;
     List<Button> optPresetButtons = new List<Button>();
     static readonly string[] optPresetTips = new string[] {
-        "Minimal wie im Optimisation Pack: Datenschutz-Einstellungen (O&O-Auswahl), Dienste und Aufgaben, Indizierung aus, Caches leeren.",
+        "Minimal: Grundlegende Datenschutz-Einstellungen, Dienste und Aufgaben, Indizierung aus, Caches leeren.",
         "Leos Empfehlung: Wie die Voreinstellung beim Start ausgewählt (empfohlene Optimierungen für Datenschutz, Apps, Dienste und System).",
-        "Erweitert wie im Optimisation Pack: Leos Empfehlung plus Windows-Funktionen, Zusatzfeatures, vorinstallierte Apps und Darstellung.",
+        "VollstÃ¤ndig: Leos Empfehlung plus Windows-Funktionen, Zusatzfeatures, vorinstallierte Apps und Darstellung.",
         "Hebt die Auswahl in allen Kategorien auf." };
 
     static readonly string[] defaultMinimal = new string[] {
@@ -8773,7 +9010,7 @@ public partial class DiagGui : Form
     Control BuildOptPage()
     {
         ReadOptCatalog();
-        FlowLayoutPanel f = Page("Optimierung", "Die Einstellungen des Windows Optimisation Pack mit seiner Sophia- und O&O-Auswahl, nativ umgesetzt und nach Kategorien gruppiert.", 5);
+        FlowLayoutPanel f = Page("Optimierung", "BewÃ¤hrte Systemeinstellungen fÃ¼r Datenschutz, Telemetrie, Apps und Leistung, Ã¼bersichtlich nach Kategorien gruppiert.", 5);
         if (optItems.Count == 0) { lblOptInfo = Lbl("Der Katalog der Optimierung fehlt (Skript ohne Modul Optimierung).", 9f, false, UI.Muted); f.Controls.Add(lblOptInfo); return f; }
 
         TableLayoutPanel md = new TableLayoutPanel();
@@ -11140,6 +11377,71 @@ public static class UI
     public const string IcoApp = "\uE71D";
     public const string IcoCheck = "\uE73E";
     public const string IcoTrash = "\uE74D";
+    public const string IcoSearch = "\uE721";
+    public const string IcoLock = "\uE72E";
+    public const string IcoSun = "\uE706";
+
+    // ab v4.0: Dezimale Versionsnummer zur verlaesslichen Groessenordnung (z. B. 3.882 < 3.9 < 3.91 < 4.0)
+    public static double VersionNumber(string v)
+    {
+        if (string.IsNullOrEmpty(v)) return 0.0;
+        string s = v.Trim();
+        if (s.StartsWith("v", StringComparison.OrdinalIgnoreCase))
+            s = s.Substring(1).Trim();
+        int dot = s.IndexOf('.');
+        if (dot < 0)
+        {
+            double res;
+            if (double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out res)) return res;
+            return 0.0;
+        }
+        string majStr = s.Substring(0, dot);
+        string minStr = s.Substring(dot + 1).Replace(".", "");
+        StringBuilder minDigits = new StringBuilder();
+        for (int i = 0; i < minStr.Length; i++)
+        {
+            if (char.IsDigit(minStr[i])) minDigits.Append(minStr[i]);
+            else break;
+        }
+        double maj = 0.0, frac = 0.0;
+        double.TryParse(majStr, NumberStyles.Float, CultureInfo.InvariantCulture, out maj);
+        if (minDigits.Length > 0)
+        {
+            double.TryParse("0." + minDigits.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out frac);
+        }
+        return maj + frac;
+    }
+
+    // ab v4.0: Kategoriesymbol aufloesen fuer Katalog- und Vertragsdefinitionen
+    public static string SymbolByName(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return IcoOpt;
+        string n = name.Trim().ToLowerInvariant();
+        if (n.StartsWith("ico")) n = n.Substring(3);
+        if (n == "shield" || n == "sicherheit" || n == "datenschutz") return IcoShield;
+        if (n == "bell" || n == "werbung") return IcoBell;
+        if (n == "search" || n == "ki" || n == "suche") return IcoSearch;
+        if (n == "lock" || n == "berechtigung") return IcoLock;
+        if (n == "gear" || n == "hintergrund" || n == "dienste" || n == "opt") return IcoGear;
+        if (n == "check" || n == "funktionen") return IcoCheck;
+        if (n == "app" || n == "apps") return IcoApp;
+        if (n == "folder" || n == "ordner" || n == "bedienung" || n == "systemdateien") return IcoFolder;
+        if (n == "sun" || n == "sonne" || n == "darstellung") return IcoSun;
+        if (n == "flame" || n == "leistung") return IcoFlame;
+        if (n == "refresh" || n == "update") return IcoRefresh;
+        if (n == "gpu" || n == "grafik") return IcoGpu;
+        if (n == "trash" || n == "entfernen" || n == "bereinigung") return IcoTrash;
+        if (n == "cpu") return IcoCpu;
+        if (n == "ram") return IcoRam;
+        if (n == "disk") return IcoDisk;
+        if (n == "diag") return IcoDiag;
+        if (n == "wartung") return IcoWartung;
+        if (n == "tools") return IcoTools;
+        if (n == "home") return IcoHome;
+        if (n == "speed") return IcoSpeed;
+        if (n == "backup") return IcoBackup;
+        return IcoOpt;
+    }
 
     public static GraphicsPath Round(RectangleF r, float rad)
     {
@@ -11241,7 +11543,7 @@ public static class UI
     {
         Button b = new PrimaryButton(); b.Text = text; b.FlatStyle = FlatStyle.Flat; b.FlatAppearance.BorderSize = 0;
         b.BackColor = Accent; b.ForeColor = OnAccent; b.FlatAppearance.MouseOverBackColor = AccentHover; b.FlatAppearance.MouseDownBackColor = AccentActive;
-        b.Font = new Font("Segoe UI Semibold", 10.5f); b.AutoSize = true; b.Padding = new Padding(S(18), S(6), S(18), S(6)); b.Cursor = Cursors.Hand; b.UseVisualStyleBackColor = false;
+        b.Font = new Font("Segoe UI Semibold", SF(10.5f)); b.AutoSize = true; b.Padding = new Padding(S(18), S(6), S(18), S(6)); b.Cursor = Cursors.Hand; b.UseVisualStyleBackColor = false;
         return b;
     }
 
@@ -11249,7 +11551,7 @@ public static class UI
     {
         Button b = new Button(); b.Text = text; b.FlatStyle = FlatStyle.Flat; b.FlatAppearance.BorderColor = Line;
         b.BackColor = Panel; b.ForeColor = Text; b.FlatAppearance.MouseOverBackColor = IsDark ? Color.FromArgb(45, 48, 52) : Color.FromArgb(243, 244, 246); b.FlatAppearance.MouseDownBackColor = IsDark ? Color.FromArgb(55, 58, 62) : Color.FromArgb(235, 237, 240);
-        b.Font = new Font("Segoe UI", 9.75f); b.AutoSize = true; b.Padding = new Padding(S(10), S(3), S(10), S(3)); b.Margin = new Padding(S(8), 0, 0, 0); b.Cursor = Cursors.Hand; b.UseVisualStyleBackColor = false;
+        b.Font = new Font("Segoe UI", SF(9.75f)); b.AutoSize = true; b.Padding = new Padding(S(10), S(3), S(10), S(3)); b.Margin = new Padding(S(8), 0, 0, 0); b.Cursor = Cursors.Hand; b.UseVisualStyleBackColor = false;
         b.Paint += delegate(object s, PaintEventArgs pe) {
             if (!b.Enabled) {
                 Graphics g = pe.Graphics;
@@ -11276,7 +11578,7 @@ public static class UI
         f.ForeColor = Text;
         if (f.Font == null || f.Font.Name != "Segoe UI")
         {
-            f.Font = new Font("Segoe UI", 9.5f);
+            f.Font = new Font("Segoe UI", SF(9.5f));
         }
         ThemeDialogControls(f.Controls);
     }
@@ -11348,6 +11650,158 @@ public static class UI
             ThemeDialogControls(c.Controls);
         }
     }
+
+    // ab v4.0: Thematisierte Rueckfragedialoge fuer konsistenten Hell- und Dunkelmodus (ohne ungestyltes MessageBox.Show)
+    public static bool Ask(string text, string title = "Frage", IWin32Window owner = null)
+    {
+        using (Form f = new Form())
+        {
+            f.Text = title ?? "Frage";
+            f.FormBorderStyle = FormBorderStyle.FixedDialog;
+            f.MaximizeBox = false;
+            f.MinimizeBox = false;
+            f.ShowInTaskbar = false;
+            f.StartPosition = owner != null ? FormStartPosition.CenterParent : FormStartPosition.CenterScreen;
+
+            int w = S(450);
+            Font mf = new Font("Segoe UI", SF(9.5f));
+            Size textSize = TextRenderer.MeasureText(text ?? "", mf, new Size(w - S(40), int.MaxValue), TextFormatFlags.WordBreak);
+            int textH = Math.Max(S(40), Math.Min(S(420), textSize.Height + S(10)));
+            int clientH = textH + S(74);
+            f.ClientSize = new Size(w, clientH);
+
+            Label lbl = new Label();
+            lbl.Text = text ?? "";
+            lbl.Font = mf;
+            lbl.Location = new Point(S(20), S(16));
+            lbl.Size = new Size(w - S(40), textH);
+            lbl.TextAlign = ContentAlignment.TopLeft;
+
+            Button btnOk = Primary("Ja");
+            btnOk.DialogResult = DialogResult.Yes;
+            Button btnNo = Secondary("Nein");
+            btnNo.DialogResult = DialogResult.No;
+
+            int btnY = clientH - btnOk.Height - S(14);
+            btnNo.Location = new Point(w - btnNo.Width - S(20), btnY);
+            btnOk.Location = new Point(btnNo.Left - btnOk.Width - S(10), btnY);
+
+            f.Controls.Add(lbl);
+            f.Controls.Add(btnOk);
+            f.Controls.Add(btnNo);
+            f.AcceptButton = btnOk;
+            f.CancelButton = btnNo;
+
+            UI.ThemeDialog(f);
+            return f.ShowDialog(owner) == DialogResult.Yes;
+        }
+    }
+    public static bool Ask(IWin32Window owner, string text, string title)
+    {
+        return Ask(text, title, owner);
+    }
+
+    // ab v4.0: Thematisierter Hinweisdialog fuer konsistenten Hell- und Dunkelmodus
+    public static void Hinweis(string text, string title = "Hinweis", IWin32Window owner = null)
+    {
+        using (Form f = new Form())
+        {
+            f.Text = title ?? "Hinweis";
+            f.FormBorderStyle = FormBorderStyle.FixedDialog;
+            f.MaximizeBox = false;
+            f.MinimizeBox = false;
+            f.ShowInTaskbar = false;
+            f.StartPosition = owner != null ? FormStartPosition.CenterParent : FormStartPosition.CenterScreen;
+
+            int w = S(450);
+            Font mf = new Font("Segoe UI", SF(9.5f));
+            Size textSize = TextRenderer.MeasureText(text ?? "", mf, new Size(w - S(40), int.MaxValue), TextFormatFlags.WordBreak);
+            int textH = Math.Max(S(40), Math.Min(S(420), textSize.Height + S(10)));
+            int clientH = textH + S(74);
+            f.ClientSize = new Size(w, clientH);
+
+            Label lbl = new Label();
+            lbl.Text = text ?? "";
+            lbl.Font = mf;
+            lbl.Location = new Point(S(20), S(16));
+            lbl.Size = new Size(w - S(40), textH);
+            lbl.TextAlign = ContentAlignment.TopLeft;
+
+            Button btnOk = Primary("OK");
+            btnOk.DialogResult = DialogResult.OK;
+            int btnY = clientH - btnOk.Height - S(14);
+            btnOk.Location = new Point(w - btnOk.Width - S(20), btnY);
+
+            f.Controls.Add(lbl);
+            f.Controls.Add(btnOk);
+            f.AcceptButton = btnOk;
+
+            UI.ThemeDialog(f);
+            f.ShowDialog(owner);
+        }
+    }
+    public static void Hinweis(IWin32Window owner, string text, string title)
+    {
+        Hinweis(text, title, owner);
+    }
+    public static void ShowInfo(string text, string title = "Hinweis", IWin32Window owner = null)
+    {
+        Hinweis(text, title, owner);
+    }
+    public static void ShowInfo(IWin32Window owner, string text, string title)
+    {
+        Hinweis(text, title, owner);
+    }
+
+    // ab v4.0: Thematisierter 3-Wege-Dialog (Ja / Nein / Abbrechen)
+    public static DialogResult Ask3(string text, string title = "Frage", IWin32Window owner = null)
+    {
+        using (Form f = new Form())
+        {
+            f.Text = title ?? "Frage";
+            f.FormBorderStyle = FormBorderStyle.FixedDialog;
+            f.MaximizeBox = false;
+            f.MinimizeBox = false;
+            f.ShowInTaskbar = false;
+            f.StartPosition = owner != null ? FormStartPosition.CenterParent : FormStartPosition.CenterScreen;
+
+            int w = S(500);
+            Font mf = new Font("Segoe UI", SF(9.5f));
+            Size textSize = TextRenderer.MeasureText(text ?? "", mf, new Size(w - S(40), int.MaxValue), TextFormatFlags.WordBreak);
+            int textH = Math.Max(S(40), Math.Min(S(420), textSize.Height + S(10)));
+            int clientH = textH + S(74);
+            f.ClientSize = new Size(w, clientH);
+
+            Label lbl = new Label();
+            lbl.Text = text ?? "";
+            lbl.Font = mf;
+            lbl.Location = new Point(S(20), S(16));
+            lbl.Size = new Size(w - S(40), textH);
+            lbl.TextAlign = ContentAlignment.TopLeft;
+
+            Button btnCancel = Secondary("Abbrechen");
+            btnCancel.DialogResult = DialogResult.Cancel;
+            Button btnNo = Secondary("Nein");
+            btnNo.DialogResult = DialogResult.No;
+            Button btnYes = Primary("Ja");
+            btnYes.DialogResult = DialogResult.Yes;
+
+            int btnY = clientH - btnYes.Height - S(14);
+            btnCancel.Location = new Point(w - btnCancel.Width - S(20), btnY);
+            btnNo.Location = new Point(btnCancel.Left - btnNo.Width - S(10), btnY);
+            btnYes.Location = new Point(btnNo.Left - btnYes.Width - S(10), btnY);
+
+            f.Controls.Add(lbl);
+            f.Controls.Add(btnYes);
+            f.Controls.Add(btnNo);
+            f.Controls.Add(btnCancel);
+            f.AcceptButton = btnYes;
+            f.CancelButton = btnCancel;
+
+            UI.ThemeDialog(f);
+            return f.ShowDialog(owner);
+        }
+    }
 }
 
 // ab v3.65: Karte mit abgerundetem Rahmen für Gruppen auf allen Seiten (wie FluentCard), Inhalt als Kindelemente
@@ -11382,14 +11836,16 @@ public class Badge : Control
     {
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor, true);
         BackColor = Color.Transparent;
-        Font = new Font("Segoe UI Semibold", 8.25f);
+        Font = new Font("Segoe UI Semibold", UI.SF(8.25f));
+        AccessibleRole = AccessibleRole.StaticText;
         Margin = new Padding(UI.S(6), UI.S(4), 0, 0);
         this.level = level ?? "skip";
         Text = text ?? "";
+        AccessibleName = Text;
         FitSize();
     }
     public string Level { get { return level; } set { level = value ?? "skip"; Invalidate(); } }
-    protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); FitSize(); Invalidate(); }
+    protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); AccessibleName = Text; FitSize(); Invalidate(); }
     void FitSize()
     {
         Size t = TextRenderer.MeasureText(Text.Length > 0 ? Text : " ", Font, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding);
@@ -11414,8 +11870,10 @@ public class PillLabel : Control
     {
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor, true);
         BackColor = Color.Transparent;
-        Font = new Font("Segoe UI", 8.75f);
+        Font = new Font("Segoe UI", UI.SF(8.75f));
+        AccessibleRole = AccessibleRole.StaticText;
         Text = text ?? "";
+        AccessibleName = Text;
         Margin = new Padding(0, 0, UI.S(6), UI.S(6));
         FitSize();
     }
@@ -11424,7 +11882,7 @@ public class PillLabel : Control
         Size sz = TextRenderer.MeasureText(Text, Font);
         Size = new Size(sz.Width + UI.S(16), Math.Max(UI.S(24), sz.Height + UI.S(6)));
     }
-    protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); FitSize(); Invalidate(); }
+    protected override void OnTextChanged(EventArgs e) { base.OnTextChanged(e); AccessibleName = Text; FitSize(); Invalidate(); }
     protected override void OnPaint(PaintEventArgs e)
     {
         Graphics g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
@@ -11462,7 +11920,7 @@ public class StartTaskCard : Control
         Margin = new Padding(0, 0, UI.S(10), UI.S(14));
     }
 
-    public string Title { get { return title; } set { title = value ?? ""; Invalidate(); } }
+    public string Title { get { return title; } set { title = value ?? ""; AccessibleName = title; Invalidate(); } }
     public string Description { get { return desc; } set { desc = value ?? ""; Invalidate(); } }
     public string FootText { get { return footText; } set { footText = value ?? ""; Invalidate(); } }
     public string BadgeText { get { return badgeText; } set { badgeText = value ?? ""; Invalidate(); } }
@@ -11589,7 +12047,7 @@ public class StartTaskRow : Control
         Margin = new Padding(0, 0, 0, UI.S(4));
     }
 
-    public string Title { get { return title; } set { title = value ?? ""; Invalidate(); } }
+    public string Title { get { return title; } set { title = value ?? ""; AccessibleName = title; Invalidate(); } }
     public string Subtitle { get { return subtitle; } set { subtitle = value ?? ""; Invalidate(); } }
     public string BadgeText { get { return badgeText; } set { badgeText = value ?? ""; Invalidate(); } }
     public string BadgeLevel { get { return badgeLevel; } set { badgeLevel = value ?? "ok"; Invalidate(); } }
@@ -11676,7 +12134,7 @@ public class KpiBox : Control
     }
     public KpiBox(string title, string val) : this(title, val, null) { }
 
-    public string Title { get { return title; } set { title = value ?? ""; Invalidate(); } }
+    public string Title { get { return title; } set { title = value ?? ""; AccessibleName = title; Invalidate(); } }
     public string Value { get { return val; } set { val = value ?? ""; Invalidate(); } }
     public string Delta { get { return delta; } set { delta = value ?? ""; Invalidate(); } }
 
@@ -11734,7 +12192,7 @@ public class GroupHeader : Control
         Size = new Size(UI.S(UI.Gruppenbreite), UI.S(32));
         Margin = new Padding(0, UI.S(UI.Abstand2), 0, 0);
     }
-    public string Title { get { return title; } set { title = value ?? ""; Invalidate(); } }
+    public string Title { get { return title; } set { title = value ?? ""; AccessibleName = title; Invalidate(); } }
     public string CountText { get { return count; } set { if (count == (value ?? "")) return; count = value ?? ""; Invalidate(); } }
     public bool Expanded { get { return expanded; } set { if (expanded == value) return; expanded = value; Invalidate(); } }
     void Flip() { Expanded = !Expanded; if (Toggled != null) Toggled(this, EventArgs.Empty); }
@@ -11778,7 +12236,7 @@ public class DarkComboBox : ComboBox
         DrawMode = DrawMode.OwnerDrawFixed;
         DropDownStyle = ComboBoxStyle.DropDownList;
         ItemHeight = UI.S(24);
-        Font = new Font("Segoe UI", 9.5f);
+        Font = new Font("Segoe UI", UI.SF(9.5f));
         Cursor = Cursors.Hand;
         BackColor = UI.Panel;
         ForeColor = UI.Text;
@@ -11836,6 +12294,8 @@ public class ToggleSwitch : Control
                  ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor | ControlStyles.Selectable, true);
         TabStop = true;
         Cursor = Cursors.Hand;
+        AccessibleRole = AccessibleRole.CheckButton;
+        AccessibleName = "Schalter";
         Size = new Size(UI.S(38), UI.S(20));
         BackColor = Color.Transparent;
     }
@@ -11967,7 +12427,9 @@ public class PillButton : Control
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable | ControlStyles.SupportsTransparentBackColor, true);
         Cursor = Cursors.Hand;
         BackColor = Color.Transparent;
-        Font = new Font("Segoe UI Semibold", 9f);
+        Font = new Font("Segoe UI Semibold", UI.SF(9f));
+        AccessibleRole = AccessibleRole.PushButton;
+        AccessibleName = text;
         Height = UI.S(28);
         Margin = new Padding(0, 0, UI.S(6), 0);
         FitSize();
@@ -11977,7 +12439,7 @@ public class PillButton : Control
     public bool Active { get { return active; } set { if (active != value) { active = value; Invalidate(); } } }
     public bool Removable { get { return removable; } set { if (removable != value) { removable = value; FitSize(); Invalidate(); } } }
     public string Icon { get { return icon; } set { icon = value ?? ""; FitSize(); Invalidate(); } }
-    public override string Text { get { return text; } set { text = value ?? ""; FitSize(); Invalidate(); } }
+    public override string Text { get { return text; } set { text = value ?? ""; AccessibleName = text; FitSize(); Invalidate(); } }
 
     void FitSize()
     {
@@ -12095,6 +12557,7 @@ public class CategoryPickerItem : Control
 {
     string catKey = "";
     string title = "";
+    string shortTitle = "";
     string subtitle = "";
     string icon = "";
     int checkedCount = 0;
@@ -12103,22 +12566,31 @@ public class CategoryPickerItem : Control
     bool hover = false;
     public event EventHandler Picked;
 
-    public CategoryPickerItem(string title, string icon) : this(title, title, icon) { }
+    public CategoryPickerItem(string title, string icon) : this(title, icon, title) { }
 
-    public CategoryPickerItem(string key, string title, string icon)
+    public CategoryPickerItem(string title, string icon, string shortTitle)
     {
-        this.catKey = key ?? "";
+        this.catKey = title ?? "";
         this.title = title ?? "";
         this.icon = icon ?? "";
+        this.shortTitle = !string.IsNullOrEmpty(shortTitle) ? shortTitle : this.title;
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
         Cursor = Cursors.Hand;
         Size = new Size(UI.S(218), UI.S(40));
         Margin = new Padding(0, 0, 0, UI.S(4));
         BackColor = UI.Panel;
+        AccessibleRole = AccessibleRole.ListItem;
+        AccessibleName = this.shortTitle;
+    }
+
+    public CategoryPickerItem(string key, string title, string icon, string shortTitle) : this(title, icon, shortTitle)
+    {
+        this.catKey = key ?? "";
     }
 
     public string CategoryKey { get { return catKey; } set { catKey = value ?? ""; } }
-    public string CategoryTitle { get { return title; } set { title = value ?? ""; Invalidate(); } }
+    public string CategoryTitle { get { return title; } set { title = value ?? ""; AccessibleName = !String.IsNullOrEmpty(shortTitle) ? shortTitle : title; Invalidate(); } }
+    public string ShortTitle { get { return !String.IsNullOrEmpty(shortTitle) ? shortTitle : title; } set { shortTitle = value ?? ""; AccessibleName = !String.IsNullOrEmpty(shortTitle) ? shortTitle : title; Invalidate(); } }
     public string Subtitle { get { return subtitle; } set { subtitle = value ?? ""; Invalidate(); } }
     public string Icon { get { return icon; } set { icon = value ?? ""; Invalidate(); } }
     public int CheckedCount { get { return checkedCount; } set { if (checkedCount != value) { checkedCount = value; Invalidate(); } } }
@@ -12217,10 +12689,13 @@ public class CategoryPickerItem : Control
         }
 
         int textW = Width - x - badgeW - UI.S(14);
+        string displayTitle = !String.IsNullOrEmpty(shortTitle) ? shortTitle : title;
         using (Font ft = new Font("Segoe UI Semibold", UI.SF(9f)))
         {
             Color titleColor = selected ? (UI.IsDark ? UI.Accent : UI.AccentDark) : UI.Text;
-            TextRenderer.DrawText(g, title, ft, new Rectangle(x, 0, Math.Max(10, textW), Height), titleColor, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            Size tsz = TextRenderer.MeasureText(g, displayTitle, ft, new Size(Math.Max(10, textW), int.MaxValue), TextFormatFlags.WordBreak);
+            int ty = Math.Max(0, (Height - tsz.Height) / 2);
+            TextRenderer.DrawText(g, displayTitle, ft, new Rectangle(x, ty, Math.Max(10, textW), tsz.Height), titleColor, TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);
         }
     }
 }
@@ -12244,6 +12719,8 @@ public class SettingRow : Control
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
         Cursor = Cursors.Hand;
         BackColor = UI.Panel;
+        AccessibleRole = AccessibleRole.ListItem;
+        AccessibleName = this.title;
         Margin = new Padding(0, 0, 0, UI.S(4));
 
         this.toggle = toggle ?? new ToggleSwitch();
@@ -12255,7 +12732,7 @@ public class SettingRow : Control
         RecalcHeight();
     }
 
-    public string Title { get { return title; } set { title = value ?? ""; Invalidate(); } }
+    public string Title { get { return title; } set { title = value ?? ""; AccessibleName = title; Invalidate(); } }
     public string Description { get { return desc; } set { desc = value ?? ""; RecalcHeight(); Invalidate(); } }
     public ToggleSwitch Toggle { get { return toggle; } }
     public bool Checked
@@ -12268,9 +12745,12 @@ public class SettingRow : Control
     {
         if (b == null) return;
         badges.Add(b);
-        b.SizeChanged += delegate { LayoutControls(); };
+        b.SizeChanged += delegate { LayoutControls(); RecalcHeight(); };
+        b.VisibleChanged += delegate { LayoutControls(); RecalcHeight(); };
+        b.TextChanged += delegate { LayoutControls(); RecalcHeight(); };
         Controls.Add(b);
         LayoutControls();
+        RecalcHeight();
     }
 
     public void ClearBadges()
@@ -12278,6 +12758,18 @@ public class SettingRow : Control
         foreach (Badge b in badges) Controls.Remove(b);
         badges.Clear();
         LayoutControls();
+        RecalcHeight();
+    }
+
+    // Spaltenordnung von rechts nach links (Regel 3.1): [ Zustand ] -> [ Risiko ] -> [ Neustart ] -> [ ToggleSwitch ]
+    static int BadgeOrder(Badge b)
+    {
+        if (b == null) return 0;
+        string t = (b.Text ?? "").ToLowerInvariant();
+        if (t.Contains("neustart")) return 4;
+        if (t == "eingriff" || t == "zerstrend" || t == "zerstoerend" || t == "ndern" || t == "aendern" || t == "lesen") return 3;
+        if (t == "empfohlen" || t == "standard") return 2;
+        return 1; // Zustand z. B. "gesetzt", "aktiv"
     }
 
     bool inRecalc = false;
@@ -12287,12 +12779,36 @@ public class SettingRow : Control
         inRecalc = true;
         try
         {
+            if (Width <= 0) return;
+            int curX = UI.S(12);
+            int rightBound = Width - UI.S(16);
+            if (toggle != null) rightBound = Math.Min(rightBound, toggle.Left > 0 ? toggle.Left : (Width - UI.S(54)));
+            for (int i = 0; i < badges.Count; i++)
+            {
+                if (badges[i] != null && badges[i].Visible && !string.IsNullOrEmpty(badges[i].Text) && badges[i].Left > 0 && badges[i].Left < Width)
+                    rightBound = Math.Min(rightBound, badges[i].Left);
+            }
+            rightBound -= UI.S(10);
+            int textW = Math.Max(UI.S(100), rightBound - curX);
+
             using (Graphics g = CreateGraphics())
+            using (Font ft = new Font("Segoe UI Semibold", UI.SF(9.5f)))
             using (Font fd = new Font("Segoe UI", UI.SF(8.25f)))
             {
-                int textW = Math.Max(UI.S(120), Width - UI.S(220));
-                Size dsz = TextRenderer.MeasureText(g, desc, fd, new Size(textW, int.MaxValue), TextFormatFlags.WordBreak);
-                int targetH = String.IsNullOrEmpty(desc) ? UI.S(38) : Math.Min(UI.S(52), Math.Max(UI.S(42), UI.S(22) + dsz.Height));
+                Size tsz = TextRenderer.MeasureText(g, title ?? "", ft, new Size(textW, int.MaxValue), TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+                int titleH = Math.Max(tsz.Height, UI.S(18));
+                int targetH;
+                if (string.IsNullOrEmpty(desc))
+                {
+                    targetH = Math.Max(UI.S(42), titleH + UI.S(14));
+                }
+                else
+                {
+                    Size dsz = TextRenderer.MeasureText(g, desc, fd, new Size(textW, int.MaxValue), TextFormatFlags.WordBreak);
+                    int maxDescH = (int)Math.Ceiling(fd.GetHeight(g) * 2.2f) + UI.S(2);
+                    int descH = Math.Min(dsz.Height, maxDescH);
+                    targetH = Math.Max(UI.S(42), UI.S(8) + titleH + UI.S(2) + descH + UI.S(8));
+                }
                 if (Height != targetH) Height = targetH;
             }
             LayoutControls();
@@ -12308,21 +12824,35 @@ public class SettingRow : Control
 
     void LayoutControls()
     {
-        int curRight = Width - UI.S(12);
+        int curRight = Width - UI.S(16);
         if (toggle != null)
         {
             toggle.Location = new Point(curRight - toggle.Width, (Height - toggle.Height) / 2);
             curRight -= toggle.Width + UI.S(10);
         }
-        for (int i = badges.Count - 1; i >= 0; i--)
+        List<Badge> visibleBadges = new List<Badge>();
+        for (int i = 0; i < badges.Count; i++)
         {
             Badge b = badges[i];
-            if (b != null && b.Visible)
+            if (b != null && b.Visible && !string.IsNullOrEmpty(b.Text))
             {
-                b.Location = new Point(curRight - b.Width, (Height - b.Height) / 2);
-                curRight -= b.Width + UI.S(6);
+                visibleBadges.Add(b);
+            }
+            else if (b != null)
+            {
+                b.Location = new Point(Width + 100, 0);
             }
         }
+        visibleBadges.Sort(delegate(Badge a, Badge b) {
+            return BadgeOrder(b).CompareTo(BadgeOrder(a));
+        });
+        for (int i = 0; i < visibleBadges.Count; i++)
+        {
+            Badge b = visibleBadges[i];
+            b.Location = new Point(curRight - b.Width, (Height - b.Height) / 2);
+            curRight -= b.Width + UI.S(8);
+        }
+        Invalidate();
     }
 
     protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
@@ -12369,23 +12899,28 @@ public class SettingRow : Control
         int curX = UI.S(12);
         int rightBound = Width - UI.S(16);
         if (toggle != null) rightBound = Math.Min(rightBound, toggle.Left);
-        for (int i = 0; i < badges.Count; i++) if (badges[i] != null && badges[i].Visible) rightBound = Math.Min(rightBound, badges[i].Left);
+        for (int i = 0; i < badges.Count; i++)
+        {
+            if (badges[i] != null && badges[i].Visible && !string.IsNullOrEmpty(badges[i].Text))
+                rightBound = Math.Min(rightBound, badges[i].Left);
+        }
         rightBound -= UI.S(10);
-        int textW = Math.Max(UI.S(50), rightBound - curX);
+        int textW = Math.Max(UI.S(100), rightBound - curX);
 
         using (Font ft = new Font("Segoe UI Semibold", UI.SF(9.5f)))
         {
-            Size tsz = TextRenderer.MeasureText(g, title, ft);
+            Size tsz = TextRenderer.MeasureText(g, title ?? "", ft, new Size(textW, int.MaxValue), TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
             int titleH = Math.Max(tsz.Height, UI.S(18));
-            int startY = String.IsNullOrEmpty(desc) ? (Height - titleH) / 2 : UI.S(5);
-            TextRenderer.DrawText(g, title, ft, new Rectangle(curX, startY, textW, titleH), UI.Text, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+            int startY = string.IsNullOrEmpty(desc) ? (Height - titleH) / 2 : UI.S(7);
+            TextRenderer.DrawText(g, title ?? "", ft, new Rectangle(curX, startY, textW, titleH), UI.Text, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
 
-            if (!String.IsNullOrEmpty(desc))
+            if (!string.IsNullOrEmpty(desc))
             {
                 using (Font fd = new Font("Segoe UI", UI.SF(8.25f)))
                 {
-                    int descY = startY + titleH + UI.S(1);
-                    TextRenderer.DrawText(g, desc, fd, new Rectangle(curX, descY, textW, Height - descY - UI.S(2)), UI.Muted, TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);
+                    int descY = startY + titleH + UI.S(2);
+                    int descAvailH = Math.Max(UI.S(12), Height - descY - UI.S(6));
+                    TextRenderer.DrawText(g, desc, fd, new Rectangle(curX, descY, textW, descAvailH), UI.Muted, TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);
                 }
             }
         }
@@ -12435,7 +12970,7 @@ public class FluentCard : Control
         Controls.Add(toggle);
     }
 
-    public string Title { get { return title; } set { title = value ?? ""; Invalidate(); } }
+    public string Title { get { return title; } set { title = value ?? ""; AccessibleName = title; Invalidate(); } }
     public string Description { get { return desc; } set { desc = value ?? ""; Invalidate(); } }
     public string Icon { get { return icon; } set { icon = value ?? ""; Invalidate(); } }
     public ToggleSwitch Toggle { get { return toggle; } }
@@ -13772,7 +14307,12 @@ public partial class DiagGui
     int dbSortCol = -1;
     bool dbSortAsc = true;
     Button btnRename;
-    Button btnCompare, btnDashboard, btnVerlauf, btnDelete, btnOpenReport, btnExport, btnSetRef, btnToggleGroups;
+    Button btnCompare, btnDashboard, btnVerlauf, btnDelete, btnOpenReport, btnExport, btnSetRef, btnToggleGroups, btnActions, btnMore;
+    TextBox txtDbFilter;
+    CardPanel pnlDbEmpty;
+    Label lblEmptyIco, lblEmptyText, lblEmptySub;
+    Button btnEmptyAction;
+    bool filterActive = false;
 
     void OnDbColumnClick(object sender, ColumnClickEventArgs e)
     {
@@ -13877,84 +14417,175 @@ public partial class DiagGui
         List<string> lines;
         string res = RunHelperPumped("-Umbenennen " + Q(String.Join("|", pathsToRename.ToArray())) + " -NeuerName " + Q(newName), out lines, 120);
         ReloadDb();
-        if (!res.StartsWith("1")) MessageBox.Show(this, "Der Name konnte nicht geändert werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Systemnamen bearbeiten", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        if (!res.StartsWith("1")) UI.Hinweis("Der Name konnte nicht geändert werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Systemnamen bearbeiten", this);
+    }
+
+    void LayoutDbEmpty()
+    {
+        if (pnlDbEmpty == null || lblEmptyIco == null) return;
+        int cx = pnlDbEmpty.ClientSize.Width / 2;
+        int cy = Math.Max(UI.S(30), pnlDbEmpty.ClientSize.Height / 3);
+        lblEmptyIco.Location = new Point(cx - lblEmptyIco.Width / 2, cy);
+        lblEmptyText.Location = new Point(cx - lblEmptyText.Width / 2, lblEmptyIco.Bottom + UI.S(10));
+        lblEmptySub.Location = new Point(cx - lblEmptySub.Width / 2, lblEmptyText.Bottom + UI.S(6));
+        btnEmptyAction.Location = new Point(cx - btnEmptyAction.Width / 2, lblEmptySub.Bottom + UI.S(16));
     }
 
     Control BuildDbPage()
     {
         Panel f = new Panel(); f.Dock = DockStyle.Fill; f.BackColor = UI.Panel;
-        FlowLayoutPanel top = Page("Datenbank", "Jeder Lauf wird als System gespeichert. Hier lassen sich bereits geprüfte Systeme ohne neuen Benchmark im interaktiven Multi-System-Dashboard gegenüberstellen: Systeme anhaken und \"Im Dashboard vergleichen\" klicken. Ältere Ausgabeordner lassen sich importieren. Ein Klick auf die Spaltenköpfe sortiert die Einträge.", -1);
+        FlowLayoutPanel top = Page("Datenbank", "Jeder Lauf wird als System gespeichert. Hier lassen sich bereits geprÃ¼fte Systeme ohne neuen Benchmark im interaktiven Multi-System-Dashboard gegenÃ¼berstellen: Systeme anhaken und \"Im Dashboard vergleichen\" klicken. Ã„ltere Ausgabeordner lassen sich importieren. Ein Klick auf die SpaltenkÃ¶pfe sortiert die EintrÃ¤ge.", -1);
         top.Dock = DockStyle.Top;
         top.AutoSize = true;
         lblDbPath = Lbl(NasAblage.AblageText(dataDir), 9f, false, UI.Muted); lblDbPath.Margin = new Padding(UI.S(4), 0, UI.S(4), UI.S(4)); top.Controls.Add(lblDbPath);
 
         FlowLayoutPanel topTools = Row();
         topTools.Margin = new Padding(UI.S(4), 0, UI.S(4), UI.S(8));
+        txtDbFilter = new TextBox();
+        txtDbFilter.Size = new Size(UI.S(160), UI.S(24));
+        txtDbFilter.BackColor = UI.Panel;
+        txtDbFilter.ForeColor = UI.Text;
+        txtDbFilter.BorderStyle = BorderStyle.FixedSingle;
+        txtDbFilter.Margin = new Padding(0, UI.S(2), UI.S(8), 0);
+        Tip(txtDbFilter, "Filtert die Liste nach Systemname, Prozessor oder Grafikkarte.");
+        txtDbFilter.TextChanged += delegate {
+            filterActive = !String.IsNullOrEmpty(txtDbFilter.Text.Trim());
+            FillDbList();
+        };
+
         Button imp = UI.Secondary("Importieren ..."); imp.Margin = new Padding(0); imp.Click += delegate { ImportRuns(); };
-        Tip(imp, "Importiert Durchläufe aus .minibench-Paketen, .zip-Archiven, .json-Dateien oder Ausgabeordnern früherer Läufe in die Datenbank samt Bericht.");
-        btnDbClean = UI.Secondary("Aufräumen ..."); btnDbClean.Margin = new Padding(UI.S(8), 0, 0, 0); btnDbClean.Click += delegate { CleanData(); }; btnDbClean.Enabled = dataDir.Length > 0;
-        Tip(btnDbClean, "Räumt nicht vergleichbare oder abgebrochene Läufe auf und verschiebt sie ins Archiv.");
-        Button rel = UI.Secondary("Aktualisieren"); rel.Margin = new Padding(UI.S(8), 0, 0, 0); rel.Click += delegate { RefreshAndSync(); };
-        Tip(rel, "Liest Datenbank und Referenz neu ein. Ist ein Netzlaufwerk eingerichtet und erreichbar, werden Berichte, Datenbank und Änderungsprotokolle vorher in beide Richtungen abgeglichen.");
-        Button open = UI.Secondary("Datenordner"); open.Margin = new Padding(UI.S(8), 0, 0, 0); open.Click += delegate { if (dataDir.Length > 0) OpenShell(dataDir); };
-        Tip(open, "Öffnet den Datenordner (Berichte, Datenbank, Tools, Archiv).");
-        Button btnNas = UI.Secondary("Netzlaufwerk ..."); btnNas.Margin = new Padding(UI.S(8), 0, 0, 0); btnNas.Click += delegate { ShowConnectNasDialog(); };
-        Tip(btnNas, "Richtet ein Netzlaufwerk (NAS) als Spiegel der Berichte und der Datenbank ein oder entfernt es. Gearbeitet wird immer auf dem Stick.");
+        Tip(imp, "Importiert DurchlÃ¤ufe aus .minibench-Paketen, .zip-Archiven, .json-Dateien oder Ausgabeordnern frÃ¼herer LÃ¤ufe in die Datenbank samt Bericht.");
         btnToggleGroups = UI.Secondary("Alle aufklappen"); btnToggleGroups.Margin = new Padding(UI.S(8), 0, 0, 0); btnToggleGroups.Click += delegate { ToggleAllGroups(); };
-        Tip(btnToggleGroups, "Klappt alle Ger\u00E4tegruppen in der Datenbank ein oder aus.");
-        topTools.Controls.Add(imp); topTools.Controls.Add(btnToggleGroups); topTools.Controls.Add(btnDbClean); topTools.Controls.Add(rel); topTools.Controls.Add(open); topTools.Controls.Add(btnNas);
+        Tip(btnToggleGroups, "Klappt alle GerÃ¤tegruppen in der Datenbank ein oder aus.");
+        Button rel = UI.Secondary("Aktualisieren"); rel.Margin = new Padding(UI.S(8), 0, 0, 0); rel.Click += delegate { RefreshAndSync(); };
+        Tip(rel, "Liest Datenbank und Referenz neu ein. Ist ein Netzlaufwerk eingerichtet und erreichbar, werden Berichte, Datenbank und Ã„nderungsprotokolle vorher in beide Richtungen abgeglichen.");
+
+        ContextMenu cmMore = new ContextMenu();
+        cmMore.MenuItems.Add("AufrÃ¤umen ...", delegate { CleanData(); });
+        cmMore.MenuItems.Add("Datenordner", delegate { if (dataDir.Length > 0) OpenShell(dataDir); });
+        cmMore.MenuItems.Add("Netzlaufwerk ...", delegate { ShowConnectNasDialog(); });
+        btnMore = UI.Secondary("Mehr \u25BE"); btnMore.Margin = new Padding(UI.S(8), 0, 0, 0);
+        btnMore.Click += delegate { cmMore.Show(btnMore, new Point(0, btnMore.Height)); };
+        Tip(btnMore, "Weitere Aktionen fÃ¼r Datenpflege, Datenordner und Netzlaufwerk-Spiegel.");
+
+        btnDbClean = UI.Secondary("AufrÃ¤umen ...");
+        Tip(btnDbClean, "RÃ¤umt nicht vergleichbare oder abgebrochene LÃ¤ufe auf und verschiebt sie ins Archiv.");
+
+        topTools.Controls.Add(txtDbFilter);
+        topTools.Controls.Add(imp);
+        topTools.Controls.Add(btnToggleGroups);
+        topTools.Controls.Add(rel);
+        topTools.Controls.Add(btnMore);
         top.Controls.Add(topTools);
 
         FlowLayoutPanel bottom = new FlowLayoutPanel(); bottom.FlowDirection = FlowDirection.TopDown; bottom.WrapContents = false; bottom.AutoSize = true; bottom.BackColor = UI.Panel; bottom.Dock = DockStyle.Bottom;
-        Label hint = Lbl("Doppelklick öffnet den Bericht des Laufs. Graue Einträge enthalten keine Benchmark-Werte. Klick auf Spaltenkopf sortiert die Tabelle.", 8.75f, false, UI.Muted); hint.Margin = new Padding(UI.S(4), UI.S(4), UI.S(4), 0); bottom.Controls.Add(hint);
+        Label hint = Lbl("Doppelklick Ã¶ffnet den Bericht des Laufs. Graue EintrÃ¤ge enthalten keine Benchmark-Werte. Klick auf Spaltenkopf sortiert die Tabelle.", 8.75f, false, UI.Muted); hint.Margin = new Padding(UI.S(4), UI.S(4), UI.S(4), 0); bottom.Controls.Add(hint);
         FlowLayoutPanel b = Row(); b.Margin = new Padding(UI.S(4), UI.S(10), 0, 0);
-        // Hinweis: Der statische Bericht "Vergleichen (Klassisch)" ist ab v3.32 vollständig durch das interaktive Dashboard abgelöst
-        btnDashboard = UI.Primary("Interaktives Dashboard"); btnDashboard.Margin = new Padding(0); btnDashboard.Padding = new Padding(UI.S(14), UI.S(3), UI.S(14), UI.S(3)); btnDashboard.Font = new Font("Segoe UI Semibold", 9.75f);
+
+        btnDashboard = UI.Primary("Im Dashboard vergleichen"); btnDashboard.Margin = new Padding(0); btnDashboard.Padding = new Padding(UI.S(14), UI.S(3), UI.S(14), UI.S(3)); btnDashboard.Font = new Font("Segoe UI Semibold", 9.75f);
         btnDashboard.Click += delegate { OpenDashboard(); };
-        Tip(btnDashboard, "Öffnet das interaktive HTML5-Dashboard für detaillierten System- und Benchmark-Vergleich.");
-        btnVerlauf = UI.Secondary("Verlauf"); btnVerlauf.Margin = new Padding(UI.S(8), 0, 0, 0);
-        btnVerlauf.Click += delegate { OpenDeviceHistory(); };
-        btnVerlauf.Enabled = false;
-        Tip(btnVerlauf, "Öffnet das interaktive Dashboard im Verlaufsmodus für alle Läufe des ausgewählten Geräts.");
-        btnOpenReport = UI.Secondary("Bericht öffnen"); btnOpenReport.Margin = new Padding(UI.S(8), 0, 0, 0);
+        btnDashboard.Enabled = false;
+        Tip(btnDashboard, "Ã–ffnet das interaktive HTML5-Dashboard fÃ¼r detaillierten System- und Benchmark-Vergleich der ausgewÃ¤hlten LÃ¤ufe.");
+
+        btnOpenReport = UI.Secondary("Bericht Ã¶ffnen"); btnOpenReport.Margin = new Padding(UI.S(8), 0, 0, 0);
         btnOpenReport.Click += delegate {
             DbEntry target = null;
             if (lvDb != null && lvDb.SelectedItems.Count > 0) target = (DbEntry)lvDb.SelectedItems[0].Tag;
-            else if (lvDb != null && lvDb.CheckedItems.Count == 1) target = (DbEntry)lvDb.CheckedItems[0].Tag;
             if (target != null) OpenEntry(target);
         };
         btnOpenReport.Enabled = false;
-        Tip(btnOpenReport, "Öffnet den vollständigen HTML-Diagnosebericht des ausgewählten Systems.");
-        btnSetRef = UI.Secondary("Als Referenz ..."); btnSetRef.Margin = new Padding(UI.S(8), 0, 0, 0);
-        btnSetRef.Click += delegate { ShowSetRefMenu(); };
-        btnSetRef.Enabled = false;
-        Tip(btnSetRef, "Legt das ausgewählte System als dauerhafte Vergleichsreferenz (Referenz.json) fest oder öffnet das Dashboard mit diesem System als Basis.");
-        btnRename = UI.Secondary("Name ändern ..."); btnRename.Margin = new Padding(UI.S(8), 0, 0, 0);
-        btnRename.Click += delegate { RenameSelectedEntry(); };
-        btnRename.Enabled = false;
-        Tip(btnRename, "Ändert den Anzeigenamen des ausgewählten Systems (z. B. Vor Reinigung) und benennt Datenbankdatei und Berichtsordner passend um. Rechnername und Hardware-Erkennung bleiben.");
-        btnExport = UI.Secondary("Lauf exportieren ..."); btnExport.Margin = new Padding(UI.S(8), 0, 0, 0);
-        btnExport.Click += delegate { ExportSelected(); };
-        btnExport.Enabled = false;
-        Tip(btnExport, "Exportiert den ausgewählten Lauf als eigenständiges .minibench-Austauschpaket mit Datenbankeintrag und Bericht.");
-        btnDelete = UI.Secondary("Entfernen"); btnDelete.Margin = new Padding(UI.S(8), 0, 0, 0); btnDelete.Click += delegate { DeleteSelected(); };
-        Tip(btnDelete, "Verschiebt die angehakten Läufe samt Berichtsordner nach Minibench-Daten\\Archiv\\Entfernt. Beim nächsten Abgleich verschwinden sie auch vom Netzlaufwerk.");
-        b.Controls.Add(btnDashboard); b.Controls.Add(btnVerlauf); b.Controls.Add(btnOpenReport); b.Controls.Add(btnSetRef); b.Controls.Add(btnRename); b.Controls.Add(btnExport); b.Controls.Add(btnDelete); bottom.Controls.Add(b);
-        lblDbClean = Lbl(DatenpflegeInfo.Length > 0 ? DatenpflegeInfo : "Lasttests vor v2.67 (nicht vergleichbar), abgebrochene und kurze Läufe verschiebt die Datenpflege beim Start nach Minibench-Daten\\Archiv.", 8.75f, false, UI.Muted);
+        Tip(btnOpenReport, "Ã–ffnet den vollstÃ¤ndigen HTML-Diagnosebericht des markierten Systems.");
+
+        btnVerlauf = UI.Secondary("Verlauf"); btnVerlauf.Margin = new Padding(UI.S(8), 0, 0, 0);
+        btnVerlauf.Click += delegate { OpenDeviceHistory(); };
+        btnVerlauf.Enabled = false;
+        Tip(btnVerlauf, "Ã–ffnet das interaktive Dashboard im Verlaufsmodus fÃ¼r alle LÃ¤ufe des markierten GerÃ¤ts.");
+
+        ContextMenu cmActions = new ContextMenu();
+        cmActions.MenuItems.Add("Als Referenz festlegen (persistent)", delegate { SetSelectedAsReference(); });
+        cmActions.MenuItems.Add("Als Basis im Dashboard Ã¶ffnen (temporÃ¤r)", delegate { OpenDashboardWithBase(); });
+        cmActions.MenuItems.Add("-");
+        cmActions.MenuItems.Add("Name Ã¤ndern ...", delegate { RenameSelectedEntry(); });
+        cmActions.MenuItems.Add("Lauf exportieren ...", delegate { ExportSelected(); });
+
+        btnActions = UI.Secondary("Aktionen \u25BE"); btnActions.Margin = new Padding(UI.S(8), 0, 0, 0);
+        btnActions.Click += delegate { cmActions.Show(btnActions, new Point(0, btnActions.Height)); };
+        btnActions.Enabled = false;
+        Tip(btnActions, "Weitere Aktionen fÃ¼r den markierten Lauf: Als Referenz festlegen, Name Ã¤ndern oder exportieren.");
+
+        btnSetRef = UI.Secondary("Als Referenz ..."); Tip(btnSetRef, "Legt das markierte System als dauerhafte Vergleichsreferenz fest.");
+        btnRename = UI.Secondary("Name Ã¤ndern ..."); Tip(btnRename, "Ã„ndert den Anzeigenamen des markierten Systems.");
+        btnExport = UI.Secondary("Lauf exportieren ..."); Tip(btnExport, "Exportiert den markierten Lauf als eigenstÃ¤ndiges Paket.");
+        btnCompare = UI.Secondary("Vergleichen"); Tip(btnCompare, "Systeme vergleichen.");
+
+        btnDelete = UI.Secondary("Lauf lÃ¶schen"); btnDelete.Margin = new Padding(UI.S(8), 0, 0, 0); btnDelete.Click += delegate { DeleteSelected(); };
+        btnDelete.Enabled = false;
+        Tip(btnDelete, "Verschiebt die markierten oder angehakten LÃ¤ufe nach Minibench-Daten\\Archiv\\Entfernt. Beim nÃ¤chsten Abgleich verschwinden sie auch vom Netzlaufwerk.");
+
+        b.Controls.Add(btnDashboard); b.Controls.Add(btnOpenReport); b.Controls.Add(btnVerlauf); b.Controls.Add(btnActions); b.Controls.Add(btnDelete); bottom.Controls.Add(b);
+
+        lblDbClean = Lbl(DatenpflegeInfo.Length > 0 ? DatenpflegeInfo : "Nicht vergleichbare, abgebrochene und unvollstÃ¤ndige LÃ¤ufe verschiebt die Datenpflege nach Minibench-Daten\\Archiv.", 8.75f, false, UI.Muted);
         lblDbClean.Margin = new Padding(UI.S(4), UI.S(8), UI.S(4), 0); bottom.Controls.Add(lblDbClean);
         bottom.Resize += delegate { lblDbClean.MaximumSize = new Size(Math.Max(UI.S(200), bottom.ClientSize.Width - UI.S(10)), 0); };
+
+        pnlDbEmpty = new CardPanel();
+        pnlDbEmpty.Dock = DockStyle.Fill;
+        pnlDbEmpty.Visible = false;
+
+        lblEmptyIco = new Label();
+        lblEmptyIco.Text = UI.IcoSearch;
+        lblEmptyIco.Font = new Font("Segoe UI", 28f);
+        lblEmptyIco.ForeColor = UI.Muted;
+        lblEmptyIco.AutoSize = true;
+
+        lblEmptyText = new Label();
+        lblEmptyText.Text = "Keine passenden LÃ¤ufe gefunden.";
+        lblEmptyText.Font = new Font("Segoe UI Semibold", 10.5f);
+        lblEmptyText.ForeColor = UI.Text;
+        lblEmptyText.AutoSize = true;
+
+        lblEmptySub = new Label();
+        lblEmptySub.Text = "PrÃ¼fen Sie den Suchbegriff oder setzen Sie den Filter zurÃ¼ck.";
+        lblEmptySub.Font = new Font("Segoe UI", 9f);
+        lblEmptySub.ForeColor = UI.Muted;
+        lblEmptySub.AutoSize = true;
+
+        btnEmptyAction = UI.Secondary("Filter zurÃ¼cksetzen");
+        btnEmptyAction.Click += delegate {
+            if (txtDbFilter != null && txtDbFilter.Text.Length > 0) txtDbFilter.Text = "";
+            else ImportRuns();
+        };
+        Tip(btnEmptyAction, "Setzt den Suchfilter zurÃ¼ck oder Ã¶ffnet den Import-Dialog.");
+
+        pnlDbEmpty.Controls.Add(lblEmptyIco);
+        pnlDbEmpty.Controls.Add(lblEmptyText);
+        pnlDbEmpty.Controls.Add(lblEmptySub);
+        pnlDbEmpty.Controls.Add(btnEmptyAction);
+
+        pnlDbEmpty.Resize += delegate { LayoutDbEmpty(); };
 
         DbListView dlv = new DbListView();
         dlv.GroupStateChanged += delegate { UpdateToggleGroupsButton(); };
         lvDb = dlv; lvDb.View = View.Details; lvDb.FullRowSelect = true; lvDb.CheckBoxes = true; lvDb.Dock = DockStyle.Fill; lvDb.BorderStyle = BorderStyle.FixedSingle; lvDb.HideSelection = false; lvDb.ShowItemToolTips = true;
         EnableDarkListView(lvDb);
-        string[] cols = new string[] { "System", "Datum", "Gesamt", "Prozessor", "Grafik", "Arbeitsspeicher", "CPU Mehrkern", "RAM Lesen", "GPU", "Befunde K/W/I" };
-        int[] w = new int[] { UI.S(135), UI.S(95), UI.S(65), UI.S(125), UI.S(115), UI.S(105), UI.S(80), UI.S(70), UI.S(70), UI.S(62) };
+        string[] cols = new string[] { "System", "Datum", "Punkte", "CPU", "GPU", "RAM", "CPU Multi", "RAM Lesen", "FPS", "Befunde" };
+        int[] w = new int[] { UI.S(140), UI.S(95), UI.S(65), UI.S(130), UI.S(120), UI.S(100), UI.S(80), UI.S(75), UI.S(70), UI.S(65) };
         for (int i = 0; i < cols.Length; i++) lvDb.Columns.Add(cols[i], w[i]);
         lvDb.Resize += delegate {
-            int rem = lvDb.ClientSize.Width;
-            for (int i = 0; i < lvDb.Columns.Count - 1; i++) rem -= lvDb.Columns[i].Width;
-            if (rem > UI.S(60)) lvDb.Columns[lvDb.Columns.Count - 1].Width = rem - 2;
+            if (lvDb.Columns.Count < 10) return;
+            int clientW = lvDb.ClientSize.Width;
+            int fixedW = lvDb.Columns[1].Width + lvDb.Columns[2].Width + lvDb.Columns[5].Width +
+                         lvDb.Columns[6].Width + lvDb.Columns[7].Width + lvDb.Columns[8].Width + lvDb.Columns[9].Width;
+            int avail = clientW - fixedW - UI.S(4);
+            if (avail > UI.S(300))
+            {
+                int wSys = (int)(avail * 0.36);
+                int wCpu = (int)(avail * 0.34);
+                int wGpu = avail - wSys - wCpu;
+                lvDb.Columns[0].Width = Math.Max(UI.S(130), wSys);
+                lvDb.Columns[3].Width = Math.Max(UI.S(110), wCpu);
+                lvDb.Columns[4].Width = Math.Max(UI.S(100), wGpu);
+            }
         };
         lvDb.DoubleClick += delegate {
             if (lvDb.SelectedItems.Count == 0) return;
@@ -14166,8 +14797,9 @@ public partial class DiagGui
             e.Befunde
         });
         it.Tag = e;
-        it.ToolTipText = e.DisplayName + (e.Disk.Length > 0 ? "\r\n" + e.Disk : "") + (e.HasBench ? "" : "\r\n(ohne Benchmark-Werte)");
-        if (!e.HasBench) it.ForeColor = UI.Muted;
+        bool hasBench = e.HasBench || e.OverallScore > 0;
+        it.ToolTipText = e.DisplayName + (e.Disk.Length > 0 ? "\r\n" + e.Disk : "") + (hasBench ? "" : "\r\n(ohne Benchmark-Werte)");
+        if (!hasBench) it.ForeColor = UI.Muted;
         return it;
     }
 
@@ -14337,47 +14969,36 @@ public partial class DiagGui
 
     void UpdateDbButtons()
     {
-        if (btnDashboard == null && btnCompare == null) return;
-        int n = CheckedEntries().Count;
-        if (btnDelete != null) btnDelete.Enabled = n >= 1;
-        if (btnCompare != null)
+        if (btnDashboard == null) return;
+        int chkN = CheckedEntries().Count;
+        int selN = (lvDb != null ? lvDb.SelectedItems.Count : 0);
+
+        btnDashboard.Enabled = (chkN >= 1);
+        btnDashboard.Text = (chkN >= 1 ? String.Format("Im Dashboard vergleichen ({0})", chkN) : "Im Dashboard vergleichen");
+
+        if (btnOpenReport != null) btnOpenReport.Enabled = (selN == 1);
+        if (btnVerlauf != null) btnVerlauf.Enabled = (selN == 1 && GetSelectedDeviceTarget() != null);
+        if (btnActions != null) btnActions.Enabled = (selN == 1);
+
+        if (btnDelete != null)
         {
-            btnCompare.Enabled = n >= 2;
-            btnCompare.Text = n >= 2 ? n + " Systeme vergleichen (Klassisch)" : "Vergleichen (Klassisch)";
-        }
-        if (btnDashboard != null)
-        {
-            btnDashboard.Text = n >= 2 ? n + " Systeme im Dashboard vergleichen" : (n == 1 ? "1 System im Dashboard anzeigen" : "Interaktives Dashboard");
-        }
-        if (btnVerlauf != null)
-        {
-            btnVerlauf.Enabled = (GetSelectedDeviceTarget() != null);
-        }
-        if (btnRename != null)
-        {
-            int selCount = (lvDb != null ? lvDb.SelectedItems.Count : 0);
-            DbEntry selTarget = null;
-            if (lvDb != null && lvDb.SelectedItems.Count == 1) selTarget = lvDb.SelectedItems[0].Tag as DbEntry;
-            else if (lvDb != null && lvDb.CheckedItems.Count == 1) selTarget = lvDb.CheckedItems[0].Tag as DbEntry;
-            btnRename.Enabled = (selTarget != null && !selTarget.IsReference && (selCount == 1 || (selCount == 0 && n == 1)));
-        }
-        if (btnOpenReport != null)
-        {
-            int selCount = (lvDb != null ? lvDb.SelectedItems.Count : 0);
-            btnOpenReport.Enabled = (selCount == 1 || (selCount == 0 && n == 1));
-        }
-        if (btnExport != null)
-        {
-            int selCount = (lvDb != null ? lvDb.SelectedItems.Count : 0);
-            btnExport.Enabled = (selCount == 1 || (selCount == 0 && n == 1));
-        }
-        if (btnSetRef != null)
-        {
-            int selCount = (lvDb != null ? lvDb.SelectedItems.Count : 0);
-            btnSetRef.Enabled = (selCount == 1 || (selCount == 0 && n == 1));
+            if (chkN > 0)
+            {
+                btnDelete.Enabled = true;
+                btnDelete.Text = (chkN > 1 ? String.Format("AusgewÃ¤hlte LÃ¤ufe lÃ¶schen ({0})", chkN) : "AusgewÃ¤hlten Lauf lÃ¶schen");
+            }
+            else if (selN == 1)
+            {
+                btnDelete.Enabled = true;
+                btnDelete.Text = "Lauf lÃ¶schen";
+            }
+            else
+            {
+                btnDelete.Enabled = false;
+                btnDelete.Text = "Lauf lÃ¶schen";
+            }
         }
     }
-
     void ShowSetRefMenu()
     {
         ContextMenu m = new ContextMenu();
@@ -14393,18 +15014,18 @@ public partial class DiagGui
         else if (lvDb != null && lvDb.CheckedItems.Count == 1) target = (DbEntry)lvDb.CheckedItems[0].Tag;
         if (target == null || !target.HasBench)
         {
-            MessageBox.Show(this, "Bitte wählen Sie ein System mit Benchmark-Werten aus.", "Referenz festlegen", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UI.Hinweis("Bitte wählen Sie ein System mit Benchmark-Werten aus.", "Referenz festlegen", this);
             return;
         }
 
         string msg = String.Format("Möchten Sie das System \"{0}\" ({1})\r\nals dauerhafte Vergleichsreferenz (100 %) festlegen?\r\n\r\nDie Werte werden in Minibench-Daten\\Referenz.json gespeichert.", target.DisplayName, target.Datum);
-        if (MessageBox.Show(this, msg, "Referenz festlegen", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        if (!UI.Ask(msg, "Referenz festlegen", this)) return;
 
         try
         {
             if (String.IsNullOrEmpty(dataDir) || !Directory.Exists(dataDir))
             {
-                MessageBox.Show(this, "Der Datenordner ist nicht verfügbar.", "Referenz festlegen", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                UI.Hinweis("Der Datenordner ist nicht verfügbar.", "Referenz festlegen", this);
                 return;
             }
             string dest = Path.Combine(dataDir, "Referenz.json");
@@ -14412,13 +15033,13 @@ public partial class DiagGui
             {
                 string raw = File.ReadAllText(target.Path, Encoding.UTF8);
                 File.WriteAllText(dest, raw, new UTF8Encoding(false));
-                MessageBox.Show(this, "Das System \"" + target.DisplayName + "\" wurde als Referenz gespeichert.", "Referenz festgelegt", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                UI.Hinweis("Das System \"" + target.DisplayName + "\" wurde als Referenz gespeichert.", "Referenz festgelegt", this);
                 ReloadDb();
             }
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, "Fehler beim Speichern der Referenz: " + ex.Message, "Referenz festlegen", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            UI.Hinweis("Fehler beim Speichern der Referenz: " + ex.Message, "Referenz festlegen", this);
         }
     }
 
@@ -14448,7 +15069,7 @@ public partial class DiagGui
         {
             string dashPath = System.IO.Path.Combine(dataDir, "Berichte\\Dashboard.html");
             if (File.Exists(dashPath)) OpenShell(dashPath);
-            else MessageBox.Show(this, "Das Dashboard konnte nicht geöffnet werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Leos Minibench", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            else UI.Hinweis("Das Dashboard konnte nicht geöffnet werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Leos Minibench", this);
         }
     }
 
@@ -14535,7 +15156,7 @@ public partial class DiagGui
         {
             string dashPath = System.IO.Path.Combine(dataDir, "Berichte\\Dashboard.html");
             if (File.Exists(dashPath)) OpenShell(dashPath);
-            else MessageBox.Show(this, "Das Dashboard konnte nicht geöffnet werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Leos Minibench", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            else UI.Hinweis("Das Dashboard konnte nicht geöffnet werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Leos Minibench", this);
         }
     }
 
@@ -14563,32 +15184,35 @@ public partial class DiagGui
         {
             string dashPath = System.IO.Path.Combine(dataDir, "Berichte\\Dashboard.html");
             if (File.Exists(dashPath)) OpenShell(dashPath);
-            else MessageBox.Show(this, "Das Dashboard konnte nicht geöffnet werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Leos Minibench", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            else UI.Hinweis("Das Dashboard konnte nicht geöffnet werden.\r\n\r\n" + String.Join("\r\n", lines.ToArray()), "Leos Minibench", this);
         }
     }
 
     // ab 3.54: Eintrag und Berichtsordner ins Archiv (Minibench-Daten\Archiv\Entfernt), über den Arbeitsprozess
+    // ab 3.54: Eintrag und Berichtsordner ins Archiv (Minibench-Daten\Archiv\Entfernt), Ã¼ber den Arbeitsprozess
     void DeleteSelected()
     {
         List<DbEntry> sel = CheckedEntries();
+        if (sel.Count == 0 && lvDb != null && lvDb.SelectedItems.Count == 1)
+        {
+            DbEntry e = lvDb.SelectedItems[0].Tag as DbEntry;
+            if (e != null) sel.Add(e);
+        }
         if (sel.Count == 0) return;
         StringBuilder sb = new StringBuilder();
-        foreach (DbEntry e in sel) sb.AppendLine("·  " + e.DisplayName + "  " + e.Datum);
+        foreach (DbEntry e in sel) sb.AppendLine("Â·  " + e.DisplayName + "  " + e.Datum);
         string nas, ben; bool mitNas = NasAblage.LeseKonfig(dataDir, out nas, out ben);
-        string msg = "Diese Läufe entfernen?\r\n\r\n" + sb.ToString() + "\r\nDatenbankeintrag und Berichtsordner werden nach Minibench-Daten\\Archiv\\Entfernt verschoben und lassen sich von dort zurückholen."
-            + (mitNas ? " Auf dem Netzlaufwerk verschwinden sie beim nächsten Aktualisieren (dort ebenfalls ins Archiv)." : "");
-        if (MessageBox.Show(this, msg, "Läufe entfernen", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        string msg = (sel.Count > 1 ? "Diese " + sel.Count + " LÃ¤ufe entfernen?" : "Diesen Lauf entfernen?") + "\r\n\r\n" + sb.ToString() + "\r\nDatenbankeintrag und Berichtsordner werden nach Minibench-Daten\\Archiv\\Entfernt verschoben und lassen sich von dort zurÃ¼ckholen."
+            + (mitNas ? " Auf dem Netzlaufwerk verschwinden sie beim nÃ¤chsten Aktualisieren (dort ebenfalls ins Archiv)." : "");
+        if (!UI.Ask(msg, "LÃ¤ufe entfernen", this)) return;
         List<string> paths = new List<string>();
         foreach (DbEntry e in sel) paths.Add(e.Path);
         List<string> lines;
         string res = RunHelperPumped("-Entfernen " + Q(String.Join("|", paths.ToArray())), out lines, 300);
         ReloadDb();
         string[] r = res.Split('|');
-        if (r.Length < 2 || r[1] != "0") MessageBox.Show(this, lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Keine Rückmeldung vom Arbeitsprozess.", "Läufe entfernen", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        if (r.Length < 2 || r[1] != "0") UI.Hinweis(lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Keine RÃ¼ckmeldung vom Arbeitsprozess.", "LÃ¤ufe entfernen", this);
     }
-
-    // Aktualisieren (ab 3.54): mit eingerichtetem und erreichbarem Netzlaufwerk erst abgleichen, dann neu einlesen.
-    // Ohne Netzlaufwerk oder unterwegs nur neu einlesen; alles auf dem Stick bleibt nutzbar.
     bool abgleichLaeuft = false;
     void RefreshAndSync()
     {
@@ -14602,7 +15226,7 @@ public partial class DiagGui
         string pfad, benutzer;
         if (dataDir.Length == 0 || !NasAblage.LeseKonfig(dataDir, out pfad, out benutzer)) { ReloadDb(); return; }
         string fehler = NasAblage.PfadFehler(pfad);
-        if (fehler.Length > 0) { ReloadDb(); MessageBox.Show(this, "Der gespeicherte Pfad des Netzlaufwerks ist nicht verwendbar: " + fehler + "\r\n\r\nBitte unter \"Netzlaufwerk ...\" korrigieren.", "Aktualisieren", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+        if (fehler.Length > 0) { ReloadDb(); UI.Hinweis("Der gespeicherte Pfad des Netzlaufwerks ist nicht verwendbar: " + fehler + "\r\n\r\nBitte unter \"Netzlaufwerk ...\" korrigieren.", "Aktualisieren", this); return; }
         SetText(lblDbPath, "Netzlaufwerk " + pfad + " wird geprüft ...");
         bool warAn = Enabled; Enabled = false;
         bool da;
@@ -14615,7 +15239,7 @@ public partial class DiagGui
                 string err = NasAblage.Verbinden(pfad, benutzer, pw);
                 Enabled = false;
                 try { da = err.Length == 0 && NasAblage.Erreichbar(pfad, 6000); } finally { Enabled = warAn; }
-                if (!da && err.Length > 0) MessageBox.Show(this, err, "Netzlaufwerk verbinden", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                if (!da && err.Length > 0) UI.Hinweis(err, "Netzlaufwerk verbinden", this);
             }
         }
         if (!da)
@@ -14633,7 +15257,7 @@ public partial class DiagGui
             string frage = "Die Freigabe ist erreichbar, der Ordner " + pfad + " aber nicht, obwohl schon abgeglichen wurde.\r\n\r\n"
                 + "Ist die Freigabe richtig eingehängt und der Ordner nicht verschoben? Nur wenn das Netzlaufwerk neu eingerichtet wurde: "
                 + "Ordner neu anlegen und beide Seiten zusammenführen? Dabei wird nichts gelöscht.";
-            if (MessageBox.Show(this, frage, "Abgleich mit dem Netzlaufwerk", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.Yes)
+            if (UI.Ask(frage, "Abgleich mit dem Netzlaufwerk", this))
                 res = RunHelperPumped("-Abgleich -AbgleichNeu", out lines, 3600, lblDbPath);
             else { ReloadDb(); SetText(lblDbPath, NasAblage.AblageText(dataDir) + "   ·   Ordner auf dem Netzlaufwerk fehlt, nichts geändert"); return; }
         }
@@ -14645,7 +15269,7 @@ public partial class DiagGui
                 + "Ja: Die Daten wurden bewusst entfernt. Die fehlenden Dateien werden auf der anderen Seite ins Archiv verschoben (Archiv\\Abgleich).\r\n"
                 + "Nein: Beide Seiten zusammenführen, nichts entfernen (z. B. Netzlaufwerk neu eingerichtet oder geleert).\r\n"
                 + "Abbrechen: nichts tun.";
-            DialogResult wahl = MessageBox.Show(this, frage, "Abgleich mit dem Netzlaufwerk", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button3);
+            DialogResult wahl = UI.Ask3(frage, "Abgleich mit dem Netzlaufwerk", this);
             if (wahl == DialogResult.Yes) res = RunHelperPumped("-Abgleich -AbgleichLoeschen", out lines, 3600, lblDbPath);
             else if (wahl == DialogResult.No) res = RunHelperPumped("-Abgleich -AbgleichNeu", out lines, 3600, lblDbPath);
             else { ReloadDb(); SetText(lblDbPath, NasAblage.AblageText(dataDir) + "   ·   Abgleich angehalten, nichts geändert"); return; }
@@ -14657,13 +15281,13 @@ public partial class DiagGui
         // Konflikte, Fehler und Abbrüche anzeigen; ein reiner Abgleich ohne Besonderheiten steht nur in der Zeile
         string[] x = res.Split('|');
         bool besonders = !ok || !erreichbar || (x.Length >= 6 && (x[4] != "0" || x[5] != "0"));
-        if (besonders) MessageBox.Show(this, kurz + (lines.Count > 0 ? "\r\n\r\n" + String.Join("\r\n", lines.ToArray()) : "") + "\r\n\r\nProtokoll: Minibench-Daten\\Abgleich\\Abgleich.log", "Abgleich mit dem Netzlaufwerk", MessageBoxButtons.OK, ok ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+        if (besonders) UI.Hinweis(kurz + (lines.Count > 0 ? "\r\n\r\n" + String.Join("\r\n", lines.ToArray()) : "") + "\r\n\r\nProtokoll: Minibench-Daten\\Abgleich\\Abgleich.log", "Abgleich mit dem Netzlaufwerk", this);
     }
 
     void CleanData()
     {
         if (dataDir.Length == 0) return;
-        if (MessageBox.Show(this, "Lasttests vor v2.67 (andere Last, nicht vergleichbar), abgebrochene Läufe ohne Bericht und kurze Läufe (Funktionstest, von Hand nach wenigen Sekunden beendeter Lasttest, Lauf ohne Messwert) sowie ungenutzte Teile von smartmontools nach Minibench-Daten\\Archiv verschieben?\r\n\r\nGelöscht wird nichts außer älteren Übersetzungen im Cache. Das Protokoll steht in Archiv\\Datenpflege.log.", "Daten aufräumen", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        if (!UI.Ask("Nicht vergleichbare, abgebrochene und unvollständige Läufe nach Minibench-Daten\\Archiv verschieben?\r\n\r\nGelöscht wird nichts außer älteren Übersetzungen im Cache. Das Protokoll steht in Archiv\\Datenpflege.log.", "Daten aufräumen", this)) return;
         Cursor = Cursors.WaitCursor;
         List<string> lines = new List<string>(); string res = "";
         try { res = RunHelper("-Datenpflege", out lines); }
@@ -14671,7 +15295,7 @@ public partial class DiagGui
         Cursor = Cursors.Default;
         ReloadDb();
         if (res.Length > 0) SetText(lblDbClean, "Datenpflege: " + res.Split('|')[0]);
-        MessageBox.Show(this, lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Nichts zu archivieren.", "Daten aufräumen", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        UI.Hinweis(lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Nichts zu archivieren.", "Daten aufräumen", this);
     }
 
     void ExportSelected()
@@ -14694,13 +15318,13 @@ public partial class DiagGui
             List<string> lines;
             string res = RunHelper("-ExportLauf " + Q(target.Path) + " -ExportZiel " + Q(sfd.FileName), out lines);
             Cursor = Cursors.Default;
-            MessageBox.Show(this, lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Export abgeschlossen.", "Lauf exportieren", MessageBoxButtons.OK, res.StartsWith("1") ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+            UI.Hinweis(lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Export abgeschlossen.", "Lauf exportieren", this);
         }
     }
 
     void ImportRuns()
     {
-        if (dbDir.Length == 0) { MessageBox.Show(this, "Kein Datenordner verfügbar.", "Leos Minibench"); return; }
+        if (dbDir.Length == 0) { UI.Hinweis("Kein Datenordner verfügbar.", "Leos Minibench", this); return; }
         Form dlg = new Form();
         dlg.Text = "Durchläufe importieren";
         dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -14767,7 +15391,7 @@ public partial class DiagGui
         catch (Exception ex) { lines.Add("Import fehlgeschlagen: " + ex.Message); }
         Cursor = Cursors.Default;
         ReloadDb();
-        MessageBox.Show(this, lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Nichts importiert.", "Import", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        UI.Hinweis(lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Nichts importiert.", "Import", this);
     }
 }
 // Seiten der grafischen Oberfläche: Versionen und Änderungen (Teilklasse DiagGui)
@@ -19183,6 +19807,13 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.0", "05.11.2026", "Aufgeräumt: Ganzheitliche Vereinheitlichung und Bereinigung der Oberfläche",
+            "\u2022 Ganzheitliche Vereinheitlichung der Oberfl\u00E4che: Bereinigung aller Inkonsistenzen, einheitliche Begrifflichkeiten (Lauf, System, Modul, Aufgabe, Einstellung, Vorlage, Ablauf) und Beseitigung s\u00E4mtlicher Entwicklersprache.\r\n" +
+            "\u2022 Globales Einstellungs-Men\u00FC: Zentraler Zahnrad-Knopf in der Kopfzeile b\u00FCndelt alle globalen Einstellungen (Darstellung, Startseite, 1-Fenstermodus, Datenschutz/Anonymisierung, Speicherorte & Netzlaufwerk, Updates, Danksagung/Lizenzen); die Fu\u00DFleiste wurde aufger\u00E4umt und fokussiert.\r\n" +
+            "\u2022 Einheitliche Einstellungszeilen (SettingRow): Dynamische H\u00F6henberechnung verhindert Textabschneiden, deterministisches Spaltenraster [Zustand] \u2192 [Risiko] \u2192 [Neustart] \u2192 [Schalter] schlie\u00DFt \u00DCberlappungen aus.\r\n" +
+            "\u2022 Kategorielisten mit Kurztiteln & Symbolen: Optimierung und Wartung nutzen sprechende Kategorie-Symbole und Kurztitel gegen Text\u00FCberl\u00E4ufe; Pillen-Z\u00E4hler einheitlich in Akzentfarbe (X/Y).\r\n" +
+            "\u2022 Entflechtete Datenbank-Bedienung: Strikte Trennung zwischen Haken f\u00FCr den Mehrfachvergleich im Dashboard ('Im Dashboard vergleichen') und Zeilen-Markierung f\u00FCr Einzelaktionen; neue Suchleiste, leere Zustandskarte und dynamische Spaltenbreiten.\r\n" +
+            "\u2022 Dezimale Versionspr\u00FCfung & Barrierefreiheit: Korrekter dezimaler Versionsvergleich (3.882 < 3.9 < 3.91 < 4.0), vollst\u00E4ndige Tastatur-Bedienung (F5, Strg+F, Strg+Enter) und Screenreader-Attribute (AccessibleRole/AccessibleName) f\u00FCr alle interaktiven Steuerelemente."),
         new Eintrag("3.91", "31.10.2026", "Ergebnis-Dashboard, schlankes Optimierungs-Layout & Zeichensatz-Korrektur",
             "\u2022 Infoboxen auf der Ergebnisseite vergr\u00F6\u00DFert: Gro\u00DFz\u00FCgige Kachel-Mindesth\u00F6he (UI.S(132)), AutoSize-Spalte f\u00FCr Metrikbezeichnungen und rechtsb\u00FCndige Werteverankerung verhindern jedes Abschneiden oder \u00DCberlaufen von Texten (z. B. Befundz\u00E4hler, DPC-Latenzen).\r\n" +
             "\u2022 Klassifizierung entfernt: Die subjektive Klassifizierungszeile ('High-End', etc.) wurde vollst\u00E4ndig vom Ergebnis-Dashboard entfernt; die Gesamtpunktzahl steht dominant und klar gegliedert \u00FCber den Hardware-Spezifikationen.\r\n" +

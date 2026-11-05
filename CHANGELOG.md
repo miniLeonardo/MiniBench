@@ -1,6 +1,25 @@
-﻿# Changelog - Leos Minibench
+# Changelog - Leos Minibench
 
 Alle wesentlichen Änderungen an Leos Minibench werden in diesem Dokument festgehalten.
+
+## v4.0 (05.11.2026)
+
+### Neu
+* **Globales Einstellungs-Menü:** Zentraler Zahnrad-Knopf in der Kopfzeile bündelt alle übergeordneten Konfigurationen (Farbschema, Startseiten-Option, 1-Fenstermodus, Datenschutz/Anonymisierung, Pfade & Netzlaufwerk, automatische Updates sowie Über/Danksagungen); die Fußleiste ist damit auf das Wesentliche entschlackt.
+* **Kurztitel & Icons für Kategorien:** Kategorielisten in Wartung und Optimierung verwenden prägnante Kurztitel und eigene Icons aus den Modulverträgen, um Textüberläufe in der Spalte zu verhindern.
+* **Datenbank-Suche & dynamische Spalten:** Sofortige Filterung nach Systemname, CPU oder GPU über die neue Suchleiste; dynamische Spaltenbreiten nutzen den Fensterplatz optimal aus.
+* **Tastatursteuerung:** F5 aktualisiert die Datenbank, Strg+F fokussiert das Suchfeld, Strg+Enter startet den Ablauf.
+* **Barrierefreiheit:** Screenreader-Unterstützung (AccessibleRole, AccessibleName) und konsistente Tooltips auf allen interaktiven Steuerelemente.
+
+### Verbessert
+* **Einheitlicher Zeilenbaustein (SettingRow):** Dynamische Höhenanpassung beseitigt abgeschnittene Zeilentexte in Wartung und Optimierung. Festes Spaltenraster ([Zustand] → [Risiko] → [Neustart] → [Schalter]) schließt Überlappungen von Badges und Titeln verlässlich aus.
+* **Entflechtung der Datenbank-Aktionen:** Checkboxen steuern ausschließlich den Mehrfachvergleich im Dashboard; Zeilen-Markierung steuert Einzelaktionen (Bericht öffnen, Verlauf, Referenz, Name ändern, Exportieren).
+* **Glossar & Sprache:** Sämtliche Benutzeroberflächen-Texte wurden einheitlich auf die verbindlichen Fachbegriffe (Lauf, System, Modul, Aufgabe, Einstellung, Vorlage, Ablauf) umgestellt und von Entwicklersprache bereinigt.
+* **Modul-Auswahl:** Schalter „beim Start ausführen“ entfällt zugunsten der Navigation; ein informatives Hinweispaneel („In den Ablauf aufnehmen“) weist auf konfigurierte, aber abgewählte Module hin.
+
+### Behoben
+* **Dezimaler Versionsvergleich:** Korrekte numerische Auswertung (`UI.VersionNumber`) verhindert Fehlalarme bei Versionsprüfungen (z. B. 3.882 < 3.91 < 4.0).
+* **Benchmark-Zeilen in der Datenbank:** Einträge mit gültigem Gesamtergebnis werden niemals mehr fälschlich als benchmarklos ausgegraut dargestellt.
 
 ## v3.91 (31.10.2026)
 
