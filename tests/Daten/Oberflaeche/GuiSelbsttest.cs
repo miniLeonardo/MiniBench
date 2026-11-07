@@ -46,6 +46,7 @@ public static class GuiSelbsttest
         Fall("SettingRow.Dynamik", SettingRowDynamik);
         Fall("CategoryPickerItem.Kurztitel", CategoryPickerKurztitel);
         Fall("UI.SkalierungDpi", UiSkalierungDpi);
+        Fall("UI.IconByName", UiSymbolNachName);
         foreach (string l in outLines) System.Console.WriteLine(l);
         return 0;
     }
@@ -526,6 +527,16 @@ public static class GuiSelbsttest
     }
 
     // ab v4.0: Dezimale Versionsnummer zur verlässlichen Größenordnung (z. B. 3.882 < 3.9 < 3.91 < 4.0)
+    // ab v4.01: Katalog und Vertrag nennen Symbole beim Namen; unbekannt oder leer ergibt den Ersatz
+    static void UiSymbolNachName()
+    {
+        Ist(UI.IconByName("IcoShield", "x") == UI.IcoShield, "IcoShield nicht aufgelöst");
+        Ist(UI.IconByName("IcoSpeed", "x") == UI.IcoSpeed, "IcoSpeed nicht aufgelöst");
+        Ist(UI.IconByName("IcoAdmin", "x") == UI.IcoAdmin, "IcoAdmin nicht aufgelöst");
+        Ist(UI.IconByName("GibtEsNicht", "x") == "x", "unbekannter Name muss den Ersatz liefern");
+        Ist(UI.IconByName("", "x") == "x", "leerer Name muss den Ersatz liefern");
+    }
+
     static void UiVersionsvergleich()
     {
         Ist(UI.VersionNumber("3.882") < UI.VersionNumber("3.9"), "3.882 < 3.9");

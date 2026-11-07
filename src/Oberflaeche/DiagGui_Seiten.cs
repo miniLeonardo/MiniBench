@@ -263,10 +263,10 @@ public partial class DiagGui
 
             Button btnInstallWg = UI.Primary("Ausgewählte installieren");
             btnInstallWg.Margin = new Padding(0); btnInstallWg.Font = new Font("Segoe UI Semibold", UI.SchriftText); btnInstallWg.Padding = new Padding(UI.S(14), UI.S(3), UI.S(14), UI.S(3));
-            LinkLabel lnkWgAll = new LinkLabel(); lnkWgAll.Text = "alle"; lnkWgAll.AutoSize = true;
+            LinkLabel lnkWgAll = new LinkLabel(); lnkWgAll.Text = "Alle an"; lnkWgAll.AutoSize = true;
             lnkWgAll.Margin = new Padding(UI.S(16), UI.S(7), UI.S(8), 0); lnkWgAll.LinkColor = UI.Accent;
             Tip(lnkWgAll, "Alle Softwarepakete auswählen.");
-            LinkLabel lnkWgNone = new LinkLabel(); lnkWgNone.Text = "keine"; lnkWgNone.AutoSize = true;
+            LinkLabel lnkWgNone = new LinkLabel(); lnkWgNone.Text = "Alle aus"; lnkWgNone.AutoSize = true;
             lnkWgNone.Margin = new Padding(0, UI.S(7), UI.S(8), 0); lnkWgNone.LinkColor = UI.Accent;
             Tip(lnkWgNone, "Alle Softwarepakete abwählen.");
             Label lblWgStatus = Lbl("", UI.SchriftHinweis, false, UI.Muted);
@@ -984,7 +984,7 @@ public partial class DiagGui
         Tip(lblLibsHead, "Pers\u00F6nliche Standardbibliotheken des Benutzers ausw\u00E4hlen.");
 
         LinkLabel lnkLibsAll = new LinkLabel();
-        lnkLibsAll.Text = "(Alle";
+        lnkLibsAll.Text = "Alle an";
         lnkLibsAll.AutoSize = true;
         lnkLibsAll.Font = new Font("Segoe UI", 8.5f);
         lnkLibsAll.LinkColor = UI.Accent;
@@ -996,7 +996,7 @@ public partial class DiagGui
         lblLibsSlash.Margin = new Padding(UI.S(2), UI.S(4), UI.S(2), UI.S(2));
 
         LinkLabel lnkLibsNone = new LinkLabel();
-        lnkLibsNone.Text = "Keine)";
+        lnkLibsNone.Text = "Alle aus";
         lnkLibsNone.AutoSize = true;
         lnkLibsNone.Font = new Font("Segoe UI", 8.5f);
         lnkLibsNone.LinkColor = UI.Accent;
@@ -2787,13 +2787,7 @@ public partial class DiagGui
         foot.BackColor = UI.Panel;
         foot.Margin = new Padding(0, UI.S(4), 0, UI.S(14));
 
-        CheckBox chkShowStart = Chk("Beim Start diese Seite zeigen", LoadStartPagePreference());
-        chkShowStart.Margin = new Padding(0, UI.S(2), UI.S(24), 0);
-        Tip(chkShowStart, "Legt fest, ob beim Programmstart standardmäßig diese Startseite geöffnet wird.");
-        chkShowStart.CheckedChanged += delegate {
-            SaveStartPagePreference(chkShowStart.Checked);
-        };
-        foot.Controls.Add(chkShowStart);
+        // ab v4.0 steht "Beim Programmstart die Startseite anzeigen" nur noch in den Einstellungen
 
         string seenVer = LoadSeenVersionPreference();
         bool isNew = (seenVer != this.version);
@@ -3492,211 +3486,166 @@ e.Result = items;
             dlg.ShowDialog(this);
         }
     }
-    // ------------------------------------------------------------ In-App Ergebnis-Dashboard (ab v3.9)
+    // ------------------------------------------------------------ Ergebnisseite nach einem Lauf (ab v3.9, neu in v4.01)
+    // Oben das Urteil mit den wichtigsten Befunden und der Vergleich mit der Referenz, darunter je Komponente ein
+    // Hauptwert mit Einordnung. Gezeigt wird nur, was dieser Lauf gemessen oder gemeldet hat; Details stehen im Bericht.
+    Label lblResVerdict, lblResCounts, lblResScore, lblResScoreSub, lblResRef;
+    FlowLayoutPanel pnlResFind, pnlResCmp, pnlResTiles;
+    TableLayoutPanel tblResMid;
+    CardPanel cardResFind, cardResCmp;
+    LinkLabel lnkResAll;
+
+    static readonly string[] resGruppen = new string[] { "CPU", "GPU", "RAM", "Laufwerke" };
+    static readonly string[] resNamen = new string[] { "Prozessor", "Grafik", "Arbeitsspeicher", "Laufwerke" };
+
     Control BuildResultDashboard()
     {
         Panel p = new Panel();
-        p.Dock = DockStyle.Fill;
-        p.AutoScroll = true;
-        p.BackColor = UI.Bg;
+        p.Dock = DockStyle.Fill; p.AutoScroll = true; p.BackColor = UI.Bg;
         p.Padding = new Padding(UI.S(UI.Seitenrand), UI.S(UI.Seitenrand), UI.S(UI.Seitenrand), UI.S(20));
 
         TableLayoutPanel main = new TableLayoutPanel();
-        main.Dock = DockStyle.Top;
-        main.AutoSize = true;
-        main.ColumnCount = 1;
-        main.BackColor = UI.Bg;
+        main.Dock = DockStyle.Top; main.AutoSize = true; main.ColumnCount = 1; main.BackColor = UI.Bg;
+        main.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
-        lblDashTitle = Lbl("Ergebnis-Dashboard", UI.SchriftTitel, true, UI.Text);
-        lblDashTitle.Margin = new Padding(0, 0, 0, UI.S(2));
-        main.Controls.Add(lblDashTitle, 0, 0);
+        lblDashTitle = Lbl("Ergebnis", UI.SchriftTitel, true, UI.Text); lblDashTitle.Margin = new Padding(0, 0, 0, UI.S(2));
+        main.Controls.Add(lblDashTitle);
+        lblDashMeta = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblDashMeta.Margin = new Padding(0, 0, 0, UI.S(12));
+        main.Controls.Add(lblDashMeta);
 
-        lblDashMeta = Lbl("", UI.SchriftHinweis, false, UI.Muted);
-        lblDashMeta.Margin = new Padding(0, 0, 0, UI.S(10));
-        main.Controls.Add(lblDashMeta, 0, 1);
+        // 1. Urteil links, Punktzahl rechts, darunter die Hardware
+        CardPanel hero = new CardPanel(); hero.Dock = DockStyle.Top; hero.AutoSize = true; hero.Padding = new Padding(UI.S(20), UI.S(16), UI.S(20), UI.S(16)); hero.Margin = new Padding(0, 0, 0, UI.S(12));
+        TableLayoutPanel ht = new TableLayoutPanel(); ht.Dock = DockStyle.Top; ht.AutoSize = true; ht.ColumnCount = 2; ht.RowCount = 2; ht.BackColor = UI.Panel;
+        ht.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); ht.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        FlowLayoutPanel hl = new FlowLayoutPanel(); hl.FlowDirection = FlowDirection.TopDown; hl.WrapContents = false; hl.AutoSize = true; hl.BackColor = UI.Panel; hl.Margin = new Padding(0);
+        lblResVerdict = Lbl("", 15f, true, UI.Text); lblResVerdict.Margin = new Padding(0, 0, 0, UI.S(4)); hl.Controls.Add(lblResVerdict);
+        lblResCounts = Lbl("", UI.SchriftText, false, UI.Muted); lblResCounts.Margin = new Padding(0); hl.Controls.Add(lblResCounts);
+        ht.Controls.Add(hl, 0, 0);
+        FlowLayoutPanel hr = new FlowLayoutPanel(); hr.FlowDirection = FlowDirection.TopDown; hr.WrapContents = false; hr.AutoSize = true; hr.BackColor = UI.Panel; hr.Margin = new Padding(UI.S(16), 0, 0, 0); hr.Anchor = AnchorStyles.Right | AnchorStyles.Top;
+        lblResScore = Lbl("", 22f, true, UI.Accent); lblResScore.Tag = "accent"; lblResScore.Margin = new Padding(0); lblResScore.Anchor = AnchorStyles.Right; hr.Controls.Add(lblResScore);
+        lblResScoreSub = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblResScoreSub.Margin = new Padding(0); lblResScoreSub.Anchor = AnchorStyles.Right; hr.Controls.Add(lblResScoreSub);
+        ht.Controls.Add(hr, 1, 0);
+        pnlDashPills = new FlowLayoutPanel(); pnlDashPills.AutoSize = true; pnlDashPills.WrapContents = true; pnlDashPills.BackColor = UI.Panel; pnlDashPills.Margin = new Padding(0, UI.S(12), 0, 0);
+        ht.Controls.Add(pnlDashPills, 0, 1); ht.SetColumnSpan(pnlDashPills, 2);
+        // Pillen umbrechen innerhalb der Karte (vorher wurde die vierte Pille unten abgeschnitten)
+        hero.Resize += delegate { pnlDashPills.MaximumSize = new Size(Math.Max(UI.S(200), hero.ClientSize.Width - hero.Padding.Horizontal), 0); };
+        hero.Controls.Add(ht);
+        main.Controls.Add(hero);
 
-        // Große Gesamtwertungs-Karte
-        CardPanel scoreCard = new CardPanel();
-        scoreCard.Dock = DockStyle.Top;
-        scoreCard.AutoSize = true;
-        scoreCard.Padding = new Padding(UI.S(16), UI.S(14), UI.S(16), UI.S(14));
-        scoreCard.Margin = new Padding(0, 0, 0, UI.S(12));
+        // 2. Wichtigste Befunde und Vergleich mit der Referenz nebeneinander
+        tblResMid = new TableLayoutPanel(); tblResMid.Dock = DockStyle.Top; tblResMid.AutoSize = true; tblResMid.ColumnCount = 2; tblResMid.RowCount = 1; tblResMid.BackColor = UI.Bg; tblResMid.Margin = new Padding(0, 0, 0, UI.S(12));
+        tblResMid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55)); tblResMid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
+        cardResFind = ResCard("Was zu tun ist", out pnlResFind); cardResFind.Margin = new Padding(0, 0, UI.S(6), 0);
+        lnkResAll = new LinkLabel(); lnkResAll.Text = "Alle Befunde im Bericht"; lnkResAll.AutoSize = true; lnkResAll.LinkColor = UI.Accent; lnkResAll.ActiveLinkColor = UI.AccentHover; lnkResAll.LinkBehavior = LinkBehavior.HoverUnderline; lnkResAll.Margin = new Padding(0, UI.S(8), 0, 0);
+        lnkResAll.LinkClicked += delegate { if (File.Exists(htmlPath)) OpenShell(htmlPath); };
+        Tip(lnkResAll, "Öffnet den Bericht mit allen Befunden, Messwerten und Erklärungen.");
+        cardResCmp = ResCard("Leistung im Vergleich", out pnlResCmp); cardResCmp.Margin = new Padding(UI.S(6), 0, 0, 0);
+        lblResRef = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblResRef.Margin = new Padding(0, 0, 0, UI.S(8));
+        tblResMid.Controls.Add(cardResFind, 0, 0); tblResMid.Controls.Add(cardResCmp, 1, 0);
+        main.Controls.Add(tblResMid);
 
-        TableLayoutPanel scoreLayout = new TableLayoutPanel();
-        scoreLayout.Dock = DockStyle.Top;
-        scoreLayout.AutoSize = true;
-        scoreLayout.ColumnCount = 1;
+        // 3. Komponenten: je ein Hauptwert mit Einordnung
+        pnlResTiles = new FlowLayoutPanel(); pnlResTiles.AutoSize = true; pnlResTiles.WrapContents = true; pnlResTiles.BackColor = UI.Bg; pnlResTiles.Margin = new Padding(0, 0, 0, UI.S(12));
+        main.Controls.Add(pnlResTiles);
 
-        lblDashScore = Lbl("0 Punkte", 24f, true, UI.Accent);
-        lblDashScore.Margin = new Padding(0, 0, 0, UI.S(6));
-        scoreLayout.Controls.Add(lblDashScore, 0, 0);
-
-        pnlDashPills = new FlowLayoutPanel();
-        pnlDashPills.Dock = DockStyle.Top;
-        pnlDashPills.AutoSize = true;
-        pnlDashPills.WrapContents = true;
-        pnlDashPills.BackColor = UI.Panel;
-        pnlDashPills.Margin = new Padding(0);
-        scoreLayout.Controls.Add(pnlDashPills, 0, 1);
-
-        scoreCard.Controls.Add(scoreLayout);
-        main.Controls.Add(scoreCard, 0, 2);
-
-        // 2x3 Kacheln Grid
-        TableLayoutPanel grid = new TableLayoutPanel();
-        grid.Dock = DockStyle.Top;
-        grid.AutoSize = true;
-        grid.ColumnCount = 3;
-        grid.RowCount = 2;
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33f));
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33f));
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.34f));
-        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        grid.Margin = new Padding(0, 0, 0, UI.S(12));
-
-        // 1. Prozessor
-        CardPanel cCpu = new CardPanel(); cCpu.Dock = DockStyle.Fill; cCpu.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12)); cCpu.MinimumSize = new Size(0, UI.S(132)); cCpu.Margin = new Padding(0, 0, UI.S(6), UI.S(8));
-        TableLayoutPanel tCpu = DashTileTable("Prozessor (CPU)", UI.IcoCpu);
-        lblDashCpuMT = DashVal(); lblDashCpuST = DashVal(); lblDashCpuAes = DashVal();
-        AddDashRow(tCpu, "Multi-Thread (MT):", lblDashCpuMT);
-        AddDashRow(tCpu, "Single-Thread (ST):", lblDashCpuST);
-        AddDashRow(tCpu, "AES Verschlüsselung:", lblDashCpuAes);
-        cCpu.Controls.Add(tCpu); grid.Controls.Add(cCpu, 0, 0);
-
-        // 2. Grafik
-        CardPanel cGpu = new CardPanel(); cGpu.Dock = DockStyle.Fill; cGpu.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12)); cGpu.MinimumSize = new Size(0, UI.S(132)); cGpu.Margin = new Padding(UI.S(3), 0, UI.S(3), UI.S(8));
-        TableLayoutPanel tGpu = DashTileTable("Grafik (GPU)", UI.IcoGpu);
-        lblDashGpuFps = DashVal(); lblDashGpuLow = DashVal(); lblDashGpuVmb = DashVal();
-        AddDashRow(tGpu, "3D-Rendertest (FPS):", lblDashGpuFps);
-        AddDashRow(tGpu, "1 %-Low Bildrate:", lblDashGpuLow);
-        AddDashRow(tGpu, "Videospeicher:", lblDashGpuVmb);
-        cGpu.Controls.Add(tGpu); grid.Controls.Add(cGpu, 1, 0);
-
-        // 3. Arbeitsspeicher
-        CardPanel cRam = new CardPanel(); cRam.Dock = DockStyle.Fill; cRam.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12)); cRam.MinimumSize = new Size(0, UI.S(132)); cRam.Margin = new Padding(UI.S(6), 0, 0, UI.S(8));
-        TableLayoutPanel tRam = DashTileTable("Arbeitsspeicher (RAM)", UI.IcoRam);
-        lblDashRamRead = DashVal(); lblDashRamWrite = DashVal(); lblDashRamLat = DashVal();
-        AddDashRow(tRam, "Lesen Durchsatz:", lblDashRamRead);
-        AddDashRow(tRam, "Schreiben Durchsatz:", lblDashRamWrite);
-        AddDashRow(tRam, "Zugriffslatenz:", lblDashRamLat);
-        cRam.Controls.Add(tRam); grid.Controls.Add(cRam, 2, 0);
-
-        // 4. Datenträger
-        CardPanel cDisk = new CardPanel(); cDisk.Dock = DockStyle.Fill; cDisk.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12)); cDisk.MinimumSize = new Size(0, UI.S(132)); cDisk.Margin = new Padding(0, 0, UI.S(6), 0);
-        TableLayoutPanel tDisk = DashTileTable("Datenträger", UI.IcoDisk);
-        lblDashDiskRead = DashVal(); lblDashDiskWrite = DashVal(); lblDashDiskIops = DashVal();
-        AddDashRow(tDisk, "Sequentiell Lesen:", lblDashDiskRead);
-        AddDashRow(tDisk, "Sequentiell Schreiben:", lblDashDiskWrite);
-        AddDashRow(tDisk, "4K Zufall (QD1):", lblDashDiskIops);
-        cDisk.Controls.Add(tDisk); grid.Controls.Add(cDisk, 0, 1);
-
-        // 5. Reaktionszeit
-        CardPanel cLat = new CardPanel(); cLat.Dock = DockStyle.Fill; cLat.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12)); cLat.MinimumSize = new Size(0, UI.S(132)); cLat.Margin = new Padding(UI.S(3), 0, UI.S(3), 0);
-        TableLayoutPanel tLat = DashTileTable("Reaktionszeit", UI.IcoSpeed);
-        lblDashDpc = DashVal(); lblDashTimer = DashVal(); lblDashOutlier = DashVal();
-        AddDashRow(tLat, "DPC/Interrupt:", lblDashDpc);
-        AddDashRow(tLat, "Timer / QPC:", lblDashTimer);
-        AddDashRow(tLat, "Ausreißer:", lblDashOutlier);
-        cLat.Controls.Add(tLat); grid.Controls.Add(cLat, 1, 1);
-
-        // 6. Zur Info
-        CardPanel cInfo = new CardPanel(); cInfo.Dock = DockStyle.Fill; cInfo.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12)); cInfo.MinimumSize = new Size(0, UI.S(132)); cInfo.Margin = new Padding(UI.S(6), 0, 0, 0);
-        TableLayoutPanel tInfo = DashTileTable("Zur Info & Status", UI.IcoInfo);
-        lblDashRebar = DashVal(); lblDashBefunde = DashVal(); lblDashNet = DashVal();
-        AddDashRow(tInfo, "Resizable BAR / SAM:", lblDashRebar);
-        AddDashRow(tInfo, "Befunde:", lblDashBefunde);
-        AddDashRow(tInfo, "Netzwerklatenz:", lblDashNet);
-        cInfo.Controls.Add(tInfo); grid.Controls.Add(cInfo, 2, 1);
-
-        main.Controls.Add(grid, 0, 3);
-
-        // Bottom Action Bar
-        FlowLayoutPanel actBar = new FlowLayoutPanel();
-        actBar.Dock = DockStyle.Top;
-        actBar.AutoSize = true;
-        actBar.WrapContents = false;
-        actBar.FlowDirection = FlowDirection.RightToLeft;
-        actBar.Margin = new Padding(0, UI.S(6), 0, UI.S(12));
-
-        btnDashOpenHtml = UI.Primary("HTML-Bericht im Browser öffnen");
-        btnDashOpenHtml.Click += delegate { OpenShell(htmlPath); };
-        Tip(btnDashOpenHtml, "Öffnet den vollständigen HTML-Bericht im Browser.");
-        actBar.Controls.Add(btnDashOpenHtml);
-
-        btnDashFolder = UI.Secondary("Berichtsordner");
-        btnDashFolder.Margin = new Padding(UI.S(8), 0, 0, 0);
-        btnDashFolder.Click += delegate { OpenShell(outDir); };
-        Tip(btnDashFolder, "Öffnet den Berichtsordner im Windows-Explorer.");
-        actBar.Controls.Add(btnDashFolder);
-
-        btnDashKi = UI.Secondary("KI-Datei");
-        btnDashKi.Margin = new Padding(UI.S(8), 0, 0, 0);
-        btnDashKi.Click += delegate { OpenSelect(kiPath); };
-        Tip(btnDashKi, "Öffnet die strukturierte KI-Datei im Explorer.");
-        actBar.Controls.Add(btnDashKi);
-
-        btnDashVerlauf = UI.Secondary("Verlauf");
-        btnDashVerlauf.Margin = new Padding(UI.S(8), 0, 0, 0);
-        btnDashVerlauf.Click += delegate { OpenDeviceHistory(); };
-        Tip(btnDashVerlauf, "Öffnet das interaktive Multi-System-Dashboard.");
-        actBar.Controls.Add(btnDashVerlauf);
-
-        btnDashBack = UI.Secondary("Zurück");
-        btnDashBack.Margin = new Padding(UI.S(8), 0, 0, 0);
+        // 4. Knöpfe: links zurück, rechts der Bericht als Hauptaktion
+        TableLayoutPanel act = new TableLayoutPanel(); act.Dock = DockStyle.Top; act.AutoSize = true; act.ColumnCount = 2; act.BackColor = UI.Bg; act.Margin = new Padding(0, UI.S(4), 0, UI.S(12));
+        act.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); act.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        btnDashBack = UI.Secondary("Zurück"); btnDashBack.Margin = new Padding(0);
         btnDashBack.Click += delegate {
-            resultDashboard.Visible = false;
-            runView.Visible = false;
-            contentHost.Visible = true;
-            foot.Visible = true;
+            resultDashboard.Visible = false; runView.Visible = false; contentHost.Visible = true; foot.Visible = true;
             for (int i = 0; i < nav.Count; i++) nav[i].Running = false;
         };
-        Tip(btnDashBack, "Kehrt zur Ablauf-Konfiguration zurück.");
-        actBar.Controls.Add(btnDashBack);
-
-        main.Controls.Add(actBar, 0, 4);
+        Tip(btnDashBack, "Kehrt zur Auswahl des Ablaufs zurück.");
+        act.Controls.Add(btnDashBack, 0, 0);
+        FlowLayoutPanel ar = new FlowLayoutPanel(); ar.AutoSize = true; ar.WrapContents = false; ar.FlowDirection = FlowDirection.RightToLeft; ar.BackColor = UI.Bg; ar.Margin = new Padding(0);
+        btnDashOpenHtml = UI.Primary("Bericht öffnen"); btnDashOpenHtml.Margin = new Padding(0);
+        btnDashOpenHtml.Click += delegate { OpenShell(htmlPath); };
+        Tip(btnDashOpenHtml, "Öffnet den vollständigen Bericht im Browser.");
+        btnDashVerlauf = UI.Secondary("Verlauf"); btnDashVerlauf.Margin = new Padding(0, 0, UI.S(8), 0);
+        btnDashVerlauf.Click += delegate { OpenDeviceHistory(); };
+        Tip(btnDashVerlauf, "Vergleicht diesen Lauf im Dashboard mit früheren Läufen desselben Geräts.");
+        btnDashFolder = UI.Secondary("Berichtsordner"); btnDashFolder.Margin = new Padding(0, 0, UI.S(8), 0);
+        btnDashFolder.Click += delegate { OpenShell(outDir); };
+        Tip(btnDashFolder, "Öffnet den Berichtsordner im Explorer.");
+        btnDashKi = UI.Secondary("KI-Datei"); btnDashKi.Margin = new Padding(0, 0, UI.S(8), 0);
+        btnDashKi.Click += delegate { OpenSelect(kiPath); };
+        Tip(btnDashKi, "Zeigt die Datei für die KI-Auswertung im Explorer.");
+        ar.Controls.Add(btnDashOpenHtml); ar.Controls.Add(btnDashVerlauf); ar.Controls.Add(btnDashFolder); ar.Controls.Add(btnDashKi);
+        act.Controls.Add(ar, 1, 0);
+        main.Controls.Add(act);
 
         p.Controls.Add(main);
+        p.Resize += delegate { LayoutResTiles(); };
+        main.SizeChanged += delegate { LayoutResTiles(); };
         return p;
     }
 
-    TableLayoutPanel DashTileTable(string title, string icon)
+    CardPanel ResCard(string title, out FlowLayoutPanel body)
     {
-        TableLayoutPanel t = new TableLayoutPanel();
-        t.Dock = DockStyle.Fill;
-        t.AutoSize = true;
-        t.ColumnCount = 2;
-        t.RowCount = 1;
-        t.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-        t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-
-        Label lh = Lbl(title, 10f, true, UI.Text);
-        lh.Margin = new Padding(0, 0, 0, UI.S(8));
-        t.Controls.Add(lh, 0, 0);
-        t.SetColumnSpan(lh, 2);
-        return t;
+        CardPanel c = new CardPanel(); c.Dock = DockStyle.Fill; c.AutoSize = true; c.Padding = new Padding(UI.S(18), UI.S(14), UI.S(18), UI.S(14));
+        FlowLayoutPanel f = new FlowLayoutPanel(); f.Dock = DockStyle.Top; f.AutoSize = true; f.FlowDirection = FlowDirection.TopDown; f.WrapContents = false; f.BackColor = UI.Panel;
+        Label lt = Lbl(title, UI.SchriftAbschnitt, true, UI.Text); lt.Margin = new Padding(0, 0, 0, UI.S(10)); f.Controls.Add(lt);
+        c.Controls.Add(f); body = f;
+        return c;
     }
 
-    void AddDashRow(TableLayoutPanel t, string label, Label valLabel)
+    // Kacheln gleich breit: vier nebeneinander, bei schmalem Fenster zwei
+    void LayoutResTiles()
     {
-        int row = t.RowCount++;
-        t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        Label l = Lbl(label, 8.5f, false, UI.Muted);
-        l.Margin = new Padding(0, UI.S(3), UI.S(6), UI.S(3));
-        l.AutoSize = true;
-        valLabel.Margin = new Padding(0, UI.S(3), 0, UI.S(3));
-        valLabel.AutoSize = true;
-        valLabel.Anchor = AnchorStyles.Right;
-        t.Controls.Add(l, 0, row);
-        t.Controls.Add(valLabel, 1, row);
+        if (pnlResTiles == null || resultDashboard == null) return;
+        Control mainT = pnlResTiles.Parent;
+        int avail = (mainT != null ? mainT.ClientSize.Width : resultDashboard.ClientSize.Width - resultDashboard.Padding.Horizontal) - UI.S(6);
+        int n = pnlResTiles.Controls.Count; if (n == 0 || avail < UI.S(200)) return;
+        int perRow = avail >= UI.S(900) ? Math.Min(4, n) : Math.Min(2, n);
+        int w = (avail - (perRow - 1) * UI.S(12)) / perRow;
+        for (int i = 0; i < n; i++)
+        {
+            Control c = pnlResTiles.Controls[i];
+            c.Width = w;
+            c.Margin = new Padding(0, 0, (i % perRow) == perRow - 1 ? 0 : UI.S(12), UI.S(12));
+        }
+        pnlResTiles.MaximumSize = new Size(avail + UI.S(4), 0);
+        int findW = (cardResCmp != null && cardResCmp.Visible ? avail * 55 / 100 : avail) - UI.S(150);
+        foreach (Control c in pnlResFind.Controls) if (c is FlowLayoutPanel) foreach (Control k in c.Controls) if (k is Label && !(k is LinkLabel)) k.MaximumSize = new Size(Math.Max(UI.S(200), findW), 0);
     }
 
-    Label DashVal()
+    static string RatingWord(double pct)
     {
-        Label l = Lbl("-", 8.75f, true, UI.Text);
-        l.AutoSize = true;
-        return l;
+        if (pct >= 115) return "Hervorragend"; if (pct >= 100) return "Sehr gut"; if (pct >= 85) return "Gut";
+        if (pct >= 70) return "Durchschnittlich"; if (pct >= 50) return "Mäßig"; return "Unterdurchschnittlich";
+    }
+    static string RatingLevel(double pct) { return pct >= 100 ? "ok" : pct >= 85 ? "info" : pct >= 70 ? "skip" : "warn"; }
+
+    // Prozent der Referenz aus der Gruppenzeile des Laufs ("112 %"), sonst NaN
+    double GroupRefPct(string g)
+    {
+        ListViewItem h;
+        if (!benchHeads.TryGetValue(g, out h) || h.SubItems.Count < 5) return double.NaN;
+        string s = h.SubItems[4].Text.Replace("%", "").Trim();
+        double v; return Double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.GetCultureInfo("de-DE"), out v) || Double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out v) ? v : double.NaN;
+    }
+
+    Control ResTile(string title, string icon, string main, string caption, string second, double pct)
+    {
+        CardPanel c = new CardPanel(); c.AutoSize = false; c.Height = UI.S(150); c.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12));
+        FlowLayoutPanel f = new FlowLayoutPanel(); f.Dock = DockStyle.Fill; f.FlowDirection = FlowDirection.TopDown; f.WrapContents = false; f.BackColor = UI.Panel;
+        FlowLayoutPanel head = new FlowLayoutPanel(); head.AutoSize = true; head.WrapContents = false; head.BackColor = UI.Panel; head.Margin = new Padding(0, 0, 0, UI.S(8));
+        Label li = new Label(); li.AutoSize = true; li.Text = icon; li.Font = UI.SymbolFont(10f); li.ForeColor = UI.Accent; li.Tag = "accent"; li.BackColor = Color.Transparent; li.Margin = new Padding(0, UI.S(2), UI.S(6), 0);
+        head.Controls.Add(li);
+        Label lt = Lbl(title, UI.SchriftText, true, UI.Muted); lt.Margin = new Padding(0); head.Controls.Add(lt);
+        f.Controls.Add(head);
+        Label lm = Lbl(main, 15f, true, UI.Text); lm.Margin = new Padding(0); f.Controls.Add(lm);
+        Label lc = Lbl(caption, UI.SchriftHinweis, false, UI.Muted); lc.Margin = new Padding(0, 0, 0, UI.S(8)); f.Controls.Add(lc);
+        if (!double.IsNaN(pct))
+        {
+            Badge b = new Badge(RatingWord(pct) + "  ·  " + pct.ToString("0") + " %", RatingLevel(pct)); b.Margin = new Padding(0, 0, 0, UI.S(6));
+            Tip(b, "Im Vergleich zur Referenz (100 %).");
+            f.Controls.Add(b);
+        }
+        if (!String.IsNullOrEmpty(second)) { Label ls = Lbl(second, UI.SchriftHinweis, false, UI.Muted); ls.Margin = new Padding(0); f.Controls.Add(ls); }
+        c.Controls.Add(f);
+        return c;
     }
 
     void PopulateResultDashboard()
@@ -3704,22 +3653,24 @@ e.Result = items;
         ReloadDb();
         DbEntry e = null;
         if (!String.IsNullOrEmpty(outDir))
-        {
-            foreach (DbEntry dbe in db)
-            {
-                if (dbe.Ordner == outDir || outDir.EndsWith(dbe.Ordner)) { e = dbe; break; }
-            }
-        }
-        if (e == null && db.Count > 0) e = db[0];
+            foreach (DbEntry dbe in db) { if (dbe.Ordner == outDir || outDir.EndsWith(dbe.Ordner)) { e = dbe; break; } }
+        System.Globalization.CultureInfo de = System.Globalization.CultureInfo.GetCultureInfo("de-DE");
 
-        lblDashMeta.Text = String.Format("{0}  ·  Lauf vom {1}  ·  Dauer {2}",
+        lblDashMeta.Text = String.Format("{0}  ·  {1}{2}",
             e != null ? e.DisplayName : Environment.MachineName,
-            e != null ? e.Datum : DateTime.Now.ToString("dd.MM.yyyy HH:mm"),
-            runStarted != DateTime.MinValue ? String.Format("{0:mm\\:ss} Min.", DateTime.Now - runStarted) : "");
+            e != null ? "Lauf vom " + e.Datum : DateTime.Now.ToString("dd.MM.yyyy HH:mm"),
+            runStarted != DateTime.MinValue ? String.Format("  ·  Dauer {0:mm\\:ss} Min.", DateTime.Now - runStarted) : "");
+
+        // Urteil aus den Befunden dieses Laufs
+        if (nK > 0) { lblResVerdict.Text = nK == 1 ? "1 kritischer Befund" : nK + " kritische Befunde"; lblResVerdict.ForeColor = UI.Crit; }
+        else if (nW > 0) { lblResVerdict.Text = nW == 1 ? "1 Warnung" : nW + " Warnungen"; lblResVerdict.ForeColor = UI.Warn; }
+        else { lblResVerdict.Text = "Keine Auffälligkeiten"; lblResVerdict.ForeColor = UI.Ok; }
+        lblResCounts.Text = String.Format("{0} kritisch  ·  {1} Warnungen  ·  {2} Hinweise", nK, nW, nI);
 
         int score = e != null ? (int)e.OverallScore : 0;
-        lblDashScore.Text = score > 0 ? String.Format(System.Globalization.CultureInfo.GetCultureInfo("de-DE"), "{0:N0} Punkte", score) : (testsOk > 0 ? String.Format("{0} Tests bestanden", testsOk) : "Abgeschlossen");
-        if (lblDashClass != null) lblDashClass.Text = "";
+        lblResScore.Text = score > 0 ? score.ToString("N0", de) : "";
+        lblResScoreSub.Text = score > 0 ? "Punkte gesamt" : "";
+        lblResScore.ForeColor = UI.Accent;
 
         pnlDashPills.Controls.Clear();
         if (e != null)
@@ -3730,42 +3681,81 @@ e.Result = items;
             if (!String.IsNullOrEmpty(e.Disk)) pnlDashPills.Controls.Add(new PillLabel(e.Disk));
         }
 
+        // Wichtigste Befunde: kritische zuerst, dann Warnungen, höchstens fünf
+        while (pnlResFind.Controls.Count > 1) pnlResFind.Controls.RemoveAt(1);
+        int shown = 0;
+        if (lvFind != null)
+            foreach (ListViewItem it in lvFind.Items)
+            {
+                string lev = it.SubItems[0].Text;
+                if (lev != "KRITISCH" && lev != "WARNUNG") continue;
+                if (shown >= 5) break;
+                FlowLayoutPanel r = new FlowLayoutPanel(); r.AutoSize = true; r.WrapContents = false; r.BackColor = UI.Panel; r.Margin = new Padding(0, 0, 0, UI.S(8));
+                Badge b = new Badge(lev == "KRITISCH" ? "Kritisch" : "Warnung", lev == "KRITISCH" ? "crit" : "warn"); b.Margin = new Padding(0, UI.S(1), UI.S(10), 0); b.Width = Math.Max(b.Width, UI.S(72));
+                Label lt = Lbl(it.SubItems.Count > 2 ? it.SubItems[2].Text : "", UI.SchriftHinweis, false, UI.Text); lt.Margin = new Padding(0, UI.S(2), 0, 0);
+                Tip(lt, (it.SubItems.Count > 1 ? it.SubItems[1].Text + ": " : "") + (it.SubItems.Count > 2 ? it.SubItems[2].Text : ""));
+                r.Controls.Add(b); r.Controls.Add(lt); pnlResFind.Controls.Add(r);
+                shown++;
+            }
+        if (shown == 0)
+        {
+            Label ok = Lbl(nI > 0 ? "Keine kritischen Befunde und keine Warnungen. " + (nI == 1 ? "1 Hinweis" : nI + " Hinweise") + " stehen im Bericht." : "Keine kritischen Befunde, keine Warnungen und keine Hinweise.", UI.SchriftText, false, UI.Text);
+            ok.MaximumSize = new Size(UI.S(440), 0); pnlResFind.Controls.Add(ok);
+        }
+        else if (nK + nW > shown)
+        {
+            Label more = Lbl(String.Format("und {0} weitere", nK + nW - shown), UI.SchriftHinweis, false, UI.Muted); more.Margin = new Padding(0, 0, 0, UI.S(2)); pnlResFind.Controls.Add(more);
+        }
+        lnkResAll.Visible = File.Exists(htmlPath);
+        pnlResFind.Controls.Add(lnkResAll);
+
+        // Vergleich mit der Referenz je Komponente (nur mit Benchmark in diesem Lauf)
+        while (pnlResCmp.Controls.Count > 1) pnlResCmp.Controls.RemoveAt(1);
+        lblResRef.Text = "100 % = " + (cmbRef != null && cmbRef.Text.Length > 0 ? cmbRef.Text : "Referenz");
+        pnlResCmp.Controls.Add(lblResRef);
+        int cmpRows = 0;
+        for (int g = 0; g < resGruppen.Length; g++)
+        {
+            double pct = GroupRefPct(resGruppen[g]);
+            if (double.IsNaN(pct)) continue;
+            TableLayoutPanel r = new TableLayoutPanel(); r.AutoSize = true; r.ColumnCount = 3; r.BackColor = UI.Panel; r.Margin = new Padding(0, 0, 0, UI.S(8));
+            r.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(120))); r.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(150))); r.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            Label ln = Lbl(resNamen[g], UI.SchriftText, false, UI.Text); ln.Margin = new Padding(0, UI.S(2), 0, 0);
+            PercentBar pb = new PercentBar(); pb.Percent = pct; pb.Size = new Size(UI.S(140), UI.S(10)); pb.Margin = new Padding(0, UI.S(7), UI.S(10), 0);
+            Tip(pb, "Strich = Referenz (100 %).");
+            Label lv = Lbl(pct.ToString("0") + " %  " + RatingWord(pct), UI.SchriftText, true, UI.Text); lv.Margin = new Padding(0, UI.S(2), 0, 0);
+            r.Controls.Add(ln, 0, 0); r.Controls.Add(pb, 1, 0); r.Controls.Add(lv, 2, 0);
+            pnlResCmp.Controls.Add(r); cmpRows++;
+        }
+        bool hasCmp = cmpRows > 0;
+        cardResCmp.Visible = hasCmp;
+        tblResMid.ColumnStyles[0].Width = hasCmp ? 55 : 100; tblResMid.ColumnStyles[1].Width = hasCmp ? 45 : 0;
+        cardResFind.Margin = new Padding(0, 0, hasCmp ? UI.S(6) : 0, 0);
+
+        // Komponenten: nur mit Messwerten
+        pnlResTiles.Controls.Clear();
         if (e != null)
         {
-            double mt = e.Get("CPU|MT"), st = e.Get("CPU|ST"), aes = e.Get("CPU|AES");
-            lblDashCpuMT.Text = mt > 0 ? String.Format("{0:N0} Punkte", mt) : "-";
-            lblDashCpuST.Text = st > 0 ? String.Format("{0:N0} Punkte", st) : "-";
-            lblDashCpuAes.Text = aes > 0 ? String.Format("{0:N0} MB/s", aes) : "-";
-
+            double mt = e.Get("CPU|MT"), st = e.Get("CPU|ST");
+            if (mt > 0) pnlResTiles.Controls.Add(ResTile("Prozessor", UI.IcoCpu, mt.ToString("N0", de), "Punkte, alle Kerne", st > 0 ? "Ein Kern: " + st.ToString("N0", de) + " Punkte" : "", GroupRefPct("CPU")));
             double rend = e.Get("GPU|REND"), rend1 = e.Get("GPU|REND1"), vmb = e.Get("GPU|VMB");
-            lblDashGpuFps.Text = rend > 0 ? String.Format("{0:N1} FPS", rend) : "-";
-            lblDashGpuLow.Text = rend1 > 0 ? String.Format("{0:N1} FPS", rend1) : "-";
-            lblDashGpuVmb.Text = vmb > 0 ? String.Format("{0:N1} GB/s", vmb) : "-";
-
-            double rL = e.Get("RAM|Lesen"), rW = e.Get("RAM|Schreiben"), rLat = e.Get("RAM|Latenz");
-            lblDashRamRead.Text = rL > 0 ? String.Format("{0:N1} GB/s", rL) : "-";
-            lblDashRamWrite.Text = rW > 0 ? String.Format("{0:N1} GB/s", rW) : "-";
-            lblDashRamLat.Text = rLat > 0 ? String.Format("{0:N1} ns", rLat) : "-";
-
-            double sr = 0, sw = 0, r1 = 0;
+            if (rend > 0) pnlResTiles.Controls.Add(ResTile("Grafik", UI.IcoGpu, rend.ToString("N1", de) + " FPS", "Bilder je Sekunde im Rendertest", rend1 > 0 ? "1 % der langsamsten Bilder: " + rend1.ToString("N1", de) + " FPS" : "", GroupRefPct("GPU")));
+            else if (vmb > 0) pnlResTiles.Controls.Add(ResTile("Grafik", UI.IcoGpu, vmb.ToString("N1", de) + " GB/s", "Speicherdurchsatz", "", GroupRefPct("GPU")));
+            double rL = e.Get("RAM|Lesen"), rLat = e.Get("RAM|Latenz");
+            if (rL > 0) pnlResTiles.Controls.Add(ResTile("Arbeitsspeicher", UI.IcoRam, rL.ToString("N1", de) + " GB/s", "Lesen", rLat > 0 ? "Latenz: " + rLat.ToString("N0", de) + " ns" : "", GroupRefPct("RAM")));
+            double sr = 0, r1 = 0;
             foreach (KeyValuePair<string, double> kv in e.Werte)
             {
                 if (kv.Key.StartsWith("DISK|") && kv.Key.EndsWith("|SR") && kv.Value > sr) sr = kv.Value;
-                if (kv.Key.StartsWith("DISK|") && kv.Key.EndsWith("|SW") && kv.Value > sw) sw = kv.Value;
                 if (kv.Key.StartsWith("DISK|") && kv.Key.EndsWith("|R1") && kv.Value > r1) r1 = kv.Value;
             }
-            lblDashDiskRead.Text = sr > 0 ? String.Format("{0:N0} MB/s", sr) : "-";
-            lblDashDiskWrite.Text = sw > 0 ? String.Format("{0:N0} MB/s", sw) : "-";
-            lblDashDiskIops.Text = r1 > 0 ? String.Format("{0:N0} IOPS", r1) : "-";
+            if (sr > 0) pnlResTiles.Controls.Add(ResTile("Laufwerk", UI.IcoDisk, sr.ToString("N0", de) + " MB/s", "Lesen am Stück, schnellstes Laufwerk", r1 > 0 ? "4K-Zufallszugriff: " + r1.ToString("N0", de) + " IOPS" : "", GroupRefPct("Laufwerke")));
         }
-
-        lblDashDpc.Text = "Unauffällig (< 500 µs)";
-        lblDashTimer.Text = "Präzise (< 0.1 %)";
-        lblDashOutlier.Text = "Keine Ausreißer";
-        lblDashRebar.Text = "aktiv";
-        lblDashBefunde.Text = String.Format("{0} kritisch / {1} Warnungen / {2} Hinweise", nK, nW, nI);
-        lblDashBefunde.ForeColor = nK > 0 ? UI.Crit : (nW > 0 ? UI.Warn : UI.Ok);
-        lblDashNet.Text = "LAN synchron / Ping OK";
+        pnlResTiles.Visible = pnlResTiles.Controls.Count > 0;
+        btnDashVerlauf.Visible = e != null;
+        btnDashKi.Visible = File.Exists(kiPath);
+        btnDashOpenHtml.Enabled = File.Exists(htmlPath);
+        LayoutResTiles();
     }
 
 }

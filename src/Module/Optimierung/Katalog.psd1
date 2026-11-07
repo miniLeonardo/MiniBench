@@ -23,9 +23,9 @@
         @{ Key = 'Apps';         Titel = 'Vorinstallierte Apps entfernen'; Kurztitel = 'Apps entfernen'; Symbol = 'IcoApp'; Text = 'Apps aus dem Microsoft Store, die Windows mitbringt. Zurück nur über den Store.' }
         @{ Key = 'Bedienung';    Titel = 'Explorer, Taskleiste und Start'; Kurztitel = 'Bedienung & Start'; Symbol = 'IcoFolder'; Text = 'Dateiendungen, Schnellzugriff, Taskleiste, Startmenü und Kontextmenüs.' }
         @{ Key = 'Darstellung';  Titel = 'Darstellung und persönliche Vorlieben'; Kurztitel = 'Darstellung'; Symbol = 'IcoSun'; Text = 'Geschmackssache: dunkler Modus, Taskleiste links, Laufwerksname und Ähnliches.' }
-        @{ Key = 'Leistung';     Titel = 'Leistung, Spiele und Energie'; Kurztitel = 'Leistung & Spiele'; Symbol = 'IcoFlame'; Text = 'Indizierung, Maus, Spiele-Prioritäten, Grafikplanung, Energieplan und Ruhezustand.' }
+        @{ Key = 'Leistung';     Titel = 'Leistung, Spiele und Energie'; Kurztitel = 'Leistung & Spiele'; Symbol = 'IcoSpeed'; Text = 'Indizierung, Maus, Spiele-Prioritäten, Grafikplanung, Energieplan und Ruhezustand.' }
         @{ Key = 'Update';       Titel = 'Windows Update, Edge und OneDrive'; Kurztitel = 'Update & Edge'; Symbol = 'IcoRefresh'; Text = 'Übermittlungsoptimierung, Neustartverhalten, Updates anderer Microsoft-Produkte, Edge im Hintergrund und OneDrive.' }
-        @{ Key = 'Sicherheit';   Titel = 'Sicherheit und Fernzugriff'; Kurztitel = 'Sicherheit'; Symbol = 'IcoShield'; Text = 'Netzwerkschutz, unerwünschte Apps, Remoteunterstützung, Remotedesktop und verschlüsseltes DNS.' }
+        @{ Key = 'Sicherheit';   Titel = 'Sicherheit und Fernzugriff'; Kurztitel = 'Sicherheit'; Symbol = 'IcoAdmin'; Text = 'Netzwerkschutz, unerwünschte Apps, Remoteunterstützung, Remotedesktop und verschlüsseltes DNS.' }
         @{ Key = 'Grafik';       Titel = 'Grafiktreiber'; Kurztitel = 'Grafiktreiber'; Symbol = 'IcoGpu'; Text = 'Grafiktreiber restlos entfernen (DDU) und NVIDIA-Profil setzen.' }
     )
     Eintraege   = @(

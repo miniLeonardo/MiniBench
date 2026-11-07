@@ -7,11 +7,19 @@ if (-not $EventMode -and -not $ImportOrdner -and -not $Vergleich -and -not $Ruec
         $hwPs = [powershell]::Create()
         [void]$hwPs.AddScript({
             $res = [ordered]@{ Disks = @(); Uuid = ''; Bv = ''; Bp = ''; Bs = ''; Bios = ''; Gpus = @(); Domain = $false; Cpu = ''; Cores = 0; Threads = 0; Ram = ''; Board = ''; IsLaptop = $false }
+            # ab v4.01 direkt über CIM statt Get-PhysicalDisk/Get-Partition: diese laden beim Start das Storage-Modul (Sekunden).
+            # BusType und MediaType kommen als Zahl; Namen wie bei Get-PhysicalDisk.
             try {
-                $res.Disks = @(foreach ($pd in @(Get-PhysicalDisk -ErrorAction Stop | Sort-Object { [int]$_.DeviceId })) {
+                $busNamen = @{ 0 = 'Unknown'; 1 = 'SCSI'; 2 = 'ATAPI'; 3 = 'ATA'; 4 = '1394'; 5 = 'SSA'; 6 = 'Fibre Channel'; 7 = 'USB'; 8 = 'RAID'; 9 = 'iSCSI'; 10 = 'SAS'; 11 = 'SATA'; 12 = 'SD'; 13 = 'MMC'; 14 = 'Virtual'; 15 = 'File Backed Virtual'; 16 = 'Storage Spaces'; 17 = 'NVMe' }
+                $medNamen = @{ 0 = 'Unspecified'; 3 = 'HDD'; 4 = 'SSD'; 5 = 'SCM' }
+                $ns = 'root/Microsoft/Windows/Storage'
+                $parts = @(Get-CimInstance -Namespace $ns -ClassName MSFT_Partition -ErrorAction SilentlyContinue)
+                $res.Disks = @(foreach ($pd in @(Get-CimInstance -Namespace $ns -ClassName MSFT_PhysicalDisk -ErrorAction Stop | Sort-Object { [int]$_.DeviceId })) {
                     $num = [int]$pd.DeviceId
-                    $letters = @(Get-Partition -DiskNumber $num -ErrorAction SilentlyContinue | Where-Object { $_.DriveLetter } | ForEach-Object { '{0}:' -f $_.DriveLetter } | Sort-Object) -join ', '
-                    [pscustomobject]@{ Num = $num; Name = ([string]$pd.FriendlyName).Trim(); Bus = [string]$pd.BusType; Medium = [string]$pd.MediaType; Size = [double]$pd.Size; Letters = $letters }
+                    $letters = @($parts | Where-Object { [int]$_.DiskNumber -eq $num -and $_.DriveLetter } | ForEach-Object { '{0}:' -f $_.DriveLetter } | Sort-Object) -join ', '
+                    $bus = $(if ($busNamen.ContainsKey([int]$pd.BusType)) { $busNamen[[int]$pd.BusType] } else { [string]$pd.BusType })
+                    $med = $(if ($medNamen.ContainsKey([int]$pd.MediaType)) { $medNamen[[int]$pd.MediaType] } else { [string]$pd.MediaType })
+                    [pscustomobject]@{ Num = $num; Name = ([string]$pd.FriendlyName).Trim(); Bus = $bus; Medium = $med; Size = [double]$pd.Size; Letters = $letters }
                 })
             } catch { }
             try { $res.Uuid = [string](Get-CimInstance Win32_ComputerSystemProduct -ErrorAction Stop).UUID } catch { }
@@ -72,21 +80,25 @@ if (-not $EventMode -and -not $ImportOrdner -and -not $Vergleich -and -not $Ruec
             Add-CachedType 'LeosMinibench-Oberflaeche' $guiCode $refs
             Write-StartPhase ('Oberfläche geladen ({0})' -f $(if ($script:CacheInfo.Count) { $script:CacheInfo[$script:CacheInfo.Count - 1] } else { 'ohne Cache' }))
         }
-        # Datenträger für die Auswahl im Benchmark und im Lasttest: Nummer|Name|Bus|Medium|Größe|Buchstaben|USB
-        $diskList = [System.Collections.Generic.List[string]]::new()
-        $hw = $null
-        if ($hwPs) { try { if ($hwHandle.AsyncWaitHandle.WaitOne(20000)) { $hw = @($hwPs.EndInvoke($hwHandle)) | Select-Object -First 1 } } catch { }; try { $hwPs.Dispose() } catch { } }
-        foreach ($d in @($(if ($hw) { $hw.Disks }))) {
-            $sz = [double]$d.Size
-            $szT = $(if ($sz -ge 1e12) { '{0:N1} TB' -f ($sz / 1e12) } elseif ($sz -ge 1e9) { '{0:N0} GB' -f ($sz / 1e9) } else { '{0:N0} MB' -f ($sz / 1e6) })
-            $diskList.Add(('{0}|{1}|{2}|{3}|{4}|{5}|{6}' -f $d.Num, (([string]$d.Name) -replace '\|', '/'), $d.Bus, $d.Medium, $szT, $d.Letters, $(if ([string]$d.Bus -eq 'USB') { '1' } else { '0' })))
-        }
+        # ab v4.01 vor dem Warten auf die Hardwareabfrage, damit beides gleichzeitig läuft.
         # Datenpflege (ab v2.7): Lasttests vor v2.67, unvollständige und kurze Läufe ins Archiv; frische Läufe (unter 60 Min.) bleiben
         try {
             $dp = Invoke-Datenpflege -DataDir $script:DataDir -MindestAlterMin 60
             if ($dp.Verschoben -or $dp.Fehler) { [DiagGui]::DatenpflegeInfo = ('Datenpflege beim Start: {0}. Protokoll: {1}' -f $dp.Kurz, (Join-Path $dp.Archiv 'Datenpflege.log')) }
             Write-StartPhase ('Datenpflege: {0}' -f $dp.Kurz)
         } catch { }
+        try { [DiagGui]::OptKatalog = [string[]](Get-OptGuiLines) } catch { }
+        Write-StartPhase 'Katalog der Optimierung gelesen'
+        # Datenträger für die Auswahl im Benchmark und im Lasttest: Nummer|Name|Bus|Medium|Größe|Buchstaben|USB
+        $diskList = [System.Collections.Generic.List[string]]::new()
+        $hw = $null
+        if ($hwPs) { try { if ($hwHandle.AsyncWaitHandle.WaitOne(20000)) { $hw = @($hwPs.EndInvoke($hwHandle)) | Select-Object -First 1 } } catch { }; try { $hwPs.Dispose() } catch { } }
+        Write-StartPhase 'Hardwareabfrage abgeschlossen'
+        foreach ($d in @($(if ($hw) { $hw.Disks }))) {
+            $sz = [double]$d.Size
+            $szT = $(if ($sz -ge 1e12) { '{0:N1} TB' -f ($sz / 1e12) } elseif ($sz -ge 1e9) { '{0:N0} GB' -f ($sz / 1e9) } else { '{0:N0} MB' -f ($sz / 1e6) })
+            $diskList.Add(('{0}|{1}|{2}|{3}|{4}|{5}|{6}' -f $d.Num, (([string]$d.Name) -replace '\|', '/'), $d.Bus, $d.Medium, $szT, $d.Letters, $(if ([string]$d.Bus -eq 'USB') { '1' } else { '0' })))
+        }
         if ($hw -and -not $script:DeviceIdentity) { try { $script:DeviceIdentity = ConvertTo-DeviceId -Uuid $hw.Uuid -BoardVendor $hw.Bv -BoardProduct $hw.Bp -BoardSerial $hw.Bs -BiosSerial $hw.Bios -ComputerName $env:COMPUTERNAME } catch { } }
         Write-StartPhase 'Datenträger und Geräteidentität gelesen'
         if ($script:DataDirFallback) { [void][Windows.Forms.MessageBox]::Show(('Der Ordner neben dem Programm ist nicht beschreibbar (USB-Stick schreibgeschützt?). Ersatzweise wird verwendet:' + "`r`n" + $script:DataDir), 'Leos Minibench', 'OK', 'Warning') }
@@ -94,7 +106,7 @@ if (-not $EventMode -and -not $ImportOrdner -and -not $Vergleich -and -not $Ruec
         New-Item -ItemType Directory -Path $script:CpDir -Force | Out-Null
         $devId = ''; try { $devId = [string](Get-DeviceIdentity).Id } catch { }
         try { [DiagGui]::GpuNames = [string[]]@($(if ($hw) { $hw.Gpus })) } catch { }
-        try { [DiagGui]::OptKatalog = [string[]](Get-OptGuiLines); [DiagGui]::DomainPc = [bool]($hw -and $hw.Domain) } catch { }
+        try { [DiagGui]::DomainPc = [bool]($hw -and $hw.Domain) } catch { }
         try {
             if ($hw) {
                 [DiagGui]::HwCpu = [string]$hw.Cpu

@@ -51,17 +51,10 @@ public partial class DiagGui : Form
 
     Panel setupView, runView, content, head, body, contentHost, mainArea, resultDashboard;
     TableLayoutPanel foot;
-    CheckBox chkSingleWindow;
     PillButton pillPresetMin, pillPresetLeo, pillPresetAdv, pillPresetReset;
     FlowLayoutPanel pnlPresetPills, pnlCustomPresets;
     Button btnDashBack, btnDashOpenHtml, btnDashFolder, btnDashKi, btnDashVerlauf;
-    Label lblDashScore, lblDashClass, lblDashTitle, lblDashMeta;
-    Label lblDashCpuMT, lblDashCpuST, lblDashCpuAes;
-    Label lblDashGpuFps, lblDashGpuLow, lblDashGpuVmb;
-    Label lblDashRamRead, lblDashRamWrite, lblDashRamLat;
-    Label lblDashDiskRead, lblDashDiskWrite, lblDashDiskIops;
-    Label lblDashDpc, lblDashTimer, lblDashOutlier;
-    Label lblDashRebar, lblDashBefunde, lblDashNet;
+    Label lblDashTitle, lblDashMeta;
     FlowLayoutPanel pnlDashPills;
 
     List<PillButton> optPresetPills = new List<PillButton>();
@@ -424,7 +417,10 @@ public partial class DiagGui : Form
         body = new Panel(); body.Dock = DockStyle.Fill; body.Padding = new Padding(UI.S(20), UI.S(16), UI.S(20), UI.S(14)); body.BackColor = UI.Bg;
         mainArea = new Panel(); mainArea.Dock = DockStyle.Fill; mainArea.BackColor = UI.Bg;
         LoadDb();
-        setupView = BuildSetup(); runView = BuildRun();
+        StartLog.Phase("Datenbank geladen");
+        setupView = BuildSetup();
+        StartLog.Phase("Seiten aufgebaut");
+        runView = BuildRun();
         resultDashboard = (Panel)BuildResultDashboard();
         FillPresets(true);
         if (LoadStartPagePreference()) ShowPage(0);
@@ -985,129 +981,131 @@ public partial class DiagGui : Form
         }
     }
 
+    // ab v4.01 im Aufbau der Seiten Wartung und Optimierung: Bereiche links, Inhalt als Karte rechts, Titelleiste im
+    // Farbschema. Übernommen wird beim Schließen.
     void ShowSettingsDialog()
     {
         using (Form dlg = new Form())
         {
             dlg.Text = "Einstellungen";
             dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
-            dlg.MaximizeBox = false;
-            dlg.MinimizeBox = false;
+            dlg.MaximizeBox = false; dlg.MinimizeBox = false; dlg.ShowInTaskbar = false;
             dlg.StartPosition = FormStartPosition.CenterParent;
-            dlg.ClientSize = new Size(UI.S(540), UI.S(560));
-            dlg.Font = new Font("Segoe UI", UI.SF(9.5f));
+            dlg.ClientSize = new Size(UI.S(780), Math.Min(UI.S(480), Screen.FromControl(this).WorkingArea.Height - UI.S(80)));
+            dlg.Font = new Font("Segoe UI", 9.5f);
 
-            Panel bodyPnl = new Panel();
-            bodyPnl.Dock = DockStyle.Fill;
-            bodyPnl.AutoScroll = true;
-            bodyPnl.Padding = new Padding(UI.S(24), UI.S(16), UI.S(24), UI.S(16));
+            TableLayoutPanel md = new TableLayoutPanel();
+            md.Dock = DockStyle.Fill; md.ColumnCount = 2; md.RowCount = 1; md.BackColor = Color.Transparent;
+            md.Padding = new Padding(UI.S(20), UI.S(20), UI.S(20), 0);
+            md.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(214)));
+            md.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            md.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-            FlowLayoutPanel flow = new FlowLayoutPanel();
-            flow.FlowDirection = FlowDirection.TopDown;
-            flow.WrapContents = false;
-            flow.AutoSize = true;
-            flow.Dock = DockStyle.Top;
-            flow.BackColor = Color.Transparent;
+            FlowLayoutPanel left = new FlowLayoutPanel(); left.Dock = DockStyle.Fill; left.FlowDirection = FlowDirection.TopDown; left.WrapContents = false; left.BackColor = Color.Transparent; left.Margin = new Padding(0);
+            CardPanel card = new CardPanel(); card.Dock = DockStyle.Fill; card.Padding = new Padding(UI.S(20), UI.S(16), UI.S(20), UI.S(16)); card.Margin = new Padding(UI.S(8), 0, 0, 0);
+            Panel host = new Panel(); host.Dock = DockStyle.Fill; host.AutoScroll = true; host.BackColor = UI.Panel;
+            card.Controls.Add(host);
+            md.Controls.Add(left, 0, 0); md.Controls.Add(card, 1, 0);
+
+            List<CategoryPickerItem> pickers = new List<CategoryPickerItem>();
+            List<Control> bereiche = new List<Control>();
+            // Bereich: Überschrift, Beschreibung, Inhalt untereinander
+            Func<string, string, string, FlowLayoutPanel> Bereich = delegate(string titel, string text, string icon)
+            {
+                FlowLayoutPanel b = new FlowLayoutPanel(); b.FlowDirection = FlowDirection.TopDown; b.WrapContents = false; b.AutoSize = true; b.BackColor = UI.Panel; b.Visible = false; b.Location = new Point(0, 0);
+                Label lt = Lbl(titel, UI.SchriftAbschnitt, true, UI.Text); lt.Margin = new Padding(0, 0, 0, UI.S(4)); b.Controls.Add(lt);
+                Label ld = Lbl(text, UI.SchriftHinweis, false, UI.Muted); ld.MaximumSize = new Size(UI.S(470), 0); ld.Margin = new Padding(0, 0, 0, UI.S(14)); b.Controls.Add(ld);
+                host.Controls.Add(b); bereiche.Add(b);
+                CategoryPickerItem pk = new CategoryPickerItem(titel, icon); pk.ShowCount = false; pk.Width = UI.S(206); pk.BackColor = UI.Bg;
+                int idx = pickers.Count;
+                pk.Picked += delegate { for (int i = 0; i < bereiche.Count; i++) { bereiche[i].Visible = (i == idx); pickers[i].Selected = (i == idx); } };
+                Tip(pk, text);
+                pickers.Add(pk); left.Controls.Add(pk);
+                return b;
+            };
 
             // 1. Darstellung
-            Label secTheme = Section("Darstellung");
-            secTheme.Margin = new Padding(0, 0, 0, UI.S(4));
-            flow.Controls.Add(secTheme);
+            FlowLayoutPanel bDar = Bereich("Darstellung", "Farbschema der Oberfläche. Der Knopf mit der Sonne oben rechts schaltet ebenfalls um.", UI.IcoSun);
+            FlowLayoutPanel rowTheme = new FlowLayoutPanel(); rowTheme.AutoSize = true; rowTheme.WrapContents = false; rowTheme.BackColor = UI.Panel; rowTheme.Margin = new Padding(0);
+            RadioButton rbDark = new RadioButton(); rbDark.Text = "Dunkel"; rbDark.Checked = UI.IsDark;
+            RadioButton rbLight = new RadioButton(); rbLight.Text = "Hell"; rbLight.Checked = !UI.IsDark;
+            foreach (RadioButton rb in new RadioButton[] { rbDark, rbLight })
+            {
+                rb.AutoSize = false; rb.Size = new Size(UI.S(110), UI.S(32)); rb.Margin = new Padding(0, 0, UI.S(6), 0);
+                StyleSegment(rb);
+                RadioButton r2 = rb; rb.CheckedChanged += delegate { StyleSegment(r2); };
+                rowTheme.Controls.Add(rb);
+            }
+            Tip(rbDark, "Dunkles Farbschema."); Tip(rbLight, "Helles Farbschema.");
+            bDar.Controls.Add(rowTheme);
 
-            FlowLayoutPanel rowTheme = Row();
-            RadioButton rbDark = new RadioButton(); rbDark.Text = "Dunkel"; rbDark.AutoSize = true; rbDark.Checked = UI.IsDark; rbDark.ForeColor = UI.Text;
-            RadioButton rbLight = new RadioButton(); rbLight.Text = "Hell"; rbLight.AutoSize = true; rbLight.Checked = !UI.IsDark; rbLight.ForeColor = UI.Text;
-            rbDark.Margin = new Padding(0, 0, UI.S(16), 0);
-            rowTheme.Controls.Add(rbDark); rowTheme.Controls.Add(rbLight);
-            flow.Controls.Add(rowTheme);
-
-            // 2. Startverhalten
-            Label secStart = Section("Startverhalten");
-            flow.Controls.Add(secStart);
+            // 2. Start
+            FlowLayoutPanel bStart = Bereich("Start", "Was beim Öffnen von Leos Minibench zuerst erscheint.", UI.IcoHome);
             CheckBox chkShowStart = Chk("Beim Programmstart die Startseite anzeigen", LoadStartPagePreference());
-            flow.Controls.Add(chkShowStart);
+            Tip(chkShowStart, "Aus: Leos Minibench öffnet direkt die Seite Diagnose.");
+            bStart.Controls.Add(chkShowStart);
 
-            // 3. Ergebnisanzeige
-            Label secResults = Section("Ergebnisanzeige");
-            flow.Controls.Add(secResults);
-            CheckBox chkRes1Window = Chk("Ergebnisse direkt im Programmfenster anzeigen (1-Fenstermodus)", chkSingleWindow != null && chkSingleWindow.Checked);
-            flow.Controls.Add(chkRes1Window);
+            // 3. Datenschutz
+            FlowLayoutPanel bPriv = Bereich("Datenschutz", "Gilt für die Datei zur KI-Auswertung, die jeder Lauf neben dem Bericht anlegt.", UI.IcoShield);
+            CheckBox chkPrivAnon = Chk("Personenbezogene Daten für die KI-Auswertung entfernen", chkAnon != null && chkAnon.Checked);
+            Tip(chkPrivAnon, "Ersetzt Benutzernamen, Computernamen, Seriennummern und Domäne durch neutrale Platzhalter.");
+            bPriv.Controls.Add(chkPrivAnon);
 
-            // 4. Datenschutz
-            Label secPrivacy = Section("Datenschutz");
-            flow.Controls.Add(secPrivacy);
-            CheckBox chkPrivAnon = Chk("Personenbezogene Daten fÃ¼r KI-Auswertung entfernen", chkAnon != null && chkAnon.Checked);
-            flow.Controls.Add(chkPrivAnon);
-
-            // 5. Speicherorte & Daten
-            Label secData = Section("Speicherorte und Daten");
-            flow.Controls.Add(secData);
-            Label lblDataDir = Hint("Datenordner: " + (dataDir.Length > 0 ? dataDir : "Nicht verfÃ¼gbar"), 0);
-            flow.Controls.Add(lblDataDir);
-
-            FlowLayoutPanel rowDataBtns = Row();
-            rowDataBtns.Margin = new Padding(0, UI.S(6), 0, 0);
-            Button btnOpenData = UI.Secondary("Datenordner Ã¶ffnen");
+            // 4. Daten
+            FlowLayoutPanel bDaten = Bereich("Daten", "Berichte, Datenbank, Werkzeuge und Vorlagen liegen im Datenordner. Ein Netzlaufwerk dient als Spiegel und wird über Aktualisieren in der Datenbank abgeglichen.", UI.IcoFolder);
+            Label lblDataDir = Lbl(NasAblage.AblageText(dataDir), UI.SchriftHinweis, false, UI.Text); lblDataDir.MaximumSize = new Size(UI.S(470), 0); lblDataDir.Margin = new Padding(0, 0, 0, UI.S(10));
+            bDaten.Controls.Add(lblDataDir);
+            FlowLayoutPanel rowDataBtns = new FlowLayoutPanel(); rowDataBtns.AutoSize = true; rowDataBtns.WrapContents = false; rowDataBtns.BackColor = UI.Panel; rowDataBtns.Margin = new Padding(0);
+            Button btnOpenData = UI.Secondary("Datenordner öffnen"); btnOpenData.Margin = new Padding(0, 0, UI.S(8), 0);
             btnOpenData.Click += delegate { if (dataDir.Length > 0) OpenShell(dataDir); };
-            Button btnNasDlg = UI.Secondary("Netzlaufwerk ...");
-            btnNasDlg.Margin = new Padding(UI.S(8), 0, 0, 0);
-            btnNasDlg.Click += delegate { ShowConnectNasDialog(); };
-            Button btnCleanDlg = UI.Secondary("Datenbereinigung ...");
-            btnCleanDlg.Margin = new Padding(UI.S(8), 0, 0, 0);
-            btnCleanDlg.Click += delegate { CleanData(); };
-            rowDataBtns.Controls.Add(btnOpenData); rowDataBtns.Controls.Add(btnNasDlg); rowDataBtns.Controls.Add(btnCleanDlg);
-            flow.Controls.Add(rowDataBtns);
+            Button btnNasDlg = UI.Secondary("Netzlaufwerk einrichten …"); btnNasDlg.Margin = new Padding(0);
+            btnNasDlg.Click += delegate { ShowConnectNasDialog(); SetText(lblDataDir, NasAblage.AblageText(dataDir)); };
+            Tip(btnOpenData, "Öffnet den Datenordner im Explorer."); Tip(btnNasDlg, "Netzlaufwerk als Spiegel der Daten einrichten oder ändern.");
+            rowDataBtns.Controls.Add(btnOpenData); rowDataBtns.Controls.Add(btnNasDlg);
+            bDaten.Controls.Add(rowDataBtns);
 
-            // 6. Updates
-            Label secUpdates = Section("Updates");
-            flow.Controls.Add(secUpdates);
+            // 5. Updates
+            FlowLayoutPanel bUpd = Bereich("Updates", "Leos Minibench fragt höchstens einmal am Tag bei GitHub nach einer neuen Version. Heruntergeladen wird nur auf Nachfrage.", UI.IcoRefresh);
             CheckBox chkAutoUpd = Chk("Automatisch nach Updates suchen", LoadUpdateCheckPreference());
-            flow.Controls.Add(chkAutoUpd);
-            FlowLayoutPanel rowUpdBtn = Row();
-            rowUpdBtn.Margin = new Padding(0, UI.S(6), 0, 0);
-            Button btnCheckUpd = UI.Secondary("Jetzt nach Updates suchen");
-            btnCheckUpd.Click += delegate {
-                StartUpdateCheck();
-                UI.Hinweis("Die Update-PrÃ¼fung wurde gestartet.", "Updates", dlg);
-            };
-            rowUpdBtn.Controls.Add(btnCheckUpd);
-            flow.Controls.Add(rowUpdBtn);
+            Tip(chkAutoUpd, "Prüft beim Start im Hintergrund, ob eine neuere Version vorliegt.");
+            bUpd.Controls.Add(chkAutoUpd);
+            Label lblUpd = Lbl("Installiert: " + this.version + (HasUpdateAvailable ? "   ·   verfügbar: " + AvailableUpdateVersion : ""), UI.SchriftHinweis, false, UI.Muted); lblUpd.Margin = new Padding(UI.S(4), UI.S(6), 0, UI.S(10));
+            bUpd.Controls.Add(lblUpd);
+            Button btnCheckUpd = UI.Secondary("Jetzt nach Updates suchen"); btnCheckUpd.Margin = new Padding(0);
+            btnCheckUpd.Click += delegate { StartUpdateCheck(); SetText(lblUpd, "Installiert: " + this.version + "   ·   Prüfung läuft im Hintergrund, das Ergebnis erscheint oben in der Kopfzeile."); };
+            Tip(btnCheckUpd, "Fragt sofort bei GitHub nach einer neueren Version.");
+            bUpd.Controls.Add(btnCheckUpd);
 
-            // 7. Ãœber
-            Label secAbout = Section("Ãœber Leos Minibench");
-            flow.Controls.Add(secAbout);
-            Label lblAboutVer = Lbl("Leos Minibench v" + this.version + " \"AufgerÃ¤umt\"", 9.5f, true, UI.Text);
-            Label lblAboutThanks = Hint("Danksagungen & Komponenten:\r\nSophia Script (Dmitry Nefedov), O&O ShutUp10++, Windows Optimisation Pack,\r\nsmartmontools, LibreHardwareMonitor, PawnIO.", 0);
-            flow.Controls.Add(lblAboutVer);
-            flow.Controls.Add(lblAboutThanks);
+            // 6. Über
+            FlowLayoutPanel bUeber = Bereich("Über Leos Minibench", "Version " + this.version + ". Diagnose, Benchmark, Lasttest, Wartung und Optimierung für Windows.", UI.IcoInfo);
+            Label lblThanks = Lbl("Danksagungen: Windows Optimisation Pack (Marvin700), Sophia Script (Dmitry Nefedov), O&O ShutUp10++, smartmontools, LibreHardwareMonitor, PawnIO.", UI.SchriftHinweis, false, UI.Text);
+            lblThanks.MaximumSize = new Size(UI.S(470), 0); lblThanks.Margin = new Padding(0, 0, 0, UI.S(12));
+            bUeber.Controls.Add(lblThanks);
+            Button btnHist = UI.Secondary("Versionshistorie"); btnHist.Margin = new Padding(0);
+            btnHist.Click += delegate { dlg.Close(); if (!running && versionPage >= 0) ShowPage(versionPage); };
+            Tip(btnHist, "Schließt die Einstellungen und zeigt, was sich in jeder Version geändert hat.");
+            bUeber.Controls.Add(btnHist);
 
-            bodyPnl.Controls.Add(flow);
-
-            Panel bottomBar = new Panel();
-            bottomBar.Dock = DockStyle.Bottom;
-            bottomBar.Height = UI.S(54);
-            bottomBar.BackColor = UI.Panel;
-
-            Button btnOk = UI.Primary("SchlieÃŸen");
-            btnOk.DialogResult = DialogResult.OK;
-            btnOk.Location = new Point(dlg.ClientSize.Width - btnOk.Width - UI.S(24), UI.S(10));
+            FlowLayoutPanel bottomBar = new FlowLayoutPanel();
+            bottomBar.Dock = DockStyle.Bottom; bottomBar.FlowDirection = FlowDirection.RightToLeft; bottomBar.WrapContents = false;
+            bottomBar.Height = UI.S(64); bottomBar.Padding = new Padding(0, UI.S(14), UI.S(20), UI.S(12)); bottomBar.BackColor = Color.Transparent;
+            Button btnOk = UI.Primary("Schließen"); btnOk.DialogResult = DialogResult.OK; btnOk.Margin = new Padding(0);
+            Tip(btnOk, "Übernimmt die Einstellungen und schließt das Fenster.");
             bottomBar.Controls.Add(btnOk);
 
-            dlg.Controls.Add(bodyPnl);
+            dlg.Controls.Add(md);
             dlg.Controls.Add(bottomBar);
-            dlg.AcceptButton = btnOk;
-
+            dlg.AcceptButton = btnOk; dlg.CancelButton = btnOk;
             UI.ThemeDialog(dlg);
+            foreach (CategoryPickerItem pk in pickers) pk.BackColor = UI.Bg;
+            StyleSegment(rbDark); StyleSegment(rbLight);
+            bereiche[0].Visible = true; pickers[0].Selected = true;
 
             dlg.ShowDialog(this);
 
-            if (rbDark.Checked != UI.IsDark)
-            {
-                ToggleTheme();
-            }
+            if (rbDark.Checked != UI.IsDark) ToggleTheme();
             SaveStartPagePreference(chkShowStart.Checked);
             SaveUpdateCheckPreference(chkAutoUpd.Checked);
-            if (chkSingleWindow != null) chkSingleWindow.Checked = chkRes1Window.Checked;
             if (chkAnon != null) chkAnon.Checked = chkPrivAnon.Checked;
         }
     }
@@ -1188,15 +1186,6 @@ public partial class DiagGui : Form
             else FillPresets(false);
             e.Handled = true;
         }
-        else if (e.Control && e.KeyCode == Keys.F)
-        {
-            if (curPage == 9 && txtDbFilter != null)
-            {
-                txtDbFilter.Focus();
-                txtDbFilter.SelectAll();
-                e.Handled = true;
-            }
-        }
         else if (e.Control && e.KeyCode == Keys.Enter)
         {
             if (btnStart != null && btnStart.Enabled && btnStart.Visible)
@@ -1233,6 +1222,7 @@ public partial class DiagGui : Form
             ApplyDiagProfile();
             // ab v3.64: Warnfelder und gedämpfte Beschriftungen tragen eigene Farben
             foreach (Label w in new Label[] { lblAkku, lblRestoreWarn }) if (w != null) { w.ForeColor = UI.Warn; w.BackColor = UI.WarnBg; }
+            foreach (Panel b in modBanners) if (b != null) { b.BackColor = UI.InfoBg; foreach (Control k in b.Controls) { if (k is LinkLabel) ((LinkLabel)k).LinkColor = UI.Accent; else k.ForeColor = UI.Text; } }
             UpdateLoadEnabled(); ThemeLog();
             if (barAll != null && !done) barAll.Fill = UI.Accent;
             if (barSub != null) barSub.Fill = UI.AccentActive;
@@ -1266,7 +1256,7 @@ public partial class DiagGui : Form
             c.BackColor = UI.Bg;
             c.Invalidate();
         }
-        else if (c is FluentCard || c is StartTaskCard)
+        else if (c is FluentCard || c is StartTaskCard || c is SettingRow || c is CategoryPickerItem)
         {
             c.BackColor = UI.Panel;
             c.Invalidate();
@@ -1565,20 +1555,26 @@ public partial class DiagGui : Form
         foot.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); foot.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         foot.RowStyles.Add(new RowStyle(SizeType.AutoSize)); foot.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         lblSel = Lbl("", 10f, true, UI.Text); lblSel.Margin = new Padding(0, 0, 0, UI.S(6)); lblSel.AutoEllipsis = true;
-        FlowLayoutPanel fo = new FlowLayoutPanel(); fo.AutoSize = true; fo.WrapContents = false; fo.BackColor = UI.Bg; fo.Margin = new Padding(0);
-        Label lp = Lbl("Voreinstellung", UI.SchriftHinweis, false, UI.Muted); lp.Margin = new Padding(0, UI.S(6), UI.S(6), 0); fo.Controls.Add(lp);
+        fo = new FlowLayoutPanel(); fo.AutoSize = true; fo.WrapContents = false; fo.BackColor = UI.Bg; fo.Margin = new Padding(0);
+        Label lp = Lbl("Ablauf", UI.SchriftHinweis, false, UI.Muted); lp.Margin = new Padding(0, UI.S(6), UI.S(6), 0); fo.Controls.Add(lp);
 
         pnlPresetPills = new FlowLayoutPanel(); pnlPresetPills.AutoSize = true; pnlPresetPills.WrapContents = false; pnlPresetPills.BackColor = UI.Bg; pnlPresetPills.Margin = new Padding(0, UI.S(2), UI.S(2), 0);
-        pillPresetMin = new PillButton("Minimal", true);
-        pillPresetLeo = new PillButton("Leos Empfehlung", false);
-        pillPresetAdv = new PillButton("Erweitert", false);
-        pillPresetReset = new PillButton("Auswahl aufheben", false);
+        // ab v4.01 eigene Namen: dieselben Begriffe stehen auf der Seite Optimierung nur für deren Einstellungen.
+        // Beim Start ist noch kein Ablauf gewählt, deshalb ist keine Pille hervorgehoben.
+        pillPresetMin = new PillButton("Schnellcheck", false);
+        pillPresetLeo = new PillButton("Standard", false);
+        pillPresetAdv = new PillButton("Komplett", false);
+        pillPresetReset = new PillButton("Alles abwählen", false);
 
         pillPresetMin.Picked += delegate { ApplyGlobalPreset("M"); };
         pillPresetLeo.Picked += delegate { ApplyGlobalPreset("S"); };
         pillPresetAdv.Picked += delegate { ApplyGlobalPreset("E"); };
         pillPresetReset.Picked += delegate { ApplyGlobalPreset(""); };
 
+        Tip(pillPresetMin, "Diagnose (Profil Schnell) und Benchmark. Optimierung mit der Vorlage Minimal, Modul aber nicht angehakt.");
+        Tip(pillPresetLeo, "Diagnose (Vollständig), Benchmark, Wartung mit der üblichen Auswahl und Optimierung mit Leos Empfehlung.");
+        Tip(pillPresetAdv, "Alle fünf Module: Diagnose (Vollständig), Benchmark, Lasttest, alle Wartungsaufgaben und Optimierung Erweitert.");
+        Tip(pillPresetReset, "Nimmt alle Module aus dem Ablauf und hebt die Auswahl in Wartung und Optimierung auf.");
         pnlPresetPills.Controls.Add(pillPresetMin);
         pnlPresetPills.Controls.Add(pillPresetLeo);
         pnlPresetPills.Controls.Add(pillPresetAdv);
@@ -1588,8 +1584,9 @@ public partial class DiagGui : Form
         pnlCustomPresets = new FlowLayoutPanel(); pnlCustomPresets.AutoSize = true; pnlCustomPresets.WrapContents = false; pnlCustomPresets.BackColor = UI.Bg; pnlCustomPresets.Margin = new Padding(0, UI.S(2), UI.S(2), 0);
         fo.Controls.Add(pnlCustomPresets);
 
-        btnPresetSave = UI.Secondary("Speichern \u2026"); btnPresetSave.Margin = new Padding(0, UI.S(1), UI.S(6), 0); fo.Controls.Add(btnPresetSave);
-        btnPresetSave.Click += delegate { SavePresetDialog(); };
+        // ab v4.0 als Pille wie die Vorlagen daneben (vorher ein eckiger Knopf in anderem Stil)
+        btnPresetSave = new PillButton("Als Vorlage speichern \u2026", false); btnPresetSave.Margin = new Padding(UI.S(4), UI.S(2), UI.S(6), 0); fo.Controls.Add(btnPresetSave);
+        btnPresetSave.Picked += delegate { SavePresetDialog(); };
 
         cmbPreset = new ComboBox(); cmbPreset.Visible = false;
         btnPresetDel = new Button(); btnPresetDel.Visible = false;
@@ -1597,13 +1594,9 @@ public partial class DiagGui : Form
         lnkAblage = new LinkLabel(); lnkAblage.AutoSize = true; lnkAblage.Font = new Font("Segoe UI", UI.SchriftHinweis); lnkAblage.LinkColor = UI.Accent; lnkAblage.ActiveLinkColor = UI.AccentHover;
         lnkAblage.Text = AblageKurz(this.dataDir); lnkAblage.Margin = new Padding(0, UI.S(7), UI.S(UI.Abstand4), 0); lnkAblage.AutoEllipsis = true; lnkAblage.LinkBehavior = LinkBehavior.HoverUnderline;
         lnkAblage.LinkClicked += delegate { if (this.dataDir.Length > 0) { try { Directory.CreateDirectory(this.dataDir); } catch { } OpenShell(this.dataDir); } };
-        fo.Controls.Add(lnkAblage);
 
         chkAnon = Chk("Personenbezogene Daten entfernen", true); chkAnon.Margin = new Padding(0, UI.S(5), UI.S(6), 0);
-        fo.Controls.Add(chkAnon);
 
-        chkSingleWindow = Chk("1-Fenstermodus", false); chkSingleWindow.Margin = new Padding(0, UI.S(5), 0, 0);
-        fo.Controls.Add(chkSingleWindow);
 
         btnStart = UI.Primary("Ablauf wählen"); btnStart.Enabled = false; btnStart.Margin = new Padding(UI.S(UI.Abstand5), 0, 0, 0); btnStart.MinimumSize = new Size(UI.S(150), UI.S(44)); btnStart.Anchor = AnchorStyles.Right;
         Tip(btnStart, "Erst eine Aufgabe wählen oder links ein Modul anhaken.");
@@ -1614,11 +1607,6 @@ public partial class DiagGui : Form
             int avail = foot.ClientSize.Width - btnStart.Width - btnStart.Margin.Horizontal - UI.S(8);
             if (avail <= UI.S(80)) return;
             lblSel.MaximumSize = new Size(avail, UI.S(24));
-            int rest = avail - lp.Width - lp.Margin.Horizontal - pnlPresetPills.Width - pnlPresetPills.Margin.Horizontal - pnlCustomPresets.Width - btnPresetSave.Width - btnPresetSave.Margin.Horizontal - chkSingleWindow.Width - chkSingleWindow.Margin.Horizontal;
-            int anonW = TextRenderer.MeasureText(chkAnon.Text, chkAnon.Font).Width + UI.S(24);
-            int ablW = Math.Max(UI.S(60), Math.Min(TextRenderer.MeasureText(lnkAblage.Text, lnkAblage.Font).Width + UI.S(4), rest - anonW - lnkAblage.Margin.Horizontal));
-            lnkAblage.AutoSize = false; lnkAblage.Size = new Size(ablW, UI.S(20));
-            chkAnon.AutoSize = false; chkAnon.Size = new Size(Math.Max(UI.S(60), Math.Min(anonW, rest - ablW - lnkAblage.Margin.Horizontal)), UI.S(22)); chkAnon.AutoEllipsis = true;
         };
         foot.Resize += delegate { footLayout(); };
         btnStart.SizeChanged += delegate { footLayout(); };
@@ -1714,9 +1702,9 @@ public partial class DiagGui : Form
         // Vergleichsdatenbank, Änderungen, Fuß
         Tip(btnCompare, "Vergleicht die angehakten Systeme in einem HTML-Bericht (mindestens zwei).");
         Tip(btnDelete, "Entfernt die angehakten Einträge aus der Datenbank. Die Berichtsordner bleiben erhalten.");
-        Tip(btnDbClean, "Datenpflege: verschiebt Lasttests vor v2.67 (andere Last, nicht vergleichbar), abgebrochene Läufe ohne Bericht und kurze Läufe (Funktionstest, Lasttest nach wenigen Sekunden beendet, Lauf ohne Messwert) sowie ungenutzte Teile von smartmontools nach Minibench-Daten\\Archiv. Gelöscht werden nur ältere Übersetzungen im Cache und Reste der Live-Ansicht; das Protokoll steht in Archiv\\Datenpflege.log.");
+        Tip(btnDbClean, "Datenpflege: verschiebt nicht mehr vergleichbare Lasttests älterer Versionen, abgebrochene Läufe ohne Bericht und kurze Läufe (Funktionstest, Lasttest nach wenigen Sekunden beendet, Lauf ohne Messwert) sowie ungenutzte Teile von smartmontools nach Minibench-Daten\\Archiv. Gelöscht werden nur ältere Übersetzungen im Cache und Reste der Live-Ansicht; das Protokoll steht in Archiv\\Datenpflege.log.");
         Tip(btnUndo, "Nimmt die angehakten Änderungen zurück (nur Stufe Ändern und nur auf dem PC, auf dem sie entstanden sind).");
-        Tip(lnkAblage, "Öffnet den Datenordner mit Berichten, Datenbank, Werkzeugen und Voreinstellungen: " + (dataDir.Length > 0 ? dataDir : "kein Datenordner"));
+        Tip(lnkAblage, "Öffnet den Datenordner mit Berichten, Datenbank, Werkzeugen und Vorlagen: " + (dataDir.Length > 0 ? dataDir : "kein Datenordner"));
         Tip(chkAnon, "Ersetzt Benutzernamen, Computernamen, Seriennummern und Domäne in Berichten und Exportdateien durch neutrale Platzhalter.");
         // Optimierung
         Tip(chkOptRestore, "Legt vor der Optimierung einen Systemwiederherstellungspunkt an. Er ist der Weg zurück für Eingriffe wie entfernte Apps und Zusatzfeatures.");
@@ -1725,7 +1713,6 @@ public partial class DiagGui : Form
         Tip(btnOptAll, "Alle Kategorien auf- oder zuklappen.");
         if (btnRepAll == null) btnRepAll = UI.Secondary("");
         Tip(btnRepAll, "Alle Gruppen auf- oder zuklappen.");
-        Tip(chkSingleWindow, "Ergebnisse im 1-Fenstermodus als natives Dashboard im Programmfenster anzeigen.");
         Tip(lnkOptAll, "Alle Optionen dieser Kategorie aktivieren.");
         Tip(lnkOptNone, "Alle Optionen dieser Kategorie deaktivieren.");
         Tip(lnkRepAll, "Alle Maßnahmen dieser Gruppe aktivieren.");
@@ -1734,7 +1721,7 @@ public partial class DiagGui : Form
         foreach (OptItem it in optItems) Tip(it.Box, OptTipText(it));
         Tip(cmbPreset, "Gespeicherte Auswahl aller Seiten laden (Voreinstellungen.json im Datenordner, weitergebbar).");
         Tip(btnPresetSave, "Aktuelle Auswahl aller Seiten unter einem Namen speichern.");
-        Tip(btnPresetDel, "Gewählte Voreinstellung löschen.");
+        Tip(btnPresetDel, "Gewählte Vorlage löschen.");
     }
 
     void ApplyRunTips()
@@ -1760,6 +1747,8 @@ public partial class DiagGui : Form
         for (int k = 0; k < nav.Count; k++) nav[k].Selected = (k == i);
         content.AutoScrollPosition = new Point(0, 0);
         for (int k = 0; k < pages.Count; k++) pages[k].Visible = (k == i);
+        // ab v4.0: Auf Werkzeugseiten (Tools bis Versionen) nur Ablaufzeile und Startknopf, ohne Vorlagen
+        if (fo != null && foot != null) { bool modulSeite = i <= 5; if (fo.Visible != modulSeite) { fo.Visible = modulSeite; foot.Height = UI.S(modulSeite ? 76 : 62); } }
         if (i == 3) UpdateLoadExtras();
         ApplyNativeControlThemes();
     }
@@ -1780,26 +1769,31 @@ public partial class DiagGui : Form
         return c;
     }
 
-    // ab v3.64: Seitenkopf mit Titel, rechts daneben der Schalter "beim Start ausführen" (gekoppelt an den Haken der
-    // Seitenleiste; vorher eine zweite Checkbox im Inhalt), darunter die Einleitung
+    // ab v4.0: Seitenkopf nur mit Titel und Einleitung. Ob ein Modul läuft, bestimmt allein der Haken in der Seitenleiste
+    // (vorher zusätzlich ein Schalter "beim Start ausführen"). Ist das Modul nicht angehakt, steht unter der Einleitung
+    // ein Hinweisband mit dem Verweis "In den Ablauf aufnehmen".
     FlowLayoutPanel Page(string title, string hint, int idx)
     {
         FlowLayoutPanel f = new FlowLayoutPanel(); f.FlowDirection = FlowDirection.TopDown; f.WrapContents = false; f.AutoSize = true; f.BackColor = UI.Panel; f.Location = new Point(0, 0);
-        FlowLayoutPanel tr = new FlowLayoutPanel(); tr.AutoSize = true; tr.WrapContents = false; tr.BackColor = UI.Panel; tr.Margin = new Padding(0);
-        Label lt = Lbl(title, UI.SchriftTitel, true, UI.Text); lt.Margin = new Padding(0, 0, UI.S(UI.Abstand5), 0); tr.Controls.Add(lt);
-        if (idx >= 0)
-        {
-            ToggleSwitch on = new ToggleSwitch(); on.Checked = nav[idx].Checked; on.Margin = new Padding(0, UI.S(6), UI.S(4), 0);
-            Label lo = Lbl("beim Start ausführen", UI.SchriftText, false, UI.Text); lo.Margin = new Padding(0, UI.S(8), 0, 0); lo.Cursor = Cursors.Hand;
-            lo.Click += delegate { on.Checked = !on.Checked; };
-            on.CheckedChanged += delegate { nav[idx].Checked = on.Checked; };
-            nav[idx].CheckedChanged += delegate { if (on.Checked != nav[idx].Checked) on.Checked = nav[idx].Checked; };
-            Tip(on, "Schaltet das Modul für den nächsten Start ein oder aus (gleich wie der Haken in der Seitenleiste).");
-            Tip(lo, "Schaltet das Modul für den nächsten Start ein oder aus (gleich wie der Haken in der Seitenleiste).");
-            tr.Controls.Add(on); tr.Controls.Add(lo);
-        }
-        f.Controls.Add(tr);
+        Label lt = Lbl(title, UI.SchriftTitel, true, UI.Text); lt.Margin = new Padding(0); f.Controls.Add(lt);
         Label h = Lbl(hint, UI.SchriftText, false, UI.Muted); h.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); h.Margin = new Padding(0, UI.S(UI.Abstand1), 0, UI.S(UI.Abstand2)); f.Controls.Add(h);
+        if (idx >= 0 && idx < nav.Count && nav[idx].HasCheck)
+        {
+            FlowLayoutPanel band = new FlowLayoutPanel(); band.AutoSize = true; band.WrapContents = false; band.BackColor = UI.InfoBg;
+            band.Padding = new Padding(UI.S(10), UI.S(6), UI.S(10), UI.S(6)); band.Margin = new Padding(0, 0, 0, UI.S(UI.Abstand2)); band.Tag = "banner";
+            Label bl = Lbl(title + " ist nicht im Ablauf. Die Auswahl auf dieser Seite wird erst ausgeführt, wenn das Modul links angehakt ist.", UI.SchriftText, false, UI.Text);
+            bl.Margin = new Padding(0, UI.S(1), UI.S(12), 0); bl.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 230), 0);
+            LinkLabel bk = new LinkLabel(); bk.Text = "In den Ablauf aufnehmen"; bk.AutoSize = true; bk.Font = new Font("Segoe UI Semibold", UI.SchriftText);
+            bk.LinkColor = UI.Accent; bk.ActiveLinkColor = UI.AccentHover; bk.LinkBehavior = LinkBehavior.HoverUnderline; bk.BackColor = Color.Transparent; bk.Margin = new Padding(0, UI.S(1), 0, 0);
+            int ni = idx;
+            bk.LinkClicked += delegate { nav[ni].Checked = true; };
+            Tip(bk, "Hakt das Modul in der Seitenleiste an; es läuft dann beim nächsten Start mit.");
+            band.Controls.Add(bl); band.Controls.Add(bk);
+            band.Visible = !nav[idx].Checked;
+            nav[idx].CheckedChanged += delegate { band.Visible = !nav[ni].Checked; };
+            if (idx < modBanners.Length) modBanners[idx] = band;
+            f.Controls.Add(band);
+        }
         return f;
     }
 
@@ -2526,7 +2520,8 @@ public partial class DiagGui : Form
             grpIdx++;
             string gd; repairGroupText.TryGetValue(grp, out gd);
 
-            CategoryPickerItem picker = new CategoryPickerItem(grp, ico);
+            string kurz; if (!repairGroupShort.TryGetValue(grp, out kurz)) kurz = grp;
+            CategoryPickerItem picker = new CategoryPickerItem(grp, ico, kurz);
             picker.Subtitle = gd ?? "";
             picker.Width = UI.S(232);
             string gKey = grp;
@@ -2641,8 +2636,8 @@ public partial class DiagGui : Form
     {
         FlowLayoutPanel h = new FlowLayoutPanel(); h.AutoSize = true; h.WrapContents = false; h.BackColor = UI.Panel; h.Margin = new Padding(0, UI.S(UI.Abstand2), 0, 0);
         tg = new GroupHeader(title); tg.Width = UI.S(UI.Gruppenbreite - 110); tg.Margin = new Padding(0);
-        all = new LinkLabel(); all.Text = "alle"; all.AutoSize = true; all.Margin = new Padding(UI.S(12), UI.S(8), UI.S(8), 0); all.LinkColor = UI.Accent;
-        none = new LinkLabel(); none.Text = "keine"; none.AutoSize = true; none.Margin = new Padding(0, UI.S(8), 0, 0); none.LinkColor = UI.Accent;
+        all = new LinkLabel(); all.Text = "Alle an"; all.AutoSize = true; all.Margin = new Padding(UI.S(12), UI.S(8), UI.S(8), 0); all.LinkColor = UI.Accent;
+        none = new LinkLabel(); none.Text = "Alle aus"; none.AutoSize = true; none.Margin = new Padding(0, UI.S(8), 0, 0); none.LinkColor = UI.Accent;
         h.Controls.Add(tg); h.Controls.Add(all); h.Controls.Add(none);
         f.Controls.Add(h);
         if (!String.IsNullOrEmpty(desc)) f.Controls.Add(Hint(desc, 30));
@@ -2650,6 +2645,13 @@ public partial class DiagGui : Form
         f.Controls.Add(body);
         return body;
     }
+
+    // ab v4.0 Kurztitel der Gruppen für die Kategorieliste (wie Kurztitel in Module\Wartung\Vertrag.psd1)
+    static readonly Dictionary<string, string> repairGroupShort = new Dictionary<string, string> {
+        { "Systemdateien und Komponentenspeicher", "Systemdateien" },
+        { "Bereinigung und Speicherplatz", "Bereinigung" },
+        { "Windows Update, Netzwerk und Zeit", "Update und Netzwerk" },
+        { "Dienste, Geräte und Energie", "Dienste und Energie" } };
 
     static readonly Dictionary<string, string> repairGroupText = new Dictionary<string, string> {
         { "Systemdateien und Komponentenspeicher", "Windows-Systemdateien, Komponentenspeicher und Dateisystem prüfen und reparieren." },
@@ -2775,8 +2777,8 @@ public partial class DiagGui : Form
     List<Button> optPresetButtons = new List<Button>();
     static readonly string[] optPresetTips = new string[] {
         "Minimal: Grundlegende Datenschutz-Einstellungen, Dienste und Aufgaben, Indizierung aus, Caches leeren.",
-        "Leos Empfehlung: Wie die Voreinstellung beim Start ausgewählt (empfohlene Optimierungen für Datenschutz, Apps, Dienste und System).",
-        "VollstÃ¤ndig: Leos Empfehlung plus Windows-Funktionen, Zusatzfeatures, vorinstallierte Apps und Darstellung.",
+        "Leos Empfehlung: (empfohlene Optimierungen für Datenschutz, Apps, Dienste und System).",
+        "Erweitert: Leos Empfehlung plus Windows-Funktionen, Zusatzfeatures, vorinstallierte Apps und Darstellung.",
         "Hebt die Auswahl in allen Kategorien auf." };
 
     static readonly string[] defaultMinimal = new string[] {
@@ -2856,7 +2858,7 @@ public partial class DiagGui : Form
         foreach (string l in OptKatalog ?? new string[0])
         {
             string[] x = l.Split('|');
-            if (x.Length >= 4 && x[0] == "K") optCats.Add(new string[] { x[1], x[2], x[3] });
+            if (x.Length >= 4 && x[0] == "K") optCats.Add(new string[] { x[1], x[2], x[3], x.Length >= 5 ? x[4] : x[2], x.Length >= 6 ? x[5] : "" });
             else if (x.Length >= 11 && x[0] == "E")
             {
                 OptItem it = new OptItem(); it.Id = x[1]; it.Kat = x[2]; it.Risiko = x[3]; it.Neustart = x[4]; it.Vorlagen = x[5]; it.Verwaltet = x[6] == "1"; it.Bedingung = x[7];
@@ -2897,7 +2899,7 @@ public partial class DiagGui : Form
     Control BuildOptPage()
     {
         ReadOptCatalog();
-        FlowLayoutPanel f = Page("Optimierung", "BewÃ¤hrte Systemeinstellungen fÃ¼r Datenschutz, Telemetrie, Apps und Leistung, Ã¼bersichtlich nach Kategorien gruppiert.", 5);
+        FlowLayoutPanel f = Page("Optimierung", "Windows-Einstellungen zu Datenschutz, Werbung, Hintergrunddiensten und Leistung. Jede Änderung wird protokolliert und lässt sich auf der Seite Änderungen zurücknehmen.", 5);
         if (optItems.Count == 0) { lblOptInfo = Lbl("Der Katalog der Optimierung fehlt (Skript ohne Modul Optimierung).", 9f, false, UI.Muted); f.Controls.Add(lblOptInfo); return f; }
 
         TableLayoutPanel md = new TableLayoutPanel();
@@ -2970,25 +2972,14 @@ public partial class DiagGui : Form
         optPickers.Clear();
         optCatPanels.Clear();
 
-        Dictionary<string, string> catIcons = new Dictionary<string, string>();
-        catIcons["Datenschutz"] = UI.IcoShield;
-        catIcons["Werbung"] = UI.IcoBell;
-        catIcons["Explorer"] = UI.IcoFolder;
-        catIcons["Leistung"] = UI.IcoFlame;
-        catIcons["Update"] = UI.IcoRefresh;
-        catIcons["Dienste"] = UI.IcoGear;
-        catIcons["Apps"] = UI.IcoApp;
-        catIcons["Features"] = UI.IcoCheck;
-        catIcons["Aufraeumen"] = UI.IcoTrash;
-
         foreach (string[] k in optCats)
         {
             string key = k[0];
             List<OptItem> items = optItems.FindAll(delegate(OptItem it) { return it.Kat == key; });
             if (items.Count == 0) continue;
 
-            string ico; if (!catIcons.TryGetValue(key, out ico)) ico = UI.IcoOpt;
-            CategoryPickerItem picker = new CategoryPickerItem(k[1], ico);
+            string ico = UI.IconByName(k.Length > 4 ? k[4] : "", UI.IcoOpt);
+            CategoryPickerItem picker = new CategoryPickerItem(k[1], ico, k.Length > 3 ? k[3] : k[1]);
             picker.Subtitle = k[2];
             picker.Width = UI.S(232);
             string gKey = key;
@@ -3013,6 +3004,7 @@ public partial class DiagGui : Form
                 it.StateBadge = new Badge("", "ok"); it.StateBadge.Tag = "zustand";
                 Badge bv = it.Verwaltet && DomainPc ? new Badge("verwaltet", "warn") : null;
                 if (bv != null) bv.Tag = "verwaltet";
+                it.VerwaltetBadge = bv;
 
                 OptItem itemRef = it;
                 it.Toggle.CheckedChanged += delegate {
@@ -3023,25 +3015,6 @@ public partial class DiagGui : Form
                     UpdateOptCounts();
                 };
 
-                string shortDesc = it.Tip ?? "";
-                int p = shortDesc.IndexOf(" \u00B6");
-                if (p < 0) p = shortDesc.IndexOf(" \u00B6");
-                if (p >= 0) shortDesc = shortDesc.Substring(0, p).Trim();
-
-                SettingRow row = new SettingRow(it.Titel, shortDesc, it.Toggle);
-                it.Row = row;
-                row.Width = UI.S(UI.Gruppenbreite - 270);
-                if (it.Risiko == "Eingriff") row.AddBadge(RiskBadge("Eingriff"));
-                else if (it.Risiko.Length > 0 && it.Risiko != "Lesen") row.AddBadge(RiskBadge(it.Risiko));
-                if (it.Neustart == "immer") row.AddBadge(RestartBadge("immer"));
-                if (bv != null) row.AddBadge(bv);
-                if (it.StateBadge != null) row.AddBadge(it.StateBadge);
-
-                string fullTip = OptTipText(it);
-                Tip(row, fullTip);
-                Tip(it.Toggle, fullTip);
-
-                rowsPanel.Controls.Add(row);
             }
             rowsPanel.Visible = false;
             catHost.Controls.Add(rowsPanel);
@@ -3066,7 +3039,7 @@ public partial class DiagGui : Form
         };
 
         // --- Unterer Bereich: Vorlagen, Werkzeuge, Absicherung und Risikolegende ---
-        f.Controls.Add(Section("Vorlagen und Zustand"));
+        f.Controls.Add(Section("Vorlagen der Optimierung und Zustand"));
 
         FlowLayoutPanel bPills = Row(); bPills.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(4));
         optPresetPills.Clear();
@@ -3099,15 +3072,49 @@ public partial class DiagGui : Form
         chkOptRestore = Chk("Vorher einen Systemwiederherstellungspunkt anlegen", true); f.Controls.Add(chkOptRestore);
 
         f.Controls.Add(RiskLegend());
-        f.Controls.Add(Hint("verwaltet: ber\u00FChrt Gruppenrichtlinien, auf Dom\u00E4nen-PCs nicht in den Vorlagen. Benutzereinstellungen gelten f\u00FCr den angemeldeten Benutzer.", 4));
+        f.Controls.Add(Hint("Einträge ohne Etikett sind Stufe Ändern. verwaltet: ber\u00FChrt Gruppenrichtlinien, auf Dom\u00E4nen-PCs nicht in den Vorlagen. Benutzereinstellungen gelten f\u00FCr den angemeldeten Benutzer.", 4));
 
         if (optCats.Count > 0) SelectOptCategory(optCats[0][0]);
         ApplyOptPreset("M");
         return f;
     }
 
+    // ab v4.01: Zeilen einer Kategorie entstehen erst, wenn sie zum ersten Mal angezeigt wird. Haken, Schalter und
+    // Etiketten gibt es von Anfang an (Vorlagen, Zähler und Zustand arbeiten damit); beim Start entsteht so nur die
+    // erste Kategorie statt aller über 150 Zeilen.
+    HashSet<string> optRowsBuilt = new HashSet<string>();
+    void EnsureOptRows(string key)
+    {
+        if (optRowsBuilt.Contains(key)) return;
+        Control host; if (!optCatPanels.TryGetValue(key, out host)) return;
+        optRowsBuilt.Add(key);
+        host.SuspendLayout();
+        foreach (OptItem it in optItems)
+        {
+            if (it.Kat != key || it.Toggle == null) continue;
+            string shortDesc = it.Tip ?? "";
+            int p = shortDesc.IndexOf(" \u00B6");
+            if (p >= 0) shortDesc = shortDesc.Substring(0, p).Trim();
+
+            SettingRow row = new SettingRow(it.Titel, shortDesc, it.Toggle);
+            it.Row = row;
+            row.Width = UI.S(UI.Gruppenbreite - 270);
+            if (it.Risiko.Length > 0 && it.Risiko != "Lesen" && it.Risiko != "Aendern") row.AddBadge(RiskBadge(it.Risiko));
+            if (it.Neustart == "immer") row.AddBadge(RestartBadge("immer"));
+            if (it.VerwaltetBadge != null) row.AddBadge(it.VerwaltetBadge);
+            if (it.StateBadge != null) row.AddBadge(it.StateBadge);
+
+            string fullTip = OptTipText(it);
+            Tip(row, fullTip);
+            Tip(it.Toggle, fullTip);
+            host.Controls.Add(row);
+        }
+        host.ResumeLayout(true);
+    }
+
     void SelectOptCategory(string key)
     {
+        EnsureOptRows(key);
         curOptKey = key;
         foreach (KeyValuePair<string, CategoryPickerItem> kv in optPickers)
         {
@@ -3465,13 +3472,13 @@ public partial class DiagGui : Form
         f.Controls.Add(b);
         FlowLayoutPanel bd = Row(); bd.Margin = new Padding(UI.S(4), 0, 0, UI.S(8));
         bd.Controls.Add(RowLabel("PawnIO-Treiber", 120));
-        cmbDriver = Combo(230, new string[] { "vorübergehend verwenden (Standard)", "nicht verwenden" }, 0); bd.Controls.Add(cmbDriver);
-        Label ld = Lbl("gilt für Live-Ansicht, Diagnose, Benchmark und Lasttest; ein vorhandener PawnIO bleibt immer unverändert", 8.75f, false, UI.Muted); ld.Margin = new Padding(0, UI.S(5), 0, 0); bd.Controls.Add(ld);
+        cmbDriver = Combo(270, new string[] { "vorübergehend verwenden (Standard)", "nicht verwenden" }, 0); bd.Controls.Add(cmbDriver);
+        Label ld = Lbl("gilt für Live-Ansicht, Diagnose, Benchmark und Lasttest; ein vorhandener PawnIO bleibt unverändert", UI.SchriftHinweis, false, UI.Muted); ld.Margin = new Padding(0, UI.S(5), 0, 0); ld.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 420), 0); bd.Controls.Add(ld);
         f.Controls.Add(bd);
         FlowLayoutPanel bk = Row(); bk.Margin = new Padding(UI.S(4), 0, 0, UI.S(8));
         bk.Controls.Add(RowLabel("Hilfswerkzeuge", 120));
-        cmbKeep = Combo(230, new string[] { "nach dem Lauf entfernen (Standard)", "auf diesem PC behalten" }, 0); bk.Controls.Add(cmbKeep);
-        Label lk = Lbl("PawnIO und smartmontools, die Leos Minibench installiert hat; gespeichert je Gerät in Geraete.json", 8.75f, false, UI.Muted); lk.Margin = new Padding(0, UI.S(5), 0, 0); bk.Controls.Add(lk);
+        cmbKeep = Combo(270, new string[] { "nach dem Lauf entfernen (Standard)", "auf diesem PC behalten" }, 0); bk.Controls.Add(cmbKeep);
+        Label lk = Lbl("PawnIO und smartmontools, die Leos Minibench installiert hat; gilt je Gerät", UI.SchriftHinweis, false, UI.Muted); lk.Margin = new Padding(0, UI.S(5), 0, 0); lk.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 420), 0); bk.Controls.Add(lk);
         f.Controls.Add(bk);
         LoadDeviceTools();
         cmbKeep.SelectedIndexChanged += delegate { SaveDeviceTools(); };
@@ -4143,7 +4150,7 @@ public partial class DiagGui : Form
     // (Voreinstellungen.json, Format Minibench-Voreinstellungen/1). Eine davon kann beim Start automatisch geladen werden:
     // Wer den Stick weitergibt, legt sie fest, die andere Person klickt nur noch Start.
     ComboBox cmbPreset;
-    Button btnPresetSave, btnPresetDel;
+    PillButton btnPresetSave; Button btnPresetDel;
     bool presetFilling, presetLoading;
     string presetActive = "";
     string PresetFile { get { return dataDir.Length > 0 ? Path.Combine(dataDir, "Voreinstellungen.json") : ""; } }
@@ -4280,7 +4287,7 @@ public partial class DiagGui : Form
     void DeletePresetByName(string n)
     {
         if (String.IsNullOrEmpty(n)) return;
-        if (MessageBox.Show(this, "Voreinstellung \"" + n + "\" l\u00F6schen?", "Leos Minibench", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        if (MessageBox.Show(this, "Vorlage \"" + n + "\" l\u00F6schen?", "Leos Minibench", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
         try
         {
             Dictionary<string, object> d = ReadPresetFile(); if (d == null) return;
@@ -4328,7 +4335,7 @@ public partial class DiagGui : Form
         object st; string start = d != null && d.TryGetValue("BeimStart", out st) ? Convert.ToString(st) : "";
         using (Form f = new Form())
         {
-            f.Text = "Voreinstellung speichern"; f.FormBorderStyle = FormBorderStyle.FixedDialog; f.MaximizeBox = false; f.MinimizeBox = false; f.ShowInTaskbar = false;
+            f.Text = "Als Vorlage speichern"; f.FormBorderStyle = FormBorderStyle.FixedDialog; f.MaximizeBox = false; f.MinimizeBox = false; f.ShowInTaskbar = false;
             f.StartPosition = FormStartPosition.CenterParent; f.Font = new Font("Segoe UI", 9.5f); f.BackColor = UI.Bg; f.AutoSize = true; f.AutoSizeMode = AutoSizeMode.GrowAndShrink; f.Padding = new Padding(UI.S(16));
             FlowLayoutPanel p = new FlowLayoutPanel(); p.FlowDirection = FlowDirection.TopDown; p.AutoSize = true; p.WrapContents = false; p.Dock = DockStyle.Fill;
             Label l = new Label(); l.AutoSize = true; l.MaximumSize = new Size(UI.S(460), 0); l.Margin = new Padding(0, 0, 0, UI.S(8));
@@ -4363,7 +4370,7 @@ public partial class DiagGui : Form
                 FillPresets(false);
                 UpdateSummary();
             }
-            catch (Exception ex) { MessageBox.Show(this, "Voreinstellung nicht gespeichert: " + ex.Message, "Leos Minibench"); }
+            catch (Exception ex) { MessageBox.Show(this, "Vorlage nicht gespeichert: " + ex.Message, "Leos Minibench"); }
         }
     }
 
@@ -4371,7 +4378,7 @@ public partial class DiagGui : Form
     {
         string n = PresetNameOf(cmbPreset.SelectedIndex);
         if (n.Length == 0) return;
-        if (MessageBox.Show(this, "Voreinstellung \"" + n + "\" l\u00F6schen?", "Leos Minibench", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        if (MessageBox.Show(this, "Vorlage \"" + n + "\" l\u00F6schen?", "Leos Minibench", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
         try
         {
             Dictionary<string, object> d = ReadPresetFile(); if (d == null) return;
@@ -5008,7 +5015,8 @@ public partial class DiagGui : Form
             {
                 tabs.Selected = 1;
             }
-            else if (chkSingleWindow != null && chkSingleWindow.Checked && File.Exists(htmlPath))
+            // ab v4.01 immer im Programmfenster (vorher nur mit der Option 1-Fenstermodus)
+            else if (File.Exists(htmlPath))
             {
                 PopulateResultDashboard();
                 runView.Visible = false;

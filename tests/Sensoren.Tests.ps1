@@ -568,7 +568,7 @@ Describe 'Sensorwerkzeuge mit festen Prüfsummen' {
         [IO.File]::WriteAllText((Join-Path $lhm 'LibreHardwareMonitorLib.dll'), 'manipuliert')
         (MinibenchTest\Get-SensorToolState $tools).LhmBereit | Should -BeFalse
     }
-    It 'repariert einen Manifesteintrag mit leerer PrÃ¼fsumme automatisch gegen das offizielle Release' {
+    It 'repariert einen Manifesteintrag mit leerer Prüfsumme automatisch gegen das offizielle Release' {
         [void](MinibenchTest\Get-SensorToolState $tools)
         $mPath = Join-Path $tools 'Tools.json'
         $mJson = Get-Content $mPath -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -993,7 +993,7 @@ Describe 'Kurven im Bericht' {
     }
 }
 
-Describe 'GeschÃ¤tzter Gesamtsystemverbrauch und Effizienz' {
+Describe 'Geschätzter Gesamtsystemverbrauch und Effizienz' {
     BeforeAll {
         Import-MinibenchTestModule -Parts 'Kern\Berichtshilfen.ps1' -Functions 'Get-GpuKind', 'Test-EntryIsNotebook'
     }
@@ -1104,7 +1104,7 @@ Describe 'GeschÃ¤tzter Gesamtsystemverbrauch und Effizienz' {
         $p.P_DC | Should -BeNullOrEmpty
     }
 
-    It 'erstellt ein vollstÃ¤ndiges Leistungsprofil mit Effizienz-Metriken' {
+    It 'erstellt ein vollständiges Leistungsprofil mit Effizienz-Metriken' {
         $entry = [pscustomobject]@{
             System    = 'Gaming PC'
             Hardware  = [pscustomobject]@{

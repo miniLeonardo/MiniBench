@@ -1,0 +1,140 @@
+﻿LEOS MINIBENCH 4.01: ÄNDERUNGEN
+===============================
+
+Version 4.01 räumt nach, was 4.0 angekündigt, aber nicht oder nur teilweise umgesetzt hat. Grundlage war ein eigener
+Bau von 4.0 mit Bildschirmfotos aller Seiten in Hell und Dunkel. Messabläufe, Berichte und Datenbankformat sind
+unverändert.
+
+
+1. ZEICHENSATZ
+  Oberfläche                  4.0 hat Texte in den Einstellungen, auf der Seite Optimierung und in der Datenbank doppelt
+                              kodiert gespeichert („fÃ¼r“, „Ã¶ffnen“, „SchlieÃŸen“, „Ãœber“). Alle Stellen sind
+                              korrigiert.
+  Doku                        Dieselbe Doppelkodierung in CHANGELOG.md, Doku\Versionshistorie.txt, Doku\Projektstand.md,
+                              AGENTS.md und tests\Sensoren.Tests.ps1 ist ebenfalls behoben.
+
+
+2. RAHMEN
+  Modulwahl                   Der Schalter „beim Start ausführen“ im Seitenkopf ist entfernt. Ob ein Modul läuft, bestimmt
+                              allein der Haken in der Seitenleiste. Ist ein Modul nicht angehakt, zeigt seine Seite unter
+                              der Einleitung ein Hinweisband mit dem Verweis „In den Ablauf aufnehmen“.
+  Fußleiste                   Die Vorlagen der Fußleiste stellen den ganzen Ablauf ein und heißen jetzt Schnellcheck,
+                              Standard, Komplett und Alles abwählen (interne Schlüssel M, S, E unverändert). Minimal,
+                              Leos Empfehlung und Erweitert stehen nur noch auf der Seite Optimierung. Beim Start ist keine
+                              Vorlage hervorgehoben, solange kein Ablauf gewählt ist. „Als Vorlage speichern …“ ist eine
+                              Pille wie die übrigen. Ablage, Anonymisierung und 1-Fenstermodus sind aus der Fußleiste
+                              entfernt. Auf den Werkzeugseiten zeigt die Fußleiste nur Ablaufzeile und Startknopf.
+  Ergebnisse                  Ergebnisse erscheinen immer im Programmfenster. Die Option 1-Fenstermodus entfällt.
+  Einstellungen               Die Option für die Startseite steht nur noch in den Einstellungen (vorher zusätzlich auf
+                              der Startseite, beide liefen auseinander). Datenbereinigung steht nur noch in der
+                              Datenbank. Neuer Aufbau des Fensters siehe 7.
+
+
+3. OPTIMIERUNG UND WARTUNG
+  Kurztitel und Symbole       4.0 hatte Kurztitel und Symbole in Katalog und Vertrag eingetragen, die Oberfläche las sie
+                              aber nicht. Die Kategorielisten zeigen jetzt die Kurztitel (keine dreizeiligen, abgeschnittenen
+                              Titel mehr) und eigene Symbole; Leistung und Sicherheit haben eigene Symbole statt Flamme und
+                              doppeltem Schild. Der volle Titel steht im Kopf der Detailkarte.
+  Und-Zeichen                 „&“ in Kurztiteln und Zeilen wurde als Unterstrich gezeichnet (TextFormatFlags.NoPrefix fehlte).
+  Etikett Ändern              Ändern ist der Normalfall der Optimierung und steht nicht mehr in jeder Zeile; die Legende
+                              unter der Seite erklärt das. Eingriff, Neustart und verwaltet bleiben.
+  Farbschema                  Beim Umschalten des Farbschemas behielten Einstellungszeilen und Kategorien den alten
+                              Hintergrund; im Dunkelschema entstanden helle Ecken. ApplyThemeRecursive berücksichtigt
+                              SettingRow und CategoryPickerItem.
+
+
+4. DATENBANK
+  Suchfeld entfernt           Das Suchfeld aus 4.0 war nicht gewünscht und filterte nichts. Entfernt samt Strg+F und der
+                              Leerkarte, die nie angezeigt wurde.
+  Werkzeugleiste              Importieren, Alle aufklappen, Aktualisieren, Aufräumen. Datenordner und Netzlaufwerk stehen
+                              in den Einstellungen.
+  Texte und Spalten           Einleitung auf zwei Zeilen gekürzt, Hinweis unter der Tabelle nur noch zu grauen Einträgen,
+                              Datenpflege-Hinweis nur, wenn die Datenpflege beim Start etwas verschoben hat. Spalte
+                              Grafiktest statt FPS (ältere Läufe zeigen dort den Speicherdurchsatz), RAM-Spalte breiter.
+
+
+5. WEITERE SEITEN
+  Auswahl-Verweise            Einheitlich „Alle an / Alle aus“ in Tools, System-Umzug und den Kategorieblöcken.
+  Sensoren                    Hinweise neben PawnIO-Treiber und Hilfswerkzeuge umbrechen innerhalb der Gruppenbreite,
+                              Auswahlfelder breiter, Dateiname Geraete.json aus dem Hinweis entfernt.
+
+
+
+6. STARTZEIT
+  Ausgangslage                Start.log auf ULB-PC10039 (Start über die exe, Festplatte): rund 19 s bis zur bedienbaren
+                              Oberfläche. Größte Abschnitte: Warten auf Hardwareabfrage und Datenpflege (6,7 s), Aufbau
+                              des Fensters (4,8 s), Laden des Skripts in PowerShell (3,5 s).
+  Einstellungszeilen          SettingRow rief für jede Höhenmessung CreateGraphics auf. Das legt für jede der über 150
+                              Zeilen der Optimierung vorzeitig ein Fensterhandle an, dazu kamen zwei neue Schriften je
+                              Messung und je Zeichnen. Jetzt wird ohne Grafikkontext gemessen, die Schriften bestehen
+                              einmal. Unter Mono sank der Aufbau der Seite Optimierung von etwa 900 auf 150 ms und das
+                              erste Anzeigen des Fensters von 1,3 s auf 0,2 s; unter Windows noch zu messen.
+  Mehr Messpunkte             Start.log nennt zusätzlich „Hardwareabfrage abgeschlossen“, „Katalog der Optimierung
+                              gelesen“, „Datenbank geladen“ und „Seiten aufgebaut“. Damit lässt sich der lange Abschnitt
+                              vor „Datenpflege“ der Hardwareabfrage oder der Datenpflege zuordnen.
+  Laufwerksabfrage            Die Hardwareabfrage im Hintergrund fragte Laufwerke über Win32_DiskDrive mit Zuordnungen
+                              (ASSOCIATORS OF) ab, auf Rechnern mit mehreren Platten mehrere Sekunden. Jetzt liefern
+                              MSFT_PhysicalDisk und MSFT_Partition aus root/Microsoft/Windows/Storage Busart (NVMe,
+                              SATA, USB), Medientyp und Laufwerksbuchstaben in einer Abfrage.
+  Reihenfolge                 Datenpflege und Katalog der Optimierung laufen, während die Hardwareabfrage noch arbeitet,
+                              statt danach.
+  Optimierung bei Bedarf      Die über 150 Einstellungszeilen der Optimierung entstehen erst, wenn eine Kategorie zum
+                              ersten Mal geöffnet wird. Beim Start wird nur die erste Kategorie aufgebaut.
+
+
+7. EINSTELLUNGEN
+  Aufbau                      Das Fenster bleibt ein eigenes Fenster, folgt aber dem Aufbau der Seiten: links die
+                              Bereiche Darstellung, Start, Datenschutz, Daten, Updates und Über Leos Minibench in derselben
+                              Kategorieliste wie Optimierung und Wartung, rechts eine Karte mit den Optionen des gewählten
+                              Bereichs. Vorher standen alle Optionen untereinander in einer langen Liste.
+  Farbschema                  Die Titelleiste aller Dialoge ist im Dunkelschema dunkel (DWM, ab Windows 10 20H1). Das
+                              Farbschema wird als Segment Dunkel / Hell gewählt.
+  Speichern                   Änderungen werden beim Schließen übernommen und gespeichert, ein Wechsel des Farbschemas
+                              ebenfalls erst dann.
+
+
+8. ERGEBNISSEITE
+  Ziel                        Die Seite nach einem Durchlauf soll in wenigen Sekunden zeigen, ob der PC in Ordnung ist,
+                              was zu tun ist und wie er gegenüber der Referenz abschneidet. Einzelwerte stehen im Bericht.
+  Urteil                      Oben eine Karte mit dem Urteil aus den Befunden (z. B. „3 Warnungen“, farbig nach
+                              Schwere), der Zählung kritisch / Warnungen / Hinweise, der Gesamtpunktzahl und der
+                              Hardware des Laufs.
+  Was zu tun ist              Die fünf wichtigsten Befunde mit Schwere, kritische vor Warnungen. Ohne kritische Befunde
+                              und Warnungen steht dort ein Satz dazu und die Zahl der Hinweise im Bericht.
+  Leistung im Vergleich       Prozessor, Grafik, Arbeitsspeicher und Laufwerke als Balken gegenüber der gespeicherten
+                              Referenz (100 %, Markierung im Balken) mit Einordnung: Hervorragend ab 115 %, Sehr gut ab
+                              100 %, Gut ab 85 %, Durchschnittlich ab 70 %, Mäßig ab 50 %, darunter Unterdurchschnittlich.
+  Kacheln                     Je Gruppe ein Hauptwert mit Einordnung und höchstens eine Nebenzeile (Prozessor: Punkte
+                              aller Kerne, ein Kern; Grafik: Rendertest oder Speicherdurchsatz; Arbeitsspeicher: Lesen,
+                              Latenz; Laufwerk: Lesen am Stück, 4K-Zufallszugriff). Vorher drei Zahlen je Gruppe ohne
+                              Einordnung.
+  Feste Texte entfernt        Das Dashboard aus 4.0 zeigte für DPC, Timer, Ausreißer, ReBAR und Netzwerk feste Texte wie
+                              „Unauffällig (< 500 µs)“ oder „LAN synchron / Ping OK“, unabhängig von der Messung. Diese
+                              Zeilen sind entfernt; angezeigt wird nur, was der Lauf gemessen hat.
+
+
+9. SKALIERUNG 125 UND 150 %
+  Schriftgrößen               Selbst gezeichnete Elemente (Pillen, Kategorielisten, Einstellungszeilen, Etiketten,
+                              Kopf der Dialoge) legten ihre Schrift mit UI.SF in Punkt an. Punkt rechnet Windows bei
+                              150 % bereits selbst um, SF skalierte ein zweites Mal: Schrift 2,25-fach statt 1,5-fach,
+                              abgeschnittene Texte in Knöpfen und Listen. Alle 29 Stellen nutzen jetzt die
+                              Punktgröße direkt; SF bleibt für Pixelmaße (Radien, Linien, Abstände).
+
+GEFUNDEN UND BEHOBEN
+  4.0 angekündigt, nicht umgesetzt: Fußleiste ohne globale Optionen, kompakte Fußleiste auf Werkzeugseiten, Kurztitel und
+  Symbole in der Oberfläche, Hinweisband statt Schalter. Jetzt umgesetzt (siehe oben).
+  Suchfeld der Datenbank ohne Wirkung: TextChanged setzte nur filterActive, FillDbList wertete es nicht aus. Entfernt.
+  Doppelkodierte Umlaute in neuen Texten von 4.0 (siehe 1).
+  Helle Ecken nach Farbschemawechsel (siehe 3).
+  Feste Beispieltexte im Ergebnis-Dashboard (siehe 8).
+  Doppelte Skalierung der Schrift bei 125 und 150 % (siehe 9).
+
+
+GRENZEN
+  Geprüft mit einem Bau unter Mono und Xvfb (Selawik als Ersatz für Segoe UI, Platzhalter für die Symbolschrift). Mono
+  rechnet fest mit 96 dpi; die Darstellung bei 125 und 150 % und die Startzeit unter Windows sind noch per Sichtprüfung
+  und Start.log zu bestätigen.
+
+
+UMSTIEG
+  Gespeicherte Vorlagen laden unverändert (Schlüssel M, S, E). Die Einstellung 1-Fenstermodus wird nicht mehr gebraucht.

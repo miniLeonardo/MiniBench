@@ -110,6 +110,8 @@ public static class UI
         return (int)Math.Round(px * DpiScale);
     }
 
+    // Nur für Pixelmaße. Schriftgrößen in Punkt nie mit SF skalieren: Windows rechnet Punkt bei 150 % selbst um,
+    // SF ergab dort doppelt große Schrift in selbst gezeichneten Elementen und Knöpfen (bis v4.0).
     public static float SF(float px)
     {
         return px * DpiScale;
@@ -168,6 +170,19 @@ public static class UI
     public const string IcoSearch = "\uE721";
     public const string IcoLock = "\uE72E";
     public const string IcoSun = "\uE706";
+
+    // Symbol nach Namen (Katalog und Vertrag nennen Felder wie "IcoShield"); unbekannt oder leer: ersatz
+    public static string IconByName(string name, string ersatz)
+    {
+        if (String.IsNullOrEmpty(name)) return ersatz;
+        try
+        {
+            System.Reflection.FieldInfo fi = typeof(UI).GetField(name, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+            if (fi != null) { string v = fi.GetValue(null) as string; if (!String.IsNullOrEmpty(v)) return v; }
+        }
+        catch { }
+        return ersatz;
+    }
 
     // ab v4.0: Dezimale Versionsnummer zur verlaesslichen Groessenordnung (z. B. 3.882 < 3.9 < 3.91 < 4.0)
     public static double VersionNumber(string v)
@@ -331,7 +346,7 @@ public static class UI
     {
         Button b = new PrimaryButton(); b.Text = text; b.FlatStyle = FlatStyle.Flat; b.FlatAppearance.BorderSize = 0;
         b.BackColor = Accent; b.ForeColor = OnAccent; b.FlatAppearance.MouseOverBackColor = AccentHover; b.FlatAppearance.MouseDownBackColor = AccentActive;
-        b.Font = new Font("Segoe UI Semibold", SF(10.5f)); b.AutoSize = true; b.Padding = new Padding(S(18), S(6), S(18), S(6)); b.Cursor = Cursors.Hand; b.UseVisualStyleBackColor = false;
+        b.Font = new Font("Segoe UI Semibold", 10.5f); b.AutoSize = true; b.Padding = new Padding(S(18), S(6), S(18), S(6)); b.Cursor = Cursors.Hand; b.UseVisualStyleBackColor = false;
         return b;
     }
 
@@ -339,7 +354,7 @@ public static class UI
     {
         Button b = new Button(); b.Text = text; b.FlatStyle = FlatStyle.Flat; b.FlatAppearance.BorderColor = Line;
         b.BackColor = Panel; b.ForeColor = Text; b.FlatAppearance.MouseOverBackColor = IsDark ? Color.FromArgb(45, 48, 52) : Color.FromArgb(243, 244, 246); b.FlatAppearance.MouseDownBackColor = IsDark ? Color.FromArgb(55, 58, 62) : Color.FromArgb(235, 237, 240);
-        b.Font = new Font("Segoe UI", SF(9.75f)); b.AutoSize = true; b.Padding = new Padding(S(10), S(3), S(10), S(3)); b.Margin = new Padding(S(8), 0, 0, 0); b.Cursor = Cursors.Hand; b.UseVisualStyleBackColor = false;
+        b.Font = new Font("Segoe UI", 9.75f); b.AutoSize = true; b.Padding = new Padding(S(10), S(3), S(10), S(3)); b.Margin = new Padding(S(8), 0, 0, 0); b.Cursor = Cursors.Hand; b.UseVisualStyleBackColor = false;
         b.Paint += delegate(object s, PaintEventArgs pe) {
             if (!b.Enabled) {
                 Graphics g = pe.Graphics;
@@ -359,14 +374,29 @@ public static class UI
         return Secondary("Diesen Schritt überspringen");
     }
 
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+    // ab v4.01: Titelleiste eines Dialogs im Farbschema (vorher blieb sie im Dunkelschema hell)
+    public static void ThemeTitleBar(Form f)
+    {
+        if (f == null) return;
+        if (f.IsHandleCreated) SetTitleBar(f);
+        else f.HandleCreated += delegate { SetTitleBar(f); };
+    }
+    static void SetTitleBar(Form f)
+    {
+        try { int dark = IsDark ? 1 : 0; if (DwmSetWindowAttribute(f.Handle, 20, ref dark, sizeof(int)) != 0) DwmSetWindowAttribute(f.Handle, 19, ref dark, sizeof(int)); } catch { }
+    }
+
     public static void ThemeDialog(Form f)
     {
         if (f == null) return;
+        ThemeTitleBar(f);
         f.BackColor = Bg;
         f.ForeColor = Text;
         if (f.Font == null || f.Font.Name != "Segoe UI")
         {
-            f.Font = new Font("Segoe UI", SF(9.5f));
+            f.Font = new Font("Segoe UI", 9.5f);
         }
         ThemeDialogControls(f.Controls);
     }
@@ -452,7 +482,7 @@ public static class UI
             f.StartPosition = owner != null ? FormStartPosition.CenterParent : FormStartPosition.CenterScreen;
 
             int w = S(450);
-            Font mf = new Font("Segoe UI", SF(9.5f));
+            Font mf = new Font("Segoe UI", 9.5f);
             Size textSize = TextRenderer.MeasureText(text ?? "", mf, new Size(w - S(40), int.MaxValue), TextFormatFlags.WordBreak);
             int textH = Math.Max(S(40), Math.Min(S(420), textSize.Height + S(10)));
             int clientH = textH + S(74);
@@ -502,7 +532,7 @@ public static class UI
             f.StartPosition = owner != null ? FormStartPosition.CenterParent : FormStartPosition.CenterScreen;
 
             int w = S(450);
-            Font mf = new Font("Segoe UI", SF(9.5f));
+            Font mf = new Font("Segoe UI", 9.5f);
             Size textSize = TextRenderer.MeasureText(text ?? "", mf, new Size(w - S(40), int.MaxValue), TextFormatFlags.WordBreak);
             int textH = Math.Max(S(40), Math.Min(S(420), textSize.Height + S(10)));
             int clientH = textH + S(74);
@@ -554,7 +584,7 @@ public static class UI
             f.StartPosition = owner != null ? FormStartPosition.CenterParent : FormStartPosition.CenterScreen;
 
             int w = S(500);
-            Font mf = new Font("Segoe UI", SF(9.5f));
+            Font mf = new Font("Segoe UI", 9.5f);
             Size textSize = TextRenderer.MeasureText(text ?? "", mf, new Size(w - S(40), int.MaxValue), TextFormatFlags.WordBreak);
             int textH = Math.Max(S(40), Math.Min(S(420), textSize.Height + S(10)));
             int clientH = textH + S(74);
@@ -624,7 +654,7 @@ public class Badge : Control
     {
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor, true);
         BackColor = Color.Transparent;
-        Font = new Font("Segoe UI Semibold", UI.SF(8.25f));
+        Font = new Font("Segoe UI Semibold", 8.25f);
         AccessibleRole = AccessibleRole.StaticText;
         Margin = new Padding(UI.S(6), UI.S(4), 0, 0);
         this.level = level ?? "skip";
@@ -658,7 +688,7 @@ public class PillLabel : Control
     {
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor, true);
         BackColor = Color.Transparent;
-        Font = new Font("Segoe UI", UI.SF(8.75f));
+        Font = new Font("Segoe UI", 8.75f);
         AccessibleRole = AccessibleRole.StaticText;
         Text = text ?? "";
         AccessibleName = Text;
@@ -1024,7 +1054,7 @@ public class DarkComboBox : ComboBox
         DrawMode = DrawMode.OwnerDrawFixed;
         DropDownStyle = ComboBoxStyle.DropDownList;
         ItemHeight = UI.S(24);
-        Font = new Font("Segoe UI", UI.SF(9.5f));
+        Font = new Font("Segoe UI", 9.5f);
         Cursor = Cursors.Hand;
         BackColor = UI.Panel;
         ForeColor = UI.Text;
@@ -1215,7 +1245,7 @@ public class PillButton : Control
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable | ControlStyles.SupportsTransparentBackColor, true);
         Cursor = Cursors.Hand;
         BackColor = Color.Transparent;
-        Font = new Font("Segoe UI Semibold", UI.SF(9f));
+        Font = new Font("Segoe UI Semibold", 9f);
         AccessibleRole = AccessibleRole.PushButton;
         AccessibleName = text;
         Height = UI.S(28);
@@ -1312,7 +1342,7 @@ public class PillButton : Control
         if (!String.IsNullOrEmpty(icon))
         {
             int icoSize = UI.S(14);
-            using (Font ifont = UI.SymbolFont(UI.SF(9f)))
+            using (Font ifont = UI.SymbolFont(9f))
             {
                 Rectangle icoR = new Rectangle(x, (Height - icoSize) / 2, icoSize, icoSize);
                 TextRenderer.DrawText(g, icon, ifont, icoR, fg, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
@@ -1332,7 +1362,7 @@ public class PillButton : Control
                 using (SolidBrush cb = new SolidBrush(active ? Color.FromArgb(50, 0, 0, 0) : (UI.IsDark ? Color.FromArgb(70, 75, 80) : Color.FromArgb(210, 215, 220))))
                     g.FillPath(cb, cp);
             }
-            using (Font xf = new Font("Segoe UI", UI.SF(8f), FontStyle.Bold))
+            using (Font xf = new Font("Segoe UI", 8f, FontStyle.Bold))
             {
                 TextRenderer.DrawText(g, "×", xf, cr, active ? UI.OnAccent : UI.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
             }
@@ -1384,6 +1414,8 @@ public class CategoryPickerItem : Control
     public int CheckedCount { get { return checkedCount; } set { if (checkedCount != value) { checkedCount = value; Invalidate(); } } }
     public int TotalCount { get { return totalCount; } set { if (totalCount != value) { totalCount = value; Invalidate(); } } }
     public bool Selected { get { return selected; } set { if (selected != value) { selected = value; Invalidate(); } } }
+    // ab v4.01: ohne Zähler, etwa für die Bereiche des Einstellungsfensters
+    public bool ShowCount = true;
 
     public void SetCounts(int chk, int total)
     {
@@ -1447,7 +1479,7 @@ public class CategoryPickerItem : Control
         {
             int icoSize = UI.S(20);
             int icoY = (Height - icoSize) / 2;
-            using (Font ifont = UI.SymbolFont(UI.SF(11f)))
+            using (Font ifont = UI.SymbolFont(11f))
             {
                 Rectangle icoR = new Rectangle(x, icoY, icoSize, icoSize);
                 TextRenderer.DrawText(g, icon, ifont, icoR, selected ? UI.Accent : UI.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
@@ -1457,7 +1489,8 @@ public class CategoryPickerItem : Control
 
         string badgeText = String.Format("{0}/{1}", checkedCount, totalCount);
         int badgeW = 0;
-        using (Font fb = new Font("Segoe UI Semibold", UI.SF(8f)))
+        if (ShowCount)
+        using (Font fb = new Font("Segoe UI Semibold", 8f))
         {
             Size bsz = TextRenderer.MeasureText(g, badgeText, fb, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding);
             badgeW = bsz.Width + UI.S(12);
@@ -1478,13 +1511,40 @@ public class CategoryPickerItem : Control
 
         int textW = Width - x - badgeW - UI.S(14);
         string displayTitle = !String.IsNullOrEmpty(shortTitle) ? shortTitle : title;
-        using (Font ft = new Font("Segoe UI Semibold", UI.SF(9f)))
+        using (Font ft = new Font("Segoe UI Semibold", 9f))
         {
             Color titleColor = selected ? (UI.IsDark ? UI.Accent : UI.AccentDark) : UI.Text;
-            Size tsz = TextRenderer.MeasureText(g, displayTitle, ft, new Size(Math.Max(10, textW), int.MaxValue), TextFormatFlags.WordBreak);
+            Size tsz = TextRenderer.MeasureText(g, displayTitle, ft, new Size(Math.Max(10, textW), int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
             int ty = Math.Max(0, (Height - tsz.Height) / 2);
-            TextRenderer.DrawText(g, displayTitle, ft, new Rectangle(x, ty, Math.Max(10, textW), tsz.Height), titleColor, TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);
+            TextRenderer.DrawText(g, displayTitle, ft, new Rectangle(x, ty, Math.Max(10, textW), tsz.Height), titleColor, TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         }
+    }
+}
+
+// ab v4.01: Balken für Prozent der Referenz; der Strich markiert 100 %, über 100 % läuft der Balken bis zum Rand
+public class PercentBar : Control
+{
+    double pct;
+    public double Percent { get { return pct; } set { pct = value; Invalidate(); } }
+    public double Max = 150;
+    public PercentBar()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor, true);
+        BackColor = Color.Transparent;
+        AccessibleRole = AccessibleRole.ProgressBar;
+    }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
+        float h = Height - 1, w = Width - 1;
+        Color track = UI.IsDark ? Color.FromArgb(52, 56, 62) : Color.FromArgb(226, 229, 234);
+        using (GraphicsPath p = UI.Round(new RectangleF(0, 0, w, h), h / 2f)) using (SolidBrush b = new SolidBrush(track)) g.FillPath(b, p);
+        float fw = (float)(Math.Max(0, Math.Min(pct, Max)) / Max * w);
+        Color fill = pct >= 100 ? UI.Ok : pct >= 70 ? UI.Accent : UI.Warn;
+        if (fw >= h) using (GraphicsPath p = UI.Round(new RectangleF(0, 0, fw, h), h / 2f)) using (SolidBrush b = new SolidBrush(fill)) g.FillPath(b, p);
+        float mx = (float)(100.0 / Max * w);
+        using (Pen pen = new Pen(UI.Text, 1.5f)) g.DrawLine(pen, mx, -1, mx, h + 1);
+        AccessibleName = pct.ToString("0") + " Prozent der Referenz";
     }
 }
 
@@ -1560,6 +1620,12 @@ public class SettingRow : Control
         return 1; // Zustand z. B. "gesetzt", "aktiv"
     }
 
+    // ab v4.01: Schriften einmal je Programmlauf statt bei jeder Messung und jedem Zeichnen neu (die Optimierung hat
+    // über 150 Zeilen); gemessen wird ohne CreateGraphics, das sonst für jede Zeile vorzeitig ein Fensterhandle anlegt
+    static Font fontTitel, fontDetail;
+    static Font FontTitel { get { if (fontTitel == null) fontTitel = new Font("Segoe UI Semibold", 9.5f); return fontTitel; } }
+    static Font FontDetail { get { if (fontDetail == null) fontDetail = new Font("Segoe UI", 8.25f); return fontDetail; } }
+
     bool inRecalc = false;
     void RecalcHeight()
     {
@@ -1579,11 +1645,9 @@ public class SettingRow : Control
             rightBound -= UI.S(10);
             int textW = Math.Max(UI.S(100), rightBound - curX);
 
-            using (Graphics g = CreateGraphics())
-            using (Font ft = new Font("Segoe UI Semibold", UI.SF(9.5f)))
-            using (Font fd = new Font("Segoe UI", UI.SF(8.25f)))
             {
-                Size tsz = TextRenderer.MeasureText(g, title ?? "", ft, new Size(textW, int.MaxValue), TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+                Font ft = FontTitel, fd = FontDetail;
+                Size tsz = TextRenderer.MeasureText(title ?? "", ft, new Size(textW, int.MaxValue), TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
                 int titleH = Math.Max(tsz.Height, UI.S(18));
                 int targetH;
                 if (string.IsNullOrEmpty(desc))
@@ -1592,8 +1656,8 @@ public class SettingRow : Control
                 }
                 else
                 {
-                    Size dsz = TextRenderer.MeasureText(g, desc, fd, new Size(textW, int.MaxValue), TextFormatFlags.WordBreak);
-                    int maxDescH = (int)Math.Ceiling(fd.GetHeight(g) * 2.2f) + UI.S(2);
+                    Size dsz = TextRenderer.MeasureText(desc, fd, new Size(textW, int.MaxValue), TextFormatFlags.WordBreak);
+                    int maxDescH = (int)Math.Ceiling(fd.Height * 2.2f) + UI.S(2);
                     int descH = Math.Min(dsz.Height, maxDescH);
                     targetH = Math.Max(UI.S(42), UI.S(8) + titleH + UI.S(2) + descH + UI.S(8));
                 }
@@ -1695,20 +1759,20 @@ public class SettingRow : Control
         rightBound -= UI.S(10);
         int textW = Math.Max(UI.S(100), rightBound - curX);
 
-        using (Font ft = new Font("Segoe UI Semibold", UI.SF(9.5f)))
         {
+            Font ft = FontTitel;
             Size tsz = TextRenderer.MeasureText(g, title ?? "", ft, new Size(textW, int.MaxValue), TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
             int titleH = Math.Max(tsz.Height, UI.S(18));
             int startY = string.IsNullOrEmpty(desc) ? (Height - titleH) / 2 : UI.S(7);
-            TextRenderer.DrawText(g, title ?? "", ft, new Rectangle(curX, startY, textW, titleH), UI.Text, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+            TextRenderer.DrawText(g, title ?? "", ft, new Rectangle(curX, startY, textW, titleH), UI.Text, TextFormatFlags.Left | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
 
             if (!string.IsNullOrEmpty(desc))
             {
-                using (Font fd = new Font("Segoe UI", UI.SF(8.25f)))
                 {
+                    Font fd = FontDetail;
                     int descY = startY + titleH + UI.S(2);
                     int descAvailH = Math.Max(UI.S(12), Height - descY - UI.S(6));
-                    TextRenderer.DrawText(g, desc, fd, new Rectangle(curX, descY, textW, descAvailH), UI.Muted, TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);
+                    TextRenderer.DrawText(g, desc, fd, new Rectangle(curX, descY, textW, descAvailH), UI.Muted, TextFormatFlags.Left | TextFormatFlags.NoPrefix | TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);
                 }
             }
         }
@@ -1889,7 +1953,7 @@ public class FluentCard : Control
         if (!String.IsNullOrEmpty(icon))
         {
             int icoSize = UI.S(28);
-            using (Font ifont = UI.SymbolFont(UI.SF(14)))
+            using (Font ifont = UI.SymbolFont(14))
             {
                 Rectangle icoRect = new Rectangle(curX, (Height - icoSize) / 2, icoSize, icoSize);
                 TextRenderer.DrawText(g, icon, ifont, icoRect, UI.Accent, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoClipping);
@@ -1904,15 +1968,15 @@ public class FluentCard : Control
         rightBound -= UI.S(12);
         int textW = Math.Max(UI.S(50), rightBound - curX);
 
-        using (Font ft = new Font("Segoe UI Semibold", UI.SF(10f)))
+        using (Font ft = new Font("Segoe UI Semibold", 10f))
         {
             Size tsz = TextRenderer.MeasureText(g, title, ft);
             int titleH = Math.Max(tsz.Height, UI.S(18));
             int startY = String.IsNullOrEmpty(desc) ? (Height - titleH) / 2 : UI.S(12);
-            TextRenderer.DrawText(g, title, ft, new Rectangle(curX, startY, textW, titleH), UI.Text, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+            TextRenderer.DrawText(g, title, ft, new Rectangle(curX, startY, textW, titleH), UI.Text, TextFormatFlags.Left | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
             if (status.Length > 0)
             {
-                using (Font fs = new Font("Segoe UI Semibold", UI.SF(8.25f)))
+                using (Font fs = new Font("Segoe UI Semibold", 8.25f))
                 {
                     Size ss = TextRenderer.MeasureText(g, status, fs, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding);
                     int bx = curX + Math.Min(tsz.Width, textW) + UI.S(8), bw = ss.Width + UI.S(14), bh = Math.Max(UI.S(18), ss.Height + UI.S(4));
@@ -1928,10 +1992,10 @@ public class FluentCard : Control
 
             if (!String.IsNullOrEmpty(desc))
             {
-                using (Font fd = new Font("Segoe UI", UI.SF(8.5f)))
+                using (Font fd = new Font("Segoe UI", 8.5f))
                 {
                     int descY = startY + titleH + UI.S(2);
-                    TextRenderer.DrawText(g, desc, fd, new Rectangle(curX, descY, textW, Height - descY - UI.S(4)), UI.Muted, TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);
+                    TextRenderer.DrawText(g, desc, fd, new Rectangle(curX, descY, textW, Height - descY - UI.S(4)), UI.Muted, TextFormatFlags.Left | TextFormatFlags.NoPrefix | TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);
                 }
             }
         }
@@ -2064,7 +2128,7 @@ class NavItem : Control
         {
             int icoSize = UI.S(22);
             int icoY = (Height - icoSize) / 2;
-            using (Font ifont = UI.SymbolFont(UI.SF(12.5f)))
+            using (Font ifont = UI.SymbolFont(12.5f))
             {
                 Rectangle icoR = new Rectangle(x, icoY, icoSize, icoSize);
                 TextRenderer.DrawText(g, Icon, ifont, icoR, sel ? UI.Accent : UI.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoClipping);
@@ -2072,7 +2136,7 @@ class NavItem : Control
             x += icoSize + UI.S(8);
         }
 
-        using (Font ft = new Font("Segoe UI Semibold", UI.SF(10f)))
+        using (Font ft = new Font("Segoe UI Semibold", 10f))
         {
             Size tsz = TextRenderer.MeasureText(g, Title, ft);
             int th = Math.Max(tsz.Height, UI.S(18));
@@ -2080,7 +2144,7 @@ class NavItem : Control
             Color titleColor = sel ? (UI.IsDark ? UI.Accent : UI.AccentDark) : UI.Text;
             int right = Width - UI.S(10);
             if (!String.IsNullOrEmpty(Hint))
-                using (Font fh = new Font("Segoe UI", UI.SF(8.5f)))
+                using (Font fh = new Font("Segoe UI", 8.5f))
                 {
                     Size hs = TextRenderer.MeasureText(g, Hint, fh);
                     if (right - hs.Width > x + tsz.Width + UI.S(6))
@@ -2116,12 +2180,12 @@ class StatCard : Control
             using (SolidBrush a = new SolidBrush(Accent)) g.FillRectangle(a, 0, 0, UI.S(5), Height);
             g.ResetClip();
         }
-        using (Font fn = new Font("Segoe UI Semibold", UI.SF(19f)))
+        using (Font fn = new Font("Segoe UI Semibold", 19f))
         {
             Size numSz = TextRenderer.MeasureText(g, count.ToString(), fn);
             int numY = UI.S(6);
             TextRenderer.DrawText(g, count.ToString(), fn, new Point(UI.S(16), numY), count > 0 ? Accent : UI.Muted);
-            using (Font fc = new Font("Segoe UI", UI.SF(8.5f)))
+            using (Font fc = new Font("Segoe UI", 8.5f))
             {
                 int capY = numY + numSz.Height - UI.S(2);
                 TextRenderer.DrawText(g, Caption, fc, new Rectangle(UI.S(16), capY, Width - UI.S(20), Height - capY), UI.Muted, TextFormatFlags.Left | TextFormatFlags.WordBreak);
@@ -2162,7 +2226,7 @@ class TabStrip : Control
         int barPad = UI.S(8);
         for (int i = 0; i < Items.Count; i++)
         {
-            using (Font f = new Font(i == selected ? "Segoe UI Semibold" : "Segoe UI", UI.SF(9.5f)))
+            using (Font f = new Font(i == selected ? "Segoe UI Semibold" : "Segoe UI", 9.5f))
             {
                 Rectangle r = ItemRect(g, i, f);
                 TextRenderer.DrawText(g, Items[i], f, r, i == selected ? UI.Accent : UI.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
@@ -2174,7 +2238,7 @@ class TabStrip : Control
     {
         using (Graphics g = CreateGraphics())
             for (int i = 0; i < Items.Count; i++)
-                using (Font f = new Font(i == selected ? "Segoe UI Semibold" : "Segoe UI", UI.SF(9.5f)))
+                using (Font f = new Font(i == selected ? "Segoe UI Semibold" : "Segoe UI", 9.5f))
                     if (ItemRect(g, i, f).Contains(e.Location)) { Selected = i; break; }
         base.OnMouseClick(e);
     }

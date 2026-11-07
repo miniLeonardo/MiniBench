@@ -61,6 +61,7 @@ Describe 'Selbsttest der Oberfläche' {
         @{ Fall = 'SettingRow.Dynamik' }
         @{ Fall = 'CategoryPickerItem.Kurztitel' }
         @{ Fall = 'UI.SkalierungDpi' }
+        @{ Fall = 'UI.IconByName' }
     ) {
         Assert-GuiSelbsttest $Fall
     }
@@ -159,5 +160,28 @@ Describe 'Projektregeln der Oberfläche' {
         $script:Gui | Should -Match 'chkFast = Chk\("Lesende Prüfungen parallel ausführen", true\);'
         $script:Gui | Should -Match 'chkLGpu = Chk\("Grafik", true\);'
         $script:Gui | Should -Match 'if \(chkLGpu != null\) chkLGpu\.Checked = true;'
+    }
+}
+
+Describe 'Kategoriesymbole (ab v4.01)' {
+    It 'jedes Symbol aus Katalog der Optimierung und Vertrag der Wartung ist eine Konstante in UI' {
+        $ui = Get-SrcText 'Oberflaeche/DiagGui_Steuerelemente.cs'
+        $namen = @()
+        foreach ($pfad in 'Module/Optimierung/Katalog.psd1', 'Module/Wartung/Vertrag.psd1') {
+            $namen += @([regex]::Matches((Get-SrcText $pfad), "Symbol\s*=\s*'(\w+)'") | ForEach-Object { $_.Groups[1].Value })
+        }
+        $namen.Count | Should -BeGreaterThan 10
+        foreach ($n in $namen) { $ui | Should -Match ('public const string {0} = ' -f $n) -Because $n }
+    }
+    It 'Optimierung zeigt Kurztitel und Symbol aus dem Katalog' {
+        $gui = Get-SrcText 'Oberflaeche/DiagGui.cs'
+        $gui | Should -Match 'UI\.IconByName\('
+        $gui | Should -Match 'new CategoryPickerItem\(k\[1\], ico, '
+    }
+    It 'Seitenkopf ohne Schalter "beim Start ausführen", Fußleiste ohne globale Optionen' {
+        $gui = Get-SrcText 'Oberflaeche/DiagGui.cs'
+        $gui | Should -Not -Match 'Lbl\("beim Start ausführen"'
+        $gui | Should -Not -Match 'chkSingleWindow'
+        $gui | Should -Not -Match 'fo\.Controls\.Add\((chkAnon|chkSingleWindow|lnkAblage)\)'
     }
 }
