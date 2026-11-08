@@ -15,6 +15,24 @@ function Get-SmartTestState($Device) {
     return $res
 }
 
+# ab v4.03: laufende SMART-Langtests beenden (smartctl -X), wenn das Warten übersprungen wird oder die
+# Datenträgermessung ansteht. Ein Langtest liest das ganze Laufwerk und senkte im Lauf vom 07.11.2026 die gemessenen
+# Werte um bis zu 49 %. Rückgabe: Namen der beendeten Laufwerke mit Fortschritt.
+function Stop-SmartLongTests([string]$Grund) {
+    $done = @()
+    if (-not $script:Smartctl) { return $done }
+    foreach ($t in @($script:SmartTests | Where-Object { $_.Status -eq 'läuft' })) {
+        $st = $null; try { $st = Get-SmartTestState $t.Device } catch { }
+        if ($st -and -not $st.Running) { $t.Status = 'beendet'; $t.Ende = Get-Date; $t.Fortschritt = 100; continue }
+        if ($st -and $null -ne $st.Percent) { $t.Fortschritt = $st.Percent }
+        $r = Invoke-External -File $script:Smartctl -Arguments ('-X -d {0} {1}' -f $t.Device.type, $t.Device.name) -TimeoutSec 60
+        $t.Status = 'abgebrochen'; $t.Ende = Get-Date; $t.Grund = $Grund
+        $done += ('{0} ({1} %)' -f $t.Name, $t.Fortschritt)
+        Write-Checkpoint 'INFO' ('SMART-Langtest {0} beendet ({1}), smartctl -X Rückgabecode {2}' -f $t.Name, $Grund, $r.ExitCode)
+    }
+    return $done
+}
+
 function Test-SmartJson {
     param($Json, [string]$Label)
     $j = $Json

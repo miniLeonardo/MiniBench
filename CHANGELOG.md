@@ -2,6 +2,21 @@
 
 Alle wesentlichen Änderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v4.03 (08.11.2026)
+
+### Behoben
+* **Update:** Klick auf das Update öffnete nur ein PowerShell-Fenster, weil der Austausch powershell.exe statt LMB.exe ansprach. Jetzt wird LMB.exe ersetzt, das Skript daneben archiviert, Update.log geschrieben und bei Fehlern die alte Version zurückgelegt.
+* **Versionsvergleich:** dezimal (4.03 < 4.1, 3.882 < 3.9) statt System.Version.
+* **Grafik:** PCIe-Anbindung unter Last gemessen statt im Leerlauf danach.
+* **Sensorkurven:** Legende und Abbruchschwelle überlappen nicht mehr, Abstände skalieren mit der Anzeige.
+
+### Verbessert
+* **SMART-Langtest:** wird beendet, wenn das Warten übersprungen wird oder die Datenträgermessung ansteht.
+* **Datenbank:** Knöpfe erst bei Markierung; Aktionen mit Berichtsordner öffnen und Lauf löschen.
+* **Ergebnisseite:** Verweis „Referenz ändern“; Referenz auf der Seite Benchmark direkt unter den Messungen.
+* **Lauf:** Kopfzeile „Aufräumen“ beim Beenden der Sensoren und Entfernen vorübergehender Treiber.
+* **Veröffentlichen:** Veroeffentlichen.ps1 erstellt das GitHub-Release mit LMB.exe und Prüfsumme.
+
 ## v4.02 (08.11.2026)
 
 ### Behoben

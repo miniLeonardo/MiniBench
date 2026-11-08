@@ -246,7 +246,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
 }
 #endregion
 
-$ScriptVersion = '4.02'
+$ScriptVersion = '4.03'
 $AppName       = 'Leos Minibench'
 # Eingebettete Referenzprofile für Leos Minibench (v3.0)
 $script:EmbeddedReferences = @{
@@ -6947,16 +6947,7 @@ public partial class DiagGui : Form
                 {
                     string cleanRemote = tag.TrimStart('v', 'V', ' ');
                     string cleanLocal = this.version.TrimStart('v', 'V', ' ');
-                    System.Version vRem, vLoc;
-                    bool isNewer = false;
-                    if (System.Version.TryParse(cleanRemote, out vRem) && System.Version.TryParse(cleanLocal, out vLoc))
-                    {
-                        isNewer = vRem > vLoc;
-                    }
-                    else
-                    {
-                        isNewer = String.Compare(cleanRemote, cleanLocal, StringComparison.OrdinalIgnoreCase) > 0;
-                    }
+                    bool isNewer = IsNewerVersion(cleanRemote, cleanLocal);
 
                     if (isNewer)
                     {
@@ -6985,6 +6976,18 @@ public partial class DiagGui : Form
         t.Start();
     }
 
+    // Versionen sind Dezimalzahlen (3.882 < 3.9 < 4.0 < 4.01 < 4.1). System.Version hielt 4.03 für größer als 4.1
+    // und 3.882 für größer als 3.9 (ab v4.03 korrigiert).
+    public static bool IsNewerVersion(string remote, string local)
+    {
+        decimal r, l;
+        System.Globalization.CultureInfo inv = System.Globalization.CultureInfo.InvariantCulture;
+        if (Decimal.TryParse((remote ?? "").Trim().TrimStart('v', 'V'), System.Globalization.NumberStyles.Number, inv, out r) &&
+            Decimal.TryParse((local ?? "").Trim().TrimStart('v', 'V'), System.Globalization.NumberStyles.Number, inv, out l))
+            return r > l;
+        return String.Compare(remote, local, StringComparison.OrdinalIgnoreCase) > 0;
+    }
+
     void TriggerUpdateDownload()
     {
         if (String.IsNullOrEmpty(AvailableUpdateUrl))
@@ -6993,8 +6996,8 @@ public partial class DiagGui : Form
             return;
         }
 
-        string msg = "Möchten Sie das Update auf Version " + AvailableUpdateVersion + " jetzt herunterladen und LMB.exe automatisch austauschen?\r\n\r\n" +
-                     "Die bisherige Programmdatei wird im Archiv gesichert und die Anwendung anschlie\u00DFend neu gestartet.";
+        string msg = "Update auf Version " + AvailableUpdateVersion + " jetzt herunterladen und LMB.exe austauschen?\r\n\r\n" +
+                     "Leos Minibench schließt sich dafür. Die bisherige Programmdatei und ein Skript daneben (LeosMinibench.ps1) werden im Datenordner unter Archiv gesichert, danach startet die neue Version.";
         if (!UI.Ask(msg, "Minibench Update", this))
             return;
 
@@ -7006,6 +7009,8 @@ public partial class DiagGui : Form
 
             Cursor.Current = Cursors.WaitCursor;
 
+            System.Net.ServicePointManager.SecurityProtocol = (System.Net.SecurityProtocolType)3072; // Tls12, auch ohne vorherige Prüfung im selben Prozess
+            if (running) { UI.Hinweis("Während eines Laufs ist kein Update möglich.", "Update", this); return; }
             using (System.Net.WebClient wc = new System.Net.WebClient())
             {
                 wc.Headers["User-Agent"] = "LeosMinibench";
@@ -7055,46 +7060,76 @@ public partial class DiagGui : Form
         }
     }
 
+    // Programmdatei austauschen (ab v4.03 neu). Bis v4.02 hielt das Austauschskript this.psExe für die Programmdatei:
+    // Das ist powershell.exe. "move" scheiterte, und "start" öffnete am Ende nur ein PowerShell-Fenster; LMB.exe blieb alt.
+    // Jetzt: Pfad der exe aus LEOSMINIBENCH_EXE (setzt das Startprogramm), Warten, bis die exe nicht mehr gesperrt ist
+    // (Startprogramm und Oberfläche beendet), altes Skript neben der exe mit archivieren (sonst lädt die neue exe weiter
+    // das alte Skript), Protokoll in Update.log, Rückweg bei Fehlern.
     void ExecuteSelfReplace(string newExePath)
     {
         try
         {
             string updateDir = Path.GetDirectoryName(newExePath);
             string updateCmd = Path.Combine(updateDir, "Update.cmd");
-            string currentExe = this.psExe;
-            if (String.IsNullOrEmpty(currentExe) || !File.Exists(currentExe))
+            string logFile = Path.Combine(updateDir, "Update.log");
+            string exe = Environment.GetEnvironmentVariable("LEOSMINIBENCH_EXE") ?? "";
+            if (exe.Length == 0 || !exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
             {
-                currentExe = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
+                // ohne Startprogramm gestartet (LeosMinibench.cmd): LMB.exe neben das Skript legen
+                string sdir = File.Exists(script) && !script.StartsWith(Path.GetTempPath(), StringComparison.OrdinalIgnoreCase) ? Path.GetDirectoryName(script) : (dataDir.Length > 0 ? Path.GetDirectoryName(dataDir.TrimEnd('\\')) : "");
+                if (sdir.Length == 0) { UI.Hinweis("Der Ordner der Programmdatei ist unbekannt. Die neue LMB.exe liegt in:\r\n" + newExePath, "Update", this); return; }
+                exe = Path.Combine(sdir, "LMB.exe");
             }
-            int myPid = System.Diagnostics.Process.GetCurrentProcess().Id;
+            string exeDir = Path.GetDirectoryName(exe);
+            string ps1Beside = Path.Combine(exeDir, "LeosMinibench.ps1");
+            string archivDir = Path.Combine(dataDir.Length > 0 ? dataDir : exeDir, Path.Combine("Archiv", "v" + this.version));
 
-            string archivDir = Path.Combine(dataDir, "Archiv", "v" + this.version);
+            List<string> c = new List<string>();
+            c.Add("@echo off");
+            c.Add("chcp 65001 >nul");
+            c.Add("setlocal");
+            c.Add("title Leos Minibench Update");
+            c.Add("set \"EXE=" + exe + "\"");
+            c.Add("set \"NEU=" + newExePath + "\"");
+            c.Add("set \"ARCH=" + archivDir + "\"");
+            c.Add("set \"PS1=" + ps1Beside + "\"");
+            c.Add("set \"LOG=" + logFile + "\"");
+            c.Add(">>\"%LOG%\" echo %date% %time% Update von " + this.version + " auf " + AvailableUpdateVersion + ": %EXE%");
+            c.Add("if not exist \"%ARCH%\" mkdir \"%ARCH%\"");
+            c.Add("if not exist \"%EXE%\" goto kopieren");
+            c.Add("set /a n=0");
+            // bis zu 90 s warten, bis Oberfläche und Startprogramm beendet sind und die exe frei ist
+            c.Add(":warte");
+            c.Add("set /a n+=1");
+            c.Add("if %n% gtr 90 goto gesperrt");
+            c.Add("ping -n 2 127.0.0.1 >nul");
+            c.Add("move /y \"%EXE%\" \"%ARCH%\\LMB.exe\" >nul 2>&1");
+            c.Add("if errorlevel 1 goto warte");
+            c.Add(":kopieren");
+            c.Add("if exist \"%PS1%\" move /y \"%PS1%\" \"%ARCH%\\LeosMinibench.ps1\" >nul 2>&1");
+            c.Add("copy /y \"%NEU%\" \"%EXE%\" >nul");
+            c.Add("if errorlevel 1 goto zurueck");
+            c.Add(">>\"%LOG%\" echo %date% %time% erfolgreich, alte Version in %ARCH%");
+            c.Add("del \"%NEU%\" >nul 2>&1");
+            c.Add("start \"\" \"%EXE%\"");
+            c.Add("goto ende");
+            c.Add(":zurueck");
+            c.Add(">>\"%LOG%\" echo %date% %time% Kopieren fehlgeschlagen, alte Version zurück");
+            c.Add("if exist \"%ARCH%\\LMB.exe\" move /y \"%ARCH%\\LMB.exe\" \"%EXE%\" >nul");
+            c.Add("if exist \"%ARCH%\\LeosMinibench.ps1\" if not exist \"%PS1%\" move /y \"%ARCH%\\LeosMinibench.ps1\" \"%PS1%\" >nul");
+            c.Add("start \"\" \"%EXE%\"");
+            c.Add("goto ende");
+            c.Add(":gesperrt");
+            c.Add(">>\"%LOG%\" echo %date% %time% LMB.exe blieb gesperrt, Update nicht ausgeführt. Neue Datei: %NEU%");
+            c.Add(":ende");
+            c.Add("del \"%~f0\"");
+            File.WriteAllText(updateCmd, String.Join("\r\n", c.ToArray()) + "\r\n", new UTF8Encoding(false));
 
-            string[] cmdLines = new string[] {
-                string.Format("{0}echo off", "@"),
-                "setlocal",
-                "title Minibench Update",
-                ":waitloop",
-                "timeout /t 1 /nobreak >nul",
-                "tasklist /fi \"PID eq " + myPid + "\" 2>nul | find \"" + myPid + "\" >nul",
-                "if %errorlevel% equ 0 goto waitloop",
-                "if not exist \"" + archivDir + "\" mkdir \"" + archivDir + "\"",
-                "move /y \"" + currentExe + "\" \"" + Path.Combine(archivDir, "LMB.exe") + "\" >nul",
-                "copy /y \"" + newExePath + "\" \"" + currentExe + "\" >nul",
-                "start \"\" \"" + currentExe + "\"",
-                "del \"%~f0\""
-            };
-
-            File.WriteAllText(updateCmd, String.Join("\r\n", cmdLines), Encoding.ASCII);
-
-            ProcessStartInfo psi = new ProcessStartInfo();
-            psi.FileName = "cmd.exe";
-            psi.Arguments = "/c \"" + updateCmd + "\"";
-            psi.CreateNoWindow = true;
-            psi.UseShellExecute = false;
+            ProcessStartInfo psi = new ProcessStartInfo("cmd.exe", "/c \"\"" + updateCmd + "\"\"");
+            psi.CreateNoWindow = true; psi.UseShellExecute = false; psi.WindowStyle = ProcessWindowStyle.Hidden;
+            psi.WorkingDirectory = updateDir;
             Process.Start(psi);
-
-            Application.Exit();
+            Close();
         }
         catch (Exception ex)
         {
@@ -7819,7 +7854,6 @@ public partial class DiagGui : Form
         Tip(cmbKeep, "Was nach dem Lauf mit PawnIO und smartmontools geschieht, die Leos Minibench installiert hat: nach dem Lauf entfernen (keine Reste) oder auf diesem PC behalten. Gespeichert je Gerät in Geraete.json.");
         // Vergleichsdatenbank, Änderungen, Fuß
         Tip(btnCompare, "Vergleicht die angehakten Systeme in einem HTML-Bericht (mindestens zwei).");
-        Tip(btnDelete, "Entfernt die angehakten Einträge aus der Datenbank. Die Berichtsordner bleiben erhalten.");
         Tip(btnDbClean, "Datenpflege: verschiebt nicht mehr vergleichbare Lasttests älterer Versionen, abgebrochene Läufe ohne Bericht und kurze Läufe (Funktionstest, Lasttest nach wenigen Sekunden beendet, Lauf ohne Messwert) sowie ungenutzte Teile von smartmontools nach Minibench-Daten\\Archiv. Gelöscht werden nur ältere Übersetzungen im Cache und Reste der Live-Ansicht; das Protokoll steht in Archiv\\Datenpflege.log.");
         Tip(btnUndo, "Nimmt die angehakten Änderungen zurück (nur Stufe Ändern und nur auf dem PC, auf dem sie entstanden sind).");
         Tip(lnkAblage, "Öffnet den Datenordner mit Berichten, Datenbank, Werkzeugen und Vorlagen: " + (dataDir.Length > 0 ? dataDir : "kein Datenordner"));
@@ -8224,6 +8258,27 @@ public partial class DiagGui : Form
             benchChk[i].CheckedChanged += delegate { clbDisks.Enabled = benchChk[3].Checked; UpdateSummary(); };
             f.Controls.Add(Opt2(benchChk[i], benchDetail[i]));
         }
+        // ab v4.03 direkt unter den Messungen: Die Referenz bestimmt alle Prozentwerte der Ergebnisseite und stand vorher
+        // ganz unten außerhalb des Sichtbereichs
+        f.Controls.Add(Section("Referenz"));
+        FlowLayoutPanel r2 = Row(); r2.Controls.Add(RowLabel("Referenz (100 %)", 170));
+        cmbRef = Combo(360, new string[0], 0); r2.Controls.Add(cmbRef);
+        btnUpdateMed = UI.Secondary("Median aktualisieren");
+        btnUpdateMed.Click += delegate {
+            if (running) return;
+            List<string> lines;
+            string res = RunHelperPumped("-MedianAktualisieren", out lines, 60);
+            string msg = "Aktualisierung fehlgeschlagen.";
+            foreach (string l in lines) if (l.StartsWith("@@STATUS|")) msg = l.Substring(9);
+            MessageBox.Show(this, msg, "Median-Referenz", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            FillRefLists();
+        };
+        r2.Controls.Add(btnUpdateMed);
+        f.Controls.Add(r2);
+        lblRefState = Hint("", 180); f.Controls.Add(lblRefState);
+        cmbRef.SelectedIndexChanged += delegate { UpdateRefState(); };
+        chkRefSave = Chk("Dieses System als Referenz (100 %) festlegen", false); f.Controls.Add(chkRefSave);
+
         f.Controls.Add(Section("Laufwerke"));
         clbDisks = new CheckedListBox(); clbDisks.CheckOnClick = true; clbDisks.Width = UI.S(UI.Gruppenbreite); clbDisks.BorderStyle = BorderStyle.FixedSingle; clbDisks.IntegralHeight = false; clbDisks.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(4)); clbDisks.BackColor = UI.Panel; clbDisks.ForeColor = UI.Text;
         foreach (string d in disks)
@@ -8246,25 +8301,6 @@ public partial class DiagGui : Form
         rg.Controls.Add(RowLabel("Anzeige", 70)); cmbGpuShow = Combo(170, new string[] { "Fenster", "Vollbild", "ohne Anzeige" }, 0); rg.Controls.Add(cmbGpuShow);
         f.Controls.Add(rg);
         f.Controls.Add(Hint("Ergebnis: Ø Bilder/s, 1-%-Low und Punktzahl je Grafikeinheit. Esc im Fenster beendet den Test.", 4));
-
-        f.Controls.Add(Section("Referenz"));
-        FlowLayoutPanel r2 = Row(); r2.Controls.Add(RowLabel("Referenz (100 %)", 170));
-        cmbRef = Combo(360, new string[0], 0); r2.Controls.Add(cmbRef);
-        btnUpdateMed = UI.Secondary("Median aktualisieren");
-        btnUpdateMed.Click += delegate {
-            if (running) return;
-            List<string> lines;
-            string res = RunHelperPumped("-MedianAktualisieren", out lines, 60);
-            string msg = "Aktualisierung fehlgeschlagen.";
-            foreach (string l in lines) if (l.StartsWith("@@STATUS|")) msg = l.Substring(9);
-            MessageBox.Show(this, msg, "Median-Referenz", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            FillRefLists();
-        };
-        r2.Controls.Add(btnUpdateMed);
-        f.Controls.Add(r2);
-        lblRefState = Hint("", 180); f.Controls.Add(lblRefState);
-        cmbRef.SelectedIndexChanged += delegate { UpdateRefState(); };
-        chkRefSave = Chk("Dieses System als Referenz (100 %) festlegen", false); f.Controls.Add(chkRefSave);
 
         clbCompare = new CheckedListBox(); clbCompare.BackColor = UI.Panel; clbCompare.ForeColor = UI.Text;
         FillRefLists();
@@ -13606,7 +13642,8 @@ class SensorChart : Control
 
     void DrawPanel(Graphics g, Rectangle r, string title, string unit, Series[] ser, double tMin, double tMax, bool limits)
     {
-        Rectangle plot = new Rectangle(r.X + 58, r.Y + 22, r.Width - 58 - 14, r.Height - 22 - 18);
+        // ab v4.03 mit UI.S: feste Pixel ließen bei 150 % Achsenbeschriftung und Legende ineinanderlaufen
+        Rectangle plot = new Rectangle(r.X + UI.S(58), r.Y + UI.S(22), r.Width - UI.S(58 + 14), r.Height - UI.S(22 + 18));
         if (plot.Width < 40 || plot.Height < 20) return;
         double lo = double.MaxValue, hi = double.MinValue; bool any = false;
         foreach (double[] row in rows)
@@ -13620,21 +13657,42 @@ class SensorChart : Control
         }
         if (unit == "Bilder/s") lo = 0;
         if (unit == "%") { lo = 0; if (hi < 100) hi = 100; }
-        using (Font ft = new Font("Segoe UI Semibold", 9f)) TextRenderer.DrawText(g, title + " (" + unit + ")", ft, new Point(r.X + 8, r.Y + 2), UI.Text);
+        int legX = r.X + UI.S(140);
+        using (Font ft = new Font("Segoe UI Semibold", 9f))
+        {
+            string tt = title + " (" + unit + ")";
+            TextRenderer.DrawText(g, tt, ft, new Point(r.X + UI.S(8), r.Y + UI.S(2)), UI.Text);
+            legX = Math.Max(legX, r.X + UI.S(8) + TextRenderer.MeasureText(tt, ft).Width + UI.S(12));
+        }
         double[] last = rows[rows.Count - 1];
         using (Font fl = new Font("Segoe UI", 8.75f))
         {
-            int x = r.X + 140;
+            int x = legX;
             foreach (Series sr in ser)
             {
                 string lv = Fmt(last[sr.Col], unit);
                 if (lv.Length == 0) continue;
                 string txt = sr.Label + " " + lv;
-                using (SolidBrush b = new SolidBrush(sr.Color)) g.FillRectangle(b, x, r.Y + 7, 10, 10);
-                TextRenderer.DrawText(g, txt, fl, new Point(x + 14, r.Y + 3), UI.Text);
-                x += 22 + TextRenderer.MeasureText(txt, fl).Width;
+                using (SolidBrush b = new SolidBrush(sr.Color)) g.FillRectangle(b, x, r.Y + UI.S(7), UI.S(10), UI.S(10));
+                TextRenderer.DrawText(g, txt, fl, new Point(x + UI.S(14), r.Y + UI.S(3)), UI.Text);
+                x += UI.S(22) + TextRenderer.MeasureText(txt, fl).Width;
             }
-            if (limits && !double.IsNaN(CpuLimit) && CpuLimit > 0) TextRenderer.DrawText(g, "Abbruch CPU " + CpuLimit.ToString("0") + " °C" + (!double.IsNaN(GpuLimit) && GpuLimit > 0 ? ", GPU " + GpuLimit.ToString("0") + " °C" : ""), fl, new Point(x + 4, r.Y + 3), UI.Crit);
+            // Abbruchschwelle rechtsbündig; passt sie nicht neben die Legende, die Kurzform, sonst nur die gestrichelten Linien
+            if (limits && !double.IsNaN(CpuLimit) && CpuLimit > 0)
+            {
+                bool gpuL = !double.IsNaN(GpuLimit) && GpuLimit > 0;
+                string[] varianten = new string[] {
+                    "Abbruch CPU " + CpuLimit.ToString("0") + " °C" + (gpuL ? ", GPU " + GpuLimit.ToString("0") + " °C" : ""),
+                    "Abbruch " + CpuLimit.ToString("0") + (gpuL ? "/" + GpuLimit.ToString("0") : "") + " °C" };
+                foreach (string lt in varianten)
+                {
+                    int w = TextRenderer.MeasureText(lt, fl).Width;
+                    int lx = r.Right - UI.S(14) - w;
+                    if (lx < x + UI.S(4)) continue;
+                    TextRenderer.DrawText(g, lt, fl, new Point(lx, r.Y + UI.S(3)), UI.Crit);
+                    break;
+                }
+            }
         }
         if (!any) { using (Font f = new Font("Segoe UI", 8.75f)) TextRenderer.DrawText(g, "kein Wert verfügbar", f, plot, UI.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); return; }
         double span = hi - lo; if (span < 1) span = 1;
@@ -13647,7 +13705,7 @@ class SensorChart : Control
             {
                 float y = (float)(plot.Bottom - (v - y0) / (y1 - y0) * plot.Height);
                 g.DrawLine(grid, plot.Left, y, plot.Right, y);
-                TextRenderer.DrawText(g, v.ToString("0"), fa, new Rectangle(r.X, (int)y - 8, 52, 16), UI.Muted, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
+                TextRenderer.DrawText(g, v.ToString("0"), fa, new Rectangle(r.X, (int)y - UI.S(8), UI.S(52), UI.S(16)), UI.Muted, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
             }
             double ts = 10; foreach (double c in new double[] { 10, 30, 60, 120, 300, 600, 900, 1800, 3600 }) { ts = c; if ((tMax - tMin) / c <= 8) break; }
             for (double t = Math.Ceiling(tMin / ts) * ts; t <= tMax; t += ts)
@@ -13655,7 +13713,7 @@ class SensorChart : Control
                 float x = (float)(plot.Left + (t - tMin) / (tMax - tMin) * plot.Width);
                 g.DrawLine(grid, x, plot.Top, x, plot.Bottom);
                 string lab = ts >= 60 ? ((int)(t / 60)).ToString() + " min" : ((int)t).ToString() + " s";
-                TextRenderer.DrawText(g, lab, fa, new Rectangle((int)x - 30, plot.Bottom + 1, 60, 16), UI.Muted, TextFormatFlags.HorizontalCenter);
+                TextRenderer.DrawText(g, lab, fa, new Rectangle((int)x - UI.S(30), plot.Bottom + 1, UI.S(60), UI.S(16)), UI.Muted, TextFormatFlags.HorizontalCenter);
             }
         }
         if (limits)
@@ -14446,7 +14504,7 @@ public partial class DiagGui
     int dbSortCol = -1;
     bool dbSortAsc = true;
     Button btnRename;
-    Button btnCompare, btnDashboard, btnVerlauf, btnDelete, btnOpenReport, btnExport, btnSetRef, btnToggleGroups, btnActions;
+    Button btnCompare, btnDashboard, btnVerlauf, btnOpenReport, btnExport, btnSetRef, btnToggleGroups, btnActions;
 
     void OnDbColumnClick(object sender, ColumnClickEventArgs e)
     {
@@ -14594,36 +14652,42 @@ public partial class DiagGui
             if (lvDb != null && lvDb.SelectedItems.Count > 0) target = (DbEntry)lvDb.SelectedItems[0].Tag;
             if (target != null) OpenEntry(target);
         };
-        btnOpenReport.Enabled = false;
+        btnOpenReport.Visible = false;
         Tip(btnOpenReport, "Öffnet den vollständigen HTML-Diagnosebericht des markierten Systems.");
 
         btnVerlauf = UI.Secondary("Verlauf"); btnVerlauf.Margin = new Padding(UI.S(8), 0, 0, 0);
         btnVerlauf.Click += delegate { OpenDeviceHistory(); };
-        btnVerlauf.Enabled = false;
+        btnVerlauf.Visible = false;
         Tip(btnVerlauf, "Öffnet das interaktive Dashboard im Verlaufsmodus für alle Läufe des markierten Geräts.");
 
+        // ab v4.03: Seltenes im Menü Aktionen, Löschen eingeschlossen. Die Knöpfe für einen Lauf erscheinen erst,
+        // wenn einer markiert ist (UpdateDbButtons); vorher standen fünf Knöpfe dauerhaft da, meist ausgegraut.
         ContextMenu cmActions = new ContextMenu();
-        cmActions.MenuItems.Add("Als Referenz festlegen (persistent)", delegate { SetSelectedAsReference(); });
-        cmActions.MenuItems.Add("Als Basis im Dashboard öffnen (temporär)", delegate { OpenDashboardWithBase(); });
-        cmActions.MenuItems.Add("-");
-        cmActions.MenuItems.Add("Name ändern ...", delegate { RenameSelectedEntry(); });
-        cmActions.MenuItems.Add("Lauf exportieren ...", delegate { ExportSelected(); });
+        MenuItem maFolder = new MenuItem("Berichtsordner öffnen", delegate { DbEntry s = SelectedDbEntry(); if (s != null) OpenEntryFolder(s); });
+        MenuItem maRef = new MenuItem("Als Referenz festlegen (persistent)", delegate { SetSelectedAsReference(); });
+        MenuItem maBase = new MenuItem("Als Basis im Dashboard öffnen (temporär)", delegate { OpenDashboardWithBase(); });
+        MenuItem maRename = new MenuItem("Name ändern ...", delegate { RenameSelectedEntry(); });
+        MenuItem maExport = new MenuItem("Lauf exportieren ...", delegate { ExportSelected(); });
+        MenuItem maDelete = new MenuItem("Lauf löschen ...", delegate { DeleteSelected(); });
+        cmActions.MenuItems.AddRange(new MenuItem[] { maFolder, new MenuItem("-"), maRef, maBase, new MenuItem("-"), maRename, maExport, new MenuItem("-"), maDelete });
+        cmActions.Popup += delegate {
+            int selN = lvDb != null ? lvDb.SelectedItems.Count : 0; int chkN = CheckedEntries().Count;
+            maFolder.Enabled = maRef.Enabled = maBase.Enabled = maRename.Enabled = maExport.Enabled = selN == 1;
+            maDelete.Enabled = chkN > 0 || selN == 1;
+            maDelete.Text = chkN > 1 ? String.Format("Angehakte Läufe löschen ({0}) ...", chkN) : chkN == 1 ? "Angehakten Lauf löschen ..." : "Lauf löschen ...";
+        };
 
         btnActions = UI.Secondary("Aktionen \u25BE"); btnActions.Margin = new Padding(UI.S(8), 0, 0, 0);
         btnActions.Click += delegate { cmActions.Show(btnActions, new Point(0, btnActions.Height)); };
-        btnActions.Enabled = false;
-        Tip(btnActions, "Weitere Aktionen für den markierten Lauf: Als Referenz festlegen, Name ändern oder exportieren.");
+        btnActions.Visible = false;
+        Tip(btnActions, "Für den markierten Lauf: Berichtsordner öffnen, als Referenz festlegen, Name ändern, exportieren oder löschen.");
 
         btnSetRef = UI.Secondary("Als Referenz ..."); Tip(btnSetRef, "Legt das markierte System als dauerhafte Vergleichsreferenz fest.");
         btnRename = UI.Secondary("Name ändern ..."); Tip(btnRename, "Ändert den Anzeigenamen des markierten Systems.");
         btnExport = UI.Secondary("Lauf exportieren ..."); Tip(btnExport, "Exportiert den markierten Lauf als eigenständiges Paket.");
         btnCompare = UI.Secondary("Vergleichen"); Tip(btnCompare, "Systeme vergleichen.");
 
-        btnDelete = UI.Secondary("Lauf löschen"); btnDelete.Margin = new Padding(UI.S(8), 0, 0, 0); btnDelete.Click += delegate { DeleteSelected(); };
-        btnDelete.Enabled = false;
-        Tip(btnDelete, "Verschiebt die markierten oder angehakten Läufe nach Minibench-Daten\\Archiv\\Entfernt. Beim nächsten Abgleich verschwinden sie auch vom Netzlaufwerk.");
-
-        b.Controls.Add(btnDashboard); b.Controls.Add(btnOpenReport); b.Controls.Add(btnVerlauf); b.Controls.Add(btnActions); b.Controls.Add(btnDelete); bottom.Controls.Add(b);
+        b.Controls.Add(btnDashboard); b.Controls.Add(btnOpenReport); b.Controls.Add(btnVerlauf); b.Controls.Add(btnActions); bottom.Controls.Add(b);
 
         lblDbClean = Lbl(DatenpflegeInfo, UI.SchriftHinweis, false, UI.Muted); lblDbClean.Visible = DatenpflegeInfo.Length > 0;
         lblDbClean.Margin = new Padding(UI.S(4), UI.S(8), UI.S(4), 0); bottom.Controls.Add(lblDbClean);
@@ -14724,6 +14788,7 @@ public partial class DiagGui
         MenuItem miSep3 = new MenuItem("-");
         MenuItem miRename = new MenuItem("Name ändern ...", delegate { RenameSelectedEntry(); });
         MenuItem miOpen = new MenuItem("Bericht öffnen", delegate { if (lvDb.SelectedItems.Count > 0) OpenEntry((DbEntry)lvDb.SelectedItems[0].Tag); });
+        MenuItem miFolder = new MenuItem("Berichtsordner öffnen", delegate { DbEntry s = SelectedDbEntry(); if (s != null) OpenEntryFolder(s); });
         MenuItem miExport = new MenuItem("Lauf exportieren ...", delegate { ExportSelected(); });
         MenuItem miSep2 = new MenuItem("-");
         MenuItem miDelete = new MenuItem("Aus Datenbank entfernen", delegate { DeleteSelected(); });
@@ -14737,6 +14802,7 @@ public partial class DiagGui
         cm.MenuItems.Add(miSep3);
         cm.MenuItems.Add(miRename);
         cm.MenuItems.Add(miOpen);
+        cm.MenuItems.Add(miFolder);
         cm.MenuItems.Add(miExport);
         cm.MenuItems.Add(miSep2);
         cm.MenuItems.Add(miDelete);
@@ -14754,7 +14820,7 @@ public partial class DiagGui
             if (selN == 1) selTarget = lvDb.SelectedItems[0].Tag as DbEntry;
             else if (chkN == 1) selTarget = lvDb.CheckedItems[0].Tag as DbEntry;
             miRename.Enabled = (selTarget != null && !selTarget.IsReference && (selN == 1 || (selN == 0 && chkN == 1)));
-            miOpen.Enabled = selN == 1;
+            miOpen.Enabled = selN == 1; miFolder.Enabled = selN == 1;
             miExport.Enabled = selN == 1 || (selN == 0 && chkN == 1);
             miDelete.Enabled = chkN >= 1 || selN >= 1;
         };
@@ -15041,28 +15107,25 @@ public partial class DiagGui
         btnDashboard.Enabled = (chkN >= 1);
         btnDashboard.Text = (chkN >= 1 ? String.Format("Im Dashboard vergleichen ({0})", chkN) : "Im Dashboard vergleichen");
 
-        if (btnOpenReport != null) btnOpenReport.Enabled = (selN == 1);
-        if (btnVerlauf != null) btnVerlauf.Enabled = (selN == 1 && GetSelectedDeviceTarget() != null);
-        if (btnActions != null) btnActions.Enabled = (selN == 1);
+        // Knöpfe für einen Lauf nur bei Markierung; Aktionen auch bei angehakten Läufen (Löschen)
+        if (btnOpenReport != null) btnOpenReport.Visible = (selN == 1);
+        if (btnVerlauf != null) btnVerlauf.Visible = (selN == 1 && GetSelectedDeviceTarget() != null);
+        if (btnActions != null) btnActions.Visible = (selN == 1 || chkN > 0);
+    }
 
-        if (btnDelete != null)
+    DbEntry SelectedDbEntry() { return lvDb != null && lvDb.SelectedItems.Count == 1 ? lvDb.SelectedItems[0].Tag as DbEntry : null; }
+
+    // Berichtsordner eines Laufs im Explorer (auch für Einträge mit altem UNC-Pfad, dann der gleichnamige Ordner im Datenordner)
+    void OpenEntryFolder(DbEntry e)
+    {
+        if (e == null) return;
+        if (e.Ordner.Length > 0)
         {
-            if (chkN > 0)
-            {
-                btnDelete.Enabled = true;
-                btnDelete.Text = (chkN > 1 ? String.Format("Ausgewählte Läufe löschen ({0})", chkN) : "Ausgewählten Lauf löschen");
-            }
-            else if (selN == 1)
-            {
-                btnDelete.Enabled = true;
-                btnDelete.Text = "Lauf löschen";
-            }
-            else
-            {
-                btnDelete.Enabled = false;
-                btnDelete.Text = "Lauf löschen";
-            }
+            string dir = System.IO.Path.IsPathRooted(e.Ordner) ? e.Ordner : System.IO.Path.Combine(dataDir, e.Ordner);
+            if (!Directory.Exists(dir)) { string alt = System.IO.Path.Combine(System.IO.Path.Combine(dataDir, "Berichte"), System.IO.Path.GetFileName(e.Ordner.TrimEnd('\\', '/'))); if (Directory.Exists(alt)) dir = alt; }
+            if (Directory.Exists(dir)) { OpenShell(dir); return; }
         }
+        OpenSelect(e.Path);
     }
     void ShowSetRefMenu()
     {
@@ -18951,6 +19014,7 @@ e.Result = items;
     // Oben das Urteil mit den wichtigsten Befunden und der Vergleich mit der Referenz, darunter je Komponente ein
     // Hauptwert mit Einordnung. Gezeigt wird nur, was dieser Lauf gemessen oder gemeldet hat; Details stehen im Bericht.
     Label lblResVerdict, lblResCounts, lblResScore, lblResScoreSub, lblResRef;
+    LinkLabel lnkResRef;
     FlowLayoutPanel pnlResFind, pnlResCmp, pnlResTiles;
     TableLayoutPanel tblResMid;
     CardPanel cardResFind, cardResCmp;
@@ -19001,7 +19065,15 @@ e.Result = items;
         lnkResAll.LinkClicked += delegate { if (File.Exists(htmlPath)) OpenShell(htmlPath); };
         Tip(lnkResAll, "Öffnet den Bericht mit allen Befunden, Messwerten und Erklärungen.");
         cardResCmp = ResCard("Leistung im Vergleich", out pnlResCmp); cardResCmp.Margin = new Padding(UI.S(6), 0, 0, 0);
-        lblResRef = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblResRef.Margin = new Padding(0, 0, 0, UI.S(8));
+        lblResRef = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblResRef.Margin = new Padding(0, 0, 0, UI.S(2));
+        // ab v4.03: Weg zur Wahl der Referenz direkt von der Ergebnisseite (Seite Benchmark, Abschnitt Referenz)
+        lnkResRef = new LinkLabel(); lnkResRef.Text = "Referenz ändern"; lnkResRef.AutoSize = true; lnkResRef.LinkColor = UI.Accent; lnkResRef.ActiveLinkColor = UI.AccentHover; lnkResRef.LinkBehavior = LinkBehavior.HoverUnderline; lnkResRef.Margin = new Padding(0, 0, 0, UI.S(10));
+        lnkResRef.LinkClicked += delegate {
+            btnDashBack.PerformClick();
+            ShowPage(2);
+            if (cmbRef != null) { cmbRef.Focus(); Control sc = cmbRef.Parent; while (sc != null && !(sc is ScrollableControl && ((ScrollableControl)sc).AutoScroll)) sc = sc.Parent; if (sc != null) ((ScrollableControl)sc).ScrollControlIntoView(cmbRef); }
+        };
+        Tip(lnkResRef, "Öffnet die Seite Benchmark bei der Wahl der Referenz. Eine andere Referenz gilt ab dem nächsten Lauf; im Dashboard lassen sich vorhandene Läufe gegen jede Referenz vergleichen.");
         tblResMid.Controls.Add(cardResFind, 0, 0); tblResMid.Controls.Add(cardResCmp, 1, 0);
         main.Controls.Add(tblResMid);
 
@@ -19073,7 +19145,7 @@ e.Result = items;
 
     // Einordnung gegenüber der Referenz, nicht gegenüber einem Durchschnitt: Die Referenz ist ein bestimmter PC
     // (meist ein schneller). Bis v4.01 hieß 32 % unterdurchschnittlich, obwohl nur der Abstand zur Referenz gemeint war.
-    static string RatingWord(double pct)
+    public static string RatingWord(double pct)
     {
         if (pct >= 110) return "schneller"; if (pct >= 90) return "gleichauf"; if (pct >= 70) return "etwas langsamer";
         if (pct >= 45) return "langsamer"; return "deutlich langsamer";
@@ -19092,7 +19164,7 @@ e.Result = items;
     }
 
     // "Samsung SSD 980 1TB (931,5 GB, NVMe, Healthy); ..." -> eine kurze Pille je Laufwerk
-    static List<string> DiskPills(string disks)
+    public static List<string> DiskPills(string disks)
     {
         List<string> res = new List<string>();
         foreach (string part in (disks ?? "").Split(';'))
@@ -19207,6 +19279,7 @@ e.Result = items;
         lblResRef.Text = "100 % = " + RefLabelText();
         lblResRef.MaximumSize = new Size(UI.S(400), 0);
         pnlResCmp.Controls.Add(lblResRef);
+        pnlResCmp.Controls.Add(lnkResRef);
         int cmpRows = 0;
         for (int g = 0; g < resGruppen.Length; g++)
         {
@@ -19903,6 +19976,15 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.03", "08.11.2026", "Update-Funktion, SMART-Langtest, Datenbank und Feinschliff",
+            "\u2022 Update: Der Austausch der Programmdatei griff seit seiner Einf\u00FChrung auf powershell.exe statt auf LMB.exe zu und \u00F6ffnete nur ein PowerShell-Fenster. Jetzt wird LMB.exe ersetzt, sobald sie frei ist, das Skript daneben mit archiviert, das Ergebnis in Minibench-Daten\\Update\\Update.log festgehalten und bei Fehlern die alte Version zur\u00FCckgelegt. Versionen werden dezimal verglichen (4.03 < 4.1).\r\n" +
+            "\u2022 SMART-Langtest: Wird das Warten \u00FCbersprungen oder steht die Datentr\u00E4germessung an, beendet Leos Minibench den Langtest (smartctl -X), damit er Benchmark und Lasttest nicht bremst.\r\n" +
+            "\u2022 Grafik: Die PCIe-Anbindung wird w\u00E4hrend des Rendertests gelesen, nicht im Leerlauf danach (GTX 1070 stand vorher mit PCIe 1.0 im Bericht).\r\n" +
+            "\u2022 Datenbank: Kn\u00F6pfe f\u00FCr einen Lauf erscheinen erst, wenn einer markiert ist. Das Men\u00FC Aktionen enth\u00E4lt Berichtsordner \u00F6ffnen und Lauf l\u00F6schen; der Knopf Lauf l\u00F6schen entf\u00E4llt.\r\n" +
+            "\u2022 Ergebnisseite: Verweis \u201EReferenz \u00E4ndern\u201C f\u00FChrt zur Wahl der Referenz, die auf der Seite Benchmark jetzt direkt unter den Messungen steht.\r\n" +
+            "\u2022 Lauf: W\u00E4hrend Sensoren beendet und vor\u00FCbergehende Treiber entfernt werden, steht \u201EAufr\u00E4umen\u201C in der Kopfzeile statt des letzten Abschnitts.\r\n" +
+            "\u2022 Sensorkurven: Legende und Abbruchschwelle laufen nicht mehr ineinander; Abst\u00E4nde skalieren mit der Anzeigeskalierung.\r\n" +
+            "\u2022 Veroeffentlichen.ps1 erstellt das GitHub-Release mit LMB.exe und der SHA-256-Zeile, die die Update-Funktion pr\u00FCft."),
         new Eintrag("4.02", "08.11.2026", "PawnIO-Entfernung, plausiblere Messwerte, Einstellungen auf einer Seite",
             "\u2022 PawnIO: Der Treiber wurde seit v3.84 am Ende des Laufs nicht entfernt. Das Setup kennt nur -uninstall -silent, die zus\u00E4tzlichen InnoSetup- und NSIS-Schalter f\u00FChrten zum Fenster \u201EUnknown argument: /VERYSILENT\u201C und R\u00FCckgabecode 87. Ein noch installierter Treiber aus fr\u00FCheren L\u00E4ufen wird beim n\u00E4chsten Lauf entfernt.\r\n" +
             "\u2022 Laufwerke mit Medientyp \u201EUnspecified\u201C (SATA hinter AMD- oder Intel-Treibern) werden \u00FCber Name und 4K-Zugriffszeit als SSD oder Festplatte eingeordnet und bekommen wieder Index und Referenzvergleich.\r\n" +
@@ -31059,6 +31141,24 @@ function Get-SmartTestState($Device) {
     return $res
 }
 
+# ab v4.03: laufende SMART-Langtests beenden (smartctl -X), wenn das Warten übersprungen wird oder die
+# Datenträgermessung ansteht. Ein Langtest liest das ganze Laufwerk und senkte im Lauf vom 07.11.2026 die gemessenen
+# Werte um bis zu 49 %. Rückgabe: Namen der beendeten Laufwerke mit Fortschritt.
+function Stop-SmartLongTests([string]$Grund) {
+    $done = @()
+    if (-not $script:Smartctl) { return $done }
+    foreach ($t in @($script:SmartTests | Where-Object { $_.Status -eq 'läuft' })) {
+        $st = $null; try { $st = Get-SmartTestState $t.Device } catch { }
+        if ($st -and -not $st.Running) { $t.Status = 'beendet'; $t.Ende = Get-Date; $t.Fortschritt = 100; continue }
+        if ($st -and $null -ne $st.Percent) { $t.Fortschritt = $st.Percent }
+        $r = Invoke-External -File $script:Smartctl -Arguments ('-X -d {0} {1}' -f $t.Device.type, $t.Device.name) -TimeoutSec 60
+        $t.Status = 'abgebrochen'; $t.Ende = Get-Date; $t.Grund = $Grund
+        $done += ('{0} ({1} %)' -f $t.Name, $t.Fortschritt)
+        Write-Checkpoint 'INFO' ('SMART-Langtest {0} beendet ({1}), smartctl -X Rückgabecode {2}' -f $t.Name, $Grund, $r.ExitCode)
+    }
+    return $done
+}
+
 function Test-SmartJson {
     param($Json, [string]$Label)
     $j = $Json
@@ -35112,7 +35212,16 @@ function Invoke-RenderBenchmark($Adapters, [int]$Width, [int]$Height, [int]$Prev
         [void][DiagGpu]::Start($r)
         $total = [double]($WarmupMs + $MeasureMs + 6600)
         $sw = [Diagnostics.Stopwatch]::StartNew()
+        # ab v4.03: PCIe-Anbindung während des Aufwärmens lesen (Karte unter Last). Danach senken viele Karten die
+        # Generation sofort wieder ab; die GTX 1070 stand im Bericht so mit "PCIe 1.0".
+        $linkDone = -not ($script:RenderLinkIds -and @($script:RenderLinkIds).Count)
+        $linkAt = [math]::Max(1500, [math]::Min(2500, $WarmupMs - 500))
         while (-not $r.Done) {
+            if (-not $linkDone -and $sw.ElapsedMilliseconds -ge $linkAt) {
+                $linkDone = $true
+                if (-not $script:RenderLinkLoad) { $script:RenderLinkLoad = @{} }
+                foreach ($lid in @($script:RenderLinkIds)) { if (-not $script:RenderLinkLoad.ContainsKey($lid)) { try { $lk = Get-PcieLink $lid; if ($lk) { $script:RenderLinkLoad[$lid] = $lk } } catch { } } }
+            }
             if ((Get-Command Test-SkipRequested -ErrorAction SilentlyContinue) -and (Test-SkipRequested)) {
                 $r.Stop = $true
                 break
@@ -37570,18 +37679,27 @@ if ($script:SmartTests | Where-Object Status -eq 'läuft') {
                 Show-Sub ('SMART-Langtest   {0} %' -f [int]$avg) ('{0}   Zeitlimit in {1:hh\:mm\:ss}' -f $txt, ($left - [TimeSpan]::FromSeconds($w))) ([math]::Max(0, [math]::Min(100, [int]$avg)))
                 Start-Sleep -Seconds 1
                 if (Test-Path $stopFile) { Remove-Item $stopFile -Force -ErrorAction SilentlyContinue; $skipWait = $true; break }
+                if (Test-SkipRequested) { $skipWait = $true; break }
             }
             if ($skipWait) { Write-Step 'Warten auf SMART-Langtest vom Benutzer beendet.'; break }
         }
         Hide-Sub
         Send-GuiEvent 'STOP' '0'
         $waitReason = $(if ($skipWait) { 'Warten vom Benutzer beendet' } else { 'Zeitlimit erreicht' })
+        # ab v4.03: übersprungen heißt beendet. Der Test lief sonst in der Firmware weiter und bremste Benchmark und Lasttest.
+        if ($skipWait) { [void](Stop-SmartLongTests 'Warten vom Benutzer beendet') }
         $waited = ((Get-Date) - ($script:SmartTests | Sort-Object Start | Select-Object -First 1).Start).TotalMinutes
 
         foreach ($t in $script:SmartTests) {
             $d = $t.Device
             Add-Sub ('{0} ({1})' -f $d.name, $d.protocol)
             if ($t.Status -eq 'nicht gestartet') { Add-Line ('  Langtest nicht gestartet: {0}' -f $t.Grund); Add-TestResult ('SMART-Langtest {0}' -f $d.name) 'Info' ('nicht gestartet: ' + $t.Grund); continue }
+            if ($t.Status -eq 'abgebrochen') {
+                Add-Line ('  {0} nach {1:N0} Minuten bei {2} %. Der Langtest wurde beendet (smartctl -X), damit er Benchmark und Lasttest nicht bremst. Für ein Ergebnis den Test einzeln laufen lassen: smartctl -t long {3}' -f $waitReason, $waited, $t.Fortschritt, $d.name)
+                Add-Finding INFO 'SMART' ('{0}: Langtest nach {1:N0} Minuten bei {2} % beendet ({3}), ohne Ergebnis.' -f $d.name, $waited, $t.Fortschritt, $waitReason)
+                Add-TestResult ('SMART-Langtest {0}' -f $d.name) 'Info' ('bei {0} % beendet, ohne Ergebnis' -f $t.Fortschritt)
+                continue
+            }
             if ($t.Status -eq 'läuft') {
                 Add-Line ('  {0} nach {1:N0} Minuten. Der Test läuft im Laufwerk weiter ({2} %). Ergebnis später mit: smartctl -l selftest {3}' -f $waitReason, $waited, $t.Fortschritt, $d.name)
                 Add-Finding INFO 'SMART' ('{0}: Langtest nach {1:N0} Minuten bei {2} % ({3}), Ergebnis später prüfen.' -f $d.name, $waited, $t.Fortschritt, $waitReason)
@@ -37620,6 +37738,11 @@ if ($script:SmartTests | Where-Object Status -eq 'läuft') {
             $safe = ($d.name -replace '[\\/:]', '_').Trim('_')
             (Invoke-External -File $script:Smartctl -Arguments ('-x -d {0} {1}' -f $d.type, $d.name) -TimeoutSec 180).Output | Out-File (Join-Path $RawDir ('smartctl_{0}_nachher.txt' -f $safe)) -Encoding UTF8
         }
+    }
+    # Schritt schon vor dem Warten übersprungen (Knopf "Diesen Schritt überspringen"): Tests ebenfalls beenden (ab v4.03)
+    if (@($script:TestResults | Where-Object { $_.Test -eq 'Test: SMART-Langtest Ergebnis' -and $_.Ergebnis -eq 'ÜBERSPRUNGEN' }).Count) {
+        $stopped = @(Stop-SmartLongTests 'Schritt übersprungen')
+        if ($stopped.Count) { Add-Finding INFO 'SMART' ('SMART-Langtest beendet, weil der Schritt übersprungen wurde ({0}), ohne Ergebnis.' -f ($stopped -join ', ')) }
     }
 }
 
@@ -38194,7 +38317,9 @@ if ($script:BenchSel['GPU']) {
                 $rs = Get-RenderSize $GpuAufloesung
                 $rWarm = $(if ($BenchmarkKurz) { 3000 } else { 6000 }); $rMeas = $(if ($BenchmarkKurz) { 10000 } else { 20000 })
                 Add-Line ('  Rendertest: {0}x{1}, je Grafikeinheit {2} s Aufwärmen und {3} s Messung, ohne VSync{5}: {4}' -f $rs[0], $rs[1], ($rWarm / 1000), ($rMeas / 1000), (($rAds | ForEach-Object { '{0} ({1})' -f $_.Name, $_.Bezeichnung }) -join ', '), $(if ($rSel.Auswahl -ne 'alle Grafikeinheiten') { ', ' + $rSel.Auswahl } else { '' }))
+                $script:RenderLinkIds = @($gpus | ForEach-Object { [string]$_.PNPDeviceID } | Where-Object { $_ }); $script:RenderLinkLoad = @{}
                 $rr = @(Invoke-RenderBenchmark $rAds $rs[0] $rs[1] (Get-RenderPreviewMode $GpuAnzeige) $rWarm $rMeas)
+                $script:RenderLinkIds = @()
                 $multi = ($rAds.Count -gt 1)
                 $leadDone = $false; $ri = 0
                 foreach ($res in $rr) {
@@ -38236,13 +38361,15 @@ if ($script:BenchSel['GPU']) {
                     $ri++
                 }
             }
-            # Anbindung direkt nach der Last lesen, im Leerlauf senken Grafikkarten die PCIe-Generation oft ab
+            # Anbindung bevorzugt aus dem Rendertest (unter Last, ab v4.03), sonst direkt danach; im Leerlauf senken
+            # Grafikkarten die PCIe-Generation oft ab
             $glink = $null
             foreach ($g in $gpus) {
-                $link = Get-PcieLink $g.PNPDeviceID
+                $unterLast = [bool]($script:RenderLinkLoad -and $script:RenderLinkLoad.ContainsKey([string]$g.PNPDeviceID))
+                $link = $(if ($unterLast) { $script:RenderLinkLoad[[string]$g.PNPDeviceID] } else { Get-PcieLink $g.PNPDeviceID })
                 if (-not $link) { continue }
                 if ($g -eq $gMain) { $glink = $link }
-                Add-Line ('  {0}: angebunden mit {1}, möglich {2}' -f $g.Name, (Format-Pcie $link), (Format-Pcie $link -Max))
+                Add-Line ('  {0}: angebunden mit {1}{3}, möglich {2}' -f $g.Name, (Format-Pcie $link), (Format-Pcie $link -Max), $(if ($unterLast) { ' (gemessen unter Last)' } else { '' }))
                 if ((& $isDisc $g) -and $link.WidthMax -gt 0 -and $link.WidthNow -lt $link.WidthMax) {
                     Add-Finding WARNUNG 'Leistung' ('{0} ist nur mit x{1} statt x{2} angebunden: falscher Steckplatz, Riser-Kabel oder Kontaktproblem.' -f $g.Name, $link.WidthNow, $link.WidthMax)
                 }
@@ -38285,16 +38412,14 @@ if ($script:BenchSel['Disk']) {
         if (-not (Test-BenchTypes)) { return }
         $inv = $script:Inv; $ms = $script:BenchMs; $threads = [Environment]::ProcessorCount
         # ---------------- Datenträger ----------------
-        # Ein SMART-Langtest, dessen Warten beendet wurde, läuft in der Laufwerksfirmware weiter und liest das ganze
-        # Laufwerk. Gleichzeitig gemessen fallen Lesen und 4K-Werte deutlich niedriger aus (Lauf vom 07.11.2026: -33 %).
+        # Ein SMART-Langtest, der nach Ablauf der Wartezeit noch in der Laufwerksfirmware läuft, liest das ganze Laufwerk.
+        # Gleichzeitig gemessen fielen Lesen und 4K-Werte deutlich niedriger aus (Lauf vom 07.11.2026: bis -49 %).
+        # Ab v4.03 wird er vor der Messung beendet (v4.02: nur ein Hinweis).
         $smartAktiv = @()
-        foreach ($smartT in @($script:SmartTests | Where-Object { $_.Status -eq 'läuft' })) {
-            $s1 = $null; try { $s1 = Get-SmartTestState $smartT.Device } catch { }
-            if ($s1 -and $s1.Running) { $smartAktiv += ('{0} ({1} %)' -f $smartT.Name, $s1.Percent) }
-        }
+        if (Get-Command Stop-SmartLongTests -ErrorAction SilentlyContinue) { $smartAktiv = @(Stop-SmartLongTests 'vor der Datenträgermessung') }
         if ($smartAktiv.Count) {
-            Add-Line ('  Hinweis: Der SMART-Langtest läuft noch auf {0}. Er bremst die Messung, die Werte dieser Laufwerke können zu niedrig sein.' -f ($smartAktiv -join ', '))
-            Add-Finding INFO 'Leistung' ('Datenträger gemessen, während der SMART-Langtest noch lief ({0}). Lese-, Schreib- und 4K-Werte können deshalb zu niedrig sein; Vergleiche mit früheren Läufen sind nur eingeschränkt aussagekräftig.' -f ($smartAktiv -join ', '))
+            Add-Line ('  SMART-Langtest vor der Messung beendet: {0}. Er hätte die Werte dieser Laufwerke verfälscht.' -f ($smartAktiv -join ', '))
+            Add-Finding INFO 'SMART' ('SMART-Langtest vor der Datenträgermessung beendet ({0}), ohne Ergebnis. Für ein Ergebnis den Langtest einzeln laufen lassen.' -f ($smartAktiv -join ', '))
         }
         try {
             $sizeB = $(if ($BenchmarkKurz) { 256MB } else { 1GB }); $phase = $(if ($BenchmarkKurz) { 2500 } else { 6000 })
@@ -39426,7 +39551,11 @@ if ($script:BgJobs.Count) { Wait-BgAll 'der Abschluss'; Stop-BgJobs }
 # Rendertest: kein Grafikgerät darf offen bleiben
 if ($GpuTypesLoaded) { try { [DiagGpu]::StopAll() } catch { } }
 
-# Sensoren schließen: entfernt einen vorübergehend installierten PawnIO-Treiber, bevor die Rückstandskontrolle prüft
+# Sensoren schließen: entfernt einen vorübergehend installierten PawnIO-Treiber, bevor die Rückstandskontrolle prüft.
+# Kopfzeile und Protokoll nennen das (bis v4.02 stand währenddessen noch der letzte Abschnitt oben, z. B. "Optimierung: Ergebnis").
+Show-Overall 'Aufräumen: Sensoren beenden, vorübergehend installierte Treiber entfernen'
+Write-Host ''
+Write-Host ('[{0}] >> Aufräumen: Sensoren und Hilfswerkzeuge' -f (Get-Date -Format 'HH:mm:ss')) -ForegroundColor Cyan
 Close-SensorSession
 foreach ($t in @($script:SensorNotes | Select-Object -Unique)) { Add-Finding INFO 'Sensoren' $t }
 

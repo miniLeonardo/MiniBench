@@ -255,7 +255,7 @@ public partial class DiagGui
     int dbSortCol = -1;
     bool dbSortAsc = true;
     Button btnRename;
-    Button btnCompare, btnDashboard, btnVerlauf, btnDelete, btnOpenReport, btnExport, btnSetRef, btnToggleGroups, btnActions;
+    Button btnCompare, btnDashboard, btnVerlauf, btnOpenReport, btnExport, btnSetRef, btnToggleGroups, btnActions;
 
     void OnDbColumnClick(object sender, ColumnClickEventArgs e)
     {
@@ -403,36 +403,42 @@ public partial class DiagGui
             if (lvDb != null && lvDb.SelectedItems.Count > 0) target = (DbEntry)lvDb.SelectedItems[0].Tag;
             if (target != null) OpenEntry(target);
         };
-        btnOpenReport.Enabled = false;
+        btnOpenReport.Visible = false;
         Tip(btnOpenReport, "Öffnet den vollständigen HTML-Diagnosebericht des markierten Systems.");
 
         btnVerlauf = UI.Secondary("Verlauf"); btnVerlauf.Margin = new Padding(UI.S(8), 0, 0, 0);
         btnVerlauf.Click += delegate { OpenDeviceHistory(); };
-        btnVerlauf.Enabled = false;
+        btnVerlauf.Visible = false;
         Tip(btnVerlauf, "Öffnet das interaktive Dashboard im Verlaufsmodus für alle Läufe des markierten Geräts.");
 
+        // ab v4.03: Seltenes im Menü Aktionen, Löschen eingeschlossen. Die Knöpfe für einen Lauf erscheinen erst,
+        // wenn einer markiert ist (UpdateDbButtons); vorher standen fünf Knöpfe dauerhaft da, meist ausgegraut.
         ContextMenu cmActions = new ContextMenu();
-        cmActions.MenuItems.Add("Als Referenz festlegen (persistent)", delegate { SetSelectedAsReference(); });
-        cmActions.MenuItems.Add("Als Basis im Dashboard öffnen (temporär)", delegate { OpenDashboardWithBase(); });
-        cmActions.MenuItems.Add("-");
-        cmActions.MenuItems.Add("Name ändern ...", delegate { RenameSelectedEntry(); });
-        cmActions.MenuItems.Add("Lauf exportieren ...", delegate { ExportSelected(); });
+        MenuItem maFolder = new MenuItem("Berichtsordner öffnen", delegate { DbEntry s = SelectedDbEntry(); if (s != null) OpenEntryFolder(s); });
+        MenuItem maRef = new MenuItem("Als Referenz festlegen (persistent)", delegate { SetSelectedAsReference(); });
+        MenuItem maBase = new MenuItem("Als Basis im Dashboard öffnen (temporär)", delegate { OpenDashboardWithBase(); });
+        MenuItem maRename = new MenuItem("Name ändern ...", delegate { RenameSelectedEntry(); });
+        MenuItem maExport = new MenuItem("Lauf exportieren ...", delegate { ExportSelected(); });
+        MenuItem maDelete = new MenuItem("Lauf löschen ...", delegate { DeleteSelected(); });
+        cmActions.MenuItems.AddRange(new MenuItem[] { maFolder, new MenuItem("-"), maRef, maBase, new MenuItem("-"), maRename, maExport, new MenuItem("-"), maDelete });
+        cmActions.Popup += delegate {
+            int selN = lvDb != null ? lvDb.SelectedItems.Count : 0; int chkN = CheckedEntries().Count;
+            maFolder.Enabled = maRef.Enabled = maBase.Enabled = maRename.Enabled = maExport.Enabled = selN == 1;
+            maDelete.Enabled = chkN > 0 || selN == 1;
+            maDelete.Text = chkN > 1 ? String.Format("Angehakte Läufe löschen ({0}) ...", chkN) : chkN == 1 ? "Angehakten Lauf löschen ..." : "Lauf löschen ...";
+        };
 
         btnActions = UI.Secondary("Aktionen \u25BE"); btnActions.Margin = new Padding(UI.S(8), 0, 0, 0);
         btnActions.Click += delegate { cmActions.Show(btnActions, new Point(0, btnActions.Height)); };
-        btnActions.Enabled = false;
-        Tip(btnActions, "Weitere Aktionen für den markierten Lauf: Als Referenz festlegen, Name ändern oder exportieren.");
+        btnActions.Visible = false;
+        Tip(btnActions, "Für den markierten Lauf: Berichtsordner öffnen, als Referenz festlegen, Name ändern, exportieren oder löschen.");
 
         btnSetRef = UI.Secondary("Als Referenz ..."); Tip(btnSetRef, "Legt das markierte System als dauerhafte Vergleichsreferenz fest.");
         btnRename = UI.Secondary("Name ändern ..."); Tip(btnRename, "Ändert den Anzeigenamen des markierten Systems.");
         btnExport = UI.Secondary("Lauf exportieren ..."); Tip(btnExport, "Exportiert den markierten Lauf als eigenständiges Paket.");
         btnCompare = UI.Secondary("Vergleichen"); Tip(btnCompare, "Systeme vergleichen.");
 
-        btnDelete = UI.Secondary("Lauf löschen"); btnDelete.Margin = new Padding(UI.S(8), 0, 0, 0); btnDelete.Click += delegate { DeleteSelected(); };
-        btnDelete.Enabled = false;
-        Tip(btnDelete, "Verschiebt die markierten oder angehakten Läufe nach Minibench-Daten\\Archiv\\Entfernt. Beim nächsten Abgleich verschwinden sie auch vom Netzlaufwerk.");
-
-        b.Controls.Add(btnDashboard); b.Controls.Add(btnOpenReport); b.Controls.Add(btnVerlauf); b.Controls.Add(btnActions); b.Controls.Add(btnDelete); bottom.Controls.Add(b);
+        b.Controls.Add(btnDashboard); b.Controls.Add(btnOpenReport); b.Controls.Add(btnVerlauf); b.Controls.Add(btnActions); bottom.Controls.Add(b);
 
         lblDbClean = Lbl(DatenpflegeInfo, UI.SchriftHinweis, false, UI.Muted); lblDbClean.Visible = DatenpflegeInfo.Length > 0;
         lblDbClean.Margin = new Padding(UI.S(4), UI.S(8), UI.S(4), 0); bottom.Controls.Add(lblDbClean);
@@ -533,6 +539,7 @@ public partial class DiagGui
         MenuItem miSep3 = new MenuItem("-");
         MenuItem miRename = new MenuItem("Name ändern ...", delegate { RenameSelectedEntry(); });
         MenuItem miOpen = new MenuItem("Bericht öffnen", delegate { if (lvDb.SelectedItems.Count > 0) OpenEntry((DbEntry)lvDb.SelectedItems[0].Tag); });
+        MenuItem miFolder = new MenuItem("Berichtsordner öffnen", delegate { DbEntry s = SelectedDbEntry(); if (s != null) OpenEntryFolder(s); });
         MenuItem miExport = new MenuItem("Lauf exportieren ...", delegate { ExportSelected(); });
         MenuItem miSep2 = new MenuItem("-");
         MenuItem miDelete = new MenuItem("Aus Datenbank entfernen", delegate { DeleteSelected(); });
@@ -546,6 +553,7 @@ public partial class DiagGui
         cm.MenuItems.Add(miSep3);
         cm.MenuItems.Add(miRename);
         cm.MenuItems.Add(miOpen);
+        cm.MenuItems.Add(miFolder);
         cm.MenuItems.Add(miExport);
         cm.MenuItems.Add(miSep2);
         cm.MenuItems.Add(miDelete);
@@ -563,7 +571,7 @@ public partial class DiagGui
             if (selN == 1) selTarget = lvDb.SelectedItems[0].Tag as DbEntry;
             else if (chkN == 1) selTarget = lvDb.CheckedItems[0].Tag as DbEntry;
             miRename.Enabled = (selTarget != null && !selTarget.IsReference && (selN == 1 || (selN == 0 && chkN == 1)));
-            miOpen.Enabled = selN == 1;
+            miOpen.Enabled = selN == 1; miFolder.Enabled = selN == 1;
             miExport.Enabled = selN == 1 || (selN == 0 && chkN == 1);
             miDelete.Enabled = chkN >= 1 || selN >= 1;
         };
@@ -850,28 +858,25 @@ public partial class DiagGui
         btnDashboard.Enabled = (chkN >= 1);
         btnDashboard.Text = (chkN >= 1 ? String.Format("Im Dashboard vergleichen ({0})", chkN) : "Im Dashboard vergleichen");
 
-        if (btnOpenReport != null) btnOpenReport.Enabled = (selN == 1);
-        if (btnVerlauf != null) btnVerlauf.Enabled = (selN == 1 && GetSelectedDeviceTarget() != null);
-        if (btnActions != null) btnActions.Enabled = (selN == 1);
+        // Knöpfe für einen Lauf nur bei Markierung; Aktionen auch bei angehakten Läufen (Löschen)
+        if (btnOpenReport != null) btnOpenReport.Visible = (selN == 1);
+        if (btnVerlauf != null) btnVerlauf.Visible = (selN == 1 && GetSelectedDeviceTarget() != null);
+        if (btnActions != null) btnActions.Visible = (selN == 1 || chkN > 0);
+    }
 
-        if (btnDelete != null)
+    DbEntry SelectedDbEntry() { return lvDb != null && lvDb.SelectedItems.Count == 1 ? lvDb.SelectedItems[0].Tag as DbEntry : null; }
+
+    // Berichtsordner eines Laufs im Explorer (auch für Einträge mit altem UNC-Pfad, dann der gleichnamige Ordner im Datenordner)
+    void OpenEntryFolder(DbEntry e)
+    {
+        if (e == null) return;
+        if (e.Ordner.Length > 0)
         {
-            if (chkN > 0)
-            {
-                btnDelete.Enabled = true;
-                btnDelete.Text = (chkN > 1 ? String.Format("Ausgewählte Läufe löschen ({0})", chkN) : "Ausgewählten Lauf löschen");
-            }
-            else if (selN == 1)
-            {
-                btnDelete.Enabled = true;
-                btnDelete.Text = "Lauf löschen";
-            }
-            else
-            {
-                btnDelete.Enabled = false;
-                btnDelete.Text = "Lauf löschen";
-            }
+            string dir = System.IO.Path.IsPathRooted(e.Ordner) ? e.Ordner : System.IO.Path.Combine(dataDir, e.Ordner);
+            if (!Directory.Exists(dir)) { string alt = System.IO.Path.Combine(System.IO.Path.Combine(dataDir, "Berichte"), System.IO.Path.GetFileName(e.Ordner.TrimEnd('\\', '/'))); if (Directory.Exists(alt)) dir = alt; }
+            if (Directory.Exists(dir)) { OpenShell(dir); return; }
         }
+        OpenSelect(e.Path);
     }
     void ShowSetRefMenu()
     {

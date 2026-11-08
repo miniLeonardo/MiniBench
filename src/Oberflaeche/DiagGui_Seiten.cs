@@ -3490,6 +3490,7 @@ e.Result = items;
     // Oben das Urteil mit den wichtigsten Befunden und der Vergleich mit der Referenz, darunter je Komponente ein
     // Hauptwert mit Einordnung. Gezeigt wird nur, was dieser Lauf gemessen oder gemeldet hat; Details stehen im Bericht.
     Label lblResVerdict, lblResCounts, lblResScore, lblResScoreSub, lblResRef;
+    LinkLabel lnkResRef;
     FlowLayoutPanel pnlResFind, pnlResCmp, pnlResTiles;
     TableLayoutPanel tblResMid;
     CardPanel cardResFind, cardResCmp;
@@ -3540,7 +3541,15 @@ e.Result = items;
         lnkResAll.LinkClicked += delegate { if (File.Exists(htmlPath)) OpenShell(htmlPath); };
         Tip(lnkResAll, "Öffnet den Bericht mit allen Befunden, Messwerten und Erklärungen.");
         cardResCmp = ResCard("Leistung im Vergleich", out pnlResCmp); cardResCmp.Margin = new Padding(UI.S(6), 0, 0, 0);
-        lblResRef = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblResRef.Margin = new Padding(0, 0, 0, UI.S(8));
+        lblResRef = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblResRef.Margin = new Padding(0, 0, 0, UI.S(2));
+        // ab v4.03: Weg zur Wahl der Referenz direkt von der Ergebnisseite (Seite Benchmark, Abschnitt Referenz)
+        lnkResRef = new LinkLabel(); lnkResRef.Text = "Referenz ändern"; lnkResRef.AutoSize = true; lnkResRef.LinkColor = UI.Accent; lnkResRef.ActiveLinkColor = UI.AccentHover; lnkResRef.LinkBehavior = LinkBehavior.HoverUnderline; lnkResRef.Margin = new Padding(0, 0, 0, UI.S(10));
+        lnkResRef.LinkClicked += delegate {
+            btnDashBack.PerformClick();
+            ShowPage(2);
+            if (cmbRef != null) { cmbRef.Focus(); Control sc = cmbRef.Parent; while (sc != null && !(sc is ScrollableControl && ((ScrollableControl)sc).AutoScroll)) sc = sc.Parent; if (sc != null) ((ScrollableControl)sc).ScrollControlIntoView(cmbRef); }
+        };
+        Tip(lnkResRef, "Öffnet die Seite Benchmark bei der Wahl der Referenz. Eine andere Referenz gilt ab dem nächsten Lauf; im Dashboard lassen sich vorhandene Läufe gegen jede Referenz vergleichen.");
         tblResMid.Controls.Add(cardResFind, 0, 0); tblResMid.Controls.Add(cardResCmp, 1, 0);
         main.Controls.Add(tblResMid);
 
@@ -3612,7 +3621,7 @@ e.Result = items;
 
     // Einordnung gegenüber der Referenz, nicht gegenüber einem Durchschnitt: Die Referenz ist ein bestimmter PC
     // (meist ein schneller). Bis v4.01 hieß 32 % unterdurchschnittlich, obwohl nur der Abstand zur Referenz gemeint war.
-    static string RatingWord(double pct)
+    public static string RatingWord(double pct)
     {
         if (pct >= 110) return "schneller"; if (pct >= 90) return "gleichauf"; if (pct >= 70) return "etwas langsamer";
         if (pct >= 45) return "langsamer"; return "deutlich langsamer";
@@ -3631,7 +3640,7 @@ e.Result = items;
     }
 
     // "Samsung SSD 980 1TB (931,5 GB, NVMe, Healthy); ..." -> eine kurze Pille je Laufwerk
-    static List<string> DiskPills(string disks)
+    public static List<string> DiskPills(string disks)
     {
         List<string> res = new List<string>();
         foreach (string part in (disks ?? "").Split(';'))
@@ -3746,6 +3755,7 @@ e.Result = items;
         lblResRef.Text = "100 % = " + RefLabelText();
         lblResRef.MaximumSize = new Size(UI.S(400), 0);
         pnlResCmp.Controls.Add(lblResRef);
+        pnlResCmp.Controls.Add(lnkResRef);
         int cmpRows = 0;
         for (int g = 0; g < resGruppen.Length; g++)
         {

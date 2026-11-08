@@ -455,7 +455,7 @@ try {
         Write-Host '  Git      : kein Commit, weil die Tests nicht gelaufen sind.' -ForegroundColor Yellow
     } elseif ($gitCmd -and $isGitRepo) {
         try {
-            $stageFiles = @('src', 'Doku', 'tests', 'Bauen.cmd', 'Testen.cmd', 'README.md', 'CHANGELOG.md', 'AGENTS.md', 'LICENSE', '.gitignore', 'Aktueller Build', 'Archiv') | Where-Object { Test-Path -LiteralPath (Join-Path $Here $_) }
+            $stageFiles = @('src', 'Doku', 'tests', 'Bauen.cmd', 'Testen.cmd', 'README.md', 'CHANGELOG.md', 'AGENTS.md', 'LICENSE', '.gitignore', 'Veroeffentlichen.ps1', 'Aktueller Build', 'Archiv') | Where-Object { Test-Path -LiteralPath (Join-Path $Here $_) }
             foreach ($sf in $stageFiles) { & git.exe -C $Here add -- $sf 2>&1 | Out-Null }
             & git.exe -C $Here diff --cached --quiet
             if ($LASTEXITCODE -eq 0) {

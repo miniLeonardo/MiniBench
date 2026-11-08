@@ -1046,18 +1046,27 @@ if ($script:SmartTests | Where-Object Status -eq 'läuft') {
                 Show-Sub ('SMART-Langtest   {0} %' -f [int]$avg) ('{0}   Zeitlimit in {1:hh\:mm\:ss}' -f $txt, ($left - [TimeSpan]::FromSeconds($w))) ([math]::Max(0, [math]::Min(100, [int]$avg)))
                 Start-Sleep -Seconds 1
                 if (Test-Path $stopFile) { Remove-Item $stopFile -Force -ErrorAction SilentlyContinue; $skipWait = $true; break }
+                if (Test-SkipRequested) { $skipWait = $true; break }
             }
             if ($skipWait) { Write-Step 'Warten auf SMART-Langtest vom Benutzer beendet.'; break }
         }
         Hide-Sub
         Send-GuiEvent 'STOP' '0'
         $waitReason = $(if ($skipWait) { 'Warten vom Benutzer beendet' } else { 'Zeitlimit erreicht' })
+        # ab v4.03: übersprungen heißt beendet. Der Test lief sonst in der Firmware weiter und bremste Benchmark und Lasttest.
+        if ($skipWait) { [void](Stop-SmartLongTests 'Warten vom Benutzer beendet') }
         $waited = ((Get-Date) - ($script:SmartTests | Sort-Object Start | Select-Object -First 1).Start).TotalMinutes
 
         foreach ($t in $script:SmartTests) {
             $d = $t.Device
             Add-Sub ('{0} ({1})' -f $d.name, $d.protocol)
             if ($t.Status -eq 'nicht gestartet') { Add-Line ('  Langtest nicht gestartet: {0}' -f $t.Grund); Add-TestResult ('SMART-Langtest {0}' -f $d.name) 'Info' ('nicht gestartet: ' + $t.Grund); continue }
+            if ($t.Status -eq 'abgebrochen') {
+                Add-Line ('  {0} nach {1:N0} Minuten bei {2} %. Der Langtest wurde beendet (smartctl -X), damit er Benchmark und Lasttest nicht bremst. Für ein Ergebnis den Test einzeln laufen lassen: smartctl -t long {3}' -f $waitReason, $waited, $t.Fortschritt, $d.name)
+                Add-Finding INFO 'SMART' ('{0}: Langtest nach {1:N0} Minuten bei {2} % beendet ({3}), ohne Ergebnis.' -f $d.name, $waited, $t.Fortschritt, $waitReason)
+                Add-TestResult ('SMART-Langtest {0}' -f $d.name) 'Info' ('bei {0} % beendet, ohne Ergebnis' -f $t.Fortschritt)
+                continue
+            }
             if ($t.Status -eq 'läuft') {
                 Add-Line ('  {0} nach {1:N0} Minuten. Der Test läuft im Laufwerk weiter ({2} %). Ergebnis später mit: smartctl -l selftest {3}' -f $waitReason, $waited, $t.Fortschritt, $d.name)
                 Add-Finding INFO 'SMART' ('{0}: Langtest nach {1:N0} Minuten bei {2} % ({3}), Ergebnis später prüfen.' -f $d.name, $waited, $t.Fortschritt, $waitReason)
@@ -1096,6 +1105,11 @@ if ($script:SmartTests | Where-Object Status -eq 'läuft') {
             $safe = ($d.name -replace '[\\/:]', '_').Trim('_')
             (Invoke-External -File $script:Smartctl -Arguments ('-x -d {0} {1}' -f $d.type, $d.name) -TimeoutSec 180).Output | Out-File (Join-Path $RawDir ('smartctl_{0}_nachher.txt' -f $safe)) -Encoding UTF8
         }
+    }
+    # Schritt schon vor dem Warten übersprungen (Knopf "Diesen Schritt überspringen"): Tests ebenfalls beenden (ab v4.03)
+    if (@($script:TestResults | Where-Object { $_.Test -eq 'Test: SMART-Langtest Ergebnis' -and $_.Ergebnis -eq 'ÜBERSPRUNGEN' }).Count) {
+        $stopped = @(Stop-SmartLongTests 'Schritt übersprungen')
+        if ($stopped.Count) { Add-Finding INFO 'SMART' ('SMART-Langtest beendet, weil der Schritt übersprungen wurde ({0}), ohne Ergebnis.' -f ($stopped -join ', ')) }
     }
 }
 

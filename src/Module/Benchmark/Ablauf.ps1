@@ -381,7 +381,9 @@ if ($script:BenchSel['GPU']) {
                 $rs = Get-RenderSize $GpuAufloesung
                 $rWarm = $(if ($BenchmarkKurz) { 3000 } else { 6000 }); $rMeas = $(if ($BenchmarkKurz) { 10000 } else { 20000 })
                 Add-Line ('  Rendertest: {0}x{1}, je Grafikeinheit {2} s Aufwärmen und {3} s Messung, ohne VSync{5}: {4}' -f $rs[0], $rs[1], ($rWarm / 1000), ($rMeas / 1000), (($rAds | ForEach-Object { '{0} ({1})' -f $_.Name, $_.Bezeichnung }) -join ', '), $(if ($rSel.Auswahl -ne 'alle Grafikeinheiten') { ', ' + $rSel.Auswahl } else { '' }))
+                $script:RenderLinkIds = @($gpus | ForEach-Object { [string]$_.PNPDeviceID } | Where-Object { $_ }); $script:RenderLinkLoad = @{}
                 $rr = @(Invoke-RenderBenchmark $rAds $rs[0] $rs[1] (Get-RenderPreviewMode $GpuAnzeige) $rWarm $rMeas)
+                $script:RenderLinkIds = @()
                 $multi = ($rAds.Count -gt 1)
                 $leadDone = $false; $ri = 0
                 foreach ($res in $rr) {
@@ -423,13 +425,15 @@ if ($script:BenchSel['GPU']) {
                     $ri++
                 }
             }
-            # Anbindung direkt nach der Last lesen, im Leerlauf senken Grafikkarten die PCIe-Generation oft ab
+            # Anbindung bevorzugt aus dem Rendertest (unter Last, ab v4.03), sonst direkt danach; im Leerlauf senken
+            # Grafikkarten die PCIe-Generation oft ab
             $glink = $null
             foreach ($g in $gpus) {
-                $link = Get-PcieLink $g.PNPDeviceID
+                $unterLast = [bool]($script:RenderLinkLoad -and $script:RenderLinkLoad.ContainsKey([string]$g.PNPDeviceID))
+                $link = $(if ($unterLast) { $script:RenderLinkLoad[[string]$g.PNPDeviceID] } else { Get-PcieLink $g.PNPDeviceID })
                 if (-not $link) { continue }
                 if ($g -eq $gMain) { $glink = $link }
-                Add-Line ('  {0}: angebunden mit {1}, möglich {2}' -f $g.Name, (Format-Pcie $link), (Format-Pcie $link -Max))
+                Add-Line ('  {0}: angebunden mit {1}{3}, möglich {2}' -f $g.Name, (Format-Pcie $link), (Format-Pcie $link -Max), $(if ($unterLast) { ' (gemessen unter Last)' } else { '' }))
                 if ((& $isDisc $g) -and $link.WidthMax -gt 0 -and $link.WidthNow -lt $link.WidthMax) {
                     Add-Finding WARNUNG 'Leistung' ('{0} ist nur mit x{1} statt x{2} angebunden: falscher Steckplatz, Riser-Kabel oder Kontaktproblem.' -f $g.Name, $link.WidthNow, $link.WidthMax)
                 }
@@ -472,16 +476,14 @@ if ($script:BenchSel['Disk']) {
         if (-not (Test-BenchTypes)) { return }
         $inv = $script:Inv; $ms = $script:BenchMs; $threads = [Environment]::ProcessorCount
         # ---------------- Datenträger ----------------
-        # Ein SMART-Langtest, dessen Warten beendet wurde, läuft in der Laufwerksfirmware weiter und liest das ganze
-        # Laufwerk. Gleichzeitig gemessen fallen Lesen und 4K-Werte deutlich niedriger aus (Lauf vom 07.11.2026: -33 %).
+        # Ein SMART-Langtest, der nach Ablauf der Wartezeit noch in der Laufwerksfirmware läuft, liest das ganze Laufwerk.
+        # Gleichzeitig gemessen fielen Lesen und 4K-Werte deutlich niedriger aus (Lauf vom 07.11.2026: bis -49 %).
+        # Ab v4.03 wird er vor der Messung beendet (v4.02: nur ein Hinweis).
         $smartAktiv = @()
-        foreach ($smartT in @($script:SmartTests | Where-Object { $_.Status -eq 'läuft' })) {
-            $s1 = $null; try { $s1 = Get-SmartTestState $smartT.Device } catch { }
-            if ($s1 -and $s1.Running) { $smartAktiv += ('{0} ({1} %)' -f $smartT.Name, $s1.Percent) }
-        }
+        if (Get-Command Stop-SmartLongTests -ErrorAction SilentlyContinue) { $smartAktiv = @(Stop-SmartLongTests 'vor der Datenträgermessung') }
         if ($smartAktiv.Count) {
-            Add-Line ('  Hinweis: Der SMART-Langtest läuft noch auf {0}. Er bremst die Messung, die Werte dieser Laufwerke können zu niedrig sein.' -f ($smartAktiv -join ', '))
-            Add-Finding INFO 'Leistung' ('Datenträger gemessen, während der SMART-Langtest noch lief ({0}). Lese-, Schreib- und 4K-Werte können deshalb zu niedrig sein; Vergleiche mit früheren Läufen sind nur eingeschränkt aussagekräftig.' -f ($smartAktiv -join ', '))
+            Add-Line ('  SMART-Langtest vor der Messung beendet: {0}. Er hätte die Werte dieser Laufwerke verfälscht.' -f ($smartAktiv -join ', '))
+            Add-Finding INFO 'SMART' ('SMART-Langtest vor der Datenträgermessung beendet ({0}), ohne Ergebnis. Für ein Ergebnis den Langtest einzeln laufen lassen.' -f ($smartAktiv -join ', '))
         }
         try {
             $sizeB = $(if ($BenchmarkKurz) { 256MB } else { 1GB }); $phase = $(if ($BenchmarkKurz) { 2500 } else { 6000 })

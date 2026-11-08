@@ -47,6 +47,9 @@ public static class GuiSelbsttest
         Fall("CategoryPickerItem.Kurztitel", CategoryPickerKurztitel);
         Fall("UI.SkalierungDpi", UiSkalierungDpi);
         Fall("UI.IconByName", UiSymbolNachName);
+        Fall("Update.Versionsvergleich", UpdateVersionsvergleich);
+        Fall("Ergebnis.Einordnung", ErgebnisEinordnung);
+        Fall("Ergebnis.Laufwerkspillen", ErgebnisLaufwerkspillen);
         foreach (string l in outLines) System.Console.WriteLine(l);
         return 0;
     }
@@ -587,5 +590,33 @@ public static class GuiSelbsttest
             Ist(s100 == 200 && s150 == 300, "150 % entspricht dem 1.5-fachen");
         }
         finally { UI.DpiScale = alt; }
+    }
+
+    // ab v4.03: Versionen dezimal vergleichen (System.Version hielt 4.03 für neuer als 4.1)
+    static void UpdateVersionsvergleich()
+    {
+        Ist(DiagGui.IsNewerVersion("v4.1", "4.03"), "4.1 ist neuer als 4.03");
+        Ist(!DiagGui.IsNewerVersion("v4.03", "4.1"), "4.03 ist nicht neuer als 4.1");
+        Ist(DiagGui.IsNewerVersion("3.9", "3.882"), "3.9 ist neuer als 3.882");
+        Ist(DiagGui.IsNewerVersion("v4.03", "4.02"), "4.03 ist neuer als 4.02");
+        Ist(!DiagGui.IsNewerVersion("v4.02", "4.02"), "gleiche Version ist nicht neuer");
+    }
+
+    // ab v4.02: Einordnung gegenüber dem Referenz-PC ohne Wertung als Durchschnitt
+    static void ErgebnisEinordnung()
+    {
+        Ist(DiagGui.RatingWord(32) == "deutlich langsamer", "32 %: " + DiagGui.RatingWord(32));
+        Ist(DiagGui.RatingWord(64) == "langsamer", "64 %: " + DiagGui.RatingWord(64));
+        Ist(DiagGui.RatingWord(95) == "gleichauf", "95 %: " + DiagGui.RatingWord(95));
+        Ist(DiagGui.RatingWord(118) == "schneller", "118 %: " + DiagGui.RatingWord(118));
+    }
+
+    // ab v4.02: eine Pille je Laufwerk; Dezimalkomma der Größe darf die Felder nicht trennen
+    static void ErgebnisLaufwerkspillen()
+    {
+        System.Collections.Generic.List<string> p = DiagGui.DiskPills("ST2000DX001 (1,82 TB, SATA, Healthy); Samsung SSD 980 1TB (931,5 GB, NVMe, Warning)");
+        Ist(p.Count == 2, "zwei Pillen erwartet, " + p.Count);
+        Ist(p[0] == "ST2000DX001  ·  SATA", "erste Pille: " + p[0]);
+        Ist(p[1].EndsWith("NVMe  ·  Warning"), "Zustand außer Healthy wird genannt: " + p[1]);
     }
 }

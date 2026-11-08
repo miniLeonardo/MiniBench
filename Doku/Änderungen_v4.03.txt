@@ -1,0 +1,91 @@
+﻿LEOS MINIBENCH 4.03: ÄNDERUNGEN
+===============================
+
+Setzt die fünf Vorschläge aus 4.02 um, beendet den SMART-Langtest vor Messungen und repariert die Update-Funktion.
+Messabläufe, Berichtsaufbau und Datenbankformat sind unverändert.
+
+
+1. UPDATE-FUNKTION
+  Fehler                      Ein Klick auf "Update verfügbar" lud LMB.exe herunter und startete ein Austauschskript. Dieses
+                              hielt this.psExe für die Programmdatei; das ist powershell.exe. "move" auf powershell.exe
+                              scheiterte, "copy" ebenso, und am Ende startete "start" die PowerShell: Es erschien nur ein
+                              PowerShell-Fenster, LMB.exe blieb alt. So seit Einführung der Funktion in v3.86.
+  Weitere Fehler              Das Skript wartete nur auf die Oberfläche, nicht auf das Startprogramm LMB.exe, das bis zum
+                              Ende geöffnet bleibt und die Datei sperrt. Ein LeosMinibench.ps1 neben der exe wäre nach dem
+                              Austausch weiter geladen worden (das Startprogramm bevorzugt das Skript daneben). Pfade mit
+                              Umlauten scheiterten an der ASCII-Kodierung des Skripts.
+  Jetzt                       Pfad der exe aus LEOSMINIBENCH_EXE (setzt das Startprogramm), ohne Startprogramm LMB.exe neben
+                              dem Skript. Das Austauschskript wartet bis zu 90 s, bis die exe frei ist, legt LMB.exe und ein
+                              LeosMinibench.ps1 daneben in Minibench-Daten\Archiv\v<alte Version>, kopiert die neue Datei,
+                              startet sie und schreibt jeden Schritt in Minibench-Daten\Update\Update.log. Scheitert das
+                              Kopieren, kommt die alte Version zurück. UTF-8 mit chcp 65001. Während eines Laufs ist kein
+                              Update möglich. Das Fenster schließt sich regulär (Treiber und Sensoren werden aufgeräumt).
+  Versionsvergleich           System.Version hielt 4.03 für neuer als 4.1 und 3.882 für neuer als 3.9. Jetzt dezimal
+                              (IsNewerVersion, Fall "Update.Versionsvergleich" im Selbsttest der Oberfläche).
+  Voraussetzung               Das neueste GitHub-Release muss LMB.exe enthalten und die Zeile "SHA-256 (LMB.exe): ...".
+                              Veroeffentlichen.ps1 erstellt es so (siehe 7).
+
+
+2. SMART-LANGTEST WIRD BEENDET
+  Vorher                      Wurde das Warten beendet ("Test beenden" oder "Diesen Schritt überspringen"), lief der Langtest
+                              in der Laufwerksfirmware weiter. Er liest das ganze Laufwerk; im Lauf vom 07.11.2026 lagen die
+                              Werte der Datenträgermessung dadurch bis zu 49 % unter früheren Läufen. 4.02 meldete das nur.
+  Jetzt                       Stop-SmartLongTests beendet laufende Langtests mit smartctl -X: beim Beenden des Wartens, wenn
+                              der Schritt schon vor dem Warten übersprungen wurde, und in jedem Fall vor der
+                              Datenträgermessung. Bericht und Tests nennen "bei x % beendet, ohne Ergebnis" statt "Ergebnis
+                              später prüfen"; ein Selbsttestprotokoll "Aborted by host" erscheint so nicht als Warnung. Läuft
+                              die Wartezeit regulär ab und folgt keine Datenträgermessung, bleibt der Test wie bisher laufen.
+  Überspringen                Die Warteschleife reagierte nur auf "Test beenden", nicht auf "Diesen Schritt überspringen".
+                              Jetzt auf beides.
+
+
+3. GRAFIK: PCIE-ANBINDUNG UNTER LAST
+  Vorher                      Gelesen direkt nach dem Rendertest. Viele Karten senken die Generation sofort ab; die GTX 1070
+                              stand mit "PCIe 1.0 x16" in Kopfzeile und Bericht.
+  Jetzt                       Gelesen während des Aufwärmens des Rendertests (nach 1,5 bis 2,5 s, vor der Messung, damit die
+                              Abfrage die Bildrate nicht beeinflusst). Der Bericht nennt "(gemessen unter Last)". Ohne
+                              Rendertest wie bisher.
+
+
+4. DATENBANK
+  Knöpfe                      Bericht öffnen, Verlauf und Aktionen erscheinen erst, wenn ein Lauf markiert ist (Aktionen auch,
+                              wenn Läufe angehakt sind). Vorher standen fünf Knöpfe dauerhaft da, meist ausgegraut.
+  Aktionen                    Berichtsordner öffnen, Als Referenz festlegen, Als Basis im Dashboard öffnen, Name ändern,
+                              Lauf exportieren, Lauf löschen (bei angehakten Läufen mit Anzahl). Der Knopf Lauf löschen
+                              entfällt. Berichtsordner öffnen steht auch im Kontextmenü der Liste.
+
+
+5. REFERENZ
+  Seite Benchmark             Der Abschnitt Referenz steht direkt unter den Messungen; vorher ganz unten außerhalb des
+                              Sichtbereichs.
+  Ergebnisseite               Unter "100 % = ..." der Verweis "Referenz ändern": zurück zur Auswahl, Seite Benchmark, Fokus
+                              auf der Referenz. Eine andere Referenz gilt ab dem nächsten Lauf; der Hinweis sagt das.
+
+
+6. LAUF UND SENSORKURVEN
+  Kopfzeile                   Während Sensoren beendet und vorübergehende Treiber entfernt werden, steht "Aufräumen: Sensoren
+                              beenden, vorübergehend installierte Treiber entfernen" oben und im Protokoll. Vorher stand dort
+                              noch der letzte Abschnitt (z. B. "Optimierung: Ergebnis").
+  Legende                     Die Abbruchschwelle stand direkt hinter der Legende und lief bei vielen Werten über den Rand
+                              ("Abbre..."). Jetzt rechtsbündig, bei Platzmangel als Kurzform "Abbruch 100/90 °C", sonst nur
+                              die gestrichelten Linien. Die Legende beginnt hinter dem Titel. Alle Abstände der Kurven
+                              skalieren mit UI.S (vorher feste Pixel, bei 150 % ineinander).
+
+
+7. VERÖFFENTLICHEN
+  Veroeffentlichen.ps1        Erstellt oder aktualisiert das GitHub-Release der aktuellen Version mit gh: Titel aus
+                              Versionen.cs, Text aus CHANGELOG.md, Anhang Aktueller Build\LMB.exe, Zeile "SHA-256 (LMB.exe)"
+                              für die Prüfung der Update-Funktion. Prüft vorher, dass Stand.txt dieselbe Version nennt und der
+                              Tag auf GitHub liegt. Bauen.cmd nimmt die Datei in den Commit auf.
+
+
+GEFUNDEN UND BEHOBEN
+  Update-Funktion tauschte powershell.exe statt LMB.exe (seit v3.86, siehe 1).
+  Versionsvergleich mit System.Version statt dezimal (siehe 1).
+  Warteschleife des SMART-Langtests ignorierte "Diesen Schritt überspringen" (siehe 2).
+
+
+GRENZEN
+  Geprüft mit einem Bau unter Mono und Xvfb, dem Selbsttest der Oberfläche und den Sandbox-Tests. Update, smartctl -X und
+  die PCIe-Abfrage unter Last sind unter Windows zu bestätigen. Ein Update testet sich am einfachsten mit einer älteren
+  LMB.exe in einem eigenen Ordner, nachdem das Release v4.03 mit Veroeffentlichen.ps1 erstellt ist.

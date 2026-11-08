@@ -2,10 +2,23 @@
 
 Gemeinsamer Stand für alle Agenten (Claude, Antigravity). Wird am Ende jeder Version aktualisiert (siehe AGENTS.md).
 
-## Stand: Version 4.02 (08.11.2026)
-Noch nicht gebaut und committet. Quelltext und Doku von Claude vorbereitet (Grundlage Commit a77b64f, Release v4.01),
-geprüft mit einem Bau unter Mono/Xvfb, Bildschirmfotos und den Sandbox-Tests. Nach dem Bau unter Windows hier den
-Release-Commit eintragen.
+## Stand: Version 4.03 (08.11.2026)
+Release-Commit "Release v4.03: Update-Funktion, SMART-Langtest, Datenbank und Feinschliff" von Claude vorbereitet
+(Grundlage Commit 2d8cff1, Release v4.02), geprüft mit einem Bau unter Mono/Xvfb, dem Selbsttest der Oberfläche und den
+Sandbox-Tests. Release auf GitHub mit Veroeffentlichen.ps1 (LMB.exe und SHA-256 für die Update-Funktion).
+
+Inhalt von 4.03 (Einzelheiten in Doku\Änderungen_v4.03.txt):
+1. Update-Funktion tauscht LMB.exe (bis v4.02 powershell.exe, es erschien nur ein PowerShell-Fenster), Update.log, Rückweg.
+2. Versionsvergleich dezimal (4.03 < 4.1).
+3. SMART-Langtest wird beim Überspringen und vor der Datenträgermessung beendet (smartctl -X).
+4. PCIe-Anbindung der Grafik während des Rendertests gelesen.
+5. Datenbank: Knöpfe erst bei Markierung; Aktionen mit Berichtsordner öffnen und Lauf löschen.
+6. Referenz auf der Seite Benchmark oben, Verweis "Referenz ändern" auf der Ergebnisseite.
+7. Kopfzeile "Aufräumen" beim Beenden der Sensoren; Legende der Sensorkurven ohne Überlappung, Abstände skaliert.
+8. Veroeffentlichen.ps1 für GitHub-Releases.
+
+## Vorher: Version 4.02 (08.11.2026)
+Release-Commit "Release v4.02: PawnIO-Entfernung, plausiblere Messwerte, Einstellungen auf einer Seite" (Commit 2d8cff1).
 
 Inhalt von 4.02 (Einzelheiten in Doku\Änderungen_v4.02.txt):
 1. PawnIO wird am Laufende wieder entfernt (seit v3.84 falsche Setup-Schalter, Fehlerfenster und Rückgabecode 87).
@@ -271,8 +284,8 @@ Inhalt von 3.64 (Einzelheiten in Doku\Änderungen_v3.64.txt):
 2. Kategorie Apps der Optimierung nutzt dasselbe Symbol wie Tools (UI.IcoApp = UI.IcoTools).
 3. Startzeit nach den Änderungen in 4.01 unter Windows messen (Start.log, zweiter Start).
 4. Rendertest auf sehr schnellen Karten (RTX 3070): hoher Mikroruckler-Anteil und niedriges 1-%-Low nur im Benchmark, nicht im Lasttest.
-5. Kopfzeile der Grafik nennt die PCIe-Anbindung im Leerlauf (GTX 1070: PCIe 1.0) ohne Erklärung.
-6. Datenträgermessung während eines noch laufenden SMART-Langtests: nur Hinweis, Werte gehen trotzdem in die Datenbank.
+5. Update-Funktion unter Windows bestätigen, sobald das Release v4.03 mit LMB.exe und Prüfsumme auf GitHub liegt.
+6. smartctl -X und PCIe-Abfrage unter Last unter Windows bestätigen.
 
 ## Letzter Commit
-Release-Commit v4.01 (Commit a77b64f). 4.02 noch nicht committet.
+Release-Commit v4.03 (Nachfolger von 2d8cff1, Release v4.02).

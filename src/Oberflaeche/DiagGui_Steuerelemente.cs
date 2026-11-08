@@ -2321,7 +2321,8 @@ class SensorChart : Control
 
     void DrawPanel(Graphics g, Rectangle r, string title, string unit, Series[] ser, double tMin, double tMax, bool limits)
     {
-        Rectangle plot = new Rectangle(r.X + 58, r.Y + 22, r.Width - 58 - 14, r.Height - 22 - 18);
+        // ab v4.03 mit UI.S: feste Pixel ließen bei 150 % Achsenbeschriftung und Legende ineinanderlaufen
+        Rectangle plot = new Rectangle(r.X + UI.S(58), r.Y + UI.S(22), r.Width - UI.S(58 + 14), r.Height - UI.S(22 + 18));
         if (plot.Width < 40 || plot.Height < 20) return;
         double lo = double.MaxValue, hi = double.MinValue; bool any = false;
         foreach (double[] row in rows)
@@ -2335,21 +2336,42 @@ class SensorChart : Control
         }
         if (unit == "Bilder/s") lo = 0;
         if (unit == "%") { lo = 0; if (hi < 100) hi = 100; }
-        using (Font ft = new Font("Segoe UI Semibold", 9f)) TextRenderer.DrawText(g, title + " (" + unit + ")", ft, new Point(r.X + 8, r.Y + 2), UI.Text);
+        int legX = r.X + UI.S(140);
+        using (Font ft = new Font("Segoe UI Semibold", 9f))
+        {
+            string tt = title + " (" + unit + ")";
+            TextRenderer.DrawText(g, tt, ft, new Point(r.X + UI.S(8), r.Y + UI.S(2)), UI.Text);
+            legX = Math.Max(legX, r.X + UI.S(8) + TextRenderer.MeasureText(tt, ft).Width + UI.S(12));
+        }
         double[] last = rows[rows.Count - 1];
         using (Font fl = new Font("Segoe UI", 8.75f))
         {
-            int x = r.X + 140;
+            int x = legX;
             foreach (Series sr in ser)
             {
                 string lv = Fmt(last[sr.Col], unit);
                 if (lv.Length == 0) continue;
                 string txt = sr.Label + " " + lv;
-                using (SolidBrush b = new SolidBrush(sr.Color)) g.FillRectangle(b, x, r.Y + 7, 10, 10);
-                TextRenderer.DrawText(g, txt, fl, new Point(x + 14, r.Y + 3), UI.Text);
-                x += 22 + TextRenderer.MeasureText(txt, fl).Width;
+                using (SolidBrush b = new SolidBrush(sr.Color)) g.FillRectangle(b, x, r.Y + UI.S(7), UI.S(10), UI.S(10));
+                TextRenderer.DrawText(g, txt, fl, new Point(x + UI.S(14), r.Y + UI.S(3)), UI.Text);
+                x += UI.S(22) + TextRenderer.MeasureText(txt, fl).Width;
             }
-            if (limits && !double.IsNaN(CpuLimit) && CpuLimit > 0) TextRenderer.DrawText(g, "Abbruch CPU " + CpuLimit.ToString("0") + " °C" + (!double.IsNaN(GpuLimit) && GpuLimit > 0 ? ", GPU " + GpuLimit.ToString("0") + " °C" : ""), fl, new Point(x + 4, r.Y + 3), UI.Crit);
+            // Abbruchschwelle rechtsbündig; passt sie nicht neben die Legende, die Kurzform, sonst nur die gestrichelten Linien
+            if (limits && !double.IsNaN(CpuLimit) && CpuLimit > 0)
+            {
+                bool gpuL = !double.IsNaN(GpuLimit) && GpuLimit > 0;
+                string[] varianten = new string[] {
+                    "Abbruch CPU " + CpuLimit.ToString("0") + " °C" + (gpuL ? ", GPU " + GpuLimit.ToString("0") + " °C" : ""),
+                    "Abbruch " + CpuLimit.ToString("0") + (gpuL ? "/" + GpuLimit.ToString("0") : "") + " °C" };
+                foreach (string lt in varianten)
+                {
+                    int w = TextRenderer.MeasureText(lt, fl).Width;
+                    int lx = r.Right - UI.S(14) - w;
+                    if (lx < x + UI.S(4)) continue;
+                    TextRenderer.DrawText(g, lt, fl, new Point(lx, r.Y + UI.S(3)), UI.Crit);
+                    break;
+                }
+            }
         }
         if (!any) { using (Font f = new Font("Segoe UI", 8.75f)) TextRenderer.DrawText(g, "kein Wert verfügbar", f, plot, UI.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); return; }
         double span = hi - lo; if (span < 1) span = 1;
@@ -2362,7 +2384,7 @@ class SensorChart : Control
             {
                 float y = (float)(plot.Bottom - (v - y0) / (y1 - y0) * plot.Height);
                 g.DrawLine(grid, plot.Left, y, plot.Right, y);
-                TextRenderer.DrawText(g, v.ToString("0"), fa, new Rectangle(r.X, (int)y - 8, 52, 16), UI.Muted, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
+                TextRenderer.DrawText(g, v.ToString("0"), fa, new Rectangle(r.X, (int)y - UI.S(8), UI.S(52), UI.S(16)), UI.Muted, TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
             }
             double ts = 10; foreach (double c in new double[] { 10, 30, 60, 120, 300, 600, 900, 1800, 3600 }) { ts = c; if ((tMax - tMin) / c <= 8) break; }
             for (double t = Math.Ceiling(tMin / ts) * ts; t <= tMax; t += ts)
@@ -2370,7 +2392,7 @@ class SensorChart : Control
                 float x = (float)(plot.Left + (t - tMin) / (tMax - tMin) * plot.Width);
                 g.DrawLine(grid, x, plot.Top, x, plot.Bottom);
                 string lab = ts >= 60 ? ((int)(t / 60)).ToString() + " min" : ((int)t).ToString() + " s";
-                TextRenderer.DrawText(g, lab, fa, new Rectangle((int)x - 30, plot.Bottom + 1, 60, 16), UI.Muted, TextFormatFlags.HorizontalCenter);
+                TextRenderer.DrawText(g, lab, fa, new Rectangle((int)x - UI.S(30), plot.Bottom + 1, UI.S(60), UI.S(16)), UI.Muted, TextFormatFlags.HorizontalCenter);
             }
         }
         if (limits)

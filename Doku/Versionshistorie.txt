@@ -5,6 +5,17 @@ Neueste Version zuerst. Einzelheiten je Version in Doku\Änderungen_vX.Y.txt (ab
 keine Änderungsdateien mehr; die Einträge nennen nur, was im Quelltext und in den Änderungen zu 2.2 belegt ist.
 Die Liste steht auch im Programm (Info-Knopf oben rechts, Quelle: src\Oberflaeche\Versionen.cs).
 
+VERSION 4.03  (08.11.2026)  UPDATE-FUNKTION, SMART-LANGTEST, DATENBANK UND FEINSCHLIFF
+======================================================================================
+• Update: Der Austausch der Programmdatei griff seit seiner Einführung auf powershell.exe statt auf LMB.exe zu und öffnete nur ein PowerShell-Fenster. Jetzt wird LMB.exe ersetzt, sobald sie frei ist, das Skript daneben mit archiviert, das Ergebnis in Minibench-Daten\Update\Update.log festgehalten und bei Fehlern die alte Version zurückgelegt. Versionen werden dezimal verglichen (4.03 < 4.1).
+• SMART-Langtest: Wird das Warten übersprungen oder steht die Datenträgermessung an, beendet Leos Minibench den Langtest (smartctl -X), damit er Benchmark und Lasttest nicht bremst.
+• Grafik: Die PCIe-Anbindung wird während des Rendertests gelesen, nicht im Leerlauf danach (GTX 1070 stand vorher mit PCIe 1.0 im Bericht).
+• Datenbank: Knöpfe für einen Lauf erscheinen erst, wenn einer markiert ist. Das Menü Aktionen enthält Berichtsordner öffnen und Lauf löschen; der Knopf Lauf löschen entfällt.
+• Ergebnisseite: Verweis „Referenz ändern“ führt zur Wahl der Referenz, die auf der Seite Benchmark jetzt direkt unter den Messungen steht.
+• Lauf: Während Sensoren beendet und vorübergehende Treiber entfernt werden, steht „Aufräumen“ in der Kopfzeile statt des letzten Abschnitts.
+• Sensorkurven: Legende und Abbruchschwelle laufen nicht mehr ineinander; Abstände skalieren mit der Anzeigeskalierung.
+• Veroeffentlichen.ps1 erstellt das GitHub-Release mit LMB.exe und der SHA-256-Zeile, die die Update-Funktion prüft.
+
 VERSION 4.02  (08.11.2026)  PAWNIO-ENTFERNUNG, PLAUSIBLERE MESSWERTE, EINSTELLUNGEN AUF EINER SEITE
 ===================================================================================================
 • PawnIO: Der Treiber wurde seit v3.84 am Ende des Laufs nicht entfernt. Das Setup kennt nur -uninstall -silent, die zusätzlichen InnoSetup- und NSIS-Schalter führten zum Fenster „Unknown argument: /VERYSILENT“ und Rückgabecode 87. Ein noch installierter Treiber aus früheren Läufen wird beim nächsten Lauf entfernt.

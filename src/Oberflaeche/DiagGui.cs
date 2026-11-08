@@ -826,16 +826,7 @@ public partial class DiagGui : Form
                 {
                     string cleanRemote = tag.TrimStart('v', 'V', ' ');
                     string cleanLocal = this.version.TrimStart('v', 'V', ' ');
-                    System.Version vRem, vLoc;
-                    bool isNewer = false;
-                    if (System.Version.TryParse(cleanRemote, out vRem) && System.Version.TryParse(cleanLocal, out vLoc))
-                    {
-                        isNewer = vRem > vLoc;
-                    }
-                    else
-                    {
-                        isNewer = String.Compare(cleanRemote, cleanLocal, StringComparison.OrdinalIgnoreCase) > 0;
-                    }
+                    bool isNewer = IsNewerVersion(cleanRemote, cleanLocal);
 
                     if (isNewer)
                     {
@@ -864,6 +855,18 @@ public partial class DiagGui : Form
         t.Start();
     }
 
+    // Versionen sind Dezimalzahlen (3.882 < 3.9 < 4.0 < 4.01 < 4.1). System.Version hielt 4.03 für größer als 4.1
+    // und 3.882 für größer als 3.9 (ab v4.03 korrigiert).
+    public static bool IsNewerVersion(string remote, string local)
+    {
+        decimal r, l;
+        System.Globalization.CultureInfo inv = System.Globalization.CultureInfo.InvariantCulture;
+        if (Decimal.TryParse((remote ?? "").Trim().TrimStart('v', 'V'), System.Globalization.NumberStyles.Number, inv, out r) &&
+            Decimal.TryParse((local ?? "").Trim().TrimStart('v', 'V'), System.Globalization.NumberStyles.Number, inv, out l))
+            return r > l;
+        return String.Compare(remote, local, StringComparison.OrdinalIgnoreCase) > 0;
+    }
+
     void TriggerUpdateDownload()
     {
         if (String.IsNullOrEmpty(AvailableUpdateUrl))
@@ -872,8 +875,8 @@ public partial class DiagGui : Form
             return;
         }
 
-        string msg = "Möchten Sie das Update auf Version " + AvailableUpdateVersion + " jetzt herunterladen und LMB.exe automatisch austauschen?\r\n\r\n" +
-                     "Die bisherige Programmdatei wird im Archiv gesichert und die Anwendung anschlie\u00DFend neu gestartet.";
+        string msg = "Update auf Version " + AvailableUpdateVersion + " jetzt herunterladen und LMB.exe austauschen?\r\n\r\n" +
+                     "Leos Minibench schließt sich dafür. Die bisherige Programmdatei und ein Skript daneben (LeosMinibench.ps1) werden im Datenordner unter Archiv gesichert, danach startet die neue Version.";
         if (!UI.Ask(msg, "Minibench Update", this))
             return;
 
@@ -885,6 +888,8 @@ public partial class DiagGui : Form
 
             Cursor.Current = Cursors.WaitCursor;
 
+            System.Net.ServicePointManager.SecurityProtocol = (System.Net.SecurityProtocolType)3072; // Tls12, auch ohne vorherige Prüfung im selben Prozess
+            if (running) { UI.Hinweis("Während eines Laufs ist kein Update möglich.", "Update", this); return; }
             using (System.Net.WebClient wc = new System.Net.WebClient())
             {
                 wc.Headers["User-Agent"] = "LeosMinibench";
@@ -934,46 +939,76 @@ public partial class DiagGui : Form
         }
     }
 
+    // Programmdatei austauschen (ab v4.03 neu). Bis v4.02 hielt das Austauschskript this.psExe für die Programmdatei:
+    // Das ist powershell.exe. "move" scheiterte, und "start" öffnete am Ende nur ein PowerShell-Fenster; LMB.exe blieb alt.
+    // Jetzt: Pfad der exe aus LEOSMINIBENCH_EXE (setzt das Startprogramm), Warten, bis die exe nicht mehr gesperrt ist
+    // (Startprogramm und Oberfläche beendet), altes Skript neben der exe mit archivieren (sonst lädt die neue exe weiter
+    // das alte Skript), Protokoll in Update.log, Rückweg bei Fehlern.
     void ExecuteSelfReplace(string newExePath)
     {
         try
         {
             string updateDir = Path.GetDirectoryName(newExePath);
             string updateCmd = Path.Combine(updateDir, "Update.cmd");
-            string currentExe = this.psExe;
-            if (String.IsNullOrEmpty(currentExe) || !File.Exists(currentExe))
+            string logFile = Path.Combine(updateDir, "Update.log");
+            string exe = Environment.GetEnvironmentVariable("LEOSMINIBENCH_EXE") ?? "";
+            if (exe.Length == 0 || !exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
             {
-                currentExe = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
+                // ohne Startprogramm gestartet (LeosMinibench.cmd): LMB.exe neben das Skript legen
+                string sdir = File.Exists(script) && !script.StartsWith(Path.GetTempPath(), StringComparison.OrdinalIgnoreCase) ? Path.GetDirectoryName(script) : (dataDir.Length > 0 ? Path.GetDirectoryName(dataDir.TrimEnd('\\')) : "");
+                if (sdir.Length == 0) { UI.Hinweis("Der Ordner der Programmdatei ist unbekannt. Die neue LMB.exe liegt in:\r\n" + newExePath, "Update", this); return; }
+                exe = Path.Combine(sdir, "LMB.exe");
             }
-            int myPid = System.Diagnostics.Process.GetCurrentProcess().Id;
+            string exeDir = Path.GetDirectoryName(exe);
+            string ps1Beside = Path.Combine(exeDir, "LeosMinibench.ps1");
+            string archivDir = Path.Combine(dataDir.Length > 0 ? dataDir : exeDir, Path.Combine("Archiv", "v" + this.version));
 
-            string archivDir = Path.Combine(dataDir, "Archiv", "v" + this.version);
+            List<string> c = new List<string>();
+            c.Add("@echo off");
+            c.Add("chcp 65001 >nul");
+            c.Add("setlocal");
+            c.Add("title Leos Minibench Update");
+            c.Add("set \"EXE=" + exe + "\"");
+            c.Add("set \"NEU=" + newExePath + "\"");
+            c.Add("set \"ARCH=" + archivDir + "\"");
+            c.Add("set \"PS1=" + ps1Beside + "\"");
+            c.Add("set \"LOG=" + logFile + "\"");
+            c.Add(">>\"%LOG%\" echo %date% %time% Update von " + this.version + " auf " + AvailableUpdateVersion + ": %EXE%");
+            c.Add("if not exist \"%ARCH%\" mkdir \"%ARCH%\"");
+            c.Add("if not exist \"%EXE%\" goto kopieren");
+            c.Add("set /a n=0");
+            // bis zu 90 s warten, bis Oberfläche und Startprogramm beendet sind und die exe frei ist
+            c.Add(":warte");
+            c.Add("set /a n+=1");
+            c.Add("if %n% gtr 90 goto gesperrt");
+            c.Add("ping -n 2 127.0.0.1 >nul");
+            c.Add("move /y \"%EXE%\" \"%ARCH%\\LMB.exe\" >nul 2>&1");
+            c.Add("if errorlevel 1 goto warte");
+            c.Add(":kopieren");
+            c.Add("if exist \"%PS1%\" move /y \"%PS1%\" \"%ARCH%\\LeosMinibench.ps1\" >nul 2>&1");
+            c.Add("copy /y \"%NEU%\" \"%EXE%\" >nul");
+            c.Add("if errorlevel 1 goto zurueck");
+            c.Add(">>\"%LOG%\" echo %date% %time% erfolgreich, alte Version in %ARCH%");
+            c.Add("del \"%NEU%\" >nul 2>&1");
+            c.Add("start \"\" \"%EXE%\"");
+            c.Add("goto ende");
+            c.Add(":zurueck");
+            c.Add(">>\"%LOG%\" echo %date% %time% Kopieren fehlgeschlagen, alte Version zurück");
+            c.Add("if exist \"%ARCH%\\LMB.exe\" move /y \"%ARCH%\\LMB.exe\" \"%EXE%\" >nul");
+            c.Add("if exist \"%ARCH%\\LeosMinibench.ps1\" if not exist \"%PS1%\" move /y \"%ARCH%\\LeosMinibench.ps1\" \"%PS1%\" >nul");
+            c.Add("start \"\" \"%EXE%\"");
+            c.Add("goto ende");
+            c.Add(":gesperrt");
+            c.Add(">>\"%LOG%\" echo %date% %time% LMB.exe blieb gesperrt, Update nicht ausgeführt. Neue Datei: %NEU%");
+            c.Add(":ende");
+            c.Add("del \"%~f0\"");
+            File.WriteAllText(updateCmd, String.Join("\r\n", c.ToArray()) + "\r\n", new UTF8Encoding(false));
 
-            string[] cmdLines = new string[] {
-                string.Format("{0}echo off", "@"),
-                "setlocal",
-                "title Minibench Update",
-                ":waitloop",
-                "timeout /t 1 /nobreak >nul",
-                "tasklist /fi \"PID eq " + myPid + "\" 2>nul | find \"" + myPid + "\" >nul",
-                "if %errorlevel% equ 0 goto waitloop",
-                "if not exist \"" + archivDir + "\" mkdir \"" + archivDir + "\"",
-                "move /y \"" + currentExe + "\" \"" + Path.Combine(archivDir, "LMB.exe") + "\" >nul",
-                "copy /y \"" + newExePath + "\" \"" + currentExe + "\" >nul",
-                "start \"\" \"" + currentExe + "\"",
-                "del \"%~f0\""
-            };
-
-            File.WriteAllText(updateCmd, String.Join("\r\n", cmdLines), Encoding.ASCII);
-
-            ProcessStartInfo psi = new ProcessStartInfo();
-            psi.FileName = "cmd.exe";
-            psi.Arguments = "/c \"" + updateCmd + "\"";
-            psi.CreateNoWindow = true;
-            psi.UseShellExecute = false;
+            ProcessStartInfo psi = new ProcessStartInfo("cmd.exe", "/c \"\"" + updateCmd + "\"\"");
+            psi.CreateNoWindow = true; psi.UseShellExecute = false; psi.WindowStyle = ProcessWindowStyle.Hidden;
+            psi.WorkingDirectory = updateDir;
             Process.Start(psi);
-
-            Application.Exit();
+            Close();
         }
         catch (Exception ex)
         {
@@ -1698,7 +1733,6 @@ public partial class DiagGui : Form
         Tip(cmbKeep, "Was nach dem Lauf mit PawnIO und smartmontools geschieht, die Leos Minibench installiert hat: nach dem Lauf entfernen (keine Reste) oder auf diesem PC behalten. Gespeichert je Gerät in Geraete.json.");
         // Vergleichsdatenbank, Änderungen, Fuß
         Tip(btnCompare, "Vergleicht die angehakten Systeme in einem HTML-Bericht (mindestens zwei).");
-        Tip(btnDelete, "Entfernt die angehakten Einträge aus der Datenbank. Die Berichtsordner bleiben erhalten.");
         Tip(btnDbClean, "Datenpflege: verschiebt nicht mehr vergleichbare Lasttests älterer Versionen, abgebrochene Läufe ohne Bericht und kurze Läufe (Funktionstest, Lasttest nach wenigen Sekunden beendet, Lauf ohne Messwert) sowie ungenutzte Teile von smartmontools nach Minibench-Daten\\Archiv. Gelöscht werden nur ältere Übersetzungen im Cache und Reste der Live-Ansicht; das Protokoll steht in Archiv\\Datenpflege.log.");
         Tip(btnUndo, "Nimmt die angehakten Änderungen zurück (nur Stufe Ändern und nur auf dem PC, auf dem sie entstanden sind).");
         Tip(lnkAblage, "Öffnet den Datenordner mit Berichten, Datenbank, Werkzeugen und Vorlagen: " + (dataDir.Length > 0 ? dataDir : "kein Datenordner"));
@@ -2103,6 +2137,27 @@ public partial class DiagGui : Form
             benchChk[i].CheckedChanged += delegate { clbDisks.Enabled = benchChk[3].Checked; UpdateSummary(); };
             f.Controls.Add(Opt2(benchChk[i], benchDetail[i]));
         }
+        // ab v4.03 direkt unter den Messungen: Die Referenz bestimmt alle Prozentwerte der Ergebnisseite und stand vorher
+        // ganz unten außerhalb des Sichtbereichs
+        f.Controls.Add(Section("Referenz"));
+        FlowLayoutPanel r2 = Row(); r2.Controls.Add(RowLabel("Referenz (100 %)", 170));
+        cmbRef = Combo(360, new string[0], 0); r2.Controls.Add(cmbRef);
+        btnUpdateMed = UI.Secondary("Median aktualisieren");
+        btnUpdateMed.Click += delegate {
+            if (running) return;
+            List<string> lines;
+            string res = RunHelperPumped("-MedianAktualisieren", out lines, 60);
+            string msg = "Aktualisierung fehlgeschlagen.";
+            foreach (string l in lines) if (l.StartsWith("@@STATUS|")) msg = l.Substring(9);
+            MessageBox.Show(this, msg, "Median-Referenz", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            FillRefLists();
+        };
+        r2.Controls.Add(btnUpdateMed);
+        f.Controls.Add(r2);
+        lblRefState = Hint("", 180); f.Controls.Add(lblRefState);
+        cmbRef.SelectedIndexChanged += delegate { UpdateRefState(); };
+        chkRefSave = Chk("Dieses System als Referenz (100 %) festlegen", false); f.Controls.Add(chkRefSave);
+
         f.Controls.Add(Section("Laufwerke"));
         clbDisks = new CheckedListBox(); clbDisks.CheckOnClick = true; clbDisks.Width = UI.S(UI.Gruppenbreite); clbDisks.BorderStyle = BorderStyle.FixedSingle; clbDisks.IntegralHeight = false; clbDisks.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(4)); clbDisks.BackColor = UI.Panel; clbDisks.ForeColor = UI.Text;
         foreach (string d in disks)
@@ -2125,25 +2180,6 @@ public partial class DiagGui : Form
         rg.Controls.Add(RowLabel("Anzeige", 70)); cmbGpuShow = Combo(170, new string[] { "Fenster", "Vollbild", "ohne Anzeige" }, 0); rg.Controls.Add(cmbGpuShow);
         f.Controls.Add(rg);
         f.Controls.Add(Hint("Ergebnis: Ø Bilder/s, 1-%-Low und Punktzahl je Grafikeinheit. Esc im Fenster beendet den Test.", 4));
-
-        f.Controls.Add(Section("Referenz"));
-        FlowLayoutPanel r2 = Row(); r2.Controls.Add(RowLabel("Referenz (100 %)", 170));
-        cmbRef = Combo(360, new string[0], 0); r2.Controls.Add(cmbRef);
-        btnUpdateMed = UI.Secondary("Median aktualisieren");
-        btnUpdateMed.Click += delegate {
-            if (running) return;
-            List<string> lines;
-            string res = RunHelperPumped("-MedianAktualisieren", out lines, 60);
-            string msg = "Aktualisierung fehlgeschlagen.";
-            foreach (string l in lines) if (l.StartsWith("@@STATUS|")) msg = l.Substring(9);
-            MessageBox.Show(this, msg, "Median-Referenz", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            FillRefLists();
-        };
-        r2.Controls.Add(btnUpdateMed);
-        f.Controls.Add(r2);
-        lblRefState = Hint("", 180); f.Controls.Add(lblRefState);
-        cmbRef.SelectedIndexChanged += delegate { UpdateRefState(); };
-        chkRefSave = Chk("Dieses System als Referenz (100 %) festlegen", false); f.Controls.Add(chkRefSave);
 
         clbCompare = new CheckedListBox(); clbCompare.BackColor = UI.Panel; clbCompare.ForeColor = UI.Text;
         FillRefLists();

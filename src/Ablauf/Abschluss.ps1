@@ -1,4 +1,4 @@
-# =====================================================================================
+﻿# =====================================================================================
 #                                    ABSCHLUSS
 # =====================================================================================
 
@@ -14,7 +14,11 @@ if ($script:BgJobs.Count) { Wait-BgAll 'der Abschluss'; Stop-BgJobs }
 # Rendertest: kein Grafikgerät darf offen bleiben
 if ($GpuTypesLoaded) { try { [DiagGpu]::StopAll() } catch { } }
 
-# Sensoren schließen: entfernt einen vorübergehend installierten PawnIO-Treiber, bevor die Rückstandskontrolle prüft
+# Sensoren schließen: entfernt einen vorübergehend installierten PawnIO-Treiber, bevor die Rückstandskontrolle prüft.
+# Kopfzeile und Protokoll nennen das (bis v4.02 stand währenddessen noch der letzte Abschnitt oben, z. B. "Optimierung: Ergebnis").
+Show-Overall 'Aufräumen: Sensoren beenden, vorübergehend installierte Treiber entfernen'
+Write-Host ''
+Write-Host ('[{0}] >> Aufräumen: Sensoren und Hilfswerkzeuge' -f (Get-Date -Format 'HH:mm:ss')) -ForegroundColor Cyan
 Close-SensorSession
 foreach ($t in @($script:SensorNotes | Select-Object -Unique)) { Add-Finding INFO 'Sensoren' $t }
 

@@ -15,7 +15,10 @@ src                 Quelltext. Reihenfolge der Teile in src\Bauplan.txt. Kern in
 Bauen.cmd           fügt src zu Aktueller Build\LeosMinibench.ps1 zusammen, führt die Tests aus, baut die .exe, schreibt
                     Stand.txt, passt README.md an (Version, Testanzahl), verschiebt den vorigen Build nach
                     Archiv\v<alte Version>, räumt Aktueller Build\Minibench-Daten auf, committet nach bestandenen
-                    Tests lokal (Nachricht aus Versionen.cs) und pusht automatisch nach GitHub (git push). Bauen.cmd ohnetests baut ohne Tests und ohne Commit.
+                    Tests lokal (Nachricht aus Versionen.cs). Übertragen nach GitHub von Hand (git push, Tag vX.Y).
+                    Bauen.cmd ohnetests baut ohne Tests und ohne Commit.
+Veroeffentlichen.ps1 erstellt das GitHub-Release der aktuellen Version mit gh (LMB.exe als Anhang, SHA-256-Zeile für die
+                    Update-Funktion, Text aus CHANGELOG.md). Ab v4.03.
 Aktueller Build     nie von Hand ändern, entsteht bei jedem Bau neu. Inhalt kommt auf den USB-Stick.
 tests               Pester-Tests nach Fachgebieten (keine Dateien je Version): Ablage, Ablauf, Aenderungen, Aufbau, Auswertung,
                     Bericht, Datenbank, Lauf (Gesamtläufe, nur mit -Gesamtlauf), Messung, Modulvertrag, Oberflaeche,
@@ -92,7 +95,7 @@ Minibench-Daten     Datenordner neben der exe: Berichte, Datenbank (JSON, PC-Dia
 
 ## Git
 Repository: https://github.com/miniLeonardo/MiniBench (Zweig main). Bauen.cmd committet nach bestandenen Tests lokal
-und pusht automatisch nach GitHub (git push). Jede Version ein Commit "Release vX.Y: <Titel aus Versionen.cs>". Vor der Arbeit
+übertragen wird von Hand (git push, dazu der Tag vX.Y). Jede Version ein Commit "Release vX.Y: <Titel aus Versionen.cs>". Vor der Arbeit
 git log seit dem in Doku\Projektstand.md genannten Commit lesen.
 
 ## Vorgehen in jedem Chat
@@ -109,5 +112,6 @@ git log seit dem in Doku\Projektstand.md genannten Commit lesen.
 3. Doku\Änderungen_vX.Y.txt im Stil der bisherigen Dateien (Abschnitte, Gefunden und behoben, Grenzen, Umstieg, Quellen).
    Keine Testmatrix.
 4. Doku\Projektstand.md aktualisieren (Stand, offene Befunde, Fallstricke, letzter Commit).
-5. Bauen.cmd ausführen (oder Leonardo darum bitten), committet und pusht bei bestandenen Tests automatisch.
-6. GitHub-Release erstellen und LMB.exe hochladen: Nach dem Tagging (vX.Y) das Release auf GitHub via API erstellen und Aktueller Build\LMB.exe als Release-Asset hochladen. Die SHA-256-Prüfsumme der gebauten LMB.exe wird dabei standardisiert im Release-Text ausgewiesen (`SHA-256 (LMB.exe): <hash>`), damit die integrierte Update-Prüfung und Prüfsummenvalidierung den Download verifizieren kann. Unbedingt auf saubere UTF-8-Kodierung des Releasetextes achten: UTF-8-Bytes explizit per [System.Text.Encoding]::UTF8.GetBytes(...) übertragen, damit Umlaute (ä, ö, ü, ß) und Anführungszeichen auf GitHub fehlerfrei ohne Mojibake (wie ü) dargestellt werden.
+5. Bauen.cmd ausführen (oder Leonardo darum bitten), committet bei bestandenen Tests; danach git push, git tag vX.Y, git push origin vX.Y.
+6. GitHub-Release mit Veroeffentlichen.ps1 erstellen (braucht gh, angemeldet). Es hängt Aktueller Build\LMB.exe an und schreibt
+   "SHA-256 (LMB.exe): <hash>" in den Text; ohne beides kann die Update-Funktion nicht aktualisieren.

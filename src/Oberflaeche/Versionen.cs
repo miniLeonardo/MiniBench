@@ -11,6 +11,15 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.03", "08.11.2026", "Update-Funktion, SMART-Langtest, Datenbank und Feinschliff",
+            "\u2022 Update: Der Austausch der Programmdatei griff seit seiner Einf\u00FChrung auf powershell.exe statt auf LMB.exe zu und \u00F6ffnete nur ein PowerShell-Fenster. Jetzt wird LMB.exe ersetzt, sobald sie frei ist, das Skript daneben mit archiviert, das Ergebnis in Minibench-Daten\\Update\\Update.log festgehalten und bei Fehlern die alte Version zur\u00FCckgelegt. Versionen werden dezimal verglichen (4.03 < 4.1).\r\n" +
+            "\u2022 SMART-Langtest: Wird das Warten \u00FCbersprungen oder steht die Datentr\u00E4germessung an, beendet Leos Minibench den Langtest (smartctl -X), damit er Benchmark und Lasttest nicht bremst.\r\n" +
+            "\u2022 Grafik: Die PCIe-Anbindung wird w\u00E4hrend des Rendertests gelesen, nicht im Leerlauf danach (GTX 1070 stand vorher mit PCIe 1.0 im Bericht).\r\n" +
+            "\u2022 Datenbank: Kn\u00F6pfe f\u00FCr einen Lauf erscheinen erst, wenn einer markiert ist. Das Men\u00FC Aktionen enth\u00E4lt Berichtsordner \u00F6ffnen und Lauf l\u00F6schen; der Knopf Lauf l\u00F6schen entf\u00E4llt.\r\n" +
+            "\u2022 Ergebnisseite: Verweis \u201EReferenz \u00E4ndern\u201C f\u00FChrt zur Wahl der Referenz, die auf der Seite Benchmark jetzt direkt unter den Messungen steht.\r\n" +
+            "\u2022 Lauf: W\u00E4hrend Sensoren beendet und vor\u00FCbergehende Treiber entfernt werden, steht \u201EAufr\u00E4umen\u201C in der Kopfzeile statt des letzten Abschnitts.\r\n" +
+            "\u2022 Sensorkurven: Legende und Abbruchschwelle laufen nicht mehr ineinander; Abst\u00E4nde skalieren mit der Anzeigeskalierung.\r\n" +
+            "\u2022 Veroeffentlichen.ps1 erstellt das GitHub-Release mit LMB.exe und der SHA-256-Zeile, die die Update-Funktion pr\u00FCft."),
         new Eintrag("4.02", "08.11.2026", "PawnIO-Entfernung, plausiblere Messwerte, Einstellungen auf einer Seite",
             "\u2022 PawnIO: Der Treiber wurde seit v3.84 am Ende des Laufs nicht entfernt. Das Setup kennt nur -uninstall -silent, die zus\u00E4tzlichen InnoSetup- und NSIS-Schalter f\u00FChrten zum Fenster \u201EUnknown argument: /VERYSILENT\u201C und R\u00FCckgabecode 87. Ein noch installierter Treiber aus fr\u00FCheren L\u00E4ufen wird beim n\u00E4chsten Lauf entfernt.\r\n" +
             "\u2022 Laufwerke mit Medientyp \u201EUnspecified\u201C (SATA hinter AMD- oder Intel-Treibern) werden \u00FCber Name und 4K-Zugriffszeit als SSD oder Festplatte eingeordnet und bekommen wieder Index und Referenzvergleich.\r\n" +

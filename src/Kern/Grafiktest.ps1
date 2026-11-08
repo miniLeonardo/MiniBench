@@ -252,7 +252,16 @@ function Invoke-RenderBenchmark($Adapters, [int]$Width, [int]$Height, [int]$Prev
         [void][DiagGpu]::Start($r)
         $total = [double]($WarmupMs + $MeasureMs + 6600)
         $sw = [Diagnostics.Stopwatch]::StartNew()
+        # ab v4.03: PCIe-Anbindung während des Aufwärmens lesen (Karte unter Last). Danach senken viele Karten die
+        # Generation sofort wieder ab; die GTX 1070 stand im Bericht so mit "PCIe 1.0".
+        $linkDone = -not ($script:RenderLinkIds -and @($script:RenderLinkIds).Count)
+        $linkAt = [math]::Max(1500, [math]::Min(2500, $WarmupMs - 500))
         while (-not $r.Done) {
+            if (-not $linkDone -and $sw.ElapsedMilliseconds -ge $linkAt) {
+                $linkDone = $true
+                if (-not $script:RenderLinkLoad) { $script:RenderLinkLoad = @{} }
+                foreach ($lid in @($script:RenderLinkIds)) { if (-not $script:RenderLinkLoad.ContainsKey($lid)) { try { $lk = Get-PcieLink $lid; if ($lk) { $script:RenderLinkLoad[$lid] = $lk } } catch { } } }
+            }
             if ((Get-Command Test-SkipRequested -ErrorAction SilentlyContinue) -and (Test-SkipRequested)) {
                 $r.Stop = $true
                 break
