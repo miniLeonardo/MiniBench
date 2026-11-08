@@ -11,6 +11,10 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.04", "08.11.2026", "Veröffentlichen in einem Schritt, Referenz über die Datenbank",
+            "\u2022 Seite Benchmark: Der Haken \u201EDieses System als Referenz (100 %) festlegen\u201C entf\u00E4llt. Eine Referenz legt man in der Datenbank fest (Lauf markieren, Aktionen \u203A Als Referenz festlegen), wo der Lauf mit seinen Werten sichtbar ist. Ein Hinweis unter der Auswahl der Referenz nennt den Weg.\r\n" +
+            "\u2022 Veroeffentlichen.ps1 erledigt alles in einem Aufruf: pr\u00FCft, dass alles committet ist und Aktueller Build zur Version passt, \u00FCbertr\u00E4gt main und den Tag, installiert und meldet die GitHub CLI bei Bedarf an und erstellt das Release mit LMB.exe und Pr\u00FCfsumme.\r\n" +
+            "\u2022 .gitignore: Ordner \u201EClaude outputs\u201C wird nicht mehr als neue Datei gemeldet."),
         new Eintrag("4.03", "08.11.2026", "Update-Funktion, SMART-Langtest, Datenbank und Feinschliff",
             "\u2022 Update: Der Austausch der Programmdatei griff seit seiner Einf\u00FChrung auf powershell.exe statt auf LMB.exe zu und \u00F6ffnete nur ein PowerShell-Fenster. Jetzt wird LMB.exe ersetzt, sobald sie frei ist, das Skript daneben mit archiviert, das Ergebnis in Minibench-Daten\\Update\\Update.log festgehalten und bei Fehlern die alte Version zur\u00FCckgelegt. Versionen werden dezimal verglichen (4.03 < 4.1).\r\n" +
             "\u2022 SMART-Langtest: Wird das Warten \u00FCbersprungen oder steht die Datentr\u00E4germessung an, beendet Leos Minibench den Langtest (smartctl -X), damit er Benchmark und Lasttest nicht bremst.\r\n" +

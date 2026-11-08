@@ -2,10 +2,17 @@
 
 Gemeinsamer Stand für alle Agenten (Claude, Antigravity). Wird am Ende jeder Version aktualisiert (siehe AGENTS.md).
 
-## Stand: Version 4.03 (08.11.2026)
-Release-Commit "Release v4.03: Update-Funktion, SMART-Langtest, Datenbank und Feinschliff" von Claude vorbereitet
-(Grundlage Commit 2d8cff1, Release v4.02), geprüft mit einem Bau unter Mono/Xvfb, dem Selbsttest der Oberfläche und den
-Sandbox-Tests. Release auf GitHub mit Veroeffentlichen.ps1 (LMB.exe und SHA-256 für die Update-Funktion).
+## Stand: Version 4.04 (08.11.2026)
+Release-Commit "Release v4.04: Veröffentlichen in einem Schritt, Referenz über die Datenbank" von Claude vorbereitet
+(Grundlage Commit 598b8b1, Release v4.03). Erstes Release über Veroeffentlichen.ps1.
+
+Inhalt von 4.04 (Einzelheiten in Doku\Änderungen_v4.04.txt):
+1. Seite Benchmark ohne Haken "Dieses System als Referenz festlegen"; Referenz über Datenbank › Aktionen.
+2. Veroeffentlichen.ps1 prüft, überträgt main und Tag, richtet gh ein und erstellt das Release in einem Aufruf.
+3. .gitignore: Claude outputs.
+
+## Vorher: Version 4.03 (08.11.2026)
+Release-Commit "Release v4.03: Update-Funktion, SMART-Langtest, Datenbank und Feinschliff" (Commit 598b8b1).
 
 Inhalt von 4.03 (Einzelheiten in Doku\Änderungen_v4.03.txt):
 1. Update-Funktion tauscht LMB.exe (bis v4.02 powershell.exe, es erschien nur ein PowerShell-Fenster), Update.log, Rückweg.
@@ -288,4 +295,4 @@ Inhalt von 3.64 (Einzelheiten in Doku\Änderungen_v3.64.txt):
 6. smartctl -X und PCIe-Abfrage unter Last unter Windows bestätigen.
 
 ## Letzter Commit
-Release-Commit v4.03 (Nachfolger von 2d8cff1, Release v4.02).
+Release-Commit v4.04 (Nachfolger von 598b8b1, Release v4.03).

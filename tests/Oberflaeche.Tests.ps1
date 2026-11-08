@@ -206,3 +206,12 @@ Describe 'Einstellungen und Ergebnisseite (ab v4.02)' {
         $gui | Should -Not -Match 'log\.AppendLine\(">> "'
     }
 }
+
+Describe 'Benchmark ohne Referenz-Haken (ab v4.04)' {
+    It 'Referenz wird nur noch in der Datenbank festgelegt' {
+        $gui = Get-SrcText 'Oberflaeche/DiagGui.cs'
+        $gui | Should -Not -Match 'chkRefSave'
+        $gui | Should -Match 'Aktionen \\u203A Als Referenz festlegen'
+        (Get-SrcText 'Oberflaeche/DiagGui_Vergleich.cs') | Should -Match 'Als Referenz festlegen \(persistent\)'
+    }
+}

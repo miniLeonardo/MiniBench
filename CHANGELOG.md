@@ -2,6 +2,13 @@
 
 Alle wesentlichen Änderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v4.04 (08.11.2026)
+
+### Verbessert
+* **Benchmark:** Haken „Dieses System als Referenz festlegen“ entfällt; Referenz wird in der Datenbank über Aktionen festgelegt, ein Hinweis auf der Seite nennt den Weg.
+* **Veröffentlichen:** Veroeffentlichen.ps1 prüft den Stand, überträgt main und Tag, richtet die GitHub CLI bei Bedarf ein und erstellt das Release in einem Aufruf.
+* **Git:** Ordner „Claude outputs“ in .gitignore.
+
 ## v4.03 (08.11.2026)
 
 ### Behoben

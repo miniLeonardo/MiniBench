@@ -6,7 +6,7 @@
 
 **Portable Diagnose-, Benchmark-, Stresstest-, Reparatur- und Optimierungs-Suite für Windows 10 & 11.**
 
-[![Version](https://img.shields.io/badge/Version-4.03-0284c7.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-4.04-0284c7.svg)](CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/Changelog-MD-6366f1.svg)](CHANGELOG.md)
 [![Lizenz](https://img.shields.io/badge/Lizenz-MIT-blue.svg)](LICENSE)
 [![Plattform](https://img.shields.io/badge/Windows-10%20%7C%2011%20(x64)-0078d4.svg)]()
@@ -22,12 +22,12 @@
 <br/>
 
 <a href="https://github.com/miniLeonardo/MiniBench/releases">
-  <img src="https://img.shields.io/badge/%E2%AC%87%EF%B8%8F%20Download-LMB.exe%20(v4.03)-2563eb?style=for-the-badge&logo=windows&logoColor=white" alt="Download LMB.exe" />
+  <img src="https://img.shields.io/badge/%E2%AC%87%EF%B8%8F%20Download-LMB.exe%20(v4.04)-2563eb?style=for-the-badge&logo=windows&logoColor=white" alt="Download LMB.exe" />
 </a>
 
 <br/><br/>
 
-<img src="Doku/Screenshots/Startseite_Neu.png" alt="Leos Minibench 4.03 Oberfläche" width="850" />
+<img src="Doku/Screenshots/Startseite_Neu.png" alt="Leos Minibench 4.04 Oberfläche" width="850" />
 
 <br/><br/>
 
@@ -55,6 +55,7 @@ Alternativ kann die Suite ohne Binärdatei direkt per PowerShell über `LMB.cmd`
 
 ## 🆕 Neu in 4.0x
 
+* **4.04:** Referenz wird in der Datenbank festgelegt (Haken auf der Seite Benchmark entfällt), Veröffentlichen in einem Schritt.
 * **4.03:** Update-Funktion repariert (tauschte bis dahin nicht die Programmdatei), SMART-Langtest wird vor Messungen beendet, PCIe-Anbindung der Grafik unter Last gemessen, aufgeräumte Datenbank-Leiste mit Menü *Aktionen*.
 * **4.02:** PawnIO-Treiber wird nach dem Lauf wieder entfernt, Laufwerke mit unbekanntem Medientyp werden eingeordnet, Ergebnisseite ordnet gegenüber dem Referenz-PC ein statt gegenüber einem Durchschnitt, Einstellungen auf einer Seite, Zustand der Optimierung im Hintergrund.
 * **4.01:** Ergebnisseite mit Urteil, To-dos und Vergleich, kürzere Startzeit (3 bis 5 s vom Stick), korrekte Schriftgrößen bei 125 und 150 % Skalierung.
@@ -97,7 +98,7 @@ Alle Versionen: [CHANGELOG.md](CHANGELOG.md), Einzelheiten je Version in `Doku\�
 * **Architektur:** Windows PowerShell 5.1 und C# 5 (Add-Type / `csc.exe`). Keine externen Laufzeitabhängigkeiten, keine Cloud- oder CDN-Erfordernisse.
 * **Testsuite:** `Testen.cmd` führt über 840 Pester-Tests aus (kompatibel mit Pester 5 und Pester 6).
 * **Build-Prozess:** `Bauen.cmd` prüft den Quelltext laut `src\Bauplan.txt`, führt die Pester-Tests aus, kompiliert `LMB.exe` lokal und führt nach erfolgreichen Tests einen lokalen Git-Commit durch. Übertragen mit `git push` und dem Tag `vX.Y`.
-* **Release:** `Veroeffentlichen.ps1` erstellt mit der GitHub CLI das Release der aktuellen Version, hängt `LMB.exe` an und schreibt die SHA-256-Zeile, die die Update-Funktion prüft.
+* **Release:** `Veroeffentlichen.ps1` überträgt `main` und den Tag, richtet bei Bedarf die GitHub CLI ein und erstellt das Release der aktuellen Version mit `LMB.exe` und der SHA-256-Zeile, die die Update-Funktion prüft.
 * **Richtlinien:** Details zu Codestil, Modulverträgen und Beitragsrichtlinien sind in [AGENTS.md](AGENTS.md) dokumentiert.
 
 ---

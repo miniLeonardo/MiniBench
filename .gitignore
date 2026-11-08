@@ -22,6 +22,7 @@ LMB*/
 *.user
 .agents/
 .antigravity/
+Claude outputs/
 
 # Betriebssystem-Artefakte
 Thumbs.db

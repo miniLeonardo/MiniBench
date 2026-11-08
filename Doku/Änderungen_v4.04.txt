@@ -1,0 +1,34 @@
+﻿LEOS MINIBENCH 4.04: ÄNDERUNGEN
+===============================
+
+Kleine Version vor dem ersten Release über Veroeffentlichen.ps1. Messabläufe, Berichte und Datenbankformat sind
+unverändert.
+
+
+1. REFERENZ NUR ÜBER DIE DATENBANK
+  Vorher                      Auf der Seite Benchmark stand der Haken "Dieses System als Referenz (100 %) festlegen". Er
+                              setzte den gerade startenden Lauf als Referenz, bevor man dessen Werte sah, und wurde nach jedem
+                              Laden einer Vorlage zurückgesetzt.
+  Jetzt                       Der Haken entfällt. Eine Referenz legt man in der Datenbank fest: Lauf markieren, Aktionen ›
+                              Als Referenz festlegen. Unter der Auswahl der Referenz steht dieser Weg als Hinweis. Der
+                              Skriptparameter -ReferenzSpeichern bleibt für Aufrufe ohne Oberfläche.
+
+
+2. VERÖFFENTLICHEN IN EINEM SCHRITT
+  Vorher                      Veroeffentlichen.ps1 (4.03) setzte eine angemeldete GitHub CLI und einen übertragenen Tag
+                              voraus und brach sonst ab.
+  Jetzt                       Ein Aufruf erledigt alles: prüft, dass keine Änderungen offen sind und Stand.txt zur Version
+                              passt, überträgt main, legt den Tag vX.Y an und überträgt ihn, installiert die GitHub CLI bei
+                              Bedarf mit winget, meldet sie über den Browser an (einmalig) und erstellt oder aktualisiert das
+                              Release mit LMB.exe und "SHA-256 (LMB.exe): ...". Fehler von git und gh werden über die
+                              Rückgabecodes geprüft, weil Windows PowerShell 5.1 Ausgaben auf stderr sonst als Abbruch
+                              behandelt. -OhnePush überspringt das Übertragen, -Entwurf legt das Release als Entwurf an.
+
+
+3. GIT
+  .gitignore                  Der Ordner "Claude outputs" (Ablage der Claude-App) erscheint nicht mehr als neue Datei.
+
+
+GRENZEN
+  Geprüft mit einem Bau unter Mono und Xvfb und den Sandbox-Tests. Veroeffentlichen.ps1 ist unter Windows mit gh zu
+  bestätigen; danach die Update-Funktion mit einer älteren LMB.exe in einem eigenen Ordner.

@@ -1,30 +1,63 @@
-﻿# Erstellt oder aktualisiert das GitHub-Release der aktuellen Version (ab v4.03).
-# Die Update-Funktion von Leos Minibench liest aus dem neuesten Release die Datei LMB.exe und die Zeile
-# "SHA-256 (LMB.exe): <Prüfsumme>"; ohne beides kann sie nicht aktualisieren.
-#
-# Voraussetzungen: GitHub CLI angemeldet (einmalig: winget install GitHub.cli, danach gh auth login),
-# Tag vX.Y ist nach GitHub übertragen (git push origin vX.Y), Aktueller Build\LMB.exe gehört zu dieser Version.
-# Aufruf im Projektordner: powershell -ExecutionPolicy Bypass -File .\Veroeffentlichen.ps1 [-Entwurf]
-param([switch]$Entwurf)
-$ErrorActionPreference = 'Stop'
+﻿# Veröffentlicht die aktuelle Version in einem Schritt (ab v4.03, ab v4.04 mit Push und Einrichtung von gh):
+#   1. prüft, dass alle Änderungen committet sind und Aktueller Build zur Version passt,
+#   2. überträgt main nach GitHub, legt den Tag vX.Y an (falls nötig) und überträgt ihn,
+#   3. installiert bei Bedarf die GitHub CLI (winget) und meldet sie an (Browser, einmalig),
+#   4. erstellt oder aktualisiert das GitHub-Release mit Aktueller Build\LMB.exe und der Zeile
+#      "SHA-256 (LMB.exe): <Prüfsumme>". Beides braucht die Update-Funktion von Leos Minibench.
+# Aufruf im Projektordner: powershell -ExecutionPolicy Bypass -File .\Veroeffentlichen.ps1 [-Entwurf] [-OhnePush]
+param([switch]$Entwurf, [switch]$OhnePush)
+# Continue statt Stop: Windows PowerShell 5.1 macht aus Ausgaben von git und gh auf stderr sonst Abbrüche.
+# Fehler werden über die Rückgabecodes geprüft.
+$ErrorActionPreference = 'Continue'
 $root = $PSScriptRoot
 $repo = 'miniLeonardo/MiniBench'
+function Schritt([string]$t) { Write-Host ('  ' + $t) -ForegroundColor Cyan }
 
 . (Join-Path $root 'src\Kern\Version.ps1')
 $tag = 'v' + $ScriptVersion
 $exe = Join-Path $root 'Aktueller Build\LMB.exe'
+Write-Host ''
+Write-Host ('Leos Minibench {0} veröffentlichen' -f $ScriptVersion) -ForegroundColor White
 
-if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { throw 'GitHub CLI (gh) fehlt. Einmalig: winget install GitHub.cli, danach gh auth login.' }
+# 1. Stand prüfen
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) { throw 'git fehlt.' }
 if (-not (Test-Path -LiteralPath $exe)) { throw 'Aktueller Build\LMB.exe fehlt. Zuerst bauen (Bauen.cmd).' }
 $stand = Join-Path $root 'Aktueller Build\Stand.txt'
 $sv = $(if (Test-Path -LiteralPath $stand) { [regex]::Match([IO.File]::ReadAllText($stand, [Text.Encoding]::UTF8), 'Version\s*:\s*([0-9.]+)').Groups[1].Value } else { '' })
 if ($sv -ne $ScriptVersion) { throw ('Aktueller Build ist laut Stand.txt Version {0}, src\Kern\Version.ps1 nennt {1}. Zuerst neu bauen.' -f $sv, $ScriptVersion) }
-& git -C $root ls-remote --exit-code --tags origin $tag *> $null
-if ($LASTEXITCODE -ne 0) { throw ('Tag {0} ist noch nicht auf GitHub: git tag {0}; git push origin {0}' -f $tag) }
+$offen = @(& git -C $root status --porcelain --untracked-files=no)
+if ($offen.Count) { $offen | ForEach-Object { Write-Host ('    ' + $_) }; throw 'Es gibt nicht committete Änderungen (siehe oben). Zuerst committen, z. B. mit Bauen.cmd.' }
+Schritt ('Stand geprüft: {0}, Aktueller Build passt' -f $tag)
 
+# 2. main und Tag übertragen
+if (-not $OhnePush) {
+    & git -C $root push origin HEAD:main
+    if ($LASTEXITCODE -ne 0) { throw 'git push origin main ist fehlgeschlagen (siehe oben).' }
+    & git -C $root rev-parse -q --verify ('refs/tags/' + $tag) *> $null
+    if ($LASTEXITCODE -ne 0) { & git -C $root tag $tag; Schritt ('Tag {0} angelegt' -f $tag) }
+    & git -C $root push origin $tag
+    if ($LASTEXITCODE -ne 0) { throw ('git push origin {0} ist fehlgeschlagen (siehe oben).' -f $tag) }
+    Schritt 'main und Tag auf GitHub'
+}
+
+# 3. GitHub CLI einrichten
+if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { throw 'GitHub CLI fehlt und winget ist nicht vorhanden. GitHub CLI von https://cli.github.com installieren.' }
+    Schritt 'GitHub CLI wird installiert (winget) ...'
+    & winget install --id GitHub.cli -e --accept-source-agreements --accept-package-agreements
+    foreach ($p in @("$env:ProgramFiles\GitHub CLI", "${env:LOCALAPPDATA}\Programs\GitHub CLI")) { if (Test-Path -LiteralPath (Join-Path $p 'gh.exe')) { $env:Path = $p + ';' + $env:Path } }
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { throw 'GitHub CLI wurde installiert, ist aber in diesem Fenster noch nicht bekannt. PowerShell neu öffnen und das Skript erneut starten.' }
+}
+& gh auth status --hostname github.com *> $null
+if ($LASTEXITCODE -ne 0) {
+    Schritt 'Anmeldung bei GitHub: Der Browser öffnet sich, dort den angezeigten Code bestätigen.'
+    & gh auth login --hostname github.com --git-protocol https --web
+    if ($LASTEXITCODE -ne 0) { throw 'Anmeldung bei GitHub fehlgeschlagen.' }
+}
+Schritt 'GitHub CLI angemeldet'
+
+# 4. Release
 $sha = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
-
-# Titel aus Versionen.cs, Text aus dem Abschnitt der Version in CHANGELOG.md
 $vcs = [IO.File]::ReadAllText((Join-Path $root 'src\Oberflaeche\Versionen.cs'), [Text.Encoding]::UTF8)
 $titel = [regex]::Match($vcs, ('new Eintrag\("{0}", "[^"]*", "([^"]+)"' -f [regex]::Escape($ScriptVersion))).Groups[1].Value
 $cl = [IO.File]::ReadAllText((Join-Path $root 'CHANGELOG.md'), [Text.Encoding]::UTF8)
@@ -38,12 +71,13 @@ $name = $(if ($titel) { '{0}: {1}' -f $tag, $titel } else { $tag })
 & gh release view $tag --repo $repo *> $null
 if ($LASTEXITCODE -eq 0) {
     & gh release upload $tag $exe --repo $repo --clobber
-    & gh release edit $tag --repo $repo --title $name --notes-file $nf --latest
+    if ($LASTEXITCODE -eq 0) { & gh release edit $tag --repo $repo --title $name --notes-file $nf --latest }
 } else {
-    $a = @('release', 'create', $tag, $exe, '--repo', $repo, '--title', $name, '--notes-file', $nf, '--latest')
+    $a = @('release', 'create', $tag, $exe, '--repo', $repo, '--title', $name, '--notes-file', $nf, '--latest', '--verify-tag')
     if ($Entwurf) { $a += '--draft' }
     & gh @a
 }
 if ($LASTEXITCODE -ne 0) { throw 'gh hat einen Fehler gemeldet (siehe oben).' }
 Remove-Item -LiteralPath $nf -Force -ErrorAction SilentlyContinue
-Write-Host ('Release {0} veröffentlicht, SHA-256 (LMB.exe): {1}' -f $tag, $sha) -ForegroundColor Green
+Write-Host ('Release {0} veröffentlicht: https://github.com/{1}/releases/tag/{0}' -f $tag, $repo) -ForegroundColor Green
+Write-Host ('SHA-256 (LMB.exe): {0}' -f $sha)

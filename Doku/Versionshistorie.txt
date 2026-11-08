@@ -5,6 +5,12 @@ Neueste Version zuerst. Einzelheiten je Version in Doku\Änderungen_vX.Y.txt (ab
 keine Änderungsdateien mehr; die Einträge nennen nur, was im Quelltext und in den Änderungen zu 2.2 belegt ist.
 Die Liste steht auch im Programm (Info-Knopf oben rechts, Quelle: src\Oberflaeche\Versionen.cs).
 
+VERSION 4.04  (08.11.2026)  VERÖFFENTLICHEN IN EINEM SCHRITT, REFERENZ ÜBER DIE DATENBANK
+=========================================================================================
+• Seite Benchmark: Der Haken „Dieses System als Referenz (100 %) festlegen“ entfällt. Eine Referenz legt man in der Datenbank fest (Lauf markieren, Aktionen › Als Referenz festlegen), wo der Lauf mit seinen Werten sichtbar ist. Ein Hinweis unter der Auswahl der Referenz nennt den Weg.
+• Veroeffentlichen.ps1 erledigt alles in einem Aufruf: prüft, dass alles committet ist und Aktueller Build zur Version passt, überträgt main und den Tag, installiert und meldet die GitHub CLI bei Bedarf an und erstellt das Release mit LMB.exe und Prüfsumme.
+• .gitignore: Ordner „Claude outputs“ wird nicht mehr als neue Datei gemeldet.
+
 VERSION 4.03  (08.11.2026)  UPDATE-FUNKTION, SMART-LANGTEST, DATENBANK UND FEINSCHLIFF
 ======================================================================================
 • Update: Der Austausch der Programmdatei griff seit seiner Einführung auf powershell.exe statt auf LMB.exe zu und öffnete nur ein PowerShell-Fenster. Jetzt wird LMB.exe ersetzt, sobald sie frei ist, das Skript daneben mit archiviert, das Ergebnis in Minibench-Daten\Update\Update.log festgehalten und bei Fehlern die alte Version zurückgelegt. Versionen werden dezimal verglichen (4.03 < 4.1).

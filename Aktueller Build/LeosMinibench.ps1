@@ -246,7 +246,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
 }
 #endregion
 
-$ScriptVersion = '4.03'
+$ScriptVersion = '4.04'
 $AppName       = 'Leos Minibench'
 # Eingebettete Referenzprofile für Leos Minibench (v3.0)
 $script:EmbeddedReferences = @{
@@ -6273,7 +6273,6 @@ public partial class DiagGui : Form
     ComboBox cmbRef;
     Label lblRefState;
     Button btnUpdateMed;
-    CheckBox chkRefSave;
     List<DbEntry> refItems = new List<DbEntry>(), cmpItems = new List<DbEntry>();
     // Lasttest
     CheckBox chkLCpu, chkLRam, chkLGpu, chkLDisk;
@@ -7818,7 +7817,6 @@ public partial class DiagGui : Form
         Tip(cmbGpuShow, "Fenster: Vorschau des Rendertests. Vollbild: erste Grafikeinheit im Vollbild. Ohne Anzeige: misst unsichtbar (Esc entfällt).");
         Tip(cmbRef, "System oder Medianwert, gegen den die Messungen in Prozent angegeben werden (100 % = Referenz). Gespeicherte Referenz: Referenz.json im Datenordner; Median: aus allen passenden Läufen der Datenbank.");
         Tip(btnUpdateMed, "Berechnet die Median-Referenzen für alle Systeme, Notebooks und Desktops aus der Datenbank neu und speichert sie als Referenz.json, Referenz_Notebook.json und Referenz_Desktop.json.");
-        Tip(chkRefSave, "Speichert die Werte dieses Laufs als Referenz.json im Datenordner. Alle PCs, die mit diesem Datenordner messen, werden dann in Prozent dieses Systems angegeben.");
         // Lasttest
         Tip(chkLCpu, "Alle logischen Prozessoren rechnen mit Ergebnisprüfung; Rechenfehler deuten auf Instabilität (Übertaktung, Spannung, Kühlung, Netzteil). Läuft in einem eigenen Prozess ohne Unterbrechungen. Mit Sensoren gibt es Takt- und Temperaturverlauf und den Drosselnachweis. Ersetzt ab v2.7 den CPU-Stabilitätstest der Diagnose.");
         Tip(chkLRam, "Mustertest über einen Teil des freien Arbeitsspeichers mit Bitfehlerprüfung. Neben der CPU-Last läuft er mit niedriger Priorität auf einem Viertel der Threads.");
@@ -8277,7 +8275,9 @@ public partial class DiagGui : Form
         f.Controls.Add(r2);
         lblRefState = Hint("", 180); f.Controls.Add(lblRefState);
         cmbRef.SelectedIndexChanged += delegate { UpdateRefState(); };
-        chkRefSave = Chk("Dieses System als Referenz (100 %) festlegen", false); f.Controls.Add(chkRefSave);
+        // ab v4.04 ohne Haken "Dieses System als Referenz festlegen": Das geht in der Datenbank über Aktionen, wo der Lauf
+        // mit seinen Werten sichtbar ist (Skriptparameter -ReferenzSpeichern bleibt für Aufrufe ohne Oberfläche)
+        f.Controls.Add(Hint("Einen bestimmten Lauf als Referenz festlegen: Seite Datenbank, Lauf markieren, Aktionen \u203A Als Referenz festlegen.", 180));
 
         f.Controls.Add(Section("Laufwerke"));
         clbDisks = new CheckedListBox(); clbDisks.CheckOnClick = true; clbDisks.Width = UI.S(UI.Gruppenbreite); clbDisks.BorderStyle = BorderStyle.FixedSingle; clbDisks.IntegralHeight = false; clbDisks.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(4)); clbDisks.BackColor = UI.Panel; clbDisks.ForeColor = UI.Text;
@@ -10152,7 +10152,6 @@ public partial class DiagGui : Form
                 else if (cmbRef.SelectedIndex == 3) a.Append(" -ReferenzDatei *median:desktop");
                 else if (cmbRef.SelectedIndex >= 4 && cmbRef.SelectedIndex - 4 < refItems.Count) a.Append(" -ReferenzDatei ").Append(Q(refItems[cmbRef.SelectedIndex - 4].Path));
             }
-            if (chkRefSave != null && chkRefSave.Checked) a.Append(" -ReferenzSpeichern");
             List<string> cmp = new List<string>();
             if (clbCompare.Enabled) for (int i = 0; i < clbCompare.Items.Count && i < cmpItems.Count; i++) if (clbCompare.GetItemChecked(i)) cmp.Add(cmpItems[i].Path);
             if (cmp.Count > 0) a.Append(" -VergleichDateien ").Append(Q(String.Join(";", cmp.ToArray())));
@@ -10699,7 +10698,6 @@ public partial class DiagGui : Form
             }
             if (ri >= 0 && ri < cmbRef.Items.Count) cmbRef.SelectedIndex = ri;
         }
-        if (chkRefSave != null) chkRefSave.Checked = false;
         GetCb(d, "Gpu.Aufloesung", cmbGpuRes); GetCb(d, "Gpu.Anzeige", cmbGpuShow);
         string gs = GetS(d, "Gpu.Auswahl"); if (gs != null) SetGpuChoice(gs);
         GetC(d, "Last.CPU", chkLCpu); GetCb(d, "Last.CPUDauer", cmbLCpu);
@@ -19976,6 +19974,10 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.04", "08.11.2026", "Veröffentlichen in einem Schritt, Referenz über die Datenbank",
+            "\u2022 Seite Benchmark: Der Haken \u201EDieses System als Referenz (100 %) festlegen\u201C entf\u00E4llt. Eine Referenz legt man in der Datenbank fest (Lauf markieren, Aktionen \u203A Als Referenz festlegen), wo der Lauf mit seinen Werten sichtbar ist. Ein Hinweis unter der Auswahl der Referenz nennt den Weg.\r\n" +
+            "\u2022 Veroeffentlichen.ps1 erledigt alles in einem Aufruf: pr\u00FCft, dass alles committet ist und Aktueller Build zur Version passt, \u00FCbertr\u00E4gt main und den Tag, installiert und meldet die GitHub CLI bei Bedarf an und erstellt das Release mit LMB.exe und Pr\u00FCfsumme.\r\n" +
+            "\u2022 .gitignore: Ordner \u201EClaude outputs\u201C wird nicht mehr als neue Datei gemeldet."),
         new Eintrag("4.03", "08.11.2026", "Update-Funktion, SMART-Langtest, Datenbank und Feinschliff",
             "\u2022 Update: Der Austausch der Programmdatei griff seit seiner Einf\u00FChrung auf powershell.exe statt auf LMB.exe zu und \u00F6ffnete nur ein PowerShell-Fenster. Jetzt wird LMB.exe ersetzt, sobald sie frei ist, das Skript daneben mit archiviert, das Ergebnis in Minibench-Daten\\Update\\Update.log festgehalten und bei Fehlern die alte Version zur\u00FCckgelegt. Versionen werden dezimal verglichen (4.03 < 4.1).\r\n" +
             "\u2022 SMART-Langtest: Wird das Warten \u00FCbersprungen oder steht die Datentr\u00E4germessung an, beendet Leos Minibench den Langtest (smartctl -X), damit er Benchmark und Lasttest nicht bremst.\r\n" +
