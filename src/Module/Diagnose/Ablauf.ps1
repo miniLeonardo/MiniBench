@@ -1,4 +1,4 @@
-# =====================================================================================
+﻿# =====================================================================================
 #                                     DIAGNOSE
 # =====================================================================================
 if ($ModDiag -and -not $AnalyzeLastRun) {
@@ -88,7 +88,7 @@ Invoke-Section 'System und Betriebssystem' {
         if (@($bootPerf.Verzoegerer).Count) {
             Add-Line ('  Autostart-Verzögerer  : {0} Anwendung(en) >= 1,0 s' -f @($bootPerf.Verzoegerer).Count)
             foreach ($vz in @($bootPerf.Verzoegerer)) {
-                Add-Line ('    {0}: {1:N1} s ({2})' -f $vz.Name, $vz.DauerSekunden, $vz.Typ)
+                Add-Line ('    {0}: {1:N1} s{2}' -f $vz.Name, $vz.DauerSekunden, $(if ($vz.Anzahl -gt 1) { ' (längster von {0} Starts)' -f $vz.Anzahl } else { '' }))
             }
         }
     } else {
@@ -105,7 +105,7 @@ Invoke-Section 'System und Betriebssystem' {
             $ii.Upgrades | Select-Object @{n = 'Installiert'; e = { $_.Installiert.ToString('dd.MM.yyyy') } }, @{n = 'Ersetzt am'; e = { if ($_.Ersetzt) { $_.Ersetzt.ToString('dd.MM.yyyy') } } }, Produkt, Version, Build | Out-Report
         }
         if ($ii.AlterTage -lt 3) { Add-Finding INFO 'System' ('Windows wurde vor {0} frisch installiert. Treiber und Updates sind eventuell noch unvollständig.' -f (Format-Age $ii.AlterTage -Dativ)) }
-        elseif ($ii.AlterTage -gt 5 * 365.25) { Add-Finding INFO 'System' ('Die Windows-Installation ist {0} alt (Erstinstallation {1:dd.MM.yyyy}, seitdem {2} Funktionsupdates). Bei hartnäckigen Problemen ist eine Neuinstallation eine Option.' -f (Format-Age $ii.AlterTage), $ii.Erstinstallation, $ii.Upgrades.Count) }
+        elseif ($ii.AlterTage -gt 5 * 365.25) { Add-Finding INFO 'System' ('Die Windows-Installation ist {0} alt (Erstinstallation {1:dd.MM.yyyy}, seitdem {2} Funktionsupdate{3}). Bei hartnäckigen Problemen ist eine Neuinstallation eine Option.' -f (Format-Age $ii.AlterTage), $ii.Erstinstallation, $ii.Upgrades.Count, $(if ($ii.Upgrades.Count -eq 1) { '' } else { 's' })) }
     } else { Add-Line '  Installationsdatum nicht ermittelbar.' }
 
     Add-Sub 'Aktivierung'
@@ -174,7 +174,7 @@ Invoke-Section 'Sicherheit, TPM, Secure Boot, BitLocker' {
         $thr = @(Get-MpThreatDetection -ErrorAction SilentlyContinue | Where-Object { $_.InitialDetectionTime -gt $Since })
         if ($thr.Count) {
             Add-Line ('  Erkennungen der letzten {0} Tage: {1}' -f $EventDays, $thr.Count)
-            Add-Finding WARNUNG 'Sicherheit' ('{0} Bedrohungserkennungen in den letzten {1} Tagen.' -f $thr.Count, $EventDays)
+            Add-Finding WARNUNG 'Sicherheit' ('{0} {1} in den letzten {2} Tagen.' -f $thr.Count, $(if ($thr.Count -eq 1) { 'Bedrohungserkennung' } else { 'Bedrohungserkennungen' }), $EventDays)
         }
     } catch { Add-Line '  Microsoft Defender Status nicht abrufbar.'; $script:DefenderActive = $false }
     $av = Get-CimInstance -Namespace 'root\SecurityCenter2' -ClassName AntiVirusProduct -ErrorAction SilentlyContinue
@@ -902,11 +902,15 @@ if ($script:Opt['Netzwerk']) {
         }
 
         Add-Sub 'DNS und HTTPS'
-        foreach ($h in 'www.microsoft.com', 'www.google.com', 'www.wikipedia.org') {
+        # Fehlschläge sammeln: Ohne DNS-Server scheitern alle Namen und HTTPS aus einem Grund. Bis v4.01 waren das vier Warnungen.
+        $dnsHosts = @('www.microsoft.com', 'www.google.com', 'www.wikipedia.org'); $dnsFail = @()
+        foreach ($h in $dnsHosts) {
             $sw = [Diagnostics.Stopwatch]::StartNew()
             try { $a = Resolve-DnsName $h -Type A -DnsOnly -ErrorAction Stop | Where-Object Type -eq 'A' | Select-Object -First 1; $sw.Stop(); Add-Line ('  DNS {0,-20} -> {1,-16} {2} ms' -f $h, $a.IPAddress, $sw.ElapsedMilliseconds) }
-            catch { Add-Line ('  DNS {0,-20} FEHLGESCHLAGEN: {1}' -f $h, $_.Exception.Message); Add-Finding WARNUNG 'Netzwerk' ('DNS-Auflösung von {0} fehlgeschlagen.' -f $h); [void]$netProblems.Add(('DNS {0}' -f $h)) }
+            catch { Add-Line ('  DNS {0,-20} FEHLGESCHLAGEN: {1}' -f $h, $_.Exception.Message); $dnsFail += [pscustomobject]@{ Name = $h; Grund = (([string]$_.Exception.Message) -replace ('^' + [regex]::Escape($h) + '\s*:\s*'), '').Trim() }; [void]$netProblems.Add(('DNS {0}' -f $h)) }
         }
+        if ($dnsFail.Count -eq $dnsHosts.Count) { Add-Finding WARNUNG 'Netzwerk' ('Keine Namensauflösung (DNS), damit auch kein Zugriff ins Internet: {0}' -f $(if ($dnsFail[0].Grund) { $dnsFail[0].Grund.TrimEnd('.') + '.' } else { 'alle Testnamen fehlgeschlagen.' })) }
+        elseif ($dnsFail.Count) { Add-Finding WARNUNG 'Netzwerk' ('DNS-Auflösung fehlgeschlagen für {0}.' -f (($dnsFail | ForEach-Object { $_.Name }) -join ', ')) }
         try {
             $wc = New-Object Net.WebClient
             $wc.Proxy = [Net.WebRequest]::GetSystemWebProxy(); $wc.Proxy.Credentials = [Net.CredentialCache]::DefaultNetworkCredentials
@@ -923,7 +927,7 @@ if ($script:Opt['Netzwerk']) {
                 Add-Line ('  Download: {0} in {1:N1} s = ca. {2} Mbit/s' -f (Format-Size $data.Length), $sw.Elapsed.TotalSeconds, $mbit)
                 Hide-Sub
             }
-        } catch { Add-Line ('  HTTP(S)-Test fehlgeschlagen: {0}' -f $_.Exception.Message); Add-Finding WARNUNG 'Netzwerk' 'HTTP(S)-Zugriff ins Internet fehlgeschlagen (Proxy/Firewall?).'; [void]$netProblems.Add('HTTP(S)') }
+        } catch { Add-Line ('  HTTP(S)-Test fehlgeschlagen: {0}' -f $_.Exception.Message); if ($dnsFail.Count -lt $dnsHosts.Count) { Add-Finding WARNUNG 'Netzwerk' 'HTTP(S)-Zugriff ins Internet fehlgeschlagen (Proxy/Firewall?).' }; [void]$netProblems.Add('HTTP(S)') }
         $pingAvg = ($pings | Where-Object { $_.'Mittel ms' -ne $null } | Select-Object -Last 1).'Mittel ms'
         $netDet = ('Ping {0} ms, Download {1}' -f $pingAvg, $(if ($mbit) { "$mbit Mbit/s" } else { 'n/v' }))
         if ($netProblems.Count) { $netDet += ', Probleme: ' + ($netProblems -join ', ') }

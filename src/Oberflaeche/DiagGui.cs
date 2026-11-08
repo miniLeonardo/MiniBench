@@ -983,6 +983,8 @@ public partial class DiagGui : Form
 
     // ab v4.01 im Aufbau der Seiten Wartung und Optimierung: Bereiche links, Inhalt als Karte rechts, Titelleiste im
     // Farbschema. Übernommen wird beim Schließen.
+    // Einstellungen (ab v4.02 eine Seite): drei Gruppen als Karten mit je einer Zeile pro Option,
+    // links Titel und Erklärung, rechts das Bedienelement. Vorher ein Reiter je Option.
     void ShowSettingsDialog()
     {
         using (Form dlg = new Form())
@@ -991,122 +993,117 @@ public partial class DiagGui : Form
             dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
             dlg.MaximizeBox = false; dlg.MinimizeBox = false; dlg.ShowInTaskbar = false;
             dlg.StartPosition = FormStartPosition.CenterParent;
-            dlg.ClientSize = new Size(UI.S(780), Math.Min(UI.S(480), Screen.FromControl(this).WorkingArea.Height - UI.S(80)));
+            dlg.ClientSize = new Size(UI.S(660), Math.Min(UI.S(640), Screen.FromControl(this).WorkingArea.Height - UI.S(80)));
             dlg.Font = new Font("Segoe UI", 9.5f);
 
-            TableLayoutPanel md = new TableLayoutPanel();
-            md.Dock = DockStyle.Fill; md.ColumnCount = 2; md.RowCount = 1; md.BackColor = Color.Transparent;
-            md.Padding = new Padding(UI.S(20), UI.S(20), UI.S(20), 0);
-            md.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(214)));
-            md.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            md.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            TableLayoutPanel body = new TableLayoutPanel();
+            body.Dock = DockStyle.Fill; body.ColumnCount = 1; body.AutoScroll = true; body.BackColor = Color.Transparent;
+            body.Padding = new Padding(UI.S(20), UI.S(12), UI.S(20), 0);
+            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            int textW = UI.S(360);
 
-            FlowLayoutPanel left = new FlowLayoutPanel(); left.Dock = DockStyle.Fill; left.FlowDirection = FlowDirection.TopDown; left.WrapContents = false; left.BackColor = Color.Transparent; left.Margin = new Padding(0);
-            CardPanel card = new CardPanel(); card.Dock = DockStyle.Fill; card.Padding = new Padding(UI.S(20), UI.S(16), UI.S(20), UI.S(16)); card.Margin = new Padding(UI.S(8), 0, 0, 0);
-            Panel host = new Panel(); host.Dock = DockStyle.Fill; host.AutoScroll = true; host.BackColor = UI.Panel;
-            card.Controls.Add(host);
-            md.Controls.Add(left, 0, 0); md.Controls.Add(card, 1, 0);
-
-            List<CategoryPickerItem> pickers = new List<CategoryPickerItem>();
-            List<Control> bereiche = new List<Control>();
-            // Bereich: Überschrift, Beschreibung, Inhalt untereinander
-            Func<string, string, string, FlowLayoutPanel> Bereich = delegate(string titel, string text, string icon)
+            Func<string, TableLayoutPanel> Gruppe = delegate(string titel)
             {
-                FlowLayoutPanel b = new FlowLayoutPanel(); b.FlowDirection = FlowDirection.TopDown; b.WrapContents = false; b.AutoSize = true; b.BackColor = UI.Panel; b.Visible = false; b.Location = new Point(0, 0);
-                Label lt = Lbl(titel, UI.SchriftAbschnitt, true, UI.Text); lt.Margin = new Padding(0, 0, 0, UI.S(4)); b.Controls.Add(lt);
-                Label ld = Lbl(text, UI.SchriftHinweis, false, UI.Muted); ld.MaximumSize = new Size(UI.S(470), 0); ld.Margin = new Padding(0, 0, 0, UI.S(14)); b.Controls.Add(ld);
-                host.Controls.Add(b); bereiche.Add(b);
-                CategoryPickerItem pk = new CategoryPickerItem(titel, icon); pk.ShowCount = false; pk.Width = UI.S(206); pk.BackColor = UI.Bg;
-                int idx = pickers.Count;
-                pk.Picked += delegate { for (int i = 0; i < bereiche.Count; i++) { bereiche[i].Visible = (i == idx); pickers[i].Selected = (i == idx); } };
-                Tip(pk, text);
-                pickers.Add(pk); left.Controls.Add(pk);
-                return b;
+                Label lh = Lbl(titel, UI.SchriftText, true, UI.Muted); lh.Margin = new Padding(UI.S(2), UI.S(8), 0, UI.S(6));
+                body.Controls.Add(lh);
+                CardPanel c = new CardPanel(); c.AutoSize = true; c.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top;
+                c.Padding = new Padding(UI.S(16), UI.S(4), UI.S(16), UI.S(4)); c.Margin = new Padding(0, 0, 0, UI.S(6));
+                TableLayoutPanel g = new TableLayoutPanel(); g.Dock = DockStyle.Top; g.AutoSize = true; g.ColumnCount = 2; g.RowCount = 0; g.BackColor = UI.Panel;
+                g.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); g.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+                c.Controls.Add(g); body.Controls.Add(c);
+                return g;
+            };
+            // Zeile: Titel und Erklärung links, Bedienelement rechts; zwischen den Zeilen eine Linie
+            Func<TableLayoutPanel, string, string, Control, FlowLayoutPanel> Zeile = delegate(TableLayoutPanel g, string titel, string text, Control ctl)
+            {
+                if (g.RowCount > 0)
+                {
+                    Panel sep = new Panel(); sep.Height = 1; sep.BackColor = UI.Line; sep.Dock = DockStyle.Fill; sep.Margin = new Padding(0);
+                    g.RowCount++; g.Controls.Add(sep, 0, g.RowCount - 1); g.SetColumnSpan(sep, 2);
+                }
+                FlowLayoutPanel f = new FlowLayoutPanel(); f.FlowDirection = FlowDirection.TopDown; f.WrapContents = false; f.AutoSize = true; f.BackColor = UI.Panel;
+                f.Margin = new Padding(0, UI.S(10), UI.S(16), UI.S(10));
+                Label lt = Lbl(titel, UI.SchriftText, true, UI.Text); lt.Margin = new Padding(0, 0, 0, UI.S(2)); f.Controls.Add(lt);
+                if (!String.IsNullOrEmpty(text)) { Label ld = Lbl(text, UI.SchriftHinweis, false, UI.Muted); ld.MaximumSize = new Size(textW, 0); ld.Margin = new Padding(0); f.Controls.Add(ld); }
+                g.RowCount++;
+                g.Controls.Add(f, 0, g.RowCount - 1);
+                if (ctl != null) { ctl.Anchor = AnchorStyles.Right; g.Controls.Add(ctl, 1, g.RowCount - 1); }
+                return f;
             };
 
-            // 1. Darstellung
-            FlowLayoutPanel bDar = Bereich("Darstellung", "Farbschema der Oberfläche. Der Knopf mit der Sonne oben rechts schaltet ebenfalls um.", UI.IcoSun);
+            // Allgemein
+            TableLayoutPanel gAll = Gruppe("Allgemein");
             FlowLayoutPanel rowTheme = new FlowLayoutPanel(); rowTheme.AutoSize = true; rowTheme.WrapContents = false; rowTheme.BackColor = UI.Panel; rowTheme.Margin = new Padding(0);
             RadioButton rbDark = new RadioButton(); rbDark.Text = "Dunkel"; rbDark.Checked = UI.IsDark;
             RadioButton rbLight = new RadioButton(); rbLight.Text = "Hell"; rbLight.Checked = !UI.IsDark;
             foreach (RadioButton rb in new RadioButton[] { rbDark, rbLight })
             {
-                rb.AutoSize = false; rb.Size = new Size(UI.S(110), UI.S(32)); rb.Margin = new Padding(0, 0, UI.S(6), 0);
+                rb.AutoSize = false; rb.Size = new Size(UI.S(84), UI.S(30)); rb.Margin = new Padding(UI.S(4), 0, 0, 0);
                 StyleSegment(rb);
                 RadioButton r2 = rb; rb.CheckedChanged += delegate { StyleSegment(r2); };
                 rowTheme.Controls.Add(rb);
             }
             Tip(rbDark, "Dunkles Farbschema."); Tip(rbLight, "Helles Farbschema.");
-            bDar.Controls.Add(rowTheme);
+            Zeile(gAll, "Farbschema", "Gilt ab dem Schließen. Der Knopf mit der Sonne oben rechts schaltet ebenfalls um.", rowTheme);
 
-            // 2. Start
-            FlowLayoutPanel bStart = Bereich("Start", "Was beim Öffnen von Leos Minibench zuerst erscheint.", UI.IcoHome);
-            CheckBox chkShowStart = Chk("Beim Programmstart die Startseite anzeigen", LoadStartPagePreference());
-            Tip(chkShowStart, "Aus: Leos Minibench öffnet direkt die Seite Diagnose.");
-            bStart.Controls.Add(chkShowStart);
+            ToggleSwitch tgStart = new ToggleSwitch(); tgStart.Checked = LoadStartPagePreference();
+            Tip(tgStart, "Aus: Leos Minibench öffnet direkt die Seite Diagnose.");
+            Zeile(gAll, "Startseite beim Programmstart", "Aus: Das Programm öffnet direkt die Seite Diagnose.", tgStart);
 
-            // 3. Datenschutz
-            FlowLayoutPanel bPriv = Bereich("Datenschutz", "Gilt für die Datei zur KI-Auswertung, die jeder Lauf neben dem Bericht anlegt.", UI.IcoShield);
-            CheckBox chkPrivAnon = Chk("Personenbezogene Daten für die KI-Auswertung entfernen", chkAnon != null && chkAnon.Checked);
-            Tip(chkPrivAnon, "Ersetzt Benutzernamen, Computernamen, Seriennummern und Domäne durch neutrale Platzhalter.");
-            bPriv.Controls.Add(chkPrivAnon);
+            ToggleSwitch tgUpd = new ToggleSwitch(); tgUpd.Checked = LoadUpdateCheckPreference();
+            Tip(tgUpd, "Prüft beim Start im Hintergrund, ob eine neuere Version vorliegt. Heruntergeladen wird nur auf Nachfrage.");
+            FlowLayoutPanel fUpd = Zeile(gAll, "Nach Updates suchen", "Höchstens einmal am Tag bei GitHub, heruntergeladen wird nur auf Nachfrage. Installiert: " + this.version + (HasUpdateAvailable ? ", verfügbar: " + AvailableUpdateVersion.TrimStart('v') : "") + ".", tgUpd);
+            LinkLabel lnkUpd = new LinkLabel(); lnkUpd.Text = "Jetzt suchen"; lnkUpd.AutoSize = true; lnkUpd.LinkColor = UI.Accent; lnkUpd.ActiveLinkColor = UI.AccentHover; lnkUpd.LinkBehavior = LinkBehavior.HoverUnderline; lnkUpd.Margin = new Padding(0, UI.S(4), 0, 0);
+            lnkUpd.LinkClicked += delegate { StartUpdateCheck(); lnkUpd.Text = "Prüfung läuft, das Ergebnis erscheint oben in der Kopfzeile"; lnkUpd.Enabled = false; };
+            Tip(lnkUpd, "Fragt sofort bei GitHub nach einer neueren Version.");
+            fUpd.Controls.Add(lnkUpd);
 
-            // 4. Daten
-            FlowLayoutPanel bDaten = Bereich("Daten", "Berichte, Datenbank, Werkzeuge und Vorlagen liegen im Datenordner. Ein Netzlaufwerk dient als Spiegel und wird über Aktualisieren in der Datenbank abgeglichen.", UI.IcoFolder);
-            Label lblDataDir = Lbl(NasAblage.AblageText(dataDir), UI.SchriftHinweis, false, UI.Text); lblDataDir.MaximumSize = new Size(UI.S(470), 0); lblDataDir.Margin = new Padding(0, 0, 0, UI.S(10));
-            bDaten.Controls.Add(lblDataDir);
+            // Daten und Datenschutz
+            TableLayoutPanel gDat = Gruppe("Daten und Datenschutz");
             FlowLayoutPanel rowDataBtns = new FlowLayoutPanel(); rowDataBtns.AutoSize = true; rowDataBtns.WrapContents = false; rowDataBtns.BackColor = UI.Panel; rowDataBtns.Margin = new Padding(0);
-            Button btnOpenData = UI.Secondary("Datenordner öffnen"); btnOpenData.Margin = new Padding(0, 0, UI.S(8), 0);
+            Button btnOpenData = UI.Secondary("Öffnen"); btnOpenData.Margin = new Padding(0, 0, UI.S(8), 0);
             btnOpenData.Click += delegate { if (dataDir.Length > 0) OpenShell(dataDir); };
-            Button btnNasDlg = UI.Secondary("Netzlaufwerk einrichten …"); btnNasDlg.Margin = new Padding(0);
-            btnNasDlg.Click += delegate { ShowConnectNasDialog(); SetText(lblDataDir, NasAblage.AblageText(dataDir)); };
-            Tip(btnOpenData, "Öffnet den Datenordner im Explorer."); Tip(btnNasDlg, "Netzlaufwerk als Spiegel der Daten einrichten oder ändern.");
+            Button btnNasDlg = UI.Secondary("Netzlaufwerk …"); btnNasDlg.Margin = new Padding(0);
+            Tip(btnOpenData, "Öffnet den Datenordner im Explorer."); Tip(btnNasDlg, "Netzlaufwerk als Spiegel der Daten einrichten oder ändern. Abgeglichen wird über Aktualisieren in der Datenbank.");
             rowDataBtns.Controls.Add(btnOpenData); rowDataBtns.Controls.Add(btnNasDlg);
-            bDaten.Controls.Add(rowDataBtns);
+            FlowLayoutPanel fDat = Zeile(gDat, "Datenordner", "Berichte, Datenbank, Werkzeuge und Vorlagen.", rowDataBtns);
+            Label lblDataDir = Lbl(NasAblage.AblageText(dataDir), UI.SchriftHinweis, false, UI.Text); lblDataDir.MaximumSize = new Size(textW, 0); lblDataDir.Margin = new Padding(0, UI.S(4), 0, 0);
+            fDat.Controls.Add(lblDataDir);
+            btnNasDlg.Click += delegate { ShowConnectNasDialog(); SetText(lblDataDir, NasAblage.AblageText(dataDir)); };
 
-            // 5. Updates
-            FlowLayoutPanel bUpd = Bereich("Updates", "Leos Minibench fragt höchstens einmal am Tag bei GitHub nach einer neuen Version. Heruntergeladen wird nur auf Nachfrage.", UI.IcoRefresh);
-            CheckBox chkAutoUpd = Chk("Automatisch nach Updates suchen", LoadUpdateCheckPreference());
-            Tip(chkAutoUpd, "Prüft beim Start im Hintergrund, ob eine neuere Version vorliegt.");
-            bUpd.Controls.Add(chkAutoUpd);
-            Label lblUpd = Lbl("Installiert: " + this.version + (HasUpdateAvailable ? "   ·   verfügbar: " + AvailableUpdateVersion : ""), UI.SchriftHinweis, false, UI.Muted); lblUpd.Margin = new Padding(UI.S(4), UI.S(6), 0, UI.S(10));
-            bUpd.Controls.Add(lblUpd);
-            Button btnCheckUpd = UI.Secondary("Jetzt nach Updates suchen"); btnCheckUpd.Margin = new Padding(0);
-            btnCheckUpd.Click += delegate { StartUpdateCheck(); SetText(lblUpd, "Installiert: " + this.version + "   ·   Prüfung läuft im Hintergrund, das Ergebnis erscheint oben in der Kopfzeile."); };
-            Tip(btnCheckUpd, "Fragt sofort bei GitHub nach einer neueren Version.");
-            bUpd.Controls.Add(btnCheckUpd);
+            ToggleSwitch tgAnon = new ToggleSwitch(); tgAnon.Checked = chkAnon != null && chkAnon.Checked;
+            Tip(tgAnon, "Ersetzt Benutzernamen, Computernamen, Seriennummern und Domäne durch neutrale Platzhalter.");
+            Zeile(gDat, "KI-Datei anonymisieren", "Entfernt Benutzer- und Computernamen, Seriennummern und Domäne aus der Datei zur KI-Auswertung, die jeder Lauf anlegt.", tgAnon);
 
-            // 6. Über
-            FlowLayoutPanel bUeber = Bereich("Über Leos Minibench", "Version " + this.version + ". Diagnose, Benchmark, Lasttest, Wartung und Optimierung für Windows.", UI.IcoInfo);
-            Label lblThanks = Lbl("Danksagungen: Windows Optimisation Pack (Marvin700), Sophia Script (Dmitry Nefedov), O&O ShutUp10++, smartmontools, LibreHardwareMonitor, PawnIO.", UI.SchriftHinweis, false, UI.Text);
-            lblThanks.MaximumSize = new Size(UI.S(470), 0); lblThanks.Margin = new Padding(0, 0, 0, UI.S(12));
-            bUeber.Controls.Add(lblThanks);
+            // Über
+            TableLayoutPanel gUeber = Gruppe("Über");
             Button btnHist = UI.Secondary("Versionshistorie"); btnHist.Margin = new Padding(0);
             btnHist.Click += delegate { dlg.Close(); if (!running && versionPage >= 0) ShowPage(versionPage); };
             Tip(btnHist, "Schließt die Einstellungen und zeigt, was sich in jeder Version geändert hat.");
-            bUeber.Controls.Add(btnHist);
+            Zeile(gUeber, "Leos Minibench " + this.version, "Danksagungen: Windows Optimisation Pack (Marvin700), Sophia Script (Dmitry Nefedov), O&O ShutUp10++, smartmontools, LibreHardwareMonitor, PawnIO.", btnHist);
 
             FlowLayoutPanel bottomBar = new FlowLayoutPanel();
             bottomBar.Dock = DockStyle.Bottom; bottomBar.FlowDirection = FlowDirection.RightToLeft; bottomBar.WrapContents = false;
-            bottomBar.Height = UI.S(64); bottomBar.Padding = new Padding(0, UI.S(14), UI.S(20), UI.S(12)); bottomBar.BackColor = Color.Transparent;
+            bottomBar.Height = UI.S(60); bottomBar.Padding = new Padding(0, UI.S(12), UI.S(20), UI.S(12)); bottomBar.BackColor = Color.Transparent;
             Button btnOk = UI.Primary("Schließen"); btnOk.DialogResult = DialogResult.OK; btnOk.Margin = new Padding(0);
             Tip(btnOk, "Übernimmt die Einstellungen und schließt das Fenster.");
             bottomBar.Controls.Add(btnOk);
 
-            dlg.Controls.Add(md);
+            dlg.Controls.Add(body);
             dlg.Controls.Add(bottomBar);
             dlg.AcceptButton = btnOk; dlg.CancelButton = btnOk;
             UI.ThemeDialog(dlg);
-            foreach (CategoryPickerItem pk in pickers) pk.BackColor = UI.Bg;
             StyleSegment(rbDark); StyleSegment(rbLight);
-            bereiche[0].Visible = true; pickers[0].Selected = true;
+            // Höhe an den Inhalt anpassen, höchstens bis zur Bildschirmhöhe
+            int need = body.GetPreferredSize(new Size(dlg.ClientSize.Width, 0)).Height + bottomBar.Height + UI.S(8);
+            dlg.ClientSize = new Size(dlg.ClientSize.Width, Math.Min(need, Screen.FromControl(this).WorkingArea.Height - UI.S(80)));
 
             dlg.ShowDialog(this);
 
             if (rbDark.Checked != UI.IsDark) ToggleTheme();
-            SaveStartPagePreference(chkShowStart.Checked);
-            SaveUpdateCheckPreference(chkAutoUpd.Checked);
-            if (chkAnon != null) chkAnon.Checked = chkPrivAnon.Checked;
+            SaveStartPagePreference(tgStart.Checked);
+            SaveUpdateCheckPreference(tgUpd.Checked);
+            if (chkAnon != null) chkAnon.Checked = tgAnon.Checked;
         }
     }
 
@@ -1708,7 +1705,6 @@ public partial class DiagGui : Form
         Tip(chkAnon, "Ersetzt Benutzernamen, Computernamen, Seriennummern und Domäne in Berichten und Exportdateien durch neutrale Platzhalter.");
         // Optimierung
         Tip(chkOptRestore, "Legt vor der Optimierung einen Systemwiederherstellungspunkt an. Er ist der Weg zurück für Eingriffe wie entfernte Apps und Zusatzfeatures.");
-        Tip(btnOptCheck, "Liest für jeden Eintrag, ob er auf diesem PC schon so eingestellt ist (aktiv, teilweise, offen). Verändert nichts, dauert bis zu einer Minute.");
         Tip(btnOptTools, "Holt Display Driver Uninstaller (aus dem Optimisation Pack, feste Prüfsumme) und NVIDIA Profile Inspector in den Tools-Ordner. Installiert wird nichts.");
         Tip(btnOptAll, "Alle Kategorien auf- oder zuklappen.");
         if (btnRepAll == null) btnRepAll = UI.Secondary("");
@@ -1848,9 +1844,11 @@ public partial class DiagGui : Form
     {
         r.Appearance = Appearance.Button; r.FlatStyle = FlatStyle.Flat; r.TextAlign = ContentAlignment.MiddleCenter;
         r.FlatAppearance.BorderColor = UI.Line; r.FlatAppearance.BorderSize = 1;
-        r.FlatAppearance.CheckedBackColor = UI.AccentSoft;
-        r.FlatAppearance.MouseOverBackColor = UI.IsDark ? Color.FromArgb(45, 48, 52) : Color.FromArgb(243, 244, 246);
-        r.BackColor = UI.Panel; r.ForeColor = r.Checked ? (UI.IsDark ? UI.Accent : UI.AccentDark) : UI.Text;
+        // gewählt: Akzentfläche mit heller Schrift (vorher Akzentschrift auf blassem Akzent, im Dunkelschema kaum lesbar)
+        r.FlatAppearance.CheckedBackColor = UI.Accent;
+        r.FlatAppearance.BorderColor = r.Checked ? UI.Accent : UI.Line;
+        r.FlatAppearance.MouseOverBackColor = r.Checked ? UI.Accent : (UI.IsDark ? Color.FromArgb(45, 48, 52) : Color.FromArgb(243, 244, 246));
+        r.BackColor = r.Checked ? UI.Accent : UI.Panel; r.ForeColor = r.Checked ? UI.OnAccent : UI.Text;
         r.Font = new Font(r.Checked ? "Segoe UI Semibold" : "Segoe UI", UI.SchriftText);
     }
 
@@ -1889,7 +1887,7 @@ public partial class DiagGui : Form
         if (k == "risiko") Tip(b, b.Level == "info" ? "Ändern: wird mit Vorher-Wert protokolliert und lässt sich auf der Seite Änderungen zurücknehmen." : "Eingriff: nicht automatisch umkehrbar; der Weg zurück ist der Wiederherstellungspunkt.");
         else if (k == "neustart") Tip(b, b.Text == "Neustart" ? "Wird erst nach einem Neustart vollständig wirksam." : "Kann einen Neustart brauchen, je nach Zustand des PCs.");
         else if (k == "verwaltet") Tip(b, "Berührt Gruppenrichtlinien oder zentrale Verwaltung; auf Domänen-PCs nicht in den Vorlagen.");
-        else if (k == "zustand") Tip(b, "Zustand auf diesem PC, ermittelt mit Zustand prüfen oder beim letzten Lauf.");
+        else if (k == "zustand") Tip(b, "Zustand auf diesem PC, beim Start im Hintergrund gelesen oder vom letzten Lauf.");
     }
 
     // ab v3.65: Gruppen als abgerundete Karten (CardPanel) wie die Werkzeugkarten
@@ -2773,7 +2771,7 @@ public partial class DiagGui : Form
     Dictionary<string, GroupHeader> optCatToggle = new Dictionary<string, GroupHeader>();
     CheckBox chkOptRestore;
     Label lblOptInfo, lblOptState;
-    Button btnOptCheck, btnOptTools, btnOptAll;
+    Button btnOptTools, btnOptAll;
     List<Button> optPresetButtons = new List<Button>();
     static readonly string[] optPresetTips = new string[] {
         "Minimal: Grundlegende Datenschutz-Einstellungen, Dienste und Aufgaben, Indizierung aus, Caches leeren.",
@@ -3060,8 +3058,8 @@ public partial class DiagGui : Form
         f.Controls.Add(bPills);
 
         FlowLayoutPanel bTools = Row(); bTools.Margin = new Padding(UI.S(4), UI.S(4), 0, UI.S(4));
-        btnOptCheck = UI.Secondary("Zustand pr\u00FCfen"); btnOptCheck.Margin = new Padding(0); btnOptCheck.Click += delegate { CheckOptState(); }; bTools.Controls.Add(btnOptCheck);
-        btnOptTools = UI.Secondary("Werkzeuge holen \u2026"); btnOptTools.Margin = new Padding(UI.S(8), 0, 0, 0); btnOptTools.Click += delegate { FetchOptTools(); }; bTools.Controls.Add(btnOptTools);
+        // ab v4.02 kein Knopf "Zustand prüfen" mehr: Der Zustand wird nach dem Start im Hintergrund gelesen (StartOptStateCheck)
+        btnOptTools = UI.Secondary("Werkzeuge holen \u2026"); btnOptTools.Margin = new Padding(0); btnOptTools.Click += delegate { FetchOptTools(); }; bTools.Controls.Add(btnOptTools);
         btnOptAll = UI.Secondary("Alle aufklappen"); btnOptAll.Visible = false;
         f.Controls.Add(bTools);
 
@@ -3200,10 +3198,62 @@ public partial class DiagGui : Form
         btnOptAll.Text = open ? "Alle zuklappen" : "Alle aufklappen";
     }
 
-    void CheckOptState()
+    // Zustand der Einträge der Optimierung im Hintergrund lesen (ab v4.02). Bis v4.01 über den Knopf "Zustand prüfen":
+    // Der Arbeitsprozess lief bis zu einer Minute, das Fenster war so lange gesperrt und reagierte nur stockend.
+    // Jetzt startet er kurz nach dem Öffnen des Fensters mit niedriger Priorität; die Oberfläche bleibt bedienbar,
+    // die Etiketten erscheinen, sobald er fertig ist. Ein Lauf, der inzwischen begonnen hat, hat Vorrang.
+    Process optStateProc;
+    DateTime optStateStarted = DateTime.MinValue;
+
+    void StartOptStateCheck()
     {
-        if (running) return;
-        List<string> lines; RunHelperPumped("-OptimierungZustand", out lines, 300);
+        if (optStateProc != null || running || lblOptState == null || optItems.Count == 0 || String.IsNullOrEmpty(psExe) || String.IsNullOrEmpty(script)) return;
+        List<string> got = new List<string>();
+        ProcessStartInfo psi = new ProcessStartInfo(psExe, "-NoProfile -ExecutionPolicy Bypass -File \"" + script + "\" -EventMode -OptimierungZustand" + (dataDir.Length > 0 ? " -DatenDir \"" + dataDir.TrimEnd('\\') + "\"" : ""));
+        psi.UseShellExecute = false; psi.CreateNoWindow = true; psi.RedirectStandardOutput = true; psi.StandardOutputEncoding = new UTF8Encoding(false);
+        Process p = new Process(); p.StartInfo = psi;
+        bool fertig = false;
+        MethodInvoker abschluss = delegate {
+            if (fertig) return; fertig = true;
+            List<string> lines = new List<string>();
+            lock (got)
+                foreach (string l in got)
+                {
+                    if (l.StartsWith("@@LOG|")) { string[] x = l.Split(new char[] { '|' }, 3); if (x.Length == 3 && x[2].Trim().Length > 0) lines.Add(x[2].Trim()); }
+                    else if (l.StartsWith("@@OPTZ|")) lines.Add(l);
+                }
+            try { BeginInvoke(new MethodInvoker(delegate { ApplyOptState(lines); try { p.Dispose(); } catch { } optStateProc = null; })); } catch { }
+        };
+        p.OutputDataReceived += delegate(object s, DataReceivedEventArgs e) {
+            if (e.Data == null) { abschluss(); return; }
+            lock (got) got.Add(e.Data);
+        };
+        try
+        {
+            p.Start(); p.BeginOutputReadLine();
+            try { p.PriorityClass = ProcessPriorityClass.BelowNormal; } catch { }
+        }
+        catch (Exception ex) { SetText(lblOptState, "Zustand nicht lesbar: " + ex.Message); try { p.Dispose(); } catch { } return; }
+        optStateProc = p; optStateStarted = DateTime.Now;
+        SetText(lblOptState, "Zustand auf diesem PC wird im Hintergrund gelesen \u2026"); lblOptState.ForeColor = UI.Muted;
+        // Sicherung: nach fünf Minuten beenden
+        System.Windows.Forms.Timer wd = new System.Windows.Forms.Timer(); wd.Interval = 300000;
+        wd.Tick += delegate { wd.Stop(); wd.Dispose(); if (!fertig) { try { if (!p.HasExited) KillProc(p); } catch { } abschluss(); } };
+        wd.Start();
+    }
+
+    // Laufender Zustandsprozess wird beim Start eines Laufs oder beim Schließen beendet
+    void StopOptStateCheck()
+    {
+        Process p = optStateProc;
+        if (p == null) return;
+        try { if (!p.HasExited) KillProc(p); } catch { }
+    }
+
+    void ApplyOptState(List<string> lines)
+    {
+        // Ein Lauf seit dem Start der Prüfung zeigt seine eigenen Ergebnisse (@@OPTE); die ältere Prüfung nicht darüberlegen
+        if (running || (runStarted != DateTime.MinValue && runStarted > optStateStarted)) { SetText(lblOptState, ""); return; }
         int a = 0, t = 0, o = 0, nz = 0, np = 0;
         string user = "";
         foreach (string l in lines)
@@ -3212,13 +3262,14 @@ public partial class DiagGui : Form
             string[] x = l.Split(new char[] { '|' }, 4);
             if (x.Length < 3) continue;
             OptItem it = optItems.Find(delegate(OptItem i) { return i.Id == x[1]; });
-            if (it == null) continue;
+            if (it == null || it.Box == null) continue;
             it.Zustand = x[2]; it.ZustandText = x.Length > 3 ? x[3].Replace("¦", "|") : "";
             if (it.Zustand == "aktiv") a++; else if (it.Zustand == "teilweise") t++; else if (it.Zustand == "offen") o++; else if (it.Zustand == "nicht zutreffend") nz++; else np++;
             it.Box.Text = OptBoxText(it); Tip(it.Box, OptTipText(it));
+            if (it.Row != null) { string tt = OptTipText(it); Tip(it.Row, tt); if (it.Toggle != null) Tip(it.Toggle, tt); }
         }
-        lblOptState.Text = (a + t + o + nz + np) == 0 ? "Zustand nicht lesbar: keine Rückmeldung vom Arbeitsprozess." : "Zustand auf diesem PC: " + a + " bereits aktiv, " + t + " teilweise, " + o + " offen, " + nz + " nicht zutreffend, " + np + " nicht prüfbar (Bereinigung, Werkzeuge)." + (user.Length > 0 ? "  " + user + "." : "");
-        lblOptState.ForeColor = UI.Text;
+        SetText(lblOptState, (a + t + o + nz + np) == 0 ? "Zustand nicht lesbar: keine Rückmeldung vom Arbeitsprozess." : "Zustand auf diesem PC: " + a + " bereits aktiv, " + t + " teilweise, " + o + " offen, " + nz + " nicht zutreffend, " + np + " nicht prüfbar (Bereinigung, Werkzeuge)." + (user.Length > 0 ? "  " + user + "." : ""));
+        lblOptState.ForeColor = UI.Muted;
     }
 
     // Ergebnis eines Eintrags während des Laufs (@@OPTE|Id|Ergebnis|Änderungen|Details): Häkchen zeigt den neuen Stand
@@ -4752,6 +4803,10 @@ public partial class DiagGui : Form
         BeginInvoke(new System.Windows.Forms.MethodInvoker(delegate { ApplyNativeControlThemes(); }));
         // erst nach dem ersten Zeichnen: Startfenster der exe schließen und die Startzeit protokollieren
         BeginInvoke(new System.Windows.Forms.MethodInvoker(delegate { StartLog.Phase("Oberfläche bereit"); StartLog.SignalReady(); StartLog.Finish(dataDir, version, script); }));
+        // Zustand der Optimierung erst nach dem Start lesen, damit er die Startzeit nicht verlängert
+        System.Windows.Forms.Timer zt = new System.Windows.Forms.Timer(); zt.Interval = 2000;
+        zt.Tick += delegate { zt.Stop(); zt.Dispose(); StartOptStateCheck(); };
+        zt.Start();
     }
 
     void BringToFront2()
@@ -4803,6 +4858,7 @@ public partial class DiagGui : Form
             try { proc.StandardInput.Close(); } catch { }
         }
         catch (Exception ex) { MessageBox.Show(this, "PowerShell konnte nicht gestartet werden: " + ex.Message, "Leos Minibench", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
+        StopOptStateCheck();   // Messungen nicht durch den Zustandsprozess belasten
         running = true;
         for (int i = 0; i < nav.Count; i++) { nav[i].Running = false; nav[i].Invalidate(); }
         contentHost.Visible = false;
@@ -4854,7 +4910,7 @@ public partial class DiagGui : Form
                 SetText(lblCounter, String.Format("Schritt {0} von {1}", s, t));
                 if (t > 0) barAll.Value = (s - 1) * 100 / t;
                 btnSkipStep.Enabled = false;
-                log.AppendLine(); log.AppendLine(">> " + Get(p, 3));
+                // Die Abschnittszeile mit Uhrzeit und Zähler kommt schon als Konsolenausgabe (Add-Section); bis v4.01 stand sie doppelt im Protokoll
                 break;
             case "SKIP_ALLOWED":
                 btnSkipStep.Enabled = Get(p, 1) == "1";
@@ -5086,6 +5142,7 @@ public partial class DiagGui : Form
     {
         // Live-Ansicht sauber beenden, damit ein vorübergehend installierter Treiber entfernt wird
         if (liveRunning) StopLiveAndWait();
+        StopOptStateCheck();
         if (!running) { CleanupDriver(); return; }
         if (MessageBox.Show(this, "Der Lauf ist noch aktiv. Abbrechen und schließen?", "Leos Minibench", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) { e.Cancel = true; return; }
         cancelled = true; KillTree();

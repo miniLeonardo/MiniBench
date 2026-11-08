@@ -656,6 +656,8 @@ Describe 'PawnIO nur vorübergehend' {
         $u = MinibenchTest\Uninstall-PawnIo
         $u.Ok | Should -BeTrue
         ($script:Calls)[1] | Should -Match '-uninstall -silent'
+        # PawnIO-Setup kennt keine InnoSetup- oder NSIS-Schalter: "/VERYSILENT" führte bis v4.01 zu Fehlerfenster und Rückgabecode 87
+        ($script:Calls)[1] | Should -Not -Match '/VERYSILENT|/S\b|/NORESTART|/SUPPRESSMSGBOXES'
         Test-Path (MinibenchTest\Get-PawnIoMarker) | Should -BeFalse
         @(Get-ModuleVar 'TestChanges').Count | Should -Be 2
     }

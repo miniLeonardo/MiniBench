@@ -647,7 +647,11 @@ function Get-SystemBootPerformance {
                     }
                 } catch { }
             }
-            $result.Verzoegerer = @($delayList | Sort-Object DauerSekunden -Descending | Select-Object -First 5)
+            # dasselbe Programm erscheint bei jedem Start erneut: je Programm nur der längste Wert und die Zahl der Starts
+            $result.Verzoegerer = @($delayList | Group-Object Name | ForEach-Object {
+                    $mx = $_.Group | Sort-Object DauerSekunden -Descending | Select-Object -First 1
+                    [pscustomobject]@{ Name = $mx.Name; DauerSekunden = $mx.DauerSekunden; EreignisId = $mx.EreignisId; Anzahl = $_.Count }
+                } | Sort-Object DauerSekunden -Descending | Select-Object -First 5)
         } catch { }
     }
 

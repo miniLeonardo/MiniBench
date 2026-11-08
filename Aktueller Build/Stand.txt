@@ -1,17 +1,17 @@
 ﻿LEOS MINIBENCH: AKTUELLER BUILD
 ===============================
-Version   : 4.01 (Dateiversion 4.1.0.0)
-Gebaut    : 07.11.2026 12:23 in der Linux-Sandbox von Claude (Testbau, nicht mit Bauen.cmd)
+Version   : 4.02 (Dateiversion 4.2.0.0)
+Gebaut    : 08.11.2026 11:21 in der Linux-Sandbox von Claude (Testbau, nicht mit Bauen.cmd)
 Tests     : Sandbox-Auswahl (Oberflaeche, Aufbau, Release, Optimierung) bestanden; Windows-Tests stehen aus
-Quelltext : 45 Teile aus src, 39,567 Zeilen
+Quelltext : 45 Teile aus src, 39,714 Zeilen
 
 Dateien (SHA-256 zur Kontrolle auf dem Stick: Get-FileHash <Datei>)
-  LMB.exe                   2,549 KB  5d44b1d383cc197b297a866ae5610ea4129a5cd36431d0f440f4be7a00d691c7
-  LeosMinibench.ps1         2,475 KB  224fe99b99b88152f12a0827935f1e4c6a968e7ac108619e3219d5fca5672ee2
+  LMB.exe                   2,562 KB  8d19d59d1ba30a7244b68e99197f727f2a7fb66a331d2bee71fada005b7582db
+  LeosMinibench.ps1         2,487 KB  c8505c5c0f2020c13189ee98734e68f39dfb4be046808cf665bea479a0879b0f
   LeosMinibench.cmd             1 KB  2238c6583cfb33fb714e6e74a5d251d0c451f9ec950230a04e2046b48d29529a
   LMB.cmd                       1 KB  fe13571593902d6e4392693da3faa8d9607d399948fd02f6913419daf4e7d288
 
 Testbau: LMB.exe ist mit dem Mono-Compiler aus demselben Startprogramm wie in Bauen.cmd übersetzt (Symbol, Manifest
 mit Administratorrechten und DPI-Angaben, Versionsangaben). Der nächste Lauf von Bauen.cmd ersetzt ihn.
-Änderungen dieser Version: Doku\Änderungen_v4.01.txt; alle Versionen: Seite Versionen im Programm und Doku\Versionshistorie.txt.
+Änderungen dieser Version: Doku\Änderungen_v4.02.txt; alle Versionen: Seite Versionen im Programm und Doku\Versionshistorie.txt.
 Diesen Ordner nicht von Hand ändern: Bauen.cmd erzeugt ihn bei jedem Bau neu aus src.

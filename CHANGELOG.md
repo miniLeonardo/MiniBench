@@ -2,6 +2,22 @@
 
 Alle wesentlichen Änderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v4.02 (08.11.2026)
+
+### Behoben
+* **PawnIO:** Treiber wird am Ende des Laufs wieder entfernt; kein Fehlerfenster „Unknown argument: /VERYSILENT“ mehr (Rückgabecode 87 seit v3.84).
+* **Laufwerke:** Medientyp „Unspecified“ wird über Name und Zugriffszeit als SSD oder Festplatte eingeordnet; Index und Referenzvergleich wieder vorhanden.
+* **Hintergrundlast:** Verursacher nach aktueller CPU-Last statt gesammelter CPU-Zeit, ohne die eigene PowerShell.
+* **Netzwerk:** Ohne DNS-Server eine Warnung statt vier.
+* **Protokoll:** Abschnittszeilen nicht mehr doppelt.
+* **Texte:** Einzahl bei „1 Bedrohungserkennung“ und „1 Funktionsupdate“; Autostart-Verzögerer ohne Wiederholungen und leere Klammern.
+
+### Verbessert
+* **Ergebnisseite:** Einordnung gegenüber dem Referenz-PC statt Wertung als Durchschnitt, Name der Referenz, „nicht gemessen“ für fehlende Gruppen, eine Pille je Laufwerk.
+* **Einstellungen:** eine Seite mit drei Gruppen statt sechs Reitern.
+* **Optimierung:** Zustand wird im Hintergrund gelesen, Knopf „Zustand prüfen“ entfällt.
+* **Datenträgermessung:** Hinweis, wenn der SMART-Langtest noch läuft.
+
 ## v4.01 (07.11.2026)
 
 ### Verbessert

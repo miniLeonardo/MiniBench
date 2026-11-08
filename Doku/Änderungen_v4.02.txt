@@ -1,0 +1,104 @@
+﻿LEOS MINIBENCH 4.02: ÄNDERUNGEN
+===============================
+
+Grundlage waren die ersten vier Läufe mit 4.01 vom 07.11.2026 (DESKTOP-F9HRMRR mit Ryzen 5 5600 und RX 570, MTK mit
+Ryzen 5 5600XT und GTX 1070 zweimal, DESKTOP-VNQLV5P mit Ryzen 9 3900X und RTX 3070). Alle vier hinterließen den
+PawnIO-Treiber, zwei Laufwerke bekamen keine Klasse, ein Lauf maß die Laufwerke während des SMART-Langtests.
+Messabläufe, Berichtsaufbau und Datenbankformat sind unverändert.
+
+
+1. PAWNIO WIRD WIEDER ENTFERNT
+  Fehler                      Seit v3.84 rief Uninstall-PawnIo das Setup mit "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /S
+                              -uninstall -silent" auf. PawnIO_setup.exe und uninstall.exe kennen nur -install, -uninstall,
+                              -unrestricted, -debuginfo und -silent. Das Setup zeigte während der Rückstandskontrolle das
+                              Fenster "Unknown argument: /VERYSILENT", beendete sich mit Rückgabecode 87 und der Treiber
+                              blieb installiert. Alle vier Läufe meldeten "PawnIO ist noch installiert (Rückgabecode 87)".
+  Behoben                     Aufruf nur noch mit -uninstall -silent. Die Markierung im Datenordner bleibt bei einem
+                              Fehlschlag erhalten; der nächste Lauf entfernt den alten Treiber deshalb von selbst.
+  Text                        Beim Start hieß ein so verbliebener Treiber "Ein früherer Lauf wurde mit installiertem
+                              PawnIO-Treiber abgebrochen", obwohl der Lauf vollständig war. Jetzt: "Ein früherer Lauf hat den
+                              PawnIO-Treiber nicht entfernt (Lauf abgebrochen oder Entfernen fehlgeschlagen)".
+  Test                        Sensoren.Tests.ps1 prüft, dass der Aufruf keine InnoSetup- oder NSIS-Schalter enthält.
+
+
+2. PLAUSIBILITÄT DER MESSWERTE
+  Laufwerksklasse             DESKTOP-VNQLV5P: Windows meldete für die Samsung 870 QVO und die Seagate-Festplatte den
+                              Medientyp "Unspecified". Die Klasse hieß "SATA Unspecified", beide Laufwerke bekamen weder
+                              Index noch Referenzvergleich, die Gruppe Laufwerke fehlte im Vergleich. Jetzt gilt bei
+                              unbekanntem Medientyp: "SSD" oder "NVMe" im Namen oder ab 1.500 IOPS 4K-Zufallslesen ist eine
+                              SSD, bis 400 IOPS eine Festplatte. Die Herleitung steht im Hinweis des Laufwerks.
+  SMART-Langtest              DESKTOP-F9HRMRR: Das Warten auf den Langtest wurde nach 3 Minuten beendet, der Test lief in der
+                              Firmware von drei Laufwerken weiter, und die Datenträgermessung lief gleichzeitig. Ergebnis:
+                              Festplatte -33 % lesen, SSD 4K -49 % gegenüber früheren Läufen, als Warnungen gemeldet. Die
+                              Datenträgermessung prüft jetzt, ob ein Langtest noch läuft, und meldet das als Hinweis mit den
+                              betroffenen Laufwerken. Das Verhalten selbst (Test läuft weiter) ist unverändert.
+  Hintergrundlast             MTK: "System (801 s CPU), powershell (415 s CPU), MsMpEng (393 s CPU)" war die seit dem
+                              Prozessstart gesammelte CPU-Zeit, nicht die aktuelle Last, und powershell war Leos Minibench
+                              selbst. Jetzt die CPU-Last der letzten zwei Sekunden in Prozent, ohne den eigenen Prozess.
+  Netzwerk                    MTK hatte keinen DNS-Server konfiguriert. Daraus wurden vier Warnungen (drei Namen und HTTPS).
+                              Scheitern alle Namen, gibt es jetzt eine Warnung mit dem Grund von Windows; HTTPS wird dann
+                              nicht zusätzlich gemeldet.
+  Autostart-Verzögerer        MsMpEng.exe stand viermal da (je ein Eintrag pro Systemstart) und jede Zeile endete mit "()".
+                              Jetzt je Programm der längste Wert und die Zahl der Starts; die Spalte "Art / Ereignis" im
+                              HTML-Bericht heißt "Starts".
+  Einzahl                     "1 Bedrohungserkennungen" und "seitdem 1 Funktionsupdates" stehen jetzt in der Einzahl.
+
+
+3. ERGEBNISSEITE
+  Einordnung                  Die Referenz ist ein bestimmter PC (hier TORRENT mit Ryzen 5 7600X und RX 6800), kein
+                              Durchschnitt. Eine RX 570 mit 32 % hieß trotzdem "Unterdurchschnittlich" und bekam einen gelben
+                              Balken. Jetzt: schneller ab 110 %, gleichauf ab 90 %, etwas langsamer ab 70 %, langsamer ab
+                              45 %, darunter deutlich langsamer. Grün ab 90 %, sonst Akzentfarbe; Gelb bleibt Warnungen
+                              vorbehalten.
+  Referenz                    Über den Balken steht der Name des Referenz-PCs statt "Gespeicherte Referenz".
+  Nicht gemessen              Wurde eine Gruppe übersprungen (DESKTOP-F9HRMRR: Prozessor), fehlte die Zeile ohne Hinweis.
+                              Sie steht jetzt mit "nicht gemessen" da.
+  Laufwerke                   Statt einer Zeile mit allen Laufwerken, die am Kartenrand abgeschnitten war, eine Pille je
+                              Laufwerk mit Name und Anschluss; der Zustand erscheint nur, wenn er nicht "Healthy" ist.
+  Abgeschnitten               "Unterdurchschnittli" in der Vergleichskarte: mit den kürzeren Wörtern und schmaleren Balken
+                              behoben.
+
+
+4. EINSTELLUNGEN AUF EINER SEITE
+  Vorher                      Sechs Reiter für sechs Optionen, je Reiter eine Option.
+  Jetzt                       Eine Seite mit drei Gruppen als Karten: Allgemein (Farbschema, Startseite, Updates mit "Jetzt
+                              suchen"), Daten und Datenschutz (Datenordner mit Öffnen und Netzlaufwerk, KI-Datei
+                              anonymisieren), Über (Version, Danksagungen, Versionshistorie). Je Option eine Zeile: Titel und
+                              Erklärung links, Schalter oder Knöpfe rechts. Die Fensterhöhe richtet sich nach dem Inhalt.
+  Farbschema                  Die gewählte Fläche ist jetzt in Akzentfarbe mit heller Schrift; vorher Akzentschrift auf
+                              blassem Akzent, im Dunkelschema kaum lesbar.
+
+
+5. OPTIMIERUNG: ZUSTAND IM HINTERGRUND
+  Vorher                      "Zustand prüfen" startete einen Arbeitsprozess und sperrte das Fenster, bis er fertig war
+                              (bis zu einer Minute); die Oberfläche reagierte nur stockend.
+  Jetzt                       Zwei Sekunden nach dem Öffnen des Fensters startet derselbe Arbeitsprozess mit niedriger
+                              Priorität im Hintergrund. Das Fenster bleibt bedienbar, die Startzeit ändert sich nicht. Unter
+                              der Seite steht "Zustand auf diesem PC wird im Hintergrund gelesen …", danach die Zählung und
+                              die Etiketten an den Einträgen. Beginnt ein Lauf, wird die Prüfung beendet, damit sie keine
+                              Messung belastet; ein Lauf zeigt seine Ergebnisse ohnehin selbst. Der Knopf entfällt.
+
+
+6. PROTOKOLL
+  Doppelte Zeilen             Jeder Abschnitt stand zweimal im Protokoll des Laufs ("[15:52:17] [34/41] >> Optimierung: …"
+                              und darunter ">> Optimierung: …"). Die zweite Zeile kam aus der Oberfläche und entfällt.
+
+
+GEFUNDEN UND BEHOBEN
+  PawnIO blieb nach jedem Lauf installiert, mit Fehlerfenster während der Rückstandskontrolle (siehe 1).
+  Laufwerke mit Medientyp "Unspecified" ohne Klasse und Vergleich (siehe 2).
+  Hintergrundlast mit gesammelter statt aktueller CPU-Zeit (siehe 2).
+  Wertende Einordnung gegenüber einem einzelnen Referenz-PC (siehe 3).
+
+
+AUFFÄLLIG, NICHT GEÄNDERT
+  GTX 1070 (MTK) mit "PCIe 1.0 x16" in der Kopfzeile der Grafik: Die Karte senkt die Anbindung im Leerlauf. Der Bericht
+  erklärt das in der Zeile Anbindung, die Kopfzeile nicht.
+  RTX 3070 (DESKTOP-VNQLV5P): Rendertest Ø 139 Bilder/s, aber 1-%-Low 46 und 30 % der Bilder über dem doppelten Median,
+  im Lasttest dagegen gleichmäßig 134 bis 148 Bilder/s. Vermutlich ein Effekt der kurzen Messung bei sehr schnellen Karten.
+  Mehr Läufe auf schnellen Karten nötig, bevor sich etwas ändern lässt.
+
+
+GRENZEN
+  Geprüft mit einem Bau unter Mono und Xvfb und den Sandbox-Tests. PawnIO-Entfernung, Hintergrundprüfung der Optimierung
+  und Startzeit sind unter Windows zu bestätigen.

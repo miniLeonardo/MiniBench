@@ -11,6 +11,16 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.02", "08.11.2026", "PawnIO-Entfernung, plausiblere Messwerte, Einstellungen auf einer Seite",
+            "\u2022 PawnIO: Der Treiber wurde seit v3.84 am Ende des Laufs nicht entfernt. Das Setup kennt nur -uninstall -silent, die zus\u00E4tzlichen InnoSetup- und NSIS-Schalter f\u00FChrten zum Fenster \u201EUnknown argument: /VERYSILENT\u201C und R\u00FCckgabecode 87. Ein noch installierter Treiber aus fr\u00FCheren L\u00E4ufen wird beim n\u00E4chsten Lauf entfernt.\r\n" +
+            "\u2022 Laufwerke mit Medientyp \u201EUnspecified\u201C (SATA hinter AMD- oder Intel-Treibern) werden \u00FCber Name und 4K-Zugriffszeit als SSD oder Festplatte eingeordnet und bekommen wieder Index und Referenzvergleich.\r\n" +
+            "\u2022 L\u00E4uft der SMART-Langtest w\u00E4hrend der Datentr\u00E4germessung noch, steht das als Hinweis im Bericht; die Werte dieser Laufwerke k\u00F6nnen zu niedrig sein.\r\n" +
+            "\u2022 Hintergrundlast vor Messungen nennt die Prozesse mit der CPU-Last der letzten zwei Sekunden statt der seit dem Prozessstart gesammelten CPU-Zeit und ohne die eigene PowerShell.\r\n" +
+            "\u2022 Netzwerk: Ohne DNS-Server eine Warnung statt vier (drei Namen und HTTPS). Autostart-Verz\u00F6gerer je Programm einmal mit dem l\u00E4ngsten Wert, ohne leere Klammern.\r\n" +
+            "\u2022 Ergebnisseite: Einordnung gegen\u00FCber dem Referenz-PC (schneller, gleichauf, etwas langsamer, langsamer, deutlich langsamer) statt \u201EUnterdurchschnittlich\u201C; Name des Referenz-PCs \u00FCber den Balken; nicht gemessene Gruppen als \u201Enicht gemessen\u201C; eine Pille je Laufwerk statt einer abgeschnittenen Zeile.\r\n" +
+            "\u2022 Einstellungen auf einer Seite: Allgemein, Daten und Datenschutz, \u00DCber; je Option eine Zeile mit Schalter statt eines Reiters je Option.\r\n" +
+            "\u2022 Optimierung: Der Zustand der Eintr\u00E4ge wird nach dem Start im Hintergrund mit niedriger Priorit\u00E4t gelesen. Der Knopf \u201EZustand pr\u00FCfen\u201C entf\u00E4llt, das Fenster friert dabei nicht mehr ein.\r\n" +
+            "\u2022 Protokoll des Laufs ohne doppelte Abschnittszeilen; Texte \u201E1 Bedrohungserkennung\u201C und \u201E1 Funktionsupdate\u201C in der Einzahl."),
         new Eintrag("4.01", "07.11.2026", "Politur der Oberfläche: Ergebnisseite, Einstellungen, Startzeit und Skalierung",
             "\u2022 Umlaute: Die Doppelkodierungen aus 4.0 (\u201Ef\u00C3\u00BCr\u201C, \u201ESchlie\u00C3\u0178en\u201C, \u201E\u00C3\u0153ber\u201C) in Einstellungen, Optimierung und Datenbank sind behoben, ebenso in CHANGELOG, Versionshistorie und Projektstand.\r\n" +
             "\u2022 Modulwahl nur noch \u00FCber den Haken in der Seitenleiste: Der Schalter \u201Ebeim Start ausf\u00FChren\u201C im Seitenkopf entf\u00E4llt. Ist ein Modul nicht angehakt, zeigt seine Seite ein Hinweisband mit \u201EIn den Ablauf aufnehmen\u201C.\r\n" +

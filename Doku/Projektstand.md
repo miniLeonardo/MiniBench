@@ -2,11 +2,23 @@
 
 Gemeinsamer Stand für alle Agenten (Claude, Antigravity). Wird am Ende jeder Version aktualisiert (siehe AGENTS.md).
 
-## Stand: Version 4.01 (07.11.2026)
-Noch nicht gebaut und committet. Quelltext und Doku von Claude vorbereitet (Grundlage Commit dd8f43f, Release v4.0),
-geprüft mit einem Bau unter Mono/Xvfb, Bildschirmfotos aller Seiten in Hell und Dunkel und den Sandbox-Tests
-Oberflaeche, Optimierung, Aufbau (alle bestanden) und Modulvertrag (nur die drei Windows-abhängigen Umzugsfälle fehlgeschlagen).
-Nach dem Bau unter Windows hier den Release-Commit eintragen.
+## Stand: Version 4.02 (08.11.2026)
+Noch nicht gebaut und committet. Quelltext und Doku von Claude vorbereitet (Grundlage Commit a77b64f, Release v4.01),
+geprüft mit einem Bau unter Mono/Xvfb, Bildschirmfotos und den Sandbox-Tests. Nach dem Bau unter Windows hier den
+Release-Commit eintragen.
+
+Inhalt von 4.02 (Einzelheiten in Doku\Änderungen_v4.02.txt):
+1. PawnIO wird am Laufende wieder entfernt (seit v3.84 falsche Setup-Schalter, Fehlerfenster und Rückgabecode 87).
+2. Laufwerke mit Medientyp "Unspecified" über Name und 4K-Zugriffszeit als SSD oder Festplatte eingeordnet.
+3. Hinweis, wenn die Datenträgermessung während eines SMART-Langtests läuft.
+4. Hintergrundlast nach aktueller CPU-Last; eine Warnung ohne DNS-Server; Autostart-Verzögerer je Programm einmal.
+5. Ergebnisseite: Einordnung gegenüber dem Referenz-PC, Name der Referenz, "nicht gemessen", eine Pille je Laufwerk.
+6. Einstellungen auf einer Seite mit drei Gruppen.
+7. Optimierung: Zustand im Hintergrund nach dem Start, Knopf "Zustand prüfen" entfällt.
+8. Protokoll ohne doppelte Abschnittszeilen.
+
+## Vorher: Version 4.01 (07.11.2026)
+Release-Commit "Release v4.01: Politur der Oberfläche: Ergebnisseite, Einstellungen, Startzeit und Skalierung" (Commit a77b64f).
 
 Inhalt von 4.01 (Einzelheiten in Doku\Änderungen_v4.01.txt):
 1. Umlaute: Doppelkodierungen aus 4.0 in Oberfläche und Doku behoben.
@@ -258,6 +270,9 @@ Inhalt von 3.64 (Einzelheiten in Doku\Änderungen_v3.64.txt):
 1. Sichtprüfung unter Windows bei 125 und 150 % Skalierung nach der Schriftkorrektur in 4.01 (in der Sandbox nicht nachstellbar, Mono rechnet fest mit 96 dpi).
 2. Kategorie Apps der Optimierung nutzt dasselbe Symbol wie Tools (UI.IcoApp = UI.IcoTools).
 3. Startzeit nach den Änderungen in 4.01 unter Windows messen (Start.log, zweiter Start).
+4. Rendertest auf sehr schnellen Karten (RTX 3070): hoher Mikroruckler-Anteil und niedriges 1-%-Low nur im Benchmark, nicht im Lasttest.
+5. Kopfzeile der Grafik nennt die PCIe-Anbindung im Leerlauf (GTX 1070: PCIe 1.0) ohne Erklärung.
+6. Datenträgermessung während eines noch laufenden SMART-Langtests: nur Hinweis, Werte gehen trotzdem in die Datenbank.
 
 ## Letzter Commit
-Release-Commit v4.0: Aufgeräumt: Ganzheitliche Vereinheitlichung und Bereinigung der Oberfläche (Commit dd8f43f). 4.01 noch nicht committet.
+Release-Commit v4.01 (Commit a77b64f). 4.02 noch nicht committet.

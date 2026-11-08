@@ -472,6 +472,17 @@ if ($script:BenchSel['Disk']) {
         if (-not (Test-BenchTypes)) { return }
         $inv = $script:Inv; $ms = $script:BenchMs; $threads = [Environment]::ProcessorCount
         # ---------------- Datenträger ----------------
+        # Ein SMART-Langtest, dessen Warten beendet wurde, läuft in der Laufwerksfirmware weiter und liest das ganze
+        # Laufwerk. Gleichzeitig gemessen fallen Lesen und 4K-Werte deutlich niedriger aus (Lauf vom 07.11.2026: -33 %).
+        $smartAktiv = @()
+        foreach ($smartT in @($script:SmartTests | Where-Object { $_.Status -eq 'läuft' })) {
+            $s1 = $null; try { $s1 = Get-SmartTestState $smartT.Device } catch { }
+            if ($s1 -and $s1.Running) { $smartAktiv += ('{0} ({1} %)' -f $smartT.Name, $s1.Percent) }
+        }
+        if ($smartAktiv.Count) {
+            Add-Line ('  Hinweis: Der SMART-Langtest läuft noch auf {0}. Er bremst die Messung, die Werte dieser Laufwerke können zu niedrig sein.' -f ($smartAktiv -join ', '))
+            Add-Finding INFO 'Leistung' ('Datenträger gemessen, während der SMART-Langtest noch lief ({0}). Lese-, Schreib- und 4K-Werte können deshalb zu niedrig sein; Vergleiche mit früheren Läufen sind nur eingeschränkt aussagekräftig.' -f ($smartAktiv -join ', '))
+        }
         try {
             $sizeB = $(if ($BenchmarkKurz) { 256MB } else { 1GB }); $phase = $(if ($BenchmarkKurz) { 2500 } else { 6000 })
             Get-Volume -ErrorAction SilentlyContinue | Where-Object DriveLetter | ForEach-Object {
@@ -512,6 +523,14 @@ if ($script:BenchSel['Disk']) {
                     continue
                 }
                 $typSeq = $null; $typRnd = $null; $refCls = ''
+                # Medientyp "Unspecified" (häufig bei SATA hinter AMD- oder Intel-Treibern): SSD oder Festplatte aus Name
+                # und gemessenem 4K-Zufallslesen ableiten. Bis v4.01 hieß die Klasse dann "SATA Unspecified", das Laufwerk
+                # bekam weder Index noch Referenzvergleich.
+                $mediaHint = ''
+                if ($media -notin 'SSD', 'HDD' -and $bus -in 'SATA', 'SAS', 'ATA', 'RAID') {
+                    if ($name -match 'SSD|NVMe' -or $res.Rnd4kQ1Iops -ge 1500) { $media = 'SSD'; $mediaHint = 'Medientyp von Windows nicht gemeldet, nach Name und Zugriffszeit SSD' }
+                    elseif ($res.Rnd4kQ1Iops -gt 0 -and $res.Rnd4kQ1Iops -le 400) { $media = 'HDD'; $mediaHint = 'Medientyp von Windows nicht gemeldet, nach Zugriffszeit Festplatte' }
+                }
                 if ($bus -eq 'NVMe') {
                     $gen = $(if ($link) { $link.GenNow } else { 0 }); $wid = $(if ($link) { $link.WidthNow } else { 4 })
                     $baseSeq = @{ 1 = 800; 2 = 1500; 3 = 3000; 4 = 5500; 5 = 10000; 6 = 14000 }
@@ -545,7 +564,7 @@ if ($script:BenchSel['Disk']) {
                 $dStat = 'OK'; foreach ($mx in $m) { if ((Get-StatusRank $mx.Status) -gt (Get-StatusRank $dStat)) { $dStat = $mx.Status } }
                 $dRef = Get-GeoMean ($m | ForEach-Object { $_.RefPct })
                 $dCmp = (@($m | Where-Object { $_.Vergleich } | ForEach-Object { $_.Vergleich }) | Select-Object -First 1)
-                $dHint = (@($cls) + @($m | Where-Object { $_.Status -ne 'OK' -or $_.Vergleich -match '^-' } | ForEach-Object { ('{0}: {1} {2}' -f ($_.Messung -replace [regex]::Escape($label + ' '), ''), $_.Anzeige, $_.Vergleich).Trim() })) -join '; '
+                $dHint = (@($cls) + @($mediaHint | Where-Object { $_ }) + @($m | Where-Object { $_.Status -ne 'OK' -or $_.Vergleich -match '^-' } | ForEach-Object { ('{0}: {1} {2}' -f ($_.Messung -replace [regex]::Escape($label + ' '), ''), $_.Anzeige, $_.Vergleich).Trim() })) -join '; '
                 $disk = [pscustomobject][ordered]@{ Laufwerk = $label; Klasse = $cls; SR = $res.SeqReadMBs; SW = $res.SeqWriteMBs; R1 = $res.Rnd4kQ1Iops; R8 = $res.Rnd4kT8Iops; W1 = $res.Rnd4kWriteQ1Iops
                     Index = $iSeq; RefPct = $dRef; Referenz = $(if ($null -ne $dRef) { '{0} %' -f $dRef } else { '' }); Status = $dStat; Vergleich = $(if ($dCmp) { $dCmp } else { '' }); Hinweis = $dHint }
                 $script:BenchDisks.Add($disk)

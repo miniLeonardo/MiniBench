@@ -5,6 +5,18 @@ Neueste Version zuerst. Einzelheiten je Version in Doku\Änderungen_vX.Y.txt (ab
 keine Änderungsdateien mehr; die Einträge nennen nur, was im Quelltext und in den Änderungen zu 2.2 belegt ist.
 Die Liste steht auch im Programm (Info-Knopf oben rechts, Quelle: src\Oberflaeche\Versionen.cs).
 
+VERSION 4.02  (08.11.2026)  PAWNIO-ENTFERNUNG, PLAUSIBLERE MESSWERTE, EINSTELLUNGEN AUF EINER SEITE
+===================================================================================================
+• PawnIO: Der Treiber wurde seit v3.84 am Ende des Laufs nicht entfernt. Das Setup kennt nur -uninstall -silent, die zusätzlichen InnoSetup- und NSIS-Schalter führten zum Fenster „Unknown argument: /VERYSILENT“ und Rückgabecode 87. Ein noch installierter Treiber aus früheren Läufen wird beim nächsten Lauf entfernt.
+• Laufwerke mit Medientyp „Unspecified“ (SATA hinter AMD- oder Intel-Treibern) werden über Name und 4K-Zugriffszeit als SSD oder Festplatte eingeordnet und bekommen wieder Index und Referenzvergleich.
+• Läuft der SMART-Langtest während der Datenträgermessung noch, steht das als Hinweis im Bericht; die Werte dieser Laufwerke können zu niedrig sein.
+• Hintergrundlast vor Messungen nennt die Prozesse mit der CPU-Last der letzten zwei Sekunden statt der seit dem Prozessstart gesammelten CPU-Zeit und ohne die eigene PowerShell.
+• Netzwerk: Ohne DNS-Server eine Warnung statt vier (drei Namen und HTTPS). Autostart-Verzögerer je Programm einmal mit dem längsten Wert, ohne leere Klammern.
+• Ergebnisseite: Einordnung gegenüber dem Referenz-PC (schneller, gleichauf, etwas langsamer, langsamer, deutlich langsamer) statt „Unterdurchschnittlich“; Name des Referenz-PCs über den Balken; nicht gemessene Gruppen als „nicht gemessen“; eine Pille je Laufwerk statt einer abgeschnittenen Zeile.
+• Einstellungen auf einer Seite: Allgemein, Daten und Datenschutz, Über; je Option eine Zeile mit Schalter statt eines Reiters je Option.
+• Optimierung: Der Zustand der Einträge wird nach dem Start im Hintergrund mit niedriger Priorität gelesen. Der Knopf „Zustand prüfen“ entfällt, das Fenster friert dabei nicht mehr ein.
+• Protokoll des Laufs ohne doppelte Abschnittszeilen; Texte „1 Bedrohungserkennung“ und „1 Funktionsupdate“ in der Einzahl.
+
 VERSION 4.01  (07.11.2026)  POLITUR DER OBERFLÄCHE: ERGEBNISSEITE, EINSTELLUNGEN, STARTZEIT UND SKALIERUNG
 ==========================================================================================================
 • Umlaute: Die Doppelkodierungen aus 4.0 („fÃ¼r“, „SchlieÃŸen“, „Ãœber“) in Einstellungen, Optimierung und Datenbank sind behoben, ebenso in CHANGELOG, Versionshistorie und Projektstand.

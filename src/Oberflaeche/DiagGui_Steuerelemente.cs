@@ -1540,7 +1540,8 @@ public class PercentBar : Control
         Color track = UI.IsDark ? Color.FromArgb(52, 56, 62) : Color.FromArgb(226, 229, 234);
         using (GraphicsPath p = UI.Round(new RectangleF(0, 0, w, h), h / 2f)) using (SolidBrush b = new SolidBrush(track)) g.FillPath(b, p);
         float fw = (float)(Math.Max(0, Math.Min(pct, Max)) / Max * w);
-        Color fill = pct >= 100 ? UI.Ok : pct >= 70 ? UI.Accent : UI.Warn;
+        // Langsamer als die Referenz ist kein Fehler (die Referenz ist meist ein schneller PC): kein Gelb, nur Grün ab Referenzniveau
+        Color fill = pct >= 90 ? UI.Ok : UI.Accent;
         if (fw >= h) using (GraphicsPath p = UI.Round(new RectangleF(0, 0, fw, h), h / 2f)) using (SolidBrush b = new SolidBrush(fill)) g.FillPath(b, p);
         float mx = (float)(100.0 / Max * w);
         using (Pen pen = new Pen(UI.Text, 1.5f)) g.DrawLine(pen, mx, -1, mx, h + 1);

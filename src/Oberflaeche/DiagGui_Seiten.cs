@@ -1,4 +1,4 @@
-// Seiten der grafischen Oberfläche: Versionen und Änderungen (Teilklasse DiagGui)
+﻿// Seiten der grafischen Oberfläche: Versionen und Änderungen (Teilklasse DiagGui)
 public partial class DiagGui
 {
     Control BuildVersionPage()
@@ -3610,12 +3610,44 @@ e.Result = items;
         foreach (Control c in pnlResFind.Controls) if (c is FlowLayoutPanel) foreach (Control k in c.Controls) if (k is Label && !(k is LinkLabel)) k.MaximumSize = new Size(Math.Max(UI.S(200), findW), 0);
     }
 
+    // Einordnung gegenüber der Referenz, nicht gegenüber einem Durchschnitt: Die Referenz ist ein bestimmter PC
+    // (meist ein schneller). Bis v4.01 hieß 32 % unterdurchschnittlich, obwohl nur der Abstand zur Referenz gemeint war.
     static string RatingWord(double pct)
     {
-        if (pct >= 115) return "Hervorragend"; if (pct >= 100) return "Sehr gut"; if (pct >= 85) return "Gut";
-        if (pct >= 70) return "Durchschnittlich"; if (pct >= 50) return "Mäßig"; return "Unterdurchschnittlich";
+        if (pct >= 110) return "schneller"; if (pct >= 90) return "gleichauf"; if (pct >= 70) return "etwas langsamer";
+        if (pct >= 45) return "langsamer"; return "deutlich langsamer";
     }
-    static string RatingLevel(double pct) { return pct >= 100 ? "ok" : pct >= 85 ? "info" : pct >= 70 ? "skip" : "warn"; }
+    static string RatingLevel(double pct) { return pct >= 90 ? "ok" : pct >= 45 ? "info" : "skip"; }
+
+    // Name der Referenz für "100 % = ..." (gespeicherte Referenz mit Namen, sonst die Auswahl im Benchmark)
+    string RefLabelText()
+    {
+        if (cmbRef == null || cmbRef.SelectedIndex <= 0)
+        {
+            string s = SavedRefText();
+            if (s.StartsWith("Gespeicherte Referenz: ")) return "Referenz-PC " + s.Substring(23);
+        }
+        return cmbRef != null && cmbRef.Text.Length > 0 ? cmbRef.Text : "Referenz";
+    }
+
+    // "Samsung SSD 980 1TB (931,5 GB, NVMe, Healthy); ..." -> eine kurze Pille je Laufwerk
+    static List<string> DiskPills(string disks)
+    {
+        List<string> res = new List<string>();
+        foreach (string part in (disks ?? "").Split(';'))
+        {
+            string d = part.Trim(); if (d.Length == 0) continue;
+            System.Text.RegularExpressions.Match m = System.Text.RegularExpressions.Regex.Match(d, @"^(.*?)\s*\((.*)\)$");
+            if (!m.Success) { res.Add(d); continue; }
+            // Felder mit ", " trennen: Die Größe selbst enthält ein Dezimalkomma ("1,82 TB")
+            string[] f = m.Groups[2].Value.Split(new string[] { ", " }, StringSplitOptions.None);
+            string txt = m.Groups[1].Value.Trim();
+            if (f.Length > 1 && f[1].Trim().Length > 0 && txt.IndexOf(f[1].Trim(), StringComparison.OrdinalIgnoreCase) < 0) txt += "  ·  " + f[1].Trim();
+            if (f.Length > 2 && f[2].Trim().Length > 0 && !f[2].Trim().Equals("Healthy", StringComparison.OrdinalIgnoreCase)) txt += "  ·  " + f[2].Trim();
+            res.Add(txt);
+        }
+        return res;
+    }
 
     // Prozent der Referenz aus der Gruppenzeile des Laufs ("112 %"), sonst NaN
     double GroupRefPct(string g)
@@ -3639,8 +3671,8 @@ e.Result = items;
         Label lc = Lbl(caption, UI.SchriftHinweis, false, UI.Muted); lc.Margin = new Padding(0, 0, 0, UI.S(8)); f.Controls.Add(lc);
         if (!double.IsNaN(pct))
         {
-            Badge b = new Badge(RatingWord(pct) + "  ·  " + pct.ToString("0") + " %", RatingLevel(pct)); b.Margin = new Padding(0, 0, 0, UI.S(6));
-            Tip(b, "Im Vergleich zur Referenz (100 %).");
+            Badge b = new Badge(pct.ToString("0") + " %  ·  " + RatingWord(pct), RatingLevel(pct)); b.Margin = new Padding(0, 0, 0, UI.S(6));
+            Tip(b, "Im Vergleich zum Referenz-PC (100 %): " + RefLabelText() + ".");
             f.Controls.Add(b);
         }
         if (!String.IsNullOrEmpty(second)) { Label ls = Lbl(second, UI.SchriftHinweis, false, UI.Muted); ls.Margin = new Padding(0); f.Controls.Add(ls); }
@@ -3678,7 +3710,7 @@ e.Result = items;
             if (!String.IsNullOrEmpty(e.CpuDisplay)) pnlDashPills.Controls.Add(new PillLabel(e.CpuDisplay));
             if (!String.IsNullOrEmpty(e.Gpu)) pnlDashPills.Controls.Add(new PillLabel(e.Gpu));
             if (!String.IsNullOrEmpty(e.Ram)) pnlDashPills.Controls.Add(new PillLabel(e.Ram));
-            if (!String.IsNullOrEmpty(e.Disk)) pnlDashPills.Controls.Add(new PillLabel(e.Disk));
+            foreach (string dp in DiskPills(e.Disk)) { PillLabel pl = new PillLabel(dp); Tip(pl, e.Disk); pnlDashPills.Controls.Add(pl); }
         }
 
         // Wichtigste Befunde: kritische zuerst, dann Warnungen, höchstens fünf
@@ -3711,20 +3743,29 @@ e.Result = items;
 
         // Vergleich mit der Referenz je Komponente (nur mit Benchmark in diesem Lauf)
         while (pnlResCmp.Controls.Count > 1) pnlResCmp.Controls.RemoveAt(1);
-        lblResRef.Text = "100 % = " + (cmbRef != null && cmbRef.Text.Length > 0 ? cmbRef.Text : "Referenz");
+        lblResRef.Text = "100 % = " + RefLabelText();
+        lblResRef.MaximumSize = new Size(UI.S(400), 0);
         pnlResCmp.Controls.Add(lblResRef);
         int cmpRows = 0;
         for (int g = 0; g < resGruppen.Length; g++)
         {
             double pct = GroupRefPct(resGruppen[g]);
-            if (double.IsNaN(pct)) continue;
             TableLayoutPanel r = new TableLayoutPanel(); r.AutoSize = true; r.ColumnCount = 3; r.BackColor = UI.Panel; r.Margin = new Padding(0, 0, 0, UI.S(8));
-            r.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(120))); r.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(150))); r.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            r.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(120))); r.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(130))); r.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             Label ln = Lbl(resNamen[g], UI.SchriftText, false, UI.Text); ln.Margin = new Padding(0, UI.S(2), 0, 0);
-            PercentBar pb = new PercentBar(); pb.Percent = pct; pb.Size = new Size(UI.S(140), UI.S(10)); pb.Margin = new Padding(0, UI.S(7), UI.S(10), 0);
-            Tip(pb, "Strich = Referenz (100 %).");
+            r.Controls.Add(ln, 0, 0);
+            if (double.IsNaN(pct))
+            {
+                // Gruppe in diesem Lauf nicht gemessen (abgewählt oder übersprungen): Zeile bleibt, damit das Fehlen auffällt
+                Label lx = Lbl("nicht gemessen", UI.SchriftText, false, UI.Muted); lx.Margin = new Padding(0, UI.S(2), 0, 0);
+                r.Controls.Add(lx, 1, 0); r.SetColumnSpan(lx, 2);
+                pnlResCmp.Controls.Add(r);
+                continue;
+            }
+            PercentBar pb = new PercentBar(); pb.Percent = pct; pb.Size = new Size(UI.S(120), UI.S(10)); pb.Margin = new Padding(0, UI.S(7), UI.S(10), 0);
+            Tip(pb, "Strich = Referenz (100 %). Langsamer als die Referenz heißt nicht defekt, nur langsamer als dieser PC.");
             Label lv = Lbl(pct.ToString("0") + " %  " + RatingWord(pct), UI.SchriftText, true, UI.Text); lv.Margin = new Padding(0, UI.S(2), 0, 0);
-            r.Controls.Add(ln, 0, 0); r.Controls.Add(pb, 1, 0); r.Controls.Add(lv, 2, 0);
+            r.Controls.Add(pb, 1, 0); r.Controls.Add(lv, 2, 0);
             pnlResCmp.Controls.Add(r); cmpRows++;
         }
         bool hasCmp = cmpRows > 0;

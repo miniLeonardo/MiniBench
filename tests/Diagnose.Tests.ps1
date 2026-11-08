@@ -55,6 +55,29 @@ Describe 'Startzeit-Analyse (Get-SystemBootPerformance)' {
         $bp.Verzoegerer[0].DauerSekunden | Should -Be 2.4
     }
 
+    It 'fasst wiederholte Verzögerer desselben Programms zusammen' {
+        $xml100 = '<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><EventData><Data Name="BootDuration">20000</Data><Data Name="MainPathBootTime">10000</Data><Data Name="BootPostBootTime">10000</Data></EventData></Event>'
+        $ev100 = [pscustomobject]@{ Id = 100; TimeCreated = (Get-Date) }
+        Add-Member -InputObject $ev100 -MemberType ScriptMethod -Name ToXml -Value ([scriptblock]::Create("return '$xml100'")) -Force
+        $evs = foreach ($ms in 33300, 27200, 26300) {
+            $x = '<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><EventData><Data Name="ImageName">C:\ProgramData\Microsoft\Windows Defender\MsMpEng.exe</Data><Data Name="TotalTime">' + $ms + '</Data></EventData></Event>'
+            $e = [pscustomobject]@{ Id = 101; TimeCreated = (Get-Date) }
+            Add-Member -InputObject $e -MemberType ScriptMethod -Name ToXml -Value ([scriptblock]::Create("return '$x'")) -Force
+            $e
+        }
+        Mock -ModuleName MinibenchTest Get-WinEvent {
+            if ($FilterHashtable.Id -eq 100) { return @($ev100) }
+            return @($evs)
+        }
+        Mock -ModuleName MinibenchTest Get-ItemProperty { $null }
+
+        $bp = MinibenchTest\Get-SystemBootPerformance
+        @($bp.Verzoegerer).Count | Should -Be 1
+        $bp.Verzoegerer[0].Name | Should -Be 'MsMpEng.exe'
+        $bp.Verzoegerer[0].DauerSekunden | Should -Be 33.3
+        $bp.Verzoegerer[0].Anzahl | Should -Be 3
+    }
+
     It 'gibt sauberen Fallback aus, wenn Protokoll fehlt oder leer ist' {
         Mock -ModuleName MinibenchTest Get-WinEvent { throw 'No events found' }
         Mock -ModuleName MinibenchTest Get-ItemProperty { $null }

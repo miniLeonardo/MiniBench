@@ -1,4 +1,4 @@
-function Get-TelemetryTip {
+﻿function Get-TelemetryTip {
     param($Sample)
     $t = [int]$Sample.T
     $mm = [int][math]::Floor($t / 60); $ss = [int]($t % 60)
@@ -625,9 +625,9 @@ function New-BootPerformanceHtml {
 
     if (@($BootPerf.Verzoegerer).Count -gt 0) {
         [void]$sb.Append('<h3 style="margin-top:16px">Autostart-Verzögerer (&ge; 1,0 s)</h3>')
-        [void]$sb.Append('<div class="tw"><table><thead><tr><th>Anwendung / Komponente</th><th class="r">Verzögerung</th><th>Art / Ereignis</th></tr></thead><tbody>')
+        [void]$sb.Append('<div class="tw"><table><thead><tr><th>Anwendung / Komponente</th><th class="r">Verzögerung</th><th>Starts</th></tr></thead><tbody>')
         foreach ($v in @($BootPerf.Verzoegerer)) {
-            [void]$sb.Append(('<tr><td><code>{0}</code></td><td class="num r"><b>{1:N1} s</b></td><td>{2}</td></tr>' -f (ConvertTo-HtmlText $v.Name), $v.DauerSekunden, (ConvertTo-HtmlText $v.Typ)))
+            [void]$sb.Append(('<tr><td><code>{0}</code></td><td class="num r"><b>{1:N1} s</b></td><td>{2}</td></tr>' -f (ConvertTo-HtmlText $v.Name), $v.DauerSekunden, $(if ($v.Anzahl -gt 1) { 'längster von {0}' -f $v.Anzahl } else { '1' })))
         }
         [void]$sb.Append('</tbody></table></div>')
     }

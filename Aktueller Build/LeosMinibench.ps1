@@ -246,7 +246,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
 }
 #endregion
 
-$ScriptVersion = '4.01'
+$ScriptVersion = '4.02'
 $AppName       = 'Leos Minibench'
 # Eingebettete Referenzprofile für Leos Minibench (v3.0)
 $script:EmbeddedReferences = @{
@@ -7104,6 +7104,8 @@ public partial class DiagGui : Form
 
     // ab v4.01 im Aufbau der Seiten Wartung und Optimierung: Bereiche links, Inhalt als Karte rechts, Titelleiste im
     // Farbschema. Übernommen wird beim Schließen.
+    // Einstellungen (ab v4.02 eine Seite): drei Gruppen als Karten mit je einer Zeile pro Option,
+    // links Titel und Erklärung, rechts das Bedienelement. Vorher ein Reiter je Option.
     void ShowSettingsDialog()
     {
         using (Form dlg = new Form())
@@ -7112,122 +7114,117 @@ public partial class DiagGui : Form
             dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
             dlg.MaximizeBox = false; dlg.MinimizeBox = false; dlg.ShowInTaskbar = false;
             dlg.StartPosition = FormStartPosition.CenterParent;
-            dlg.ClientSize = new Size(UI.S(780), Math.Min(UI.S(480), Screen.FromControl(this).WorkingArea.Height - UI.S(80)));
+            dlg.ClientSize = new Size(UI.S(660), Math.Min(UI.S(640), Screen.FromControl(this).WorkingArea.Height - UI.S(80)));
             dlg.Font = new Font("Segoe UI", 9.5f);
 
-            TableLayoutPanel md = new TableLayoutPanel();
-            md.Dock = DockStyle.Fill; md.ColumnCount = 2; md.RowCount = 1; md.BackColor = Color.Transparent;
-            md.Padding = new Padding(UI.S(20), UI.S(20), UI.S(20), 0);
-            md.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(214)));
-            md.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            md.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            TableLayoutPanel body = new TableLayoutPanel();
+            body.Dock = DockStyle.Fill; body.ColumnCount = 1; body.AutoScroll = true; body.BackColor = Color.Transparent;
+            body.Padding = new Padding(UI.S(20), UI.S(12), UI.S(20), 0);
+            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            int textW = UI.S(360);
 
-            FlowLayoutPanel left = new FlowLayoutPanel(); left.Dock = DockStyle.Fill; left.FlowDirection = FlowDirection.TopDown; left.WrapContents = false; left.BackColor = Color.Transparent; left.Margin = new Padding(0);
-            CardPanel card = new CardPanel(); card.Dock = DockStyle.Fill; card.Padding = new Padding(UI.S(20), UI.S(16), UI.S(20), UI.S(16)); card.Margin = new Padding(UI.S(8), 0, 0, 0);
-            Panel host = new Panel(); host.Dock = DockStyle.Fill; host.AutoScroll = true; host.BackColor = UI.Panel;
-            card.Controls.Add(host);
-            md.Controls.Add(left, 0, 0); md.Controls.Add(card, 1, 0);
-
-            List<CategoryPickerItem> pickers = new List<CategoryPickerItem>();
-            List<Control> bereiche = new List<Control>();
-            // Bereich: Überschrift, Beschreibung, Inhalt untereinander
-            Func<string, string, string, FlowLayoutPanel> Bereich = delegate(string titel, string text, string icon)
+            Func<string, TableLayoutPanel> Gruppe = delegate(string titel)
             {
-                FlowLayoutPanel b = new FlowLayoutPanel(); b.FlowDirection = FlowDirection.TopDown; b.WrapContents = false; b.AutoSize = true; b.BackColor = UI.Panel; b.Visible = false; b.Location = new Point(0, 0);
-                Label lt = Lbl(titel, UI.SchriftAbschnitt, true, UI.Text); lt.Margin = new Padding(0, 0, 0, UI.S(4)); b.Controls.Add(lt);
-                Label ld = Lbl(text, UI.SchriftHinweis, false, UI.Muted); ld.MaximumSize = new Size(UI.S(470), 0); ld.Margin = new Padding(0, 0, 0, UI.S(14)); b.Controls.Add(ld);
-                host.Controls.Add(b); bereiche.Add(b);
-                CategoryPickerItem pk = new CategoryPickerItem(titel, icon); pk.ShowCount = false; pk.Width = UI.S(206); pk.BackColor = UI.Bg;
-                int idx = pickers.Count;
-                pk.Picked += delegate { for (int i = 0; i < bereiche.Count; i++) { bereiche[i].Visible = (i == idx); pickers[i].Selected = (i == idx); } };
-                Tip(pk, text);
-                pickers.Add(pk); left.Controls.Add(pk);
-                return b;
+                Label lh = Lbl(titel, UI.SchriftText, true, UI.Muted); lh.Margin = new Padding(UI.S(2), UI.S(8), 0, UI.S(6));
+                body.Controls.Add(lh);
+                CardPanel c = new CardPanel(); c.AutoSize = true; c.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top;
+                c.Padding = new Padding(UI.S(16), UI.S(4), UI.S(16), UI.S(4)); c.Margin = new Padding(0, 0, 0, UI.S(6));
+                TableLayoutPanel g = new TableLayoutPanel(); g.Dock = DockStyle.Top; g.AutoSize = true; g.ColumnCount = 2; g.RowCount = 0; g.BackColor = UI.Panel;
+                g.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); g.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+                c.Controls.Add(g); body.Controls.Add(c);
+                return g;
+            };
+            // Zeile: Titel und Erklärung links, Bedienelement rechts; zwischen den Zeilen eine Linie
+            Func<TableLayoutPanel, string, string, Control, FlowLayoutPanel> Zeile = delegate(TableLayoutPanel g, string titel, string text, Control ctl)
+            {
+                if (g.RowCount > 0)
+                {
+                    Panel sep = new Panel(); sep.Height = 1; sep.BackColor = UI.Line; sep.Dock = DockStyle.Fill; sep.Margin = new Padding(0);
+                    g.RowCount++; g.Controls.Add(sep, 0, g.RowCount - 1); g.SetColumnSpan(sep, 2);
+                }
+                FlowLayoutPanel f = new FlowLayoutPanel(); f.FlowDirection = FlowDirection.TopDown; f.WrapContents = false; f.AutoSize = true; f.BackColor = UI.Panel;
+                f.Margin = new Padding(0, UI.S(10), UI.S(16), UI.S(10));
+                Label lt = Lbl(titel, UI.SchriftText, true, UI.Text); lt.Margin = new Padding(0, 0, 0, UI.S(2)); f.Controls.Add(lt);
+                if (!String.IsNullOrEmpty(text)) { Label ld = Lbl(text, UI.SchriftHinweis, false, UI.Muted); ld.MaximumSize = new Size(textW, 0); ld.Margin = new Padding(0); f.Controls.Add(ld); }
+                g.RowCount++;
+                g.Controls.Add(f, 0, g.RowCount - 1);
+                if (ctl != null) { ctl.Anchor = AnchorStyles.Right; g.Controls.Add(ctl, 1, g.RowCount - 1); }
+                return f;
             };
 
-            // 1. Darstellung
-            FlowLayoutPanel bDar = Bereich("Darstellung", "Farbschema der Oberfläche. Der Knopf mit der Sonne oben rechts schaltet ebenfalls um.", UI.IcoSun);
+            // Allgemein
+            TableLayoutPanel gAll = Gruppe("Allgemein");
             FlowLayoutPanel rowTheme = new FlowLayoutPanel(); rowTheme.AutoSize = true; rowTheme.WrapContents = false; rowTheme.BackColor = UI.Panel; rowTheme.Margin = new Padding(0);
             RadioButton rbDark = new RadioButton(); rbDark.Text = "Dunkel"; rbDark.Checked = UI.IsDark;
             RadioButton rbLight = new RadioButton(); rbLight.Text = "Hell"; rbLight.Checked = !UI.IsDark;
             foreach (RadioButton rb in new RadioButton[] { rbDark, rbLight })
             {
-                rb.AutoSize = false; rb.Size = new Size(UI.S(110), UI.S(32)); rb.Margin = new Padding(0, 0, UI.S(6), 0);
+                rb.AutoSize = false; rb.Size = new Size(UI.S(84), UI.S(30)); rb.Margin = new Padding(UI.S(4), 0, 0, 0);
                 StyleSegment(rb);
                 RadioButton r2 = rb; rb.CheckedChanged += delegate { StyleSegment(r2); };
                 rowTheme.Controls.Add(rb);
             }
             Tip(rbDark, "Dunkles Farbschema."); Tip(rbLight, "Helles Farbschema.");
-            bDar.Controls.Add(rowTheme);
+            Zeile(gAll, "Farbschema", "Gilt ab dem Schließen. Der Knopf mit der Sonne oben rechts schaltet ebenfalls um.", rowTheme);
 
-            // 2. Start
-            FlowLayoutPanel bStart = Bereich("Start", "Was beim Öffnen von Leos Minibench zuerst erscheint.", UI.IcoHome);
-            CheckBox chkShowStart = Chk("Beim Programmstart die Startseite anzeigen", LoadStartPagePreference());
-            Tip(chkShowStart, "Aus: Leos Minibench öffnet direkt die Seite Diagnose.");
-            bStart.Controls.Add(chkShowStart);
+            ToggleSwitch tgStart = new ToggleSwitch(); tgStart.Checked = LoadStartPagePreference();
+            Tip(tgStart, "Aus: Leos Minibench öffnet direkt die Seite Diagnose.");
+            Zeile(gAll, "Startseite beim Programmstart", "Aus: Das Programm öffnet direkt die Seite Diagnose.", tgStart);
 
-            // 3. Datenschutz
-            FlowLayoutPanel bPriv = Bereich("Datenschutz", "Gilt für die Datei zur KI-Auswertung, die jeder Lauf neben dem Bericht anlegt.", UI.IcoShield);
-            CheckBox chkPrivAnon = Chk("Personenbezogene Daten für die KI-Auswertung entfernen", chkAnon != null && chkAnon.Checked);
-            Tip(chkPrivAnon, "Ersetzt Benutzernamen, Computernamen, Seriennummern und Domäne durch neutrale Platzhalter.");
-            bPriv.Controls.Add(chkPrivAnon);
+            ToggleSwitch tgUpd = new ToggleSwitch(); tgUpd.Checked = LoadUpdateCheckPreference();
+            Tip(tgUpd, "Prüft beim Start im Hintergrund, ob eine neuere Version vorliegt. Heruntergeladen wird nur auf Nachfrage.");
+            FlowLayoutPanel fUpd = Zeile(gAll, "Nach Updates suchen", "Höchstens einmal am Tag bei GitHub, heruntergeladen wird nur auf Nachfrage. Installiert: " + this.version + (HasUpdateAvailable ? ", verfügbar: " + AvailableUpdateVersion.TrimStart('v') : "") + ".", tgUpd);
+            LinkLabel lnkUpd = new LinkLabel(); lnkUpd.Text = "Jetzt suchen"; lnkUpd.AutoSize = true; lnkUpd.LinkColor = UI.Accent; lnkUpd.ActiveLinkColor = UI.AccentHover; lnkUpd.LinkBehavior = LinkBehavior.HoverUnderline; lnkUpd.Margin = new Padding(0, UI.S(4), 0, 0);
+            lnkUpd.LinkClicked += delegate { StartUpdateCheck(); lnkUpd.Text = "Prüfung läuft, das Ergebnis erscheint oben in der Kopfzeile"; lnkUpd.Enabled = false; };
+            Tip(lnkUpd, "Fragt sofort bei GitHub nach einer neueren Version.");
+            fUpd.Controls.Add(lnkUpd);
 
-            // 4. Daten
-            FlowLayoutPanel bDaten = Bereich("Daten", "Berichte, Datenbank, Werkzeuge und Vorlagen liegen im Datenordner. Ein Netzlaufwerk dient als Spiegel und wird über Aktualisieren in der Datenbank abgeglichen.", UI.IcoFolder);
-            Label lblDataDir = Lbl(NasAblage.AblageText(dataDir), UI.SchriftHinweis, false, UI.Text); lblDataDir.MaximumSize = new Size(UI.S(470), 0); lblDataDir.Margin = new Padding(0, 0, 0, UI.S(10));
-            bDaten.Controls.Add(lblDataDir);
+            // Daten und Datenschutz
+            TableLayoutPanel gDat = Gruppe("Daten und Datenschutz");
             FlowLayoutPanel rowDataBtns = new FlowLayoutPanel(); rowDataBtns.AutoSize = true; rowDataBtns.WrapContents = false; rowDataBtns.BackColor = UI.Panel; rowDataBtns.Margin = new Padding(0);
-            Button btnOpenData = UI.Secondary("Datenordner öffnen"); btnOpenData.Margin = new Padding(0, 0, UI.S(8), 0);
+            Button btnOpenData = UI.Secondary("Öffnen"); btnOpenData.Margin = new Padding(0, 0, UI.S(8), 0);
             btnOpenData.Click += delegate { if (dataDir.Length > 0) OpenShell(dataDir); };
-            Button btnNasDlg = UI.Secondary("Netzlaufwerk einrichten …"); btnNasDlg.Margin = new Padding(0);
-            btnNasDlg.Click += delegate { ShowConnectNasDialog(); SetText(lblDataDir, NasAblage.AblageText(dataDir)); };
-            Tip(btnOpenData, "Öffnet den Datenordner im Explorer."); Tip(btnNasDlg, "Netzlaufwerk als Spiegel der Daten einrichten oder ändern.");
+            Button btnNasDlg = UI.Secondary("Netzlaufwerk …"); btnNasDlg.Margin = new Padding(0);
+            Tip(btnOpenData, "Öffnet den Datenordner im Explorer."); Tip(btnNasDlg, "Netzlaufwerk als Spiegel der Daten einrichten oder ändern. Abgeglichen wird über Aktualisieren in der Datenbank.");
             rowDataBtns.Controls.Add(btnOpenData); rowDataBtns.Controls.Add(btnNasDlg);
-            bDaten.Controls.Add(rowDataBtns);
+            FlowLayoutPanel fDat = Zeile(gDat, "Datenordner", "Berichte, Datenbank, Werkzeuge und Vorlagen.", rowDataBtns);
+            Label lblDataDir = Lbl(NasAblage.AblageText(dataDir), UI.SchriftHinweis, false, UI.Text); lblDataDir.MaximumSize = new Size(textW, 0); lblDataDir.Margin = new Padding(0, UI.S(4), 0, 0);
+            fDat.Controls.Add(lblDataDir);
+            btnNasDlg.Click += delegate { ShowConnectNasDialog(); SetText(lblDataDir, NasAblage.AblageText(dataDir)); };
 
-            // 5. Updates
-            FlowLayoutPanel bUpd = Bereich("Updates", "Leos Minibench fragt höchstens einmal am Tag bei GitHub nach einer neuen Version. Heruntergeladen wird nur auf Nachfrage.", UI.IcoRefresh);
-            CheckBox chkAutoUpd = Chk("Automatisch nach Updates suchen", LoadUpdateCheckPreference());
-            Tip(chkAutoUpd, "Prüft beim Start im Hintergrund, ob eine neuere Version vorliegt.");
-            bUpd.Controls.Add(chkAutoUpd);
-            Label lblUpd = Lbl("Installiert: " + this.version + (HasUpdateAvailable ? "   ·   verfügbar: " + AvailableUpdateVersion : ""), UI.SchriftHinweis, false, UI.Muted); lblUpd.Margin = new Padding(UI.S(4), UI.S(6), 0, UI.S(10));
-            bUpd.Controls.Add(lblUpd);
-            Button btnCheckUpd = UI.Secondary("Jetzt nach Updates suchen"); btnCheckUpd.Margin = new Padding(0);
-            btnCheckUpd.Click += delegate { StartUpdateCheck(); SetText(lblUpd, "Installiert: " + this.version + "   ·   Prüfung läuft im Hintergrund, das Ergebnis erscheint oben in der Kopfzeile."); };
-            Tip(btnCheckUpd, "Fragt sofort bei GitHub nach einer neueren Version.");
-            bUpd.Controls.Add(btnCheckUpd);
+            ToggleSwitch tgAnon = new ToggleSwitch(); tgAnon.Checked = chkAnon != null && chkAnon.Checked;
+            Tip(tgAnon, "Ersetzt Benutzernamen, Computernamen, Seriennummern und Domäne durch neutrale Platzhalter.");
+            Zeile(gDat, "KI-Datei anonymisieren", "Entfernt Benutzer- und Computernamen, Seriennummern und Domäne aus der Datei zur KI-Auswertung, die jeder Lauf anlegt.", tgAnon);
 
-            // 6. Über
-            FlowLayoutPanel bUeber = Bereich("Über Leos Minibench", "Version " + this.version + ". Diagnose, Benchmark, Lasttest, Wartung und Optimierung für Windows.", UI.IcoInfo);
-            Label lblThanks = Lbl("Danksagungen: Windows Optimisation Pack (Marvin700), Sophia Script (Dmitry Nefedov), O&O ShutUp10++, smartmontools, LibreHardwareMonitor, PawnIO.", UI.SchriftHinweis, false, UI.Text);
-            lblThanks.MaximumSize = new Size(UI.S(470), 0); lblThanks.Margin = new Padding(0, 0, 0, UI.S(12));
-            bUeber.Controls.Add(lblThanks);
+            // Über
+            TableLayoutPanel gUeber = Gruppe("Über");
             Button btnHist = UI.Secondary("Versionshistorie"); btnHist.Margin = new Padding(0);
             btnHist.Click += delegate { dlg.Close(); if (!running && versionPage >= 0) ShowPage(versionPage); };
             Tip(btnHist, "Schließt die Einstellungen und zeigt, was sich in jeder Version geändert hat.");
-            bUeber.Controls.Add(btnHist);
+            Zeile(gUeber, "Leos Minibench " + this.version, "Danksagungen: Windows Optimisation Pack (Marvin700), Sophia Script (Dmitry Nefedov), O&O ShutUp10++, smartmontools, LibreHardwareMonitor, PawnIO.", btnHist);
 
             FlowLayoutPanel bottomBar = new FlowLayoutPanel();
             bottomBar.Dock = DockStyle.Bottom; bottomBar.FlowDirection = FlowDirection.RightToLeft; bottomBar.WrapContents = false;
-            bottomBar.Height = UI.S(64); bottomBar.Padding = new Padding(0, UI.S(14), UI.S(20), UI.S(12)); bottomBar.BackColor = Color.Transparent;
+            bottomBar.Height = UI.S(60); bottomBar.Padding = new Padding(0, UI.S(12), UI.S(20), UI.S(12)); bottomBar.BackColor = Color.Transparent;
             Button btnOk = UI.Primary("Schließen"); btnOk.DialogResult = DialogResult.OK; btnOk.Margin = new Padding(0);
             Tip(btnOk, "Übernimmt die Einstellungen und schließt das Fenster.");
             bottomBar.Controls.Add(btnOk);
 
-            dlg.Controls.Add(md);
+            dlg.Controls.Add(body);
             dlg.Controls.Add(bottomBar);
             dlg.AcceptButton = btnOk; dlg.CancelButton = btnOk;
             UI.ThemeDialog(dlg);
-            foreach (CategoryPickerItem pk in pickers) pk.BackColor = UI.Bg;
             StyleSegment(rbDark); StyleSegment(rbLight);
-            bereiche[0].Visible = true; pickers[0].Selected = true;
+            // Höhe an den Inhalt anpassen, höchstens bis zur Bildschirmhöhe
+            int need = body.GetPreferredSize(new Size(dlg.ClientSize.Width, 0)).Height + bottomBar.Height + UI.S(8);
+            dlg.ClientSize = new Size(dlg.ClientSize.Width, Math.Min(need, Screen.FromControl(this).WorkingArea.Height - UI.S(80)));
 
             dlg.ShowDialog(this);
 
             if (rbDark.Checked != UI.IsDark) ToggleTheme();
-            SaveStartPagePreference(chkShowStart.Checked);
-            SaveUpdateCheckPreference(chkAutoUpd.Checked);
-            if (chkAnon != null) chkAnon.Checked = chkPrivAnon.Checked;
+            SaveStartPagePreference(tgStart.Checked);
+            SaveUpdateCheckPreference(tgUpd.Checked);
+            if (chkAnon != null) chkAnon.Checked = tgAnon.Checked;
         }
     }
 
@@ -7829,7 +7826,6 @@ public partial class DiagGui : Form
         Tip(chkAnon, "Ersetzt Benutzernamen, Computernamen, Seriennummern und Domäne in Berichten und Exportdateien durch neutrale Platzhalter.");
         // Optimierung
         Tip(chkOptRestore, "Legt vor der Optimierung einen Systemwiederherstellungspunkt an. Er ist der Weg zurück für Eingriffe wie entfernte Apps und Zusatzfeatures.");
-        Tip(btnOptCheck, "Liest für jeden Eintrag, ob er auf diesem PC schon so eingestellt ist (aktiv, teilweise, offen). Verändert nichts, dauert bis zu einer Minute.");
         Tip(btnOptTools, "Holt Display Driver Uninstaller (aus dem Optimisation Pack, feste Prüfsumme) und NVIDIA Profile Inspector in den Tools-Ordner. Installiert wird nichts.");
         Tip(btnOptAll, "Alle Kategorien auf- oder zuklappen.");
         if (btnRepAll == null) btnRepAll = UI.Secondary("");
@@ -7969,9 +7965,11 @@ public partial class DiagGui : Form
     {
         r.Appearance = Appearance.Button; r.FlatStyle = FlatStyle.Flat; r.TextAlign = ContentAlignment.MiddleCenter;
         r.FlatAppearance.BorderColor = UI.Line; r.FlatAppearance.BorderSize = 1;
-        r.FlatAppearance.CheckedBackColor = UI.AccentSoft;
-        r.FlatAppearance.MouseOverBackColor = UI.IsDark ? Color.FromArgb(45, 48, 52) : Color.FromArgb(243, 244, 246);
-        r.BackColor = UI.Panel; r.ForeColor = r.Checked ? (UI.IsDark ? UI.Accent : UI.AccentDark) : UI.Text;
+        // gewählt: Akzentfläche mit heller Schrift (vorher Akzentschrift auf blassem Akzent, im Dunkelschema kaum lesbar)
+        r.FlatAppearance.CheckedBackColor = UI.Accent;
+        r.FlatAppearance.BorderColor = r.Checked ? UI.Accent : UI.Line;
+        r.FlatAppearance.MouseOverBackColor = r.Checked ? UI.Accent : (UI.IsDark ? Color.FromArgb(45, 48, 52) : Color.FromArgb(243, 244, 246));
+        r.BackColor = r.Checked ? UI.Accent : UI.Panel; r.ForeColor = r.Checked ? UI.OnAccent : UI.Text;
         r.Font = new Font(r.Checked ? "Segoe UI Semibold" : "Segoe UI", UI.SchriftText);
     }
 
@@ -8010,7 +8008,7 @@ public partial class DiagGui : Form
         if (k == "risiko") Tip(b, b.Level == "info" ? "Ändern: wird mit Vorher-Wert protokolliert und lässt sich auf der Seite Änderungen zurücknehmen." : "Eingriff: nicht automatisch umkehrbar; der Weg zurück ist der Wiederherstellungspunkt.");
         else if (k == "neustart") Tip(b, b.Text == "Neustart" ? "Wird erst nach einem Neustart vollständig wirksam." : "Kann einen Neustart brauchen, je nach Zustand des PCs.");
         else if (k == "verwaltet") Tip(b, "Berührt Gruppenrichtlinien oder zentrale Verwaltung; auf Domänen-PCs nicht in den Vorlagen.");
-        else if (k == "zustand") Tip(b, "Zustand auf diesem PC, ermittelt mit Zustand prüfen oder beim letzten Lauf.");
+        else if (k == "zustand") Tip(b, "Zustand auf diesem PC, beim Start im Hintergrund gelesen oder vom letzten Lauf.");
     }
 
     // ab v3.65: Gruppen als abgerundete Karten (CardPanel) wie die Werkzeugkarten
@@ -8894,7 +8892,7 @@ public partial class DiagGui : Form
     Dictionary<string, GroupHeader> optCatToggle = new Dictionary<string, GroupHeader>();
     CheckBox chkOptRestore;
     Label lblOptInfo, lblOptState;
-    Button btnOptCheck, btnOptTools, btnOptAll;
+    Button btnOptTools, btnOptAll;
     List<Button> optPresetButtons = new List<Button>();
     static readonly string[] optPresetTips = new string[] {
         "Minimal: Grundlegende Datenschutz-Einstellungen, Dienste und Aufgaben, Indizierung aus, Caches leeren.",
@@ -9181,8 +9179,8 @@ public partial class DiagGui : Form
         f.Controls.Add(bPills);
 
         FlowLayoutPanel bTools = Row(); bTools.Margin = new Padding(UI.S(4), UI.S(4), 0, UI.S(4));
-        btnOptCheck = UI.Secondary("Zustand pr\u00FCfen"); btnOptCheck.Margin = new Padding(0); btnOptCheck.Click += delegate { CheckOptState(); }; bTools.Controls.Add(btnOptCheck);
-        btnOptTools = UI.Secondary("Werkzeuge holen \u2026"); btnOptTools.Margin = new Padding(UI.S(8), 0, 0, 0); btnOptTools.Click += delegate { FetchOptTools(); }; bTools.Controls.Add(btnOptTools);
+        // ab v4.02 kein Knopf "Zustand prüfen" mehr: Der Zustand wird nach dem Start im Hintergrund gelesen (StartOptStateCheck)
+        btnOptTools = UI.Secondary("Werkzeuge holen \u2026"); btnOptTools.Margin = new Padding(0); btnOptTools.Click += delegate { FetchOptTools(); }; bTools.Controls.Add(btnOptTools);
         btnOptAll = UI.Secondary("Alle aufklappen"); btnOptAll.Visible = false;
         f.Controls.Add(bTools);
 
@@ -9321,10 +9319,62 @@ public partial class DiagGui : Form
         btnOptAll.Text = open ? "Alle zuklappen" : "Alle aufklappen";
     }
 
-    void CheckOptState()
+    // Zustand der Einträge der Optimierung im Hintergrund lesen (ab v4.02). Bis v4.01 über den Knopf "Zustand prüfen":
+    // Der Arbeitsprozess lief bis zu einer Minute, das Fenster war so lange gesperrt und reagierte nur stockend.
+    // Jetzt startet er kurz nach dem Öffnen des Fensters mit niedriger Priorität; die Oberfläche bleibt bedienbar,
+    // die Etiketten erscheinen, sobald er fertig ist. Ein Lauf, der inzwischen begonnen hat, hat Vorrang.
+    Process optStateProc;
+    DateTime optStateStarted = DateTime.MinValue;
+
+    void StartOptStateCheck()
     {
-        if (running) return;
-        List<string> lines; RunHelperPumped("-OptimierungZustand", out lines, 300);
+        if (optStateProc != null || running || lblOptState == null || optItems.Count == 0 || String.IsNullOrEmpty(psExe) || String.IsNullOrEmpty(script)) return;
+        List<string> got = new List<string>();
+        ProcessStartInfo psi = new ProcessStartInfo(psExe, "-NoProfile -ExecutionPolicy Bypass -File \"" + script + "\" -EventMode -OptimierungZustand" + (dataDir.Length > 0 ? " -DatenDir \"" + dataDir.TrimEnd('\\') + "\"" : ""));
+        psi.UseShellExecute = false; psi.CreateNoWindow = true; psi.RedirectStandardOutput = true; psi.StandardOutputEncoding = new UTF8Encoding(false);
+        Process p = new Process(); p.StartInfo = psi;
+        bool fertig = false;
+        MethodInvoker abschluss = delegate {
+            if (fertig) return; fertig = true;
+            List<string> lines = new List<string>();
+            lock (got)
+                foreach (string l in got)
+                {
+                    if (l.StartsWith("@@LOG|")) { string[] x = l.Split(new char[] { '|' }, 3); if (x.Length == 3 && x[2].Trim().Length > 0) lines.Add(x[2].Trim()); }
+                    else if (l.StartsWith("@@OPTZ|")) lines.Add(l);
+                }
+            try { BeginInvoke(new MethodInvoker(delegate { ApplyOptState(lines); try { p.Dispose(); } catch { } optStateProc = null; })); } catch { }
+        };
+        p.OutputDataReceived += delegate(object s, DataReceivedEventArgs e) {
+            if (e.Data == null) { abschluss(); return; }
+            lock (got) got.Add(e.Data);
+        };
+        try
+        {
+            p.Start(); p.BeginOutputReadLine();
+            try { p.PriorityClass = ProcessPriorityClass.BelowNormal; } catch { }
+        }
+        catch (Exception ex) { SetText(lblOptState, "Zustand nicht lesbar: " + ex.Message); try { p.Dispose(); } catch { } return; }
+        optStateProc = p; optStateStarted = DateTime.Now;
+        SetText(lblOptState, "Zustand auf diesem PC wird im Hintergrund gelesen \u2026"); lblOptState.ForeColor = UI.Muted;
+        // Sicherung: nach fünf Minuten beenden
+        System.Windows.Forms.Timer wd = new System.Windows.Forms.Timer(); wd.Interval = 300000;
+        wd.Tick += delegate { wd.Stop(); wd.Dispose(); if (!fertig) { try { if (!p.HasExited) KillProc(p); } catch { } abschluss(); } };
+        wd.Start();
+    }
+
+    // Laufender Zustandsprozess wird beim Start eines Laufs oder beim Schließen beendet
+    void StopOptStateCheck()
+    {
+        Process p = optStateProc;
+        if (p == null) return;
+        try { if (!p.HasExited) KillProc(p); } catch { }
+    }
+
+    void ApplyOptState(List<string> lines)
+    {
+        // Ein Lauf seit dem Start der Prüfung zeigt seine eigenen Ergebnisse (@@OPTE); die ältere Prüfung nicht darüberlegen
+        if (running || (runStarted != DateTime.MinValue && runStarted > optStateStarted)) { SetText(lblOptState, ""); return; }
         int a = 0, t = 0, o = 0, nz = 0, np = 0;
         string user = "";
         foreach (string l in lines)
@@ -9333,13 +9383,14 @@ public partial class DiagGui : Form
             string[] x = l.Split(new char[] { '|' }, 4);
             if (x.Length < 3) continue;
             OptItem it = optItems.Find(delegate(OptItem i) { return i.Id == x[1]; });
-            if (it == null) continue;
+            if (it == null || it.Box == null) continue;
             it.Zustand = x[2]; it.ZustandText = x.Length > 3 ? x[3].Replace("¦", "|") : "";
             if (it.Zustand == "aktiv") a++; else if (it.Zustand == "teilweise") t++; else if (it.Zustand == "offen") o++; else if (it.Zustand == "nicht zutreffend") nz++; else np++;
             it.Box.Text = OptBoxText(it); Tip(it.Box, OptTipText(it));
+            if (it.Row != null) { string tt = OptTipText(it); Tip(it.Row, tt); if (it.Toggle != null) Tip(it.Toggle, tt); }
         }
-        lblOptState.Text = (a + t + o + nz + np) == 0 ? "Zustand nicht lesbar: keine Rückmeldung vom Arbeitsprozess." : "Zustand auf diesem PC: " + a + " bereits aktiv, " + t + " teilweise, " + o + " offen, " + nz + " nicht zutreffend, " + np + " nicht prüfbar (Bereinigung, Werkzeuge)." + (user.Length > 0 ? "  " + user + "." : "");
-        lblOptState.ForeColor = UI.Text;
+        SetText(lblOptState, (a + t + o + nz + np) == 0 ? "Zustand nicht lesbar: keine Rückmeldung vom Arbeitsprozess." : "Zustand auf diesem PC: " + a + " bereits aktiv, " + t + " teilweise, " + o + " offen, " + nz + " nicht zutreffend, " + np + " nicht prüfbar (Bereinigung, Werkzeuge)." + (user.Length > 0 ? "  " + user + "." : ""));
+        lblOptState.ForeColor = UI.Muted;
     }
 
     // Ergebnis eines Eintrags während des Laufs (@@OPTE|Id|Ergebnis|Änderungen|Details): Häkchen zeigt den neuen Stand
@@ -10873,6 +10924,10 @@ public partial class DiagGui : Form
         BeginInvoke(new System.Windows.Forms.MethodInvoker(delegate { ApplyNativeControlThemes(); }));
         // erst nach dem ersten Zeichnen: Startfenster der exe schließen und die Startzeit protokollieren
         BeginInvoke(new System.Windows.Forms.MethodInvoker(delegate { StartLog.Phase("Oberfläche bereit"); StartLog.SignalReady(); StartLog.Finish(dataDir, version, script); }));
+        // Zustand der Optimierung erst nach dem Start lesen, damit er die Startzeit nicht verlängert
+        System.Windows.Forms.Timer zt = new System.Windows.Forms.Timer(); zt.Interval = 2000;
+        zt.Tick += delegate { zt.Stop(); zt.Dispose(); StartOptStateCheck(); };
+        zt.Start();
     }
 
     void BringToFront2()
@@ -10924,6 +10979,7 @@ public partial class DiagGui : Form
             try { proc.StandardInput.Close(); } catch { }
         }
         catch (Exception ex) { MessageBox.Show(this, "PowerShell konnte nicht gestartet werden: " + ex.Message, "Leos Minibench", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
+        StopOptStateCheck();   // Messungen nicht durch den Zustandsprozess belasten
         running = true;
         for (int i = 0; i < nav.Count; i++) { nav[i].Running = false; nav[i].Invalidate(); }
         contentHost.Visible = false;
@@ -10975,7 +11031,7 @@ public partial class DiagGui : Form
                 SetText(lblCounter, String.Format("Schritt {0} von {1}", s, t));
                 if (t > 0) barAll.Value = (s - 1) * 100 / t;
                 btnSkipStep.Enabled = false;
-                log.AppendLine(); log.AppendLine(">> " + Get(p, 3));
+                // Die Abschnittszeile mit Uhrzeit und Zähler kommt schon als Konsolenausgabe (Add-Section); bis v4.01 stand sie doppelt im Protokoll
                 break;
             case "SKIP_ALLOWED":
                 btnSkipStep.Enabled = Get(p, 1) == "1";
@@ -11207,6 +11263,7 @@ public partial class DiagGui : Form
     {
         // Live-Ansicht sauber beenden, damit ein vorübergehend installierter Treiber entfernt wird
         if (liveRunning) StopLiveAndWait();
+        StopOptStateCheck();
         if (!running) { CleanupDriver(); return; }
         if (MessageBox.Show(this, "Der Lauf ist noch aktiv. Abbrechen und schließen?", "Leos Minibench", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) { e.Cancel = true; return; }
         cancelled = true; KillTree();
@@ -12768,7 +12825,8 @@ public class PercentBar : Control
         Color track = UI.IsDark ? Color.FromArgb(52, 56, 62) : Color.FromArgb(226, 229, 234);
         using (GraphicsPath p = UI.Round(new RectangleF(0, 0, w, h), h / 2f)) using (SolidBrush b = new SolidBrush(track)) g.FillPath(b, p);
         float fw = (float)(Math.Max(0, Math.Min(pct, Max)) / Max * w);
-        Color fill = pct >= 100 ? UI.Ok : pct >= 70 ? UI.Accent : UI.Warn;
+        // Langsamer als die Referenz ist kein Fehler (die Referenz ist meist ein schneller PC): kein Gelb, nur Grün ab Referenzniveau
+        Color fill = pct >= 90 ? UI.Ok : UI.Accent;
         if (fw >= h) using (GraphicsPath p = UI.Round(new RectangleF(0, 0, fw, h), h / 2f)) using (SolidBrush b = new SolidBrush(fill)) g.FillPath(b, p);
         float mx = (float)(100.0 / Max * w);
         using (Pen pen = new Pen(UI.Text, 1.5f)) g.DrawLine(pen, mx, -1, mx, h + 1);
@@ -19013,12 +19071,44 @@ e.Result = items;
         foreach (Control c in pnlResFind.Controls) if (c is FlowLayoutPanel) foreach (Control k in c.Controls) if (k is Label && !(k is LinkLabel)) k.MaximumSize = new Size(Math.Max(UI.S(200), findW), 0);
     }
 
+    // Einordnung gegenüber der Referenz, nicht gegenüber einem Durchschnitt: Die Referenz ist ein bestimmter PC
+    // (meist ein schneller). Bis v4.01 hieß 32 % unterdurchschnittlich, obwohl nur der Abstand zur Referenz gemeint war.
     static string RatingWord(double pct)
     {
-        if (pct >= 115) return "Hervorragend"; if (pct >= 100) return "Sehr gut"; if (pct >= 85) return "Gut";
-        if (pct >= 70) return "Durchschnittlich"; if (pct >= 50) return "Mäßig"; return "Unterdurchschnittlich";
+        if (pct >= 110) return "schneller"; if (pct >= 90) return "gleichauf"; if (pct >= 70) return "etwas langsamer";
+        if (pct >= 45) return "langsamer"; return "deutlich langsamer";
     }
-    static string RatingLevel(double pct) { return pct >= 100 ? "ok" : pct >= 85 ? "info" : pct >= 70 ? "skip" : "warn"; }
+    static string RatingLevel(double pct) { return pct >= 90 ? "ok" : pct >= 45 ? "info" : "skip"; }
+
+    // Name der Referenz für "100 % = ..." (gespeicherte Referenz mit Namen, sonst die Auswahl im Benchmark)
+    string RefLabelText()
+    {
+        if (cmbRef == null || cmbRef.SelectedIndex <= 0)
+        {
+            string s = SavedRefText();
+            if (s.StartsWith("Gespeicherte Referenz: ")) return "Referenz-PC " + s.Substring(23);
+        }
+        return cmbRef != null && cmbRef.Text.Length > 0 ? cmbRef.Text : "Referenz";
+    }
+
+    // "Samsung SSD 980 1TB (931,5 GB, NVMe, Healthy); ..." -> eine kurze Pille je Laufwerk
+    static List<string> DiskPills(string disks)
+    {
+        List<string> res = new List<string>();
+        foreach (string part in (disks ?? "").Split(';'))
+        {
+            string d = part.Trim(); if (d.Length == 0) continue;
+            System.Text.RegularExpressions.Match m = System.Text.RegularExpressions.Regex.Match(d, @"^(.*?)\s*\((.*)\)$");
+            if (!m.Success) { res.Add(d); continue; }
+            // Felder mit ", " trennen: Die Größe selbst enthält ein Dezimalkomma ("1,82 TB")
+            string[] f = m.Groups[2].Value.Split(new string[] { ", " }, StringSplitOptions.None);
+            string txt = m.Groups[1].Value.Trim();
+            if (f.Length > 1 && f[1].Trim().Length > 0 && txt.IndexOf(f[1].Trim(), StringComparison.OrdinalIgnoreCase) < 0) txt += "  ·  " + f[1].Trim();
+            if (f.Length > 2 && f[2].Trim().Length > 0 && !f[2].Trim().Equals("Healthy", StringComparison.OrdinalIgnoreCase)) txt += "  ·  " + f[2].Trim();
+            res.Add(txt);
+        }
+        return res;
+    }
 
     // Prozent der Referenz aus der Gruppenzeile des Laufs ("112 %"), sonst NaN
     double GroupRefPct(string g)
@@ -19042,8 +19132,8 @@ e.Result = items;
         Label lc = Lbl(caption, UI.SchriftHinweis, false, UI.Muted); lc.Margin = new Padding(0, 0, 0, UI.S(8)); f.Controls.Add(lc);
         if (!double.IsNaN(pct))
         {
-            Badge b = new Badge(RatingWord(pct) + "  ·  " + pct.ToString("0") + " %", RatingLevel(pct)); b.Margin = new Padding(0, 0, 0, UI.S(6));
-            Tip(b, "Im Vergleich zur Referenz (100 %).");
+            Badge b = new Badge(pct.ToString("0") + " %  ·  " + RatingWord(pct), RatingLevel(pct)); b.Margin = new Padding(0, 0, 0, UI.S(6));
+            Tip(b, "Im Vergleich zum Referenz-PC (100 %): " + RefLabelText() + ".");
             f.Controls.Add(b);
         }
         if (!String.IsNullOrEmpty(second)) { Label ls = Lbl(second, UI.SchriftHinweis, false, UI.Muted); ls.Margin = new Padding(0); f.Controls.Add(ls); }
@@ -19081,7 +19171,7 @@ e.Result = items;
             if (!String.IsNullOrEmpty(e.CpuDisplay)) pnlDashPills.Controls.Add(new PillLabel(e.CpuDisplay));
             if (!String.IsNullOrEmpty(e.Gpu)) pnlDashPills.Controls.Add(new PillLabel(e.Gpu));
             if (!String.IsNullOrEmpty(e.Ram)) pnlDashPills.Controls.Add(new PillLabel(e.Ram));
-            if (!String.IsNullOrEmpty(e.Disk)) pnlDashPills.Controls.Add(new PillLabel(e.Disk));
+            foreach (string dp in DiskPills(e.Disk)) { PillLabel pl = new PillLabel(dp); Tip(pl, e.Disk); pnlDashPills.Controls.Add(pl); }
         }
 
         // Wichtigste Befunde: kritische zuerst, dann Warnungen, höchstens fünf
@@ -19114,20 +19204,29 @@ e.Result = items;
 
         // Vergleich mit der Referenz je Komponente (nur mit Benchmark in diesem Lauf)
         while (pnlResCmp.Controls.Count > 1) pnlResCmp.Controls.RemoveAt(1);
-        lblResRef.Text = "100 % = " + (cmbRef != null && cmbRef.Text.Length > 0 ? cmbRef.Text : "Referenz");
+        lblResRef.Text = "100 % = " + RefLabelText();
+        lblResRef.MaximumSize = new Size(UI.S(400), 0);
         pnlResCmp.Controls.Add(lblResRef);
         int cmpRows = 0;
         for (int g = 0; g < resGruppen.Length; g++)
         {
             double pct = GroupRefPct(resGruppen[g]);
-            if (double.IsNaN(pct)) continue;
             TableLayoutPanel r = new TableLayoutPanel(); r.AutoSize = true; r.ColumnCount = 3; r.BackColor = UI.Panel; r.Margin = new Padding(0, 0, 0, UI.S(8));
-            r.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(120))); r.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(150))); r.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            r.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(120))); r.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(130))); r.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             Label ln = Lbl(resNamen[g], UI.SchriftText, false, UI.Text); ln.Margin = new Padding(0, UI.S(2), 0, 0);
-            PercentBar pb = new PercentBar(); pb.Percent = pct; pb.Size = new Size(UI.S(140), UI.S(10)); pb.Margin = new Padding(0, UI.S(7), UI.S(10), 0);
-            Tip(pb, "Strich = Referenz (100 %).");
+            r.Controls.Add(ln, 0, 0);
+            if (double.IsNaN(pct))
+            {
+                // Gruppe in diesem Lauf nicht gemessen (abgewählt oder übersprungen): Zeile bleibt, damit das Fehlen auffällt
+                Label lx = Lbl("nicht gemessen", UI.SchriftText, false, UI.Muted); lx.Margin = new Padding(0, UI.S(2), 0, 0);
+                r.Controls.Add(lx, 1, 0); r.SetColumnSpan(lx, 2);
+                pnlResCmp.Controls.Add(r);
+                continue;
+            }
+            PercentBar pb = new PercentBar(); pb.Percent = pct; pb.Size = new Size(UI.S(120), UI.S(10)); pb.Margin = new Padding(0, UI.S(7), UI.S(10), 0);
+            Tip(pb, "Strich = Referenz (100 %). Langsamer als die Referenz heißt nicht defekt, nur langsamer als dieser PC.");
             Label lv = Lbl(pct.ToString("0") + " %  " + RatingWord(pct), UI.SchriftText, true, UI.Text); lv.Margin = new Padding(0, UI.S(2), 0, 0);
-            r.Controls.Add(ln, 0, 0); r.Controls.Add(pb, 1, 0); r.Controls.Add(lv, 2, 0);
+            r.Controls.Add(pb, 1, 0); r.Controls.Add(lv, 2, 0);
             pnlResCmp.Controls.Add(r); cmpRows++;
         }
         bool hasCmp = cmpRows > 0;
@@ -19804,6 +19903,16 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.02", "08.11.2026", "PawnIO-Entfernung, plausiblere Messwerte, Einstellungen auf einer Seite",
+            "\u2022 PawnIO: Der Treiber wurde seit v3.84 am Ende des Laufs nicht entfernt. Das Setup kennt nur -uninstall -silent, die zus\u00E4tzlichen InnoSetup- und NSIS-Schalter f\u00FChrten zum Fenster \u201EUnknown argument: /VERYSILENT\u201C und R\u00FCckgabecode 87. Ein noch installierter Treiber aus fr\u00FCheren L\u00E4ufen wird beim n\u00E4chsten Lauf entfernt.\r\n" +
+            "\u2022 Laufwerke mit Medientyp \u201EUnspecified\u201C (SATA hinter AMD- oder Intel-Treibern) werden \u00FCber Name und 4K-Zugriffszeit als SSD oder Festplatte eingeordnet und bekommen wieder Index und Referenzvergleich.\r\n" +
+            "\u2022 L\u00E4uft der SMART-Langtest w\u00E4hrend der Datentr\u00E4germessung noch, steht das als Hinweis im Bericht; die Werte dieser Laufwerke k\u00F6nnen zu niedrig sein.\r\n" +
+            "\u2022 Hintergrundlast vor Messungen nennt die Prozesse mit der CPU-Last der letzten zwei Sekunden statt der seit dem Prozessstart gesammelten CPU-Zeit und ohne die eigene PowerShell.\r\n" +
+            "\u2022 Netzwerk: Ohne DNS-Server eine Warnung statt vier (drei Namen und HTTPS). Autostart-Verz\u00F6gerer je Programm einmal mit dem l\u00E4ngsten Wert, ohne leere Klammern.\r\n" +
+            "\u2022 Ergebnisseite: Einordnung gegen\u00FCber dem Referenz-PC (schneller, gleichauf, etwas langsamer, langsamer, deutlich langsamer) statt \u201EUnterdurchschnittlich\u201C; Name des Referenz-PCs \u00FCber den Balken; nicht gemessene Gruppen als \u201Enicht gemessen\u201C; eine Pille je Laufwerk statt einer abgeschnittenen Zeile.\r\n" +
+            "\u2022 Einstellungen auf einer Seite: Allgemein, Daten und Datenschutz, \u00DCber; je Option eine Zeile mit Schalter statt eines Reiters je Option.\r\n" +
+            "\u2022 Optimierung: Der Zustand der Eintr\u00E4ge wird nach dem Start im Hintergrund mit niedriger Priorit\u00E4t gelesen. Der Knopf \u201EZustand pr\u00FCfen\u201C entf\u00E4llt, das Fenster friert dabei nicht mehr ein.\r\n" +
+            "\u2022 Protokoll des Laufs ohne doppelte Abschnittszeilen; Texte \u201E1 Bedrohungserkennung\u201C und \u201E1 Funktionsupdate\u201C in der Einzahl."),
         new Eintrag("4.01", "07.11.2026", "Politur der Oberfläche: Ergebnisseite, Einstellungen, Startzeit und Skalierung",
             "\u2022 Umlaute: Die Doppelkodierungen aus 4.0 (\u201Ef\u00C3\u00BCr\u201C, \u201ESchlie\u00C3\u0178en\u201C, \u201E\u00C3\u0153ber\u201C) in Einstellungen, Optimierung und Datenbank sind behoben, ebenso in CHANGELOG, Versionshistorie und Projektstand.\r\n" +
             "\u2022 Modulwahl nur noch \u00FCber den Haken in der Seitenleiste: Der Schalter \u201Ebeim Start ausf\u00FChren\u201C im Seitenkopf entf\u00E4llt. Ist ein Modul nicht angehakt, zeigt seine Seite ein Hinweisband mit \u201EIn den Ablauf aufnehmen\u201C.\r\n" +
@@ -27853,9 +27962,9 @@ function New-BootPerformanceHtml {
 
     if (@($BootPerf.Verzoegerer).Count -gt 0) {
         [void]$sb.Append('<h3 style="margin-top:16px">Autostart-Verzögerer (&ge; 1,0 s)</h3>')
-        [void]$sb.Append('<div class="tw"><table><thead><tr><th>Anwendung / Komponente</th><th class="r">Verzögerung</th><th>Art / Ereignis</th></tr></thead><tbody>')
+        [void]$sb.Append('<div class="tw"><table><thead><tr><th>Anwendung / Komponente</th><th class="r">Verzögerung</th><th>Starts</th></tr></thead><tbody>')
         foreach ($v in @($BootPerf.Verzoegerer)) {
-            [void]$sb.Append(('<tr><td><code>{0}</code></td><td class="num r"><b>{1:N1} s</b></td><td>{2}</td></tr>' -f (ConvertTo-HtmlText $v.Name), $v.DauerSekunden, (ConvertTo-HtmlText $v.Typ)))
+            [void]$sb.Append(('<tr><td><code>{0}</code></td><td class="num r"><b>{1:N1} s</b></td><td>{2}</td></tr>' -f (ConvertTo-HtmlText $v.Name), $v.DauerSekunden, $(if ($v.Anzahl -gt 1) { 'längster von {0}' -f $v.Anzahl } else { '1' })))
         }
         [void]$sb.Append('</tbody></table></div>')
     }
@@ -32527,7 +32636,11 @@ function Get-SystemBootPerformance {
                     }
                 } catch { }
             }
-            $result.Verzoegerer = @($delayList | Sort-Object DauerSekunden -Descending | Select-Object -First 5)
+            # dasselbe Programm erscheint bei jedem Start erneut: je Programm nur der längste Wert und die Zahl der Starts
+            $result.Verzoegerer = @($delayList | Group-Object Name | ForEach-Object {
+                    $mx = $_.Group | Sort-Object DauerSekunden -Descending | Select-Object -First 1
+                    [pscustomobject]@{ Name = $mx.Name; DauerSekunden = $mx.DauerSekunden; EreignisId = $mx.EreignisId; Anzahl = $_.Count }
+                } | Sort-Object DauerSekunden -Descending | Select-Object -First 5)
         } catch { }
     }
 
@@ -33656,8 +33769,10 @@ function Uninstall-PawnIo {
     if ($un -and (Test-Path -LiteralPath $un)) { $file = $un }
     else { $file = (Get-SensorToolState).PawnIoSetup }
     if (-not $file) { return [pscustomobject]@{ Ok = $false; Text = 'PawnIO konnte nicht entfernt werden: weder uninstall.exe noch PawnIO-Setup gefunden' } }
-    # Unterstützt InnoSetup (/VERYSILENT), NSIS (/S) und PawnIO-Parameter (-uninstall -silent)
-    $uninstArgs = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /S -uninstall -silent'
+    # uninstall.exe und PawnIO_setup.exe kennen nur -install, -uninstall, -unrestricted, -debuginfo und -silent.
+    # v3.84 bis v4.01 hängten InnoSetup- und NSIS-Schalter an (/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /S): Das Setup
+    # zeigte "Unknown argument: /VERYSILENT", brach mit Rückgabecode 87 ab und der Treiber blieb installiert.
+    $uninstArgs = '-uninstall -silent'
     $r = Invoke-External -File $file -Arguments $uninstArgs -TimeoutSec 180 -Progress 'PawnIO-Treiber wird entfernt'
     $st = Get-PawnIoState
     if ($st.Installiert) { return [pscustomobject]@{ Ok = $false; Text = ('PawnIO ist noch installiert (Rückgabecode {0}). Von Hand entfernen: "{1}" -uninstall' -f $r.ExitCode, $file) } }
@@ -33673,9 +33788,10 @@ function Uninstall-PawnIo {
 function Remove-PawnIoLeftover {
     $marker = Get-PawnIoMarker
     if (-not $marker -or -not (Test-Path -LiteralPath $marker)) { return }
-    if ((Get-ToolKeep) -eq 'behalten') { $k = Save-PawnIoKept; if ($k) { $script:SensorNotes.Add(('Ein früherer Lauf wurde mit installiertem PawnIO-Treiber abgebrochen: {0}.' -f $k.Text)) }; return }
+    $vor = 'Ein früherer Lauf hat den PawnIO-Treiber nicht entfernt (Lauf abgebrochen oder Entfernen fehlgeschlagen): {0}.'
+    if ((Get-ToolKeep) -eq 'behalten') { $k = Save-PawnIoKept; if ($k) { $script:SensorNotes.Add(($vor -f $k.Text)) }; return }
     $u = Uninstall-PawnIo
-    if ($u) { $script:SensorNotes.Add(('Ein früherer Lauf wurde mit installiertem PawnIO-Treiber abgebrochen: {0}.' -f $u.Text)) }
+    if ($u) { $script:SensorNotes.Add(($vor -f $u.Text)) }
 }
 
 # ---------- Sitzung ----------
@@ -34724,7 +34840,15 @@ function Test-HintergrundlastVorMessung([string]$Phase = 'Benchmark') {
         $s = $null; try { $s = Get-CpuSample } catch { }
         $finalLoad = if ($s -and $null -ne $s.Last) { [double]$s.Last } else { $avgLoad }
         if ($finalLoad -gt 15.0) {
-            $topProcs = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.CPU -gt 0 } | Sort-Object CPU -Descending | Select-Object -First 3 | ForEach-Object { '{0} ({1:N0} s CPU)' -f $_.ProcessName, $_.CPU })
+            # Verursacher aus der CPU-Zeit der letzten 2 Sekunden, ohne diesen Prozess. Bis v4.01 die seit dem Prozessstart
+            # gesammelte CPU-Zeit: Das nannte Prozesse, die gerade gar nichts taten, und die eigene PowerShell.
+            $t0 = @{}
+            foreach ($pr in @(Get-Process -ErrorAction SilentlyContinue)) { try { $t0[$pr.Id] = $pr.TotalProcessorTime.TotalMilliseconds } catch { } }
+            $swP = [Diagnostics.Stopwatch]::StartNew(); Start-Sleep -Milliseconds 2000; $span = [math]::Max(1.0, $swP.Elapsed.TotalMilliseconds) * [Environment]::ProcessorCount
+            $topProcs = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne $PID -and $_.Id -ne 0 -and $t0.ContainsKey($_.Id) } | ForEach-Object {
+                    $ms = $null; try { $ms = $_.TotalProcessorTime.TotalMilliseconds } catch { }
+                    if ($null -ne $ms) { [pscustomobject]@{ Name = $_.ProcessName; Anteil = ($ms - $t0[$_.Id]) / $span * 100 } }
+                } | Where-Object { $_.Anteil -ge 1 } | Sort-Object Anteil -Descending | Select-Object -First 3 | ForEach-Object { '{0} ({1:N0} % CPU)' -f $_.Name, $_.Anteil })
             $procText = if ($topProcs.Count) { $topProcs -join ', ' } else { 'keine ermittelbar' }
             $script:AblaufHintergrundlast = $true
             Add-Finding INFO $Phase ('Erhöhte Hintergrundlast vor {0} ({1:N0} % CPU): {2}. Die Messwerte können dadurch niedriger ausfallen.' -f $Phase, $finalLoad, $procText)
@@ -36488,7 +36612,7 @@ Invoke-Section 'System und Betriebssystem' {
         if (@($bootPerf.Verzoegerer).Count) {
             Add-Line ('  Autostart-Verzögerer  : {0} Anwendung(en) >= 1,0 s' -f @($bootPerf.Verzoegerer).Count)
             foreach ($vz in @($bootPerf.Verzoegerer)) {
-                Add-Line ('    {0}: {1:N1} s ({2})' -f $vz.Name, $vz.DauerSekunden, $vz.Typ)
+                Add-Line ('    {0}: {1:N1} s{2}' -f $vz.Name, $vz.DauerSekunden, $(if ($vz.Anzahl -gt 1) { ' (längster von {0} Starts)' -f $vz.Anzahl } else { '' }))
             }
         }
     } else {
@@ -36505,7 +36629,7 @@ Invoke-Section 'System und Betriebssystem' {
             $ii.Upgrades | Select-Object @{n = 'Installiert'; e = { $_.Installiert.ToString('dd.MM.yyyy') } }, @{n = 'Ersetzt am'; e = { if ($_.Ersetzt) { $_.Ersetzt.ToString('dd.MM.yyyy') } } }, Produkt, Version, Build | Out-Report
         }
         if ($ii.AlterTage -lt 3) { Add-Finding INFO 'System' ('Windows wurde vor {0} frisch installiert. Treiber und Updates sind eventuell noch unvollständig.' -f (Format-Age $ii.AlterTage -Dativ)) }
-        elseif ($ii.AlterTage -gt 5 * 365.25) { Add-Finding INFO 'System' ('Die Windows-Installation ist {0} alt (Erstinstallation {1:dd.MM.yyyy}, seitdem {2} Funktionsupdates). Bei hartnäckigen Problemen ist eine Neuinstallation eine Option.' -f (Format-Age $ii.AlterTage), $ii.Erstinstallation, $ii.Upgrades.Count) }
+        elseif ($ii.AlterTage -gt 5 * 365.25) { Add-Finding INFO 'System' ('Die Windows-Installation ist {0} alt (Erstinstallation {1:dd.MM.yyyy}, seitdem {2} Funktionsupdate{3}). Bei hartnäckigen Problemen ist eine Neuinstallation eine Option.' -f (Format-Age $ii.AlterTage), $ii.Erstinstallation, $ii.Upgrades.Count, $(if ($ii.Upgrades.Count -eq 1) { '' } else { 's' })) }
     } else { Add-Line '  Installationsdatum nicht ermittelbar.' }
 
     Add-Sub 'Aktivierung'
@@ -36574,7 +36698,7 @@ Invoke-Section 'Sicherheit, TPM, Secure Boot, BitLocker' {
         $thr = @(Get-MpThreatDetection -ErrorAction SilentlyContinue | Where-Object { $_.InitialDetectionTime -gt $Since })
         if ($thr.Count) {
             Add-Line ('  Erkennungen der letzten {0} Tage: {1}' -f $EventDays, $thr.Count)
-            Add-Finding WARNUNG 'Sicherheit' ('{0} Bedrohungserkennungen in den letzten {1} Tagen.' -f $thr.Count, $EventDays)
+            Add-Finding WARNUNG 'Sicherheit' ('{0} {1} in den letzten {2} Tagen.' -f $thr.Count, $(if ($thr.Count -eq 1) { 'Bedrohungserkennung' } else { 'Bedrohungserkennungen' }), $EventDays)
         }
     } catch { Add-Line '  Microsoft Defender Status nicht abrufbar.'; $script:DefenderActive = $false }
     $av = Get-CimInstance -Namespace 'root\SecurityCenter2' -ClassName AntiVirusProduct -ErrorAction SilentlyContinue
@@ -37302,11 +37426,15 @@ if ($script:Opt['Netzwerk']) {
         }
 
         Add-Sub 'DNS und HTTPS'
-        foreach ($h in 'www.microsoft.com', 'www.google.com', 'www.wikipedia.org') {
+        # Fehlschläge sammeln: Ohne DNS-Server scheitern alle Namen und HTTPS aus einem Grund. Bis v4.01 waren das vier Warnungen.
+        $dnsHosts = @('www.microsoft.com', 'www.google.com', 'www.wikipedia.org'); $dnsFail = @()
+        foreach ($h in $dnsHosts) {
             $sw = [Diagnostics.Stopwatch]::StartNew()
             try { $a = Resolve-DnsName $h -Type A -DnsOnly -ErrorAction Stop | Where-Object Type -eq 'A' | Select-Object -First 1; $sw.Stop(); Add-Line ('  DNS {0,-20} -> {1,-16} {2} ms' -f $h, $a.IPAddress, $sw.ElapsedMilliseconds) }
-            catch { Add-Line ('  DNS {0,-20} FEHLGESCHLAGEN: {1}' -f $h, $_.Exception.Message); Add-Finding WARNUNG 'Netzwerk' ('DNS-Auflösung von {0} fehlgeschlagen.' -f $h); [void]$netProblems.Add(('DNS {0}' -f $h)) }
+            catch { Add-Line ('  DNS {0,-20} FEHLGESCHLAGEN: {1}' -f $h, $_.Exception.Message); $dnsFail += [pscustomobject]@{ Name = $h; Grund = (([string]$_.Exception.Message) -replace ('^' + [regex]::Escape($h) + '\s*:\s*'), '').Trim() }; [void]$netProblems.Add(('DNS {0}' -f $h)) }
         }
+        if ($dnsFail.Count -eq $dnsHosts.Count) { Add-Finding WARNUNG 'Netzwerk' ('Keine Namensauflösung (DNS), damit auch kein Zugriff ins Internet: {0}' -f $(if ($dnsFail[0].Grund) { $dnsFail[0].Grund.TrimEnd('.') + '.' } else { 'alle Testnamen fehlgeschlagen.' })) }
+        elseif ($dnsFail.Count) { Add-Finding WARNUNG 'Netzwerk' ('DNS-Auflösung fehlgeschlagen für {0}.' -f (($dnsFail | ForEach-Object { $_.Name }) -join ', ')) }
         try {
             $wc = New-Object Net.WebClient
             $wc.Proxy = [Net.WebRequest]::GetSystemWebProxy(); $wc.Proxy.Credentials = [Net.CredentialCache]::DefaultNetworkCredentials
@@ -37323,7 +37451,7 @@ if ($script:Opt['Netzwerk']) {
                 Add-Line ('  Download: {0} in {1:N1} s = ca. {2} Mbit/s' -f (Format-Size $data.Length), $sw.Elapsed.TotalSeconds, $mbit)
                 Hide-Sub
             }
-        } catch { Add-Line ('  HTTP(S)-Test fehlgeschlagen: {0}' -f $_.Exception.Message); Add-Finding WARNUNG 'Netzwerk' 'HTTP(S)-Zugriff ins Internet fehlgeschlagen (Proxy/Firewall?).'; [void]$netProblems.Add('HTTP(S)') }
+        } catch { Add-Line ('  HTTP(S)-Test fehlgeschlagen: {0}' -f $_.Exception.Message); if ($dnsFail.Count -lt $dnsHosts.Count) { Add-Finding WARNUNG 'Netzwerk' 'HTTP(S)-Zugriff ins Internet fehlgeschlagen (Proxy/Firewall?).' }; [void]$netProblems.Add('HTTP(S)') }
         $pingAvg = ($pings | Where-Object { $_.'Mittel ms' -ne $null } | Select-Object -Last 1).'Mittel ms'
         $netDet = ('Ping {0} ms, Download {1}' -f $pingAvg, $(if ($mbit) { "$mbit Mbit/s" } else { 'n/v' }))
         if ($netProblems.Count) { $netDet += ', Probleme: ' + ($netProblems -join ', ') }
@@ -38157,6 +38285,17 @@ if ($script:BenchSel['Disk']) {
         if (-not (Test-BenchTypes)) { return }
         $inv = $script:Inv; $ms = $script:BenchMs; $threads = [Environment]::ProcessorCount
         # ---------------- Datenträger ----------------
+        # Ein SMART-Langtest, dessen Warten beendet wurde, läuft in der Laufwerksfirmware weiter und liest das ganze
+        # Laufwerk. Gleichzeitig gemessen fallen Lesen und 4K-Werte deutlich niedriger aus (Lauf vom 07.11.2026: -33 %).
+        $smartAktiv = @()
+        foreach ($smartT in @($script:SmartTests | Where-Object { $_.Status -eq 'läuft' })) {
+            $s1 = $null; try { $s1 = Get-SmartTestState $smartT.Device } catch { }
+            if ($s1 -and $s1.Running) { $smartAktiv += ('{0} ({1} %)' -f $smartT.Name, $s1.Percent) }
+        }
+        if ($smartAktiv.Count) {
+            Add-Line ('  Hinweis: Der SMART-Langtest läuft noch auf {0}. Er bremst die Messung, die Werte dieser Laufwerke können zu niedrig sein.' -f ($smartAktiv -join ', '))
+            Add-Finding INFO 'Leistung' ('Datenträger gemessen, während der SMART-Langtest noch lief ({0}). Lese-, Schreib- und 4K-Werte können deshalb zu niedrig sein; Vergleiche mit früheren Läufen sind nur eingeschränkt aussagekräftig.' -f ($smartAktiv -join ', '))
+        }
         try {
             $sizeB = $(if ($BenchmarkKurz) { 256MB } else { 1GB }); $phase = $(if ($BenchmarkKurz) { 2500 } else { 6000 })
             Get-Volume -ErrorAction SilentlyContinue | Where-Object DriveLetter | ForEach-Object {
@@ -38197,6 +38336,14 @@ if ($script:BenchSel['Disk']) {
                     continue
                 }
                 $typSeq = $null; $typRnd = $null; $refCls = ''
+                # Medientyp "Unspecified" (häufig bei SATA hinter AMD- oder Intel-Treibern): SSD oder Festplatte aus Name
+                # und gemessenem 4K-Zufallslesen ableiten. Bis v4.01 hieß die Klasse dann "SATA Unspecified", das Laufwerk
+                # bekam weder Index noch Referenzvergleich.
+                $mediaHint = ''
+                if ($media -notin 'SSD', 'HDD' -and $bus -in 'SATA', 'SAS', 'ATA', 'RAID') {
+                    if ($name -match 'SSD|NVMe' -or $res.Rnd4kQ1Iops -ge 1500) { $media = 'SSD'; $mediaHint = 'Medientyp von Windows nicht gemeldet, nach Name und Zugriffszeit SSD' }
+                    elseif ($res.Rnd4kQ1Iops -gt 0 -and $res.Rnd4kQ1Iops -le 400) { $media = 'HDD'; $mediaHint = 'Medientyp von Windows nicht gemeldet, nach Zugriffszeit Festplatte' }
+                }
                 if ($bus -eq 'NVMe') {
                     $gen = $(if ($link) { $link.GenNow } else { 0 }); $wid = $(if ($link) { $link.WidthNow } else { 4 })
                     $baseSeq = @{ 1 = 800; 2 = 1500; 3 = 3000; 4 = 5500; 5 = 10000; 6 = 14000 }
@@ -38230,7 +38377,7 @@ if ($script:BenchSel['Disk']) {
                 $dStat = 'OK'; foreach ($mx in $m) { if ((Get-StatusRank $mx.Status) -gt (Get-StatusRank $dStat)) { $dStat = $mx.Status } }
                 $dRef = Get-GeoMean ($m | ForEach-Object { $_.RefPct })
                 $dCmp = (@($m | Where-Object { $_.Vergleich } | ForEach-Object { $_.Vergleich }) | Select-Object -First 1)
-                $dHint = (@($cls) + @($m | Where-Object { $_.Status -ne 'OK' -or $_.Vergleich -match '^-' } | ForEach-Object { ('{0}: {1} {2}' -f ($_.Messung -replace [regex]::Escape($label + ' '), ''), $_.Anzeige, $_.Vergleich).Trim() })) -join '; '
+                $dHint = (@($cls) + @($mediaHint | Where-Object { $_ }) + @($m | Where-Object { $_.Status -ne 'OK' -or $_.Vergleich -match '^-' } | ForEach-Object { ('{0}: {1} {2}' -f ($_.Messung -replace [regex]::Escape($label + ' '), ''), $_.Anzeige, $_.Vergleich).Trim() })) -join '; '
                 $disk = [pscustomobject][ordered]@{ Laufwerk = $label; Klasse = $cls; SR = $res.SeqReadMBs; SW = $res.SeqWriteMBs; R1 = $res.Rnd4kQ1Iops; R8 = $res.Rnd4kT8Iops; W1 = $res.Rnd4kWriteQ1Iops
                     Index = $iSeq; RefPct = $dRef; Referenz = $(if ($null -ne $dRef) { '{0} %' -f $dRef } else { '' }); Status = $dStat; Vergleich = $(if ($dCmp) { $dCmp } else { '' }); Hinweis = $dHint }
                 $script:BenchDisks.Add($disk)

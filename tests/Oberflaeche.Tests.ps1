@@ -185,3 +185,24 @@ Describe 'Kategoriesymbole (ab v4.01)' {
         $gui | Should -Not -Match 'fo\.Controls\.Add\((chkAnon|chkSingleWindow|lnkAblage)\)'
     }
 }
+
+Describe 'Einstellungen und Ergebnisseite (ab v4.02)' {
+    It 'Einstellungen auf einer Seite ohne Reiter je Option' {
+        $gui = Get-SrcText 'Oberflaeche/DiagGui.cs'
+        $m = [regex]::Match($gui, '(?s)void ShowSettingsDialog\(\).*?\n    void SaveWindowPreferences')
+        $m.Success | Should -BeTrue
+        $m.Value | Should -Not -Match 'CategoryPickerItem'
+        $m.Value | Should -Match 'Gruppe\("Allgemein"\)'
+        $m.Value | Should -Match 'Gruppe\("Daten und Datenschutz"\)'
+    }
+    It 'Einordnung gegenüber der Referenz ohne Wertung als Durchschnitt' {
+        $seiten = Get-SrcText 'Oberflaeche/DiagGui_Seiten.cs'
+        $seiten | Should -Not -Match '"Unterdurchschnittlich"|"Hervorragend"'
+        $seiten | Should -Match 'static string RatingWord'
+        $seiten | Should -Match '"nicht gemessen"'
+    }
+    It 'Protokoll schreibt Abschnittszeilen nur einmal' {
+        $gui = Get-SrcText 'Oberflaeche/DiagGui.cs'
+        $gui | Should -Not -Match 'log\.AppendLine\(">> "'
+    }
+}

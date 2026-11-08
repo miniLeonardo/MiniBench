@@ -232,8 +232,10 @@ function Uninstall-PawnIo {
     if ($un -and (Test-Path -LiteralPath $un)) { $file = $un }
     else { $file = (Get-SensorToolState).PawnIoSetup }
     if (-not $file) { return [pscustomobject]@{ Ok = $false; Text = 'PawnIO konnte nicht entfernt werden: weder uninstall.exe noch PawnIO-Setup gefunden' } }
-    # Unterstützt InnoSetup (/VERYSILENT), NSIS (/S) und PawnIO-Parameter (-uninstall -silent)
-    $uninstArgs = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /S -uninstall -silent'
+    # uninstall.exe und PawnIO_setup.exe kennen nur -install, -uninstall, -unrestricted, -debuginfo und -silent.
+    # v3.84 bis v4.01 hängten InnoSetup- und NSIS-Schalter an (/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /S): Das Setup
+    # zeigte "Unknown argument: /VERYSILENT", brach mit Rückgabecode 87 ab und der Treiber blieb installiert.
+    $uninstArgs = '-uninstall -silent'
     $r = Invoke-External -File $file -Arguments $uninstArgs -TimeoutSec 180 -Progress 'PawnIO-Treiber wird entfernt'
     $st = Get-PawnIoState
     if ($st.Installiert) { return [pscustomobject]@{ Ok = $false; Text = ('PawnIO ist noch installiert (Rückgabecode {0}). Von Hand entfernen: "{1}" -uninstall' -f $r.ExitCode, $file) } }
@@ -249,9 +251,10 @@ function Uninstall-PawnIo {
 function Remove-PawnIoLeftover {
     $marker = Get-PawnIoMarker
     if (-not $marker -or -not (Test-Path -LiteralPath $marker)) { return }
-    if ((Get-ToolKeep) -eq 'behalten') { $k = Save-PawnIoKept; if ($k) { $script:SensorNotes.Add(('Ein früherer Lauf wurde mit installiertem PawnIO-Treiber abgebrochen: {0}.' -f $k.Text)) }; return }
+    $vor = 'Ein früherer Lauf hat den PawnIO-Treiber nicht entfernt (Lauf abgebrochen oder Entfernen fehlgeschlagen): {0}.'
+    if ((Get-ToolKeep) -eq 'behalten') { $k = Save-PawnIoKept; if ($k) { $script:SensorNotes.Add(($vor -f $k.Text)) }; return }
     $u = Uninstall-PawnIo
-    if ($u) { $script:SensorNotes.Add(('Ein früherer Lauf wurde mit installiertem PawnIO-Treiber abgebrochen: {0}.' -f $u.Text)) }
+    if ($u) { $script:SensorNotes.Add(($vor -f $u.Text)) }
 }
 
 # ---------- Sitzung ----------
@@ -1300,7 +1303,15 @@ function Test-HintergrundlastVorMessung([string]$Phase = 'Benchmark') {
         $s = $null; try { $s = Get-CpuSample } catch { }
         $finalLoad = if ($s -and $null -ne $s.Last) { [double]$s.Last } else { $avgLoad }
         if ($finalLoad -gt 15.0) {
-            $topProcs = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.CPU -gt 0 } | Sort-Object CPU -Descending | Select-Object -First 3 | ForEach-Object { '{0} ({1:N0} s CPU)' -f $_.ProcessName, $_.CPU })
+            # Verursacher aus der CPU-Zeit der letzten 2 Sekunden, ohne diesen Prozess. Bis v4.01 die seit dem Prozessstart
+            # gesammelte CPU-Zeit: Das nannte Prozesse, die gerade gar nichts taten, und die eigene PowerShell.
+            $t0 = @{}
+            foreach ($pr in @(Get-Process -ErrorAction SilentlyContinue)) { try { $t0[$pr.Id] = $pr.TotalProcessorTime.TotalMilliseconds } catch { } }
+            $swP = [Diagnostics.Stopwatch]::StartNew(); Start-Sleep -Milliseconds 2000; $span = [math]::Max(1.0, $swP.Elapsed.TotalMilliseconds) * [Environment]::ProcessorCount
+            $topProcs = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne $PID -and $_.Id -ne 0 -and $t0.ContainsKey($_.Id) } | ForEach-Object {
+                    $ms = $null; try { $ms = $_.TotalProcessorTime.TotalMilliseconds } catch { }
+                    if ($null -ne $ms) { [pscustomobject]@{ Name = $_.ProcessName; Anteil = ($ms - $t0[$_.Id]) / $span * 100 } }
+                } | Where-Object { $_.Anteil -ge 1 } | Sort-Object Anteil -Descending | Select-Object -First 3 | ForEach-Object { '{0} ({1:N0} % CPU)' -f $_.Name, $_.Anteil })
             $procText = if ($topProcs.Count) { $topProcs -join ', ' } else { 'keine ermittelbar' }
             $script:AblaufHintergrundlast = $true
             Add-Finding INFO $Phase ('Erhöhte Hintergrundlast vor {0} ({1:N0} % CPU): {2}. Die Messwerte können dadurch niedriger ausfallen.' -f $Phase, $finalLoad, $procText)
