@@ -157,248 +157,374 @@ public partial class DiagGui
         MessageBox.Show(this, lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Keine Rückmeldung vom Arbeitsprozess.", "Rückgängig", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
-    // ab v3.64: Seite ohne eigenen Bildlaufbereich (vorher zwei Bildlaufleisten), Werkzeugkarten mit Zustandsetikett und
-    // festen Knopfspalten, Netzlaufwerk als eigener Bereich, Paketauswahl ohne IDs im Text
+    // ab v4.05: kompakte Zeilen statt 68 px hoher Karten, bei breitem Fenster in zwei Spalten (vorher feste Gruppenbreite,
+    // die rechte Hälfte blieb leer). Die sechs portablen Werkzeuge stehen zusammen, darunter die Windows-Schnellstarter
+    // und die Softwarepakete als Liste in Spalten je Gruppe. Der Abschnitt Netzlaufwerk entfällt (Einstellungen › Daten
+    // und Datenschutz). "Neu scannen" und "Tools-Ordner" stehen rechts im Seitenkopf.
+    Action toolsLayout;
+    Panel toolsKopf;
+    List<FlowLayoutPanel> toolsRaster = new List<FlowLayoutPanel>();
+    List<FlowLayoutPanel> paketZeilen = new List<FlowLayoutPanel>();
+    Dictionary<string, CheckBox> paketBoxen = new Dictionary<string, CheckBox>(StringComparer.OrdinalIgnoreCase);
+    Dictionary<string, string[]> paketInfo = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);   // Id -> Name, Beschreibung
+    Label lblPaketZustand;
+    public static string[] SoftwarePakete = new string[0];   // Zeilen aus Get-SoftwarePaketGuiLines (G|Gruppe, P|Gruppe|Id|Name|Beschreibung)
+
+    // Breite der Inhaltsfläche der Seiten (ohne Seitenrand und Bildlaufleiste)
+    int SeitenBreite()
+    {
+        if (content == null) return UI.S(UI.Gruppenbreite);
+        int w = content.ClientSize.Width - content.Padding.Horizontal - UI.S(4);
+        return Math.Max(UI.S(UI.Gruppenbreite), w);
+    }
+
+    // Zwei Spalten ab dieser Breite, sonst eine (Zeilen bleiben mindestens 440 px breit)
+    public static int ToolSpalten(int breite) { return breite >= UI.S(900) ? 2 : 1; }
+
     Control BuildToolsPage()
     {
-        FlowLayoutPanel f = Page("Tools", "Portable Werkzeuge und Windows-Schnellstarter für gründliche Deinstallation, Partitionierung, Speicherplatzanalyse, Geräte und den Neustart in die Firmware.", -1);
+        FlowLayoutPanel f = Page("Tools", "Portable Werkzeuge, Windows-Schnellstarter und Softwarepakete über winget.", -1);
+        toolsRaster.Clear(); paketZeilen.Clear(); paketBoxen.Clear(); paketInfo.Clear();
 
-        FlowLayoutPanel topBar = Row(); topBar.Margin = new Padding(0, UI.S(UI.Abstand1), 0, 0);
-        Button btnRefreshTools = UI.Secondary("Neu scannen");
-        btnRefreshTools.Margin = new Padding(0);
-        Tip(btnRefreshTools, "Prüft erneut auf vorhandene portable Werkzeuge und Systeminstallationen.");
-        Button btnOpenToolsDir = UI.Secondary("Tools-Ordner");
-        btnOpenToolsDir.Margin = new Padding(UI.S(8), 0, 0, 0);
+        // Seitenkopf: Titel und Einleitung links, die beiden Knöpfe rechts
+        Control lt = f.Controls[0], lh = f.Controls[1];
+        f.Controls.Clear();
+        TableLayoutPanel kopf = new TableLayoutPanel(); kopf.ColumnCount = 2; kopf.RowCount = 1; kopf.AutoSize = true; kopf.Margin = new Padding(0);
+        kopf.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); kopf.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        FlowLayoutPanel kt = new FlowLayoutPanel(); kt.FlowDirection = FlowDirection.TopDown; kt.WrapContents = false; kt.AutoSize = true; kt.Margin = new Padding(0);
+        kt.Controls.Add(lt); kt.Controls.Add(lh);
+        FlowLayoutPanel kb = new FlowLayoutPanel(); kb.AutoSize = true; kb.WrapContents = false; kb.Margin = new Padding(0, UI.S(4), 0, 0); kb.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        Button btnRefreshTools = UI.Secondary("Neu scannen"); btnRefreshTools.Margin = new Padding(0);
+        Tip(btnRefreshTools, "Prüft erneut auf portable Werkzeuge im Tools-Ordner und auf Installationen, dazu die installierten Softwarepakete.");
+        Button btnOpenToolsDir = UI.Secondary("Tools-Ordner"); btnOpenToolsDir.Margin = new Padding(UI.S(8), 0, 0, 0);
         Tip(btnOpenToolsDir, "Öffnet den Ordner Minibench-Daten\\Tools im Windows Explorer.");
-        btnOpenToolsDir.Click += delegate {
-            string td = Path.Combine(dataDir, "Tools");
-            try { Directory.CreateDirectory(td); } catch { }
-            OpenShell(td);
+        btnOpenToolsDir.Click += delegate { string td = Path.Combine(dataDir, "Tools"); try { Directory.CreateDirectory(td); } catch { } OpenShell(td); };
+        kb.Controls.Add(btnRefreshTools); kb.Controls.Add(btnOpenToolsDir);
+        kopf.Controls.Add(kt, 0, 0); kopf.Controls.Add(kb, 1, 0);
+        toolsKopf = kopf;
+        f.Controls.Add(kopf);
+
+        // 1. Portable Werkzeuge (CPU-Z, GPU-Z, MSI Afterburner, Revo, Partition Wizard, WizTree)
+        f.Controls.Add(Section("Portable Werkzeuge"));
+        f.Controls.Add(Hint("Liegt ein Werkzeug im Ordner Minibench-Daten\\Tools, startet Leos Minibench diese Version ohne Installation, sonst eine vorhandene Installation. Heruntergeladen wird nichts automatisch.", 0));
+        FlowLayoutPanel rw = ToolRaster(); f.Controls.Add(rw);
+        Action fuelleWerkzeuge = delegate {
+            rw.SuspendLayout();
+            rw.Controls.Clear();
+            string pf = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), pf86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+            rw.Controls.Add(ToolZeile("CPU-Z", "Prozessor, Mainboard, Arbeitsspeicher mit Timings.", UI.IcoCpu, "CPU-Z",
+                new string[] { "cpuz_x64.exe", "cpuz_x32.exe", "cpuz.exe" }, new string[] { "CPU-Z" },
+                new string[] { Path.Combine(pf, @"CPUID\CPU-Z\cpuz.exe"), Path.Combine(pf86, @"CPUID\CPU-Z\cpuz.exe") },
+                "https://www.cpuid.com/softwares/cpu-z.html", ""));
+            rw.Controls.Add(ToolZeile("GPU-Z", "Grafikkarte mit Takt, Sensoren, PCIe und BIOS.", UI.IcoGpu, "GPU-Z",
+                new string[] { "GPU-Z*.exe" }, new string[] { "GPU-Z" },
+                new string[] { Path.Combine(pf86, @"GPU-Z\GPU-Z.exe"), Path.Combine(pf, @"GPU-Z\GPU-Z.exe") },
+                "https://www.techpowerup.com/gpuz/", "Portabel: GPU-Z.<Version>.exe in den Tools-Ordner legen und beim ersten Start \"Nein\" für die Installation wählen; bei mehreren Dateien gilt die neueste Version."));
+            rw.Controls.Add(ToolZeile("MSI Afterburner", "Takt, Lüfterkurve und Overlay der Grafikkarte.", UI.IcoFlame, "MSIAfterburner",
+                new string[] { "MSIAfterburner.exe" }, new string[] { "MSI Afterburner" },
+                new string[] { Path.Combine(pf86, @"MSI Afterburner\MSIAfterburner.exe"), Path.Combine(pf, @"MSI Afterburner\MSIAfterburner.exe") },
+                "https://www.msi.com/Landing/afterburner/graphics-cards", "Nur als Setup erhältlich; es braucht Administratorrechte und bietet RivaTuner Statistics Server (Overlay, Bildratenbegrenzung) zur Installation mit an."));
+            rw.Controls.Add(ToolZeile("Revo Uninstaller", "Gründlich deinstallieren, mit Resten.", UI.IcoEntfernen, "RevoUninstaller",
+                new string[] { "RevoUPort.exe", "RevoUnin.exe", "RevoUninPro.exe", "RevoUninstaller_Portable.exe" }, new string[] { "Revo Uninstaller" },
+                new string[] { Path.Combine(pf, @"VS Revo Group\Revo Uninstaller\RevoUnin.exe"), Path.Combine(pf86, @"VS Revo Group\Revo Uninstaller\RevoUnin.exe"),
+                    Path.Combine(pf, @"VS Revo Group\Revo Uninstaller Pro\RevoUninPro.exe"), Path.Combine(pf86, @"VS Revo Group\Revo Uninstaller Pro\RevoUninPro.exe") },
+                "https://www.revouninstaller.com/revo-uninstaller-free-download/", ""));
+            rw.Controls.Add(ToolZeile("MiniTool Partition Wizard", "Partitionieren und Dateisysteme konvertieren.", UI.IcoDisk, "PartitionWizard",
+                new string[] { "partitionwizard.exe", "PartitionWizard.exe", "MiniToolPartitionWizard.exe" }, new string[] { "Partition Wizard", "MiniTool Partition Wizard" },
+                new string[] { Path.Combine(pf, @"MiniTool Partition Wizard 12\partitionwizard.exe"), Path.Combine(pf86, @"MiniTool Partition Wizard 12\partitionwizard.exe"),
+                    Path.Combine(pf, @"MiniTool Partition Wizard\partitionwizard.exe"), Path.Combine(pf86, @"MiniTool Partition Wizard\partitionwizard.exe") },
+                "https://www.partitionwizard.com/free-partition-manager.html", ""));
+            rw.Controls.Add(ToolZeile("WizTree", "Speicherplatzanalyse direkt aus der MFT.", UI.IcoTorte, "WizTree",
+                new string[] { "WizTree64.exe", "WizTree.exe" }, new string[] { "WizTree" },
+                new string[] { Path.Combine(pf, @"WizTree\WizTree64.exe"), Path.Combine(pf, @"WizTree\WizTree.exe"), Path.Combine(pf86, @"WizTree\WizTree.exe") },
+                "https://diskanalyzer.com/download", ""));
+            rw.ResumeLayout(true);
         };
-        topBar.Controls.Add(btnRefreshTools);
-        topBar.Controls.Add(btnOpenToolsDir);
-        f.Controls.Add(topBar);
+        fuelleWerkzeuge();
 
-        FlowLayoutPanel pnlCards = new FlowLayoutPanel();
-        pnlCards.AutoSize = true; pnlCards.FlowDirection = FlowDirection.TopDown; pnlCards.WrapContents = false;
-        pnlCards.BackColor = UI.Panel; pnlCards.Margin = new Padding(0);
-
-        Action populateCards = delegate {
-            pnlCards.SuspendLayout();
-            pnlCards.Controls.Clear();
-            int cardW = UI.S(UI.Gruppenbreite); int cardH = UI.S(68);
-
-            // 1. Portable Werkzeuge
-            pnlCards.Controls.Add(Section("Portable Werkzeuge"));
-            pnlCards.Controls.Add(Hint("Liegen portable Versionen im Ordner Minibench-Daten\\Tools, nutzt Leos Minibench diese ohne Installation, sonst eine vorhandene Systeminstallation.", 0));
-
-            pnlCards.Controls.Add(ToolCard("Revo Uninstaller", "Gründliche Deinstallation von Programmen mit Registry- und Dateiresten.", UI.IcoEntfernen,
-                "RevoUninstaller", new string[] { "RevoUPort.exe", "RevoUnin.exe", "RevoUninPro.exe", "RevoUninstaller_Portable.exe" }, new string[] { "Revo Uninstaller" },
-                new string[] {
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"VS Revo Group\Revo Uninstaller\RevoUnin.exe"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), @"VS Revo Group\Revo Uninstaller\RevoUnin.exe"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"VS Revo Group\Revo Uninstaller Pro\RevoUninPro.exe"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), @"VS Revo Group\Revo Uninstaller Pro\RevoUninPro.exe") },
-                "https://www.revouninstaller.com/revo-uninstaller-free-download/", cardW, cardH));
-            pnlCards.Controls.Add(ToolCard("MiniTool Partition Wizard", "Laufwerke partitionieren, Dateisysteme konvertieren und Datenträger verwalten.", UI.IcoDisk,
-                "PartitionWizard", new string[] { "partitionwizard.exe", "PartitionWizard.exe", "MiniToolPartitionWizard.exe" }, new string[] { "Partition Wizard", "MiniTool Partition Wizard" },
-                new string[] {
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"MiniTool Partition Wizard 12\partitionwizard.exe"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), @"MiniTool Partition Wizard 12\partitionwizard.exe"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"MiniTool Partition Wizard\partitionwizard.exe"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), @"MiniTool Partition Wizard\partitionwizard.exe") },
-                "https://www.partitionwizard.com/free-partition-manager.html", cardW, cardH));
-            pnlCards.Controls.Add(ToolCard("WizTree", "Schnelle Speicherplatzanalyse direkt aus der MFT des Laufwerks.", UI.IcoTorte,
-                "WizTree", new string[] { "WizTree64.exe", "WizTree.exe" }, new string[] { "WizTree" },
-                new string[] {
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"WizTree\WizTree64.exe"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"WizTree\WizTree.exe"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), @"WizTree\WizTree.exe") },
-                "https://diskanalyzer.com/download", cardW, cardH));
-
-            // 2. Softwarepakete installieren (winget)
-            pnlCards.Controls.Add(Section("Softwarepakete installieren"));
-            pnlCards.Controls.Add(Hint("Stille Installation gängiger Programme über den Windows-Paket-Manager (winget). Jede Installation steht danach auf der Seite Systemänderungen und lässt sich dort wieder entfernen.", 0));
-
-            // ab v3.65 als abgerundete Karte wie die Werkzeugkarten (vorher eckiger Rahmen)
-            CardPanel pnlWgBox = new CardPanel();
-            pnlWgBox.MinimumSize = new Size(cardW, 0);
-            pnlWgBox.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12));
-            pnlWgBox.AutoSize = true;
-            pnlWgBox.Margin = new Padding(0, 0, 0, UI.S(12));
-
-            FlowLayoutPanel pnlWgInner = new FlowLayoutPanel();
-            pnlWgInner.Dock = DockStyle.Fill;
-            pnlWgInner.AutoSize = true;
-            pnlWgInner.FlowDirection = FlowDirection.TopDown;
-            pnlWgInner.WrapContents = false;
-
-            string wingetPath;
-            bool hasWinget = IsWingetAvailable(out wingetPath);
-
-            CheckBox chkChrome = Chk("Google Chrome", false); Tip(chkChrome, "Webbrowser Google Chrome, winget-Paket Google.Chrome");
-            CheckBox chkFirefox = Chk("Mozilla Firefox", false); Tip(chkFirefox, "Webbrowser Mozilla Firefox, winget-Paket Mozilla.Firefox");
-            CheckBox chkOpera = Chk("Opera", false); Tip(chkOpera, "Webbrowser Opera, winget-Paket Opera.Opera");
-            CheckBox chkSteam = Chk("Steam", false); Tip(chkSteam, "Spieleplattform Steam, winget-Paket Valve.Steam");
-            CheckBox chkDiscord = Chk("Discord", false); Tip(chkDiscord, "Chat- und Sprachprogramm Discord, winget-Paket Discord.Discord");
-            CheckBox chkNpp = Chk("Notepad++", false); Tip(chkNpp, "Texteditor Notepad++, winget-Paket Notepad++.Notepad++");
-            CheckBox chkOnlyOffice = Chk("ONLYOFFICE Desktop Editors", false); Tip(chkOnlyOffice, "Office-Programme ONLYOFFICE, winget-Paket ONLYOFFICE.DesktopEditors");
-            CheckBox chk7zip = Chk("7-Zip", false); Tip(chk7zip, "Packprogramm 7-Zip, winget-Paket 7zip.7zip");
-            CheckBox chkVlc = Chk("VLC Media Player", false); Tip(chkVlc, "Medienwiedergabe VLC, winget-Paket VideoLAN.VLC");
-            string[] cats = new string[] { "Web-Browser", "Gaming und Chat", "Produktivität und Werkzeuge" };
-            CheckBox[][] rows = new CheckBox[][] { new CheckBox[] { chkChrome, chkFirefox, chkOpera }, new CheckBox[] { chkSteam, chkDiscord }, new CheckBox[] { chkNpp, chkOnlyOffice, chk7zip, chkVlc } };
-            for (int ci = 0; ci < cats.Length; ci++)
+        // 2. Windows-Schnellstarter
+        f.Controls.Add(Section("Windows-Schnellstarter"));
+        FlowLayoutPanel rs = ToolRaster(); f.Controls.Add(rs);
+        ToolRow rUefi = new ToolRow("Ins BIOS/UEFI neu starten", "Sofortiger Neustart in das UEFI-Setup (shutdown /r /fw /t 0), nach Rückfrage.", UI.IcoAdmin);
+        Button bUefi = UI.Secondary("Neu starten"); bUefi.MinimumSize = new Size(UI.S(110), 0); bUefi.Margin = new Padding(0);
+        Tip(bUefi, "Prüft auf UEFI-Unterstützung und führt nach Bestätigung 'shutdown.exe /r /fw /t 0' aus.");
+        bUefi.Click += delegate {
+            if (!IsUefiFirmware())
             {
-                Label lc = Lbl(cats[ci], UI.SchriftText, true, UI.Text); lc.Margin = new Padding(0, ci == 0 ? 0 : UI.S(4), 0, UI.S(4)); pnlWgInner.Controls.Add(lc);
-                FlowLayoutPanel r = Row(); r.Margin = new Padding(0, 0, 0, UI.S(8));
-                foreach (CheckBox cb in rows[ci]) { cb.Margin = new Padding(UI.S(4), UI.S(3), UI.S(12), UI.S(3)); r.Controls.Add(cb); }
-                pnlWgInner.Controls.Add(r);
+                MessageBox.Show(this, "Dieser Computer verwendet ein klassisches BIOS oder meldet keine Unterstützung für den direkten Neustart in die UEFI-Firmware.", "BIOS/UEFI-Neustart", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
             }
-
-            FlowLayoutPanel rowWgActions = Row();
-            rowWgActions.Margin = new Padding(0, UI.S(4), 0, 0);
-            CheckBox[] allWgBoxes = new CheckBox[] { chkChrome, chkFirefox, chkOpera, chkSteam, chkDiscord, chkNpp, chkOnlyOffice, chk7zip, chkVlc };
-            string[] allWgIds = new string[] { "Google.Chrome", "Mozilla.Firefox", "Opera.Opera", "Valve.Steam", "Discord.Discord", "Notepad++.Notepad++", "ONLYOFFICE.DesktopEditors", "7zip.7zip", "VideoLAN.VLC" };
-            string[] allWgNames = new string[] { "Google Chrome", "Mozilla Firefox", "Opera", "Steam", "Discord", "Notepad++", "ONLYOFFICE Desktop Editors", "7-Zip", "VLC Media Player" };
-
-            Button btnInstallWg = UI.Primary("Ausgewählte installieren");
-            btnInstallWg.Margin = new Padding(0); btnInstallWg.Font = new Font("Segoe UI Semibold", UI.SchriftText); btnInstallWg.Padding = new Padding(UI.S(14), UI.S(3), UI.S(14), UI.S(3));
-            LinkLabel lnkWgAll = new LinkLabel(); lnkWgAll.Text = "Alle an"; lnkWgAll.AutoSize = true;
-            lnkWgAll.Margin = new Padding(UI.S(16), UI.S(7), UI.S(8), 0); lnkWgAll.LinkColor = UI.Accent;
-            Tip(lnkWgAll, "Alle Softwarepakete auswählen.");
-            LinkLabel lnkWgNone = new LinkLabel(); lnkWgNone.Text = "Alle aus"; lnkWgNone.AutoSize = true;
-            lnkWgNone.Margin = new Padding(0, UI.S(7), UI.S(8), 0); lnkWgNone.LinkColor = UI.Accent;
-            Tip(lnkWgNone, "Alle Softwarepakete abwählen.");
-            Label lblWgStatus = Lbl("", UI.SchriftHinweis, false, UI.Muted);
-            lblWgStatus.Margin = new Padding(UI.S(12), UI.S(7), 0, 0);
-            EventHandler wgCount = delegate {
-                int n = 0; foreach (CheckBox cb in allWgBoxes) if (cb.Checked) n++;
-                SetText(btnInstallWg, n > 0 ? "Ausgewählte installieren (" + n + ")" : "Ausgewählte installieren");
-            };
-            foreach (CheckBox cb in allWgBoxes) cb.CheckedChanged += wgCount;
-            lnkWgAll.LinkClicked += delegate { foreach (CheckBox cb in allWgBoxes) cb.Checked = true; };
-            lnkWgNone.LinkClicked += delegate { foreach (CheckBox cb in allWgBoxes) cb.Checked = false; };
-
-            if (!hasWinget)
-            {
-                btnInstallWg.Enabled = false;
-                lblWgStatus.Text = "winget ist auf diesem System nicht installiert.";
-                lblWgStatus.ForeColor = UI.Warn;
-                Tip(btnInstallWg, "winget ist auf diesem System nicht installiert.");
-            }
-            else
-            {
-                Tip(btnInstallWg, "Installiert die markierten Programme über winget im Hintergrund. Jede Installation steht danach auf der Seite Systemänderungen und lässt sich dort wieder entfernen; schon vorhandene Programme bleiben unberührt.");
-                btnInstallWg.Click += delegate {
-                    List<int> selIndices = new List<int>();
-                    for (int i = 0; i < allWgBoxes.Length; i++) {
-                        if (allWgBoxes[i].Checked) selIndices.Add(i);
-                    }
-                    if (selIndices.Count == 0) {
-                        MessageBox.Show(this, "Bitte mindestens ein Programm zur Installation auswählen.", "Softwarepakete installieren", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        return;
-                    }
-                    InstallWingetPackagesAsync(selIndices, allWgIds, allWgNames, lblWgStatus, btnInstallWg, allWgBoxes, lnkWgAll, lnkWgNone);
-                };
-            }
-
-            rowWgActions.Controls.Add(btnInstallWg);
-            rowWgActions.Controls.Add(lnkWgAll);
-            rowWgActions.Controls.Add(lnkWgNone);
-            rowWgActions.Controls.Add(lblWgStatus);
-
-            pnlWgInner.Controls.Add(rowWgActions);
-            pnlWgBox.Controls.Add(pnlWgInner);
-            pnlCards.Controls.Add(pnlWgBox);
-
-            // 3. Netzlaufwerk (vorher als Knopf zwischen den Werkzeugknöpfen)
-            pnlCards.Controls.Add(Section("Netzlaufwerk"));
-            FluentCard cNas = new FluentCard("Netzlaufwerk als Spiegel", "Berichte und Datenbank zusätzlich auf einem Netzlaufwerk spiegeln.", UI.IcoNetz);
-            cNas.Width = cardW; cNas.Height = cardH;
-            Button bNas = UI.Secondary("Einrichten ..."); bNas.MinimumSize = new Size(UI.S(130), 0);
-            Tip(bNas, "Richtet ein Netzlaufwerk als Spiegel der Berichte und der Datenbank ein. Werkzeuge bleiben immer auf dem Stick.");
-            bNas.Click += delegate { ShowConnectNasDialog(); };
-            cNas.ActionButton = bNas;
-            Tip(cNas, "Netzlaufwerk als Spiegel von Berichten und Datenbank. Abgeglichen wird nur über Aktualisieren; Werkzeuge bleiben immer auf dem Stick.");
-            pnlCards.Controls.Add(cNas);
-
-            // 4. Schnellstarter
-            pnlCards.Controls.Add(Section("Schnellstarter"));
-            pnlCards.Controls.Add(Hint("Direkter Aufruf der Windows-Verwaltungskonsolen und Neustart in die Firmware.", 0));
-
-            FluentCard cUefi = new FluentCard("Ins BIOS/UEFI neu starten", "Startet den Computer sofort neu und öffnet das UEFI-Setup (shutdown /r /fw /t 0).", "");
-            cUefi.Width = cardW; cUefi.Height = cardH;
-            Button bUefi = UI.Secondary("Neu starten"); bUefi.MinimumSize = new Size(UI.S(130), 0);
-            Tip(bUefi, "Prüft auf UEFI-Unterstützung und führt nach Bestätigung 'shutdown.exe /r /fw /t 0' aus.");
-            bUefi.Click += delegate {
-                if (!IsUefiFirmware())
-                {
-                    MessageBox.Show(this, "Dieser Computer verwendet ein klassisches BIOS oder meldet keine Unterstützung für den direkten Neustart in die UEFI-Firmware.", "BIOS/UEFI-Neustart", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-                if (MessageBox.Show(this, "Den Computer jetzt sofort neu starten und die UEFI/BIOS-Einstellungen öffnen?\r\n\r\nVorher alle geöffneten Dokumente und Arbeiten sichern.", "Ins BIOS/UEFI neu starten", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
-                {
-                    StartAdminProcess("shutdown.exe", "/r /fw /t 0");
-                }
-            };
-            cUefi.ActionButton = bUefi;
-            Tip(cUefi, "Startet das System neu und leitet direkt in das UEFI-Setup weiter.");
-            pnlCards.Controls.Add(cUefi);
-
-            pnlCards.Controls.Add(LauncherCard("Datenträgerverwaltung", "Partitionen anlegen, verkleinern und Laufwerksbuchstaben zuweisen (diskmgmt.msc).", UI.IcoOrdner, "diskmgmt.msc", "", cardW, cardH));
-            pnlCards.Controls.Add(LauncherCard("Geräte-Manager", "Hardware, Treiber und Ressourcen prüfen (devmgmt.msc).", UI.IcoGeraete, "devmgmt.msc", "", cardW, cardH));
-            pnlCards.Controls.Add(LauncherCard("Zuverlässigkeitsverlauf", "Stabilitätsindex mit Abstürzen, Warnungen und Fehlern im Zeitverlauf (perfmon /rel).", UI.IcoDiag, "perfmon.exe", "/rel", cardW, cardH));
-
-            pnlCards.ResumeLayout(true);
+            if (MessageBox.Show(this, "Den Computer jetzt sofort neu starten und die UEFI/BIOS-Einstellungen öffnen?\r\n\r\nVorher alle geöffneten Dokumente und Arbeiten sichern.", "Ins BIOS/UEFI neu starten", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                StartAdminProcess("shutdown.exe", "/r /fw /t 0");
         };
+        rUefi.MainButton = bUefi;
+        Tip(rUefi, "Startet das System neu und leitet direkt in das UEFI-Setup weiter.");
+        rs.Controls.Add(rUefi);
+        rs.Controls.Add(LauncherRow("Datenträgerverwaltung", "Partitionen anlegen, verkleinern, Laufwerksbuchstaben (diskmgmt.msc).", UI.IcoOrdner, "diskmgmt.msc", ""));
+        rs.Controls.Add(LauncherRow("Geräte-Manager", "Hardware, Treiber und Ressourcen prüfen (devmgmt.msc).", UI.IcoGeraete, "devmgmt.msc", ""));
+        rs.Controls.Add(LauncherRow("Zuverlässigkeitsverlauf", "Stabilitätsindex mit Abstürzen und Fehlern im Zeitverlauf (perfmon /rel).", UI.IcoDiag, "perfmon.exe", "/rel"));
 
-        btnRefreshTools.Click += delegate { populateCards(); ApplyThemeRecursive(pnlCards); };
-        populateCards();
-        f.Controls.Add(pnlCards);
+        // 3. Softwarepakete (winget), Liste aus Kern\Softwarepakete.psd1
+        f.Controls.Add(Section("Softwarepakete installieren"));
+        f.Controls.Add(Hint("Stille Installation über den Windows-Paket-Manager (winget). Jede Installation steht danach auf der Seite Änderungen und lässt sich dort wieder entfernen. Schon installierte Programme sind grün und gesperrt.", 0));
+        BuildSoftwareListe(f);
+
+        btnRefreshTools.Click += delegate { fuelleWerkzeuge(); ApplyThemeRecursive(rw); if (toolsLayout != null) toolsLayout(); StartSoftwareStateCheck(); };
+
+        toolsLayout = delegate {
+            int w = SeitenBreite();
+            int sp = ToolSpalten(w), gap = UI.S(12);
+            int zw = sp == 2 ? (w - gap) / 2 : w;
+            if (toolsKopf != null) toolsKopf.MinimumSize = new Size(w, 0);
+            foreach (FlowLayoutPanel r in toolsRaster)
+            {
+                // Größe selbst setzen: AutoSize behielt die Höhe der einspaltigen Anordnung beim ersten Aufbau
+                r.SuspendLayout();
+                int h = 0;
+                for (int i = 0; i < r.Controls.Count; i++)
+                {
+                    Control c = r.Controls[i];
+                    c.Width = zw;
+                    c.Margin = new Padding(0, 0, sp == 2 && i % 2 == 0 ? gap : 0, UI.S(6));
+                    if (i % sp == 0) h += c.Height + UI.S(6);
+                }
+                r.Size = new Size(w + 1, h);
+                r.ResumeLayout(true);
+            }
+            foreach (FlowLayoutPanel z in paketZeilen) { z.MaximumSize = new Size(Math.Max(UI.S(200), w - UI.S(160)), 0); }
+        };
+        if (content != null) content.Resize += delegate { if (toolsLayout != null) toolsLayout(); };
+        toolsLayout();
         return f;
     }
 
-    // Karte eines portablen Werkzeugs: Zustand als Etikett, links "Ordner", rechts die Hauptaktion (Starten oder Herunterladen)
-    FluentCard ToolCard(string title, string desc, string icon, string subDir, string[] exeNames, string[] regNames, string[] direct, string downloadUrl, int w, int h)
+    FlowLayoutPanel ToolRaster()
     {
-        FluentCard c = new FluentCard(title, desc, icon); c.Width = w; c.Height = h;
-        string path = FindToolPath(subDir, exeNames, regNames, direct);
-        Button bMain, bFolder = UI.Secondary("Ordner");
-        if (!String.IsNullOrEmpty(path))
+        FlowLayoutPanel r = new FlowLayoutPanel(); r.FlowDirection = FlowDirection.LeftToRight; r.WrapContents = true; r.AutoSize = false;
+        r.BackColor = UI.Panel; r.Margin = new Padding(0); r.Padding = new Padding(0);
+        toolsRaster.Add(r);
+        return r;
+    }
+
+    // Softwarepakete: je Gruppe eine Zeile mit der Überschrift links und den Paketen in gleich breiten Spalten
+    void BuildSoftwareListe(FlowLayoutPanel f)
+    {
+        List<string> gruppen = new List<string>();
+        List<string[]> pakete = new List<string[]>();
+        LiesPaketListe(SoftwarePakete, gruppen, pakete);
+        if (pakete.Count == 0) { f.Controls.Add(Hint("Die Paketliste fehlt (Skript ohne Kern\\Softwarepakete.psd1).", 0)); return; }
+
+        string[] allWgIds = new string[pakete.Count], allWgNames = new string[pakete.Count];
+        CheckBox[] allWgBoxes = new CheckBox[pakete.Count];
+        TableLayoutPanel t = new TableLayoutPanel(); t.ColumnCount = 2; t.AutoSize = true; t.AutoSizeMode = AutoSizeMode.GrowAndShrink; t.Margin = new Padding(0, 0, 0, UI.S(4));
+        t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(156))); t.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        int row = 0;
+        foreach (string g in gruppen)
         {
-            bool portable = path.IndexOf("Minibench-Daten", StringComparison.OrdinalIgnoreCase) >= 0;
-            c.StatusText = portable ? "Bereit, portabel" : "Bereit, installiert"; c.StatusLevel = "ok";
-            bMain = UI.Primary("Starten");
-            bMain.Image = UI.GlyphImage(UI.IcoAdmin, UI.OnAccent, UI.S(20)); bMain.Tag = UI.IcoAdmin; bMain.ImageAlign = ContentAlignment.MiddleLeft; bMain.TextImageRelation = TextImageRelation.ImageBeforeText;
-            Tip(bMain, "Startet " + title + " mit Administratorrechten (" + path + ").");
-            string p = path; bMain.Click += delegate { StartAdminProcess(p, ""); };
-            Tip(bFolder, "Öffnet den Speicherort von " + title + ".");
-            bFolder.Click += delegate { OpenSelect(p); };
+            Label lg = Lbl(g, UI.SchriftText, true, UI.Text); lg.Margin = new Padding(0, UI.S(4), UI.S(8), 0);
+            FlowLayoutPanel z = new FlowLayoutPanel(); z.AutoSize = true; z.AutoSizeMode = AutoSizeMode.GrowAndShrink; z.WrapContents = true; z.Margin = new Padding(0, 0, 0, UI.S(2));
+            for (int i = 0; i < pakete.Count; i++)
+            {
+                if (pakete[i][0] != g) continue;
+                CheckBox cb = Chk(pakete[i][2], false);
+                cb.AutoSize = false; cb.Size = new Size(UI.S(154), UI.S(24)); cb.Margin = new Padding(0, 0, UI.S(4), 0); cb.AutoEllipsis = true;
+                Tip(cb, PaketTip(pakete[i][2], pakete[i][3], pakete[i][1], false));
+                allWgIds[i] = pakete[i][1]; allWgNames[i] = pakete[i][2]; allWgBoxes[i] = cb;
+                paketBoxen[pakete[i][1]] = cb; paketInfo[pakete[i][1]] = new string[] { pakete[i][2], pakete[i][3] };
+                z.Controls.Add(cb);
+            }
+            paketZeilen.Add(z);
+            t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            t.Controls.Add(lg, 0, row); t.Controls.Add(z, 1, row); row++;
+        }
+        f.Controls.Add(t);
+
+        FlowLayoutPanel rowWgActions = Row(); rowWgActions.Margin = new Padding(0, UI.S(6), 0, 0);
+        string wingetPath;
+        bool hasWinget = IsWingetAvailable(out wingetPath);
+        Button btnInstallWg = UI.Primary("Ausgewählte installieren");
+        btnInstallWg.Margin = new Padding(0); btnInstallWg.Font = new Font("Segoe UI Semibold", UI.SchriftText); btnInstallWg.Padding = new Padding(UI.S(14), UI.S(3), UI.S(14), UI.S(3));
+        LinkLabel lnkWgNone = new LinkLabel(); lnkWgNone.Text = "Auswahl leeren"; lnkWgNone.AutoSize = true;
+        lnkWgNone.Margin = new Padding(UI.S(16), UI.S(7), UI.S(8), 0); lnkWgNone.LinkColor = UI.Accent;
+        Tip(lnkWgNone, "Alle gewählten Softwarepakete abwählen.");
+        Label lblWgStatus = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblWgStatus.Margin = new Padding(UI.S(12), UI.S(7), 0, 0);
+        lblPaketZustand = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblPaketZustand.Margin = new Padding(0, UI.S(6), 0, 0);
+        EventHandler wgCount = delegate {
+            int n = AuswahlPakete(allWgBoxes).Count;
+            SetText(btnInstallWg, n > 0 ? "Ausgewählte installieren (" + n + ")" : "Ausgewählte installieren");
+        };
+        foreach (CheckBox cb in allWgBoxes) cb.CheckedChanged += wgCount;
+        lnkWgNone.LinkClicked += delegate { foreach (CheckBox cb in allWgBoxes) if (cb.AutoCheck) cb.Checked = false; };
+        if (!hasWinget)
+        {
+            btnInstallWg.Enabled = false;
+            lblWgStatus.Text = "winget ist auf diesem System nicht installiert."; lblWgStatus.ForeColor = UI.Warn;
+            Tip(btnInstallWg, "winget ist auf diesem System nicht installiert.");
         }
         else
         {
-            c.StatusText = "Nicht gefunden"; c.StatusLevel = "warn";
-            bMain = UI.Primary("Herunterladen");
-            Tip(bMain, "Öffnet die Downloadseite von " + title + " im Standardbrowser. Die portable Version gehört in Minibench-Daten\\Tools\\" + subDir + ".");
-            string u = downloadUrl; bMain.Click += delegate { OpenShell(u); };
-            Tip(bFolder, "Erstellt und öffnet den Ordner Minibench-Daten\\Tools\\" + subDir + " für die portable Version.");
-            string sd = subDir; bFolder.Click += delegate { string d = Path.Combine(dataDir, "Tools\\" + sd); try { Directory.CreateDirectory(d); } catch { } OpenShell(d); };
+            Tip(btnInstallWg, "Installiert die markierten Programme über winget im Hintergrund. Jede Installation steht danach auf der Seite Änderungen und lässt sich dort wieder entfernen; schon vorhandene Programme bleiben unberührt.");
+            btnInstallWg.Click += delegate {
+                List<int> selIndices = AuswahlPakete(allWgBoxes);
+                if (selIndices.Count == 0)
+                {
+                    MessageBox.Show(this, "Bitte mindestens ein Programm zur Installation auswählen.", "Softwarepakete installieren", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                InstallWingetPackagesAsync(selIndices, allWgIds, allWgNames, lblWgStatus, btnInstallWg, allWgBoxes, lnkWgNone);
+            };
         }
-        bMain.Font = new Font("Segoe UI Semibold", UI.SchriftText); bMain.Padding = new Padding(UI.S(10), UI.S(3), UI.S(10), UI.S(3));
-        bMain.MinimumSize = new Size(UI.S(140), 0); bFolder.MinimumSize = new Size(UI.S(90), 0);
-        c.ActionButton = bMain; c.SecondaryButton = bFolder;
-        Tip(c, title + ": " + desc + (String.IsNullOrEmpty(path) ? " Erwartet in Minibench-Daten\\Tools\\" + subDir + " oder als Systeminstallation." : " Gefunden: " + path));
+        rowWgActions.Controls.Add(btnInstallWg); rowWgActions.Controls.Add(lnkWgNone); rowWgActions.Controls.Add(lblWgStatus);
+        f.Controls.Add(rowWgActions);
+        f.Controls.Add(lblPaketZustand);
+    }
+
+    // Zeilen G|Gruppe und P|Gruppe|Id|Name|Beschreibung lesen; Pakete einer nicht genannten Gruppe bekommen eine eigene
+    // Gruppe am Ende (nichts geht verloren)
+    public static void LiesPaketListe(string[] lines, List<string> gruppen, List<string[]> pakete)
+    {
+        foreach (string l in lines ?? new string[0])
+        {
+            string[] x = (l ?? "").Split('|');
+            if (x.Length >= 2 && x[0] == "G" && x[1].Length > 0 && !gruppen.Contains(x[1])) gruppen.Add(x[1]);
+            else if (x.Length >= 5 && x[0] == "P" && x[2].Length > 0) pakete.Add(new string[] { x[1], x[2], x[3].Length > 0 ? x[3] : x[2], x[4] });
+        }
+        foreach (string[] p in pakete) if (!gruppen.Contains(p[0])) gruppen.Add(p[0]);
+    }
+
+    // Gewählte Pakete ohne schon installierte (die sind angehakt, aber gesperrt)
+    public static List<int> AuswahlPakete(CheckBox[] boxen)
+    {
+        List<int> r = new List<int>();
+        for (int i = 0; i < boxen.Length; i++) if (boxen[i] != null && boxen[i].Checked && boxen[i].AutoCheck) r.Add(i);
+        return r;
+    }
+
+    static string PaketTip(string name, string beschreibung, string id, bool installiert)
+    {
+        return (installiert ? "Ist auf diesem PC schon installiert (laut winget). " : "") + name + ": " + beschreibung + ". winget-Paket " + id + ".";
+    }
+
+    // Paket als installiert kennzeichnen: Haken gesetzt und gesperrt, Schrift grün (nicht ausgegraut)
+    public static void MarkierePaket(CheckBox cb, bool installiert)
+    {
+        if (cb == null) return;
+        if (installiert) { cb.AutoCheck = false; cb.Checked = true; cb.Tag = "installiert"; cb.ForeColor = UI.Ok; cb.Cursor = Cursors.Default; }
+        else if ((cb.Tag as string) == "installiert") { cb.AutoCheck = true; cb.Checked = false; cb.Tag = null; cb.ForeColor = UI.Text; cb.Cursor = Cursors.Default; }
+    }
+
+    // Installierte Pakete im Hintergrund erkennen (-SoftwareZustand, winget export), mit niedriger Priorität wie die
+    // Zustandsprüfung der Optimierung. Startet beim ersten Öffnen der Seite Tools, nach "Neu scannen" und nach Installationen.
+    Process paketProc;
+    bool paketGeprueft;
+    void StartSoftwareStateCheck()
+    {
+        if (paketProc != null || running || paketBoxen.Count == 0 || String.IsNullOrEmpty(psExe) || String.IsNullOrEmpty(script)) return;
+        string wp; if (!IsWingetAvailable(out wp)) return;
+        paketGeprueft = true;
+        List<string> got = new List<string>();
+        ProcessStartInfo psi = new ProcessStartInfo(psExe, "-NoProfile -ExecutionPolicy Bypass -File \"" + script + "\" -EventMode -SoftwareZustand" + (dataDir.Length > 0 ? " -DatenDir \"" + dataDir.TrimEnd('\\') + "\"" : ""));
+        psi.UseShellExecute = false; psi.CreateNoWindow = true; psi.RedirectStandardOutput = true; psi.StandardOutputEncoding = new UTF8Encoding(false);
+        Process p = new Process(); p.StartInfo = psi;
+        bool fertig = false;
+        MethodInvoker abschluss = delegate {
+            if (fertig) return; fertig = true;
+            List<string> lines; lock (got) lines = new List<string>(got);
+            try { BeginInvoke(new MethodInvoker(delegate { ApplySoftwareState(lines); try { p.Dispose(); } catch { } paketProc = null; })); } catch { }
+        };
+        p.OutputDataReceived += delegate(object s, DataReceivedEventArgs e) {
+            if (e.Data == null) { abschluss(); return; }
+            if (e.Data.StartsWith("@@PAKZ|") || e.Data.StartsWith("@@RESULT|")) lock (got) got.Add(e.Data);
+        };
+        try { p.Start(); p.BeginOutputReadLine(); try { p.PriorityClass = ProcessPriorityClass.BelowNormal; } catch { } }
+        catch (Exception ex) { SetText(lblPaketZustand, "Installierte Programme nicht lesbar: " + ex.Message); try { p.Dispose(); } catch { } return; }
+        paketProc = p;
+        SetText(lblPaketZustand, "Installierte Programme werden im Hintergrund erkannt …");
+        System.Windows.Forms.Timer wd = new System.Windows.Forms.Timer(); wd.Interval = 300000;
+        wd.Tick += delegate { wd.Stop(); wd.Dispose(); if (!fertig) { try { if (!p.HasExited) KillProc(p); } catch { } abschluss(); } };
+        wd.Start();
+    }
+
+    void StopSoftwareStateCheck()
+    {
+        Process p = paketProc;
+        if (p == null) return;
+        try { if (!p.HasExited) KillProc(p); } catch { }
+    }
+
+    void ApplySoftwareState(List<string> lines)
+    {
+        int n = 0, gelesen = 0;
+        foreach (string l in lines)
+        {
+            string id; bool inst;
+            if (!ParsePaketZustand(l, out id, out inst)) continue;
+            gelesen++;
+            CheckBox cb; if (!paketBoxen.TryGetValue(id, out cb)) continue;
+            MarkierePaket(cb, inst);
+            if (inst) n++;
+            string[] info; if (paketInfo.TryGetValue(id, out info)) Tip(cb, PaketTip(info[0], info[1], id, inst));
+        }
+        SetText(lblPaketZustand, gelesen == 0 ? "Installierte Programme nicht erkannt (winget export ohne Ergebnis)." : n == 0 ? "Keines der Programme ist auf diesem PC installiert." : n + (n == 1 ? " Programm ist" : " Programme sind") + " schon installiert (grün, Haken gesperrt).");
+    }
+
+    // @@PAKZ|Id|installiert oder nicht installiert
+    public static bool ParsePaketZustand(string line, out string id, out bool installiert)
+    {
+        id = ""; installiert = false;
+        if (line == null || !line.StartsWith("@@PAKZ|")) return false;
+        string[] x = line.Split('|');
+        if (x.Length < 3 || x[1].Length == 0) return false;
+        id = x[1]; installiert = x[2] == "installiert";
+        return true;
+    }
+
+    // Zeile eines portablen Werkzeugs: Zustand als Etikett, Hauptaktion Starten (gefunden) oder Herunterladen (Herstellerseite),
+    // im Menü "…" Ordner öffnen und Herstellerseite
+    ToolRow ToolZeile(string title, string desc, string icon, string subDir, string[] exeNames, string[] regNames, string[] direct, string downloadUrl, string zusatz)
+    {
+        ToolRow c = new ToolRow(title, desc, icon);
+        string path = FindToolPath(subDir, exeNames, regNames, direct);
+        Button bMain;
+        string u = downloadUrl, sd = subDir;
+        ContextMenu cm = new ContextMenu();
+        if (!String.IsNullOrEmpty(path))
+        {
+            bool portable = path.IndexOf("Minibench-Daten", StringComparison.OrdinalIgnoreCase) >= 0;
+            c.StatusText = portable ? "bereit, portabel" : "installiert"; c.StatusLevel = "ok";
+            bMain = UI.Primary("Starten");
+            bMain.Image = UI.GlyphImage(UI.IcoAdmin, UI.OnAccent, UI.S(18)); bMain.Tag = UI.IcoAdmin; bMain.ImageAlign = ContentAlignment.MiddleLeft; bMain.TextImageRelation = TextImageRelation.ImageBeforeText;
+            Tip(bMain, "Startet " + title + " mit Administratorrechten (" + path + ").");
+            string p = path; bMain.Click += delegate { StartAdminProcess(p, ""); };
+            cm.MenuItems.Add(new MenuItem("Speicherort öffnen", delegate { OpenSelect(p); }));
+        }
+        else
+        {
+            c.StatusText = "nicht gefunden"; c.StatusLevel = "warn";
+            bMain = UI.Secondary("Herunterladen");
+            Tip(bMain, "Öffnet die Herstellerseite von " + title + " im Standardbrowser. Eine portable Version gehört in Minibench-Daten\\Tools\\" + subDir + ".");
+            bMain.Click += delegate { OpenShell(u); };
+            cm.MenuItems.Add(new MenuItem("Ordner Tools\\" + subDir + " öffnen", delegate { string d = Path.Combine(dataDir, "Tools\\" + sd); try { Directory.CreateDirectory(d); } catch { } OpenShell(d); }));
+        }
+        cm.MenuItems.Add(new MenuItem("Herstellerseite öffnen", delegate { OpenShell(u); }));
+        bMain.Font = new Font("Segoe UI Semibold", UI.SchriftText); bMain.Padding = new Padding(UI.S(8), UI.S(2), UI.S(8), UI.S(2));
+        bMain.MinimumSize = new Size(UI.S(126), 0); bMain.Margin = new Padding(0);
+        Button bMore = UI.Secondary("…"); bMore.AutoSize = false; bMore.Size = new Size(UI.S(32), bMain.PreferredSize.Height); bMore.Padding = new Padding(0); bMore.Margin = new Padding(0);
+        bMore.Click += delegate { cm.Show(bMore, new Point(0, bMore.Height)); };
+        Tip(bMore, "Weitere Aktionen: " + (String.IsNullOrEmpty(path) ? "Ordner für die portable Version öffnen" : "Speicherort öffnen") + ", Herstellerseite öffnen.");
+        c.MainButton = bMain; c.MoreButton = bMore;
+        Tip(c, title + ": " + desc + (String.IsNullOrEmpty(path) ? " Erwartet in Minibench-Daten\\Tools\\" + subDir + " oder als Installation." : " Gefunden: " + path) + (zusatz.Length > 0 ? " " + zusatz : ""));
         return c;
     }
 
-    // Karte eines Windows-Schnellstarters mit einem Knopf "Öffnen"
-    FluentCard LauncherCard(string title, string desc, string icon, string exe, string args, int w, int h)
+    // Zeile eines Windows-Schnellstarters mit einem Knopf "Öffnen"
+    ToolRow LauncherRow(string title, string desc, string icon, string exe, string args)
     {
-        FluentCard c = new FluentCard(title, desc, icon); c.Width = w; c.Height = h;
-        Button b = UI.Secondary("Öffnen"); b.MinimumSize = new Size(UI.S(130), 0);
+        ToolRow c = new ToolRow(title, desc, icon);
+        Button b = UI.Secondary("Öffnen"); b.MinimumSize = new Size(UI.S(110), 0); b.Margin = new Padding(0);
         Tip(b, "Öffnet " + title + " (" + exe + (args.Length > 0 ? " " + args : "") + ").");
         string e = exe, a = args; b.Click += delegate { StartAdminProcess(e, a); };
-        c.ActionButton = b;
+        c.MainButton = b;
         Tip(c, title + ": " + desc);
         return c;
     }
@@ -458,6 +584,67 @@ public partial class DiagGui
         }
     }
 
+    // Programm in einem Ordner nach Namen suchen (Reihenfolge = Vorrang). Ab v4.05 auch mit Platzhaltern (GPU-Z*.exe):
+    // dann gilt die Datei mit der höchsten Versionsnummer im Namen, bei gleicher Nummer die jüngste.
+    public static string SucheProgramm(string dir, string[] exeNames)
+    {
+        if (exeNames == null || String.IsNullOrEmpty(dir)) return null;
+        foreach (string en in exeNames)
+        {
+            try
+            {
+                if (en.IndexOf('*') >= 0 || en.IndexOf('?') >= 0)
+                {
+                    string n = NeuesteDatei(Directory.GetFiles(dir, en));
+                    if (n != null) return n;
+                }
+                else
+                {
+                    string p = Path.Combine(dir, en);
+                    if (File.Exists(p)) return p;
+                }
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    // Höchste Versionsnummer im Dateinamen (GPU-Z.2.71.0.exe vor GPU-Z.2.9.0.exe), Dateien ohne Nummer zuletzt
+    public static string NeuesteDatei(string[] files)
+    {
+        if (files == null || files.Length == 0) return null;
+        string best = null; long[] bestV = null; DateTime bestT = DateTime.MinValue;
+        foreach (string f in files)
+        {
+            long[] v = VersionImNamen(Path.GetFileNameWithoutExtension(f));
+            DateTime t = DateTime.MinValue; try { t = File.GetLastWriteTimeUtc(f); } catch { }
+            int c = best == null ? 1 : VergleicheVersion(v, bestV);
+            if (c > 0 || (c == 0 && t > bestT)) { best = f; bestV = v; bestT = t; }
+        }
+        return best;
+    }
+
+    static long[] VersionImNamen(string name)
+    {
+        System.Text.RegularExpressions.Match m = System.Text.RegularExpressions.Regex.Match(name ?? "", @"\d+(\.\d+)+|\d+");
+        if (!m.Success) return new long[0];
+        string[] t = m.Value.Split('.');
+        long[] r = new long[t.Length];
+        for (int i = 0; i < t.Length; i++) long.TryParse(t[i], out r[i]);
+        return r;
+    }
+
+    static int VergleicheVersion(long[] a, long[] b)
+    {
+        int n = Math.Max(a.Length, b.Length);
+        for (int i = 0; i < n; i++)
+        {
+            long x = i < a.Length ? a[i] : -1, y = i < b.Length ? b[i] : -1;
+            if (x != y) return x > y ? 1 : -1;
+        }
+        return 0;
+    }
+
     public string FindToolPath(string subDir, string[] exeNames, string[] registryNames, string[] directPaths)
     {
         // 1. Portable im Minibench-Daten Ordner suchen
@@ -466,14 +653,8 @@ public partial class DiagGui
             string tdir = Path.Combine(dataDir, "Tools\\" + subDir);
             if (Directory.Exists(tdir))
             {
-                if (exeNames != null)
-                {
-                    foreach (string en in exeNames)
-                    {
-                        string p = Path.Combine(tdir, en);
-                        if (File.Exists(p)) return p;
-                    }
-                }
+                string pt = SucheProgramm(tdir, exeNames);
+                if (pt != null) return pt;
                 try
                 {
                     string[] files = Directory.GetFiles(tdir, "*.exe");
@@ -538,14 +719,8 @@ public partial class DiagGui
                                                     string cleanLoc = loc.Trim('"', ' ');
                                                     if (Directory.Exists(cleanLoc))
                                                     {
-                                                        if (exeNames != null)
-                                                        {
-                                                            foreach (string en in exeNames)
-                                                            {
-                                                                string p = Path.Combine(cleanLoc, en);
-                                                                if (File.Exists(p)) return p;
-                                                            }
-                                                        }
+                                                        string pl = SucheProgramm(cleanLoc, exeNames);
+                                                        if (pl != null) return pl;
                                                         string[] ef = Directory.GetFiles(cleanLoc, "*.exe");
                                                         if (ef.Length > 0) return ef[0];
                                                     }
@@ -597,19 +772,20 @@ public partial class DiagGui
         return true;
     }
 
-    public void InstallWingetPackagesAsync(List<int> selIndices, string[] allWgIds, string[] allWgNames, Label lblWgStatus, Button btnInstallWg, CheckBox[] allWgBoxes, LinkLabel lnkWgAll, LinkLabel lnkWgNone)
+    public void InstallWingetPackagesAsync(List<int> selIndices, string[] allWgIds, string[] allWgNames, Label lblWgStatus, Button btnInstallWg, CheckBox[] allWgBoxes, LinkLabel lnkWgNone)
     {
         StringBuilder m = new StringBuilder();
         m.AppendLine("Diese Programme werden über winget installiert (Risikostufe Eingriff):");
         m.AppendLine();
         foreach (int i in selIndices) m.AppendLine("·  " + allWgNames[i] + " (" + allWgIds[i] + ")");
         m.AppendLine();
-        m.AppendLine("Jede Installation steht danach auf der Seite Systemänderungen und lässt sich dort wieder entfernen. Schon vorhandene Programme bleiben unberührt. Je Programm gilt eine Frist von 20 Minuten.");
+        m.AppendLine("Jede Installation steht danach auf der Seite Änderungen und lässt sich dort wieder entfernen. Schon vorhandene Programme bleiben unberührt. Je Programm gilt eine Frist von 20 Minuten.");
         if (MessageBox.Show(this, m.ToString(), "Softwarepakete installieren", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
 
         btnInstallWg.Enabled = false;
         foreach (CheckBox cb in allWgBoxes) cb.Enabled = false;
-        lnkWgAll.Enabled = false; lnkWgNone.Enabled = false;
+        lnkWgNone.Enabled = false;
+        StopSoftwareStateCheck();
         lblWgStatus.Text = "winget wird gestartet ..."; lblWgStatus.ForeColor = UI.Accent;
 
         string spec = WingetSpec(selIndices, allWgIds, allWgNames);
@@ -654,8 +830,8 @@ public partial class DiagGui
             {
                 BeginInvoke(new MethodInvoker(delegate {
                     btnInstallWg.Enabled = true;
-                    foreach (CheckBox cb in allWgBoxes) cb.Enabled = true;
-                    lnkWgAll.Enabled = true; lnkWgNone.Enabled = true;
+                    foreach (CheckBox cb in allWgBoxes) { cb.Enabled = true; if ((cb.Tag as string) == "installiert") cb.ForeColor = UI.Ok; }
+                    lnkWgNone.Enabled = true;
                     string[] r = result.Split('|');
                     int ok = 0, da = 0, bad = 0;
                     if (r.Length >= 3) { int.TryParse(r[0], out ok); int.TryParse(r[1], out da); int.TryParse(r[2], out bad); }
@@ -663,6 +839,7 @@ public partial class DiagGui
                     lblWgStatus.Text = String.Format("Abgeschlossen: {0} installiert, {1} schon vorhanden, {2} fehlgeschlagen.", ok, da, bad);
                     lblWgStatus.ForeColor = bad == 0 ? UI.Ok : UI.Warn;
                     ReloadDb();
+                    StartSoftwareStateCheck();
                     if (bad > 0)
                     {
                         string all; lock (texte) all = String.Join("\r\n", texte.ToArray());

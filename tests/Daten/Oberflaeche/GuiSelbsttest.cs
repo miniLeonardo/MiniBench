@@ -50,6 +50,12 @@ public static class GuiSelbsttest
         Fall("Update.Versionsvergleich", UpdateVersionsvergleich);
         Fall("Ergebnis.Einordnung", ErgebnisEinordnung);
         Fall("Ergebnis.Laufwerkspillen", ErgebnisLaufwerkspillen);
+        Fall("Optimierung.Sperre", OptimierungSperre);
+        Fall("Optimierung.Zaehler", OptimierungZaehler);
+        Fall("Tools.Platzhalter", ToolsPlatzhalter);
+        Fall("Tools.Raster", ToolsRaster);
+        Fall("Softwarepakete.Liste", SoftwareListe);
+        Fall("Softwarepakete.Installiert", SoftwareInstalliert);
         foreach (string l in outLines) System.Console.WriteLine(l);
         return 0;
     }
@@ -618,5 +624,132 @@ public static class GuiSelbsttest
         Ist(p.Count == 2, "zwei Pillen erwartet, " + p.Count);
         Ist(p[0] == "ST2000DX001  ·  SATA", "erste Pille: " + p[0]);
         Ist(p[1].EndsWith("NVMe  ·  Warning"), "Zustand außer Healthy wird genannt: " + p[1]);
+    }
+
+    // ab v4.05: bereits aktive Einträge der Optimierung stehen auf An, sind gesperrt und laufen nicht mit
+    static OptItem NeuerOptEintrag(string id, string kat)
+    {
+        OptItem it = new OptItem(); it.Id = id; it.Kat = kat;
+        it.Box = new CheckBox(); it.Toggle = new ToggleSwitch();
+        DiagGui.VerbindeOptEintrag(it, null);
+        return it;
+    }
+
+    static void OptimierungSperre()
+    {
+        OptItem a = NeuerOptEintrag("A", "K"), b = NeuerOptEintrag("B", "K");
+        System.Collections.Generic.List<OptItem> l = new System.Collections.Generic.List<OptItem>(new OptItem[] { a, b });
+        a.Box.Checked = true; b.Box.Checked = true;
+        Ist(a.Toggle.Checked && b.Toggle.Checked, "Haken und Schalter verbunden");
+        DiagGui.SperreOptEintrag(a, true);
+        Ist(a.Toggle.Checked && a.Toggle.Locked && a.Gesperrt, "gesperrt steht auf An");
+        Ist(a.Toggle.Enabled, "gesperrt ist nicht ausgegraut (Enabled)");
+        a.Toggle.UserToggle();
+        Ist(a.Toggle.Checked, "Klick ändert gesperrten Schalter nicht");
+        SettingRow row = new SettingRow("A", "", a.Toggle);
+        row.Checked = row.Checked; // Zeile reicht Klicks über UserToggle weiter
+        System.Reflection.MethodInfo klick = typeof(SettingRow).GetMethod("OnMouseClick", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        klick.Invoke(row, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 5, 5, 0) });
+        Ist(a.Toggle.Checked, "Klick auf die Zeile ändert gesperrten Schalter nicht");
+        // Vorlage "Alles abwählen": Auswahl ändert sich, Anzeige des gesperrten Eintrags nicht
+        a.Box.Checked = false; b.Box.Checked = false;
+        Ist(a.Toggle.Checked && !b.Toggle.Checked, "Vorlage lässt gesperrten Schalter auf An");
+        a.Box.Checked = true;
+        System.Collections.Generic.List<string> ids = DiagGui.GewaehlteOptIds(l);
+        Ist(ids.Count == 0, "gesperrte Einträge gehen nicht in den Lauf: " + string.Join(",", ids.ToArray()));
+        b.Box.Checked = true;
+        ids = DiagGui.GewaehlteOptIds(l);
+        Ist(ids.Count == 1 && ids[0] == "B", "nur offene Einträge im Lauf");
+        // Entsperren (z. B. Zustand teilweise) zeigt wieder die Auswahl
+        a.Box.Checked = false;
+        DiagGui.SperreOptEintrag(a, false);
+        Ist(!a.Toggle.Checked && !a.Toggle.Locked, "entsperrt folgt der Auswahl");
+        a.Toggle.UserToggle();
+        Ist(a.Box.Checked, "entsperrt wieder umschaltbar");
+        Ist(DiagGui.OptGesperrtHinweis.Contains("Seite \u00C4nderungen"), "Hinweis nennt die Seite Änderungen");
+    }
+
+    static void OptimierungZaehler()
+    {
+        System.Collections.Generic.List<OptItem> l = new System.Collections.Generic.List<OptItem>();
+        for (int i = 0; i < 17; i++) l.Add(NeuerOptEintrag("E" + i, "Datenschutz"));
+        l.Add(NeuerOptEintrag("X", "Andere"));
+        for (int i = 0; i < 3; i++) l[i].Box.Checked = true;
+        for (int i = 10; i < 15; i++) DiagGui.SperreOptEintrag(l[i], true);
+        l[10].Box.Checked = true; // gewählt und gesperrt zählt als aktiv, nicht als gewählt
+        int[] z = DiagGui.OptZaehler(l, "Datenschutz");
+        Ist(z[0] == 3 && z[1] == 5 && z[2] == 17, "Zähler: " + z[0] + "/" + z[1] + "/" + z[2]);
+        Ist(DiagGui.OptZaehlerText(z) == "3 gew\u00E4hlt \u00B7 5 bereits aktiv \u00B7 17 Eintr\u00E4ge", "Text: " + DiagGui.OptZaehlerText(z));
+        Ist(DiagGui.OptZaehlerText(new int[] { 0, 0, 7 }) == "0 gew\u00E4hlt \u00B7 7 Eintr\u00E4ge", "ohne aktive kein Teil bereits aktiv");
+        using (CategoryPickerItem p = new CategoryPickerItem("Datenschutz", UI.IcoShield, "Datenschutz"))
+        {
+            p.SetCounts(z[0], z[2], z[1]);
+            Ist(p.CheckedCount == 3 && p.TotalCount == 17 && p.ActiveCount == 5, "Seitenleiste erhält gewählt, gesamt und aktiv");
+            p.Width = UI.S(254); p.Height = UI.S(40);
+            using (Bitmap bmp = new Bitmap(p.Width, p.Height)) p.DrawToBitmap(bmp, new Rectangle(0, 0, p.Width, p.Height));
+        }
+    }
+
+    // ab v4.05: GPU-Z liegt mit Versionsnummer im Namen vor (GPU-Z.2.71.0.exe); bei mehreren gilt die neueste
+    static void ToolsPlatzhalter()
+    {
+        Ist(DiagGui.NeuesteDatei(new string[] { @"T\GPU-Z.2.9.0.exe", @"T\GPU-Z.2.71.0.exe", @"T\GPU-Z.2.70.1.exe" }) == @"T\GPU-Z.2.71.0.exe", "höchste Version (2.71.0 vor 2.9.0)");
+        Ist(DiagGui.NeuesteDatei(new string[] { @"T\GPU-Z.exe", @"T\GPU-Z.2.1.exe" }) == @"T\GPU-Z.2.1.exe", "Datei ohne Nummer zuletzt");
+        Ist(DiagGui.NeuesteDatei(new string[0]) == null, "leere Liste");
+        string d = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "MinibenchTools_" + System.Diagnostics.Process.GetCurrentProcess().Id);
+        try
+        {
+            System.IO.Directory.CreateDirectory(d);
+            foreach (string n in new string[] { "GPU-Z.2.70.0.exe", "GPU-Z.2.71.0.exe", "cpuz_x32.exe", "cpuz_x64.exe" }) System.IO.File.WriteAllText(System.IO.Path.Combine(d, n), "");
+            Ist(System.IO.Path.GetFileName(DiagGui.SucheProgramm(d, new string[] { "GPU-Z*.exe" })) == "GPU-Z.2.71.0.exe", "Platzhalter findet die neueste Datei");
+            Ist(System.IO.Path.GetFileName(DiagGui.SucheProgramm(d, new string[] { "cpuz_x64.exe", "cpuz_x32.exe" })) == "cpuz_x64.exe", "Reihenfolge der Namen ist Vorrang");
+            Ist(DiagGui.SucheProgramm(d, new string[] { "MSIAfterburner.exe" }) == null, "fehlende Datei");
+            Ist(DiagGui.SucheProgramm(System.IO.Path.Combine(d, "fehlt"), new string[] { "GPU-Z*.exe" }) == null, "fehlender Ordner");
+        }
+        finally { try { System.IO.Directory.Delete(d, true); } catch { } }
+    }
+
+    static void ToolsRaster()
+    {
+        Ist(DiagGui.ToolSpalten(UI.S(1100)) == 2, "breites Fenster: zwei Spalten");
+        Ist(DiagGui.ToolSpalten(UI.S(780)) == 1, "schmales Fenster: eine Spalte");
+        using (ToolRow r = new ToolRow("CPU-Z", "Prozessor", UI.IcoCpu))
+        {
+            Ist(r.Height <= UI.S(52), "Zeile deutlich unter 68 px: " + r.Height);
+            Button b = UI.Primary("Starten"), m = UI.Secondary("\u2026");
+            r.MainButton = b; r.MoreButton = m; r.Width = UI.S(500);
+            Ist(m.Right <= r.Width && b.Right <= m.Left, "Knöpfe rechts, \u2026 ganz außen");
+            r.StatusText = "bereit, portabel"; r.StatusLevel = "ok";
+            using (Bitmap bmp = new Bitmap(r.Width, r.Height)) r.DrawToBitmap(bmp, new Rectangle(0, 0, r.Width, r.Height));
+        }
+    }
+
+    static void SoftwareListe()
+    {
+        System.Collections.Generic.List<string> g = new System.Collections.Generic.List<string>();
+        System.Collections.Generic.List<string[]> p = new System.Collections.Generic.List<string[]>();
+        DiagGui.LiesPaketListe(new string[] { "G|Browser", "G|Medien", "P|Browser|Google.Chrome|Google Chrome|Webbrowser", "P|Medien|VideoLAN.VLC|VLC|Wiedergabe", "P|Neu|X.Y||ohne Name", "kaputt", "P|Browser||leer|x" }, g, p);
+        Ist(g.Count == 3 && g[0] == "Browser" && g[1] == "Medien" && g[2] == "Neu", "Gruppen in Reihenfolge, unbekannte am Ende: " + string.Join(",", g.ToArray()));
+        Ist(p.Count == 3, "Pakete ohne Id werden übergangen: " + p.Count);
+        Ist(p[2][2] == "X.Y", "ohne Namen gilt die Id");
+    }
+
+    static void SoftwareInstalliert()
+    {
+        string id; bool inst;
+        Ist(DiagGui.ParsePaketZustand("@@PAKZ|7zip.7zip|installiert", out id, out inst) && id == "7zip.7zip" && inst, "installiert");
+        Ist(DiagGui.ParsePaketZustand("@@PAKZ|VideoLAN.VLC|nicht installiert", out id, out inst) && !inst, "nicht installiert");
+        Ist(!DiagGui.ParsePaketZustand("@@RESULT|2", out id, out inst) && !DiagGui.ParsePaketZustand("@@PAKZ||x", out id, out inst), "andere Zeilen");
+        CheckBox a = new CheckBox(), b = new CheckBox();
+        CheckBox[] l = new CheckBox[] { a, b };
+        a.Checked = true; b.Checked = true;
+        DiagGui.MarkierePaket(a, true);
+        Ist(a.Checked && !a.AutoCheck && a.Enabled && a.ForeColor == UI.Ok, "installiert: Haken gesperrt, grün, nicht ausgegraut");
+        System.Collections.Generic.List<int> sel = DiagGui.AuswahlPakete(l);
+        Ist(sel.Count == 1 && sel[0] == 1, "installierte gehen nicht in die Installation");
+        DiagGui.MarkierePaket(a, false);
+        Ist(!a.Checked && a.AutoCheck, "nach Deinstallation wieder wählbar");
+        DiagGui.MarkierePaket(b, false);
+        Ist(b.Checked && b.AutoCheck, "nie installiert markiertes Paket behält die Auswahl");
     }
 }

@@ -6,7 +6,7 @@
 
 **Portable Diagnose-, Benchmark-, Stresstest-, Reparatur- und Optimierungs-Suite für Windows 10 & 11.**
 
-[![Version](https://img.shields.io/badge/Version-4.04-0284c7.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-4.05-0284c7.svg)](CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/Changelog-MD-6366f1.svg)](CHANGELOG.md)
 [![Lizenz](https://img.shields.io/badge/Lizenz-MIT-blue.svg)](LICENSE)
 [![Plattform](https://img.shields.io/badge/Windows-10%20%7C%2011%20(x64)-0078d4.svg)]()
@@ -22,12 +22,12 @@
 <br/>
 
 <a href="https://github.com/miniLeonardo/MiniBench/releases">
-  <img src="https://img.shields.io/badge/%E2%AC%87%EF%B8%8F%20Download-LMB.exe%20(v4.04)-2563eb?style=for-the-badge&logo=windows&logoColor=white" alt="Download LMB.exe" />
+  <img src="https://img.shields.io/badge/%E2%AC%87%EF%B8%8F%20Download-LMB.exe%20(v4.05)-2563eb?style=for-the-badge&logo=windows&logoColor=white" alt="Download LMB.exe" />
 </a>
 
 <br/><br/>
 
-<img src="Doku/Screenshots/Startseite_Neu.png" alt="Leos Minibench 4.04 Oberfläche" width="850" />
+<img src="Doku/Screenshots/Startseite_Neu.png" alt="Leos Minibench 4.05 Oberfläche" width="850" />
 
 <br/><br/>
 
@@ -55,6 +55,7 @@ Alternativ kann die Suite ohne Binärdatei direkt per PowerShell über `LMB.cmd`
 
 ## 🆕 Neu in 4.0x
 
+* **4.05:** Bereits aktive Optimierungen sind gesperrt und laufen nicht erneut, kompakte Tools-Seite mit CPU-Z, GPU-Z und MSI Afterburner, 28 Softwarepakete in sechs Gruppen mit Erkennung bereits installierter Programme.
 * **4.04:** Referenz wird in der Datenbank festgelegt (Haken auf der Seite Benchmark entfällt), Veröffentlichen in einem Schritt.
 * **4.03:** Update-Funktion repariert (tauschte bis dahin nicht die Programmdatei), SMART-Langtest wird vor Messungen beendet, PCIe-Anbindung der Grafik unter Last gemessen, aufgeräumte Datenbank-Leiste mit Menü *Aktionen*.
 * **4.02:** PawnIO-Treiber wird nach dem Lauf wieder entfernt, Laufwerke mit unbekanntem Medientyp werden eingeordnet, Ergebnisseite ordnet gegenüber dem Referenz-PC ein statt gegenüber einem Durchschnitt, Einstellungen auf einer Seite, Zustand der Optimierung im Hintergrund.
@@ -73,6 +74,7 @@ Alle Versionen: [CHANGELOG.md](CHANGELOG.md), Einzelheiten je Version in `Doku\�
 * **Wartung & Reparatur:** Integrierte Systemdateireparatur (SFC, DISM), Windows-Update-Reset, Netzwerk- und Winsock-Rücksetzung, Freigabe von Speicherplatz durch Bereinigung veralteter Komponentenspeicher (WinSxS) sowie saubere Grafikkartentreiber-Vorbereitung (DDU).
 * **Optimierung:** Über 160 praxisnahe Windows-Tuning-Optionen in 14 Kategorien (Datenschutz, Telemetrie, Gaming-Latenzen, Dienste und visuelle Effekte). Jede Maßnahme besitzt eine definierte Risikostufe, wird im Änderungsprotokoll erfasst und kann jederzeit einzeln oder als Gruppe wieder rückgängig gemacht werden.
 * **System-Umzug:** Transparente Sicherung persönlicher Daten, Bibliotheken, Desktop-Layout und Programme vor einer Windows-Neuinstallation auf Wechsellaufwerke oder Netzlaufwerke inklusive 1-Klick-Wiederherstellung. Sicherheitskritische Daten (wie Browser-Passwörter oder Zugangsdaten) werden aus Datenschutzgründen prinzipbedingt ausgeschlossen.
+* **Tools:** Portable Werkzeuge (CPU-Z, GPU-Z, MSI Afterburner, Revo Uninstaller, MiniTool Partition Wizard, WizTree), Windows-Schnellstarter (UEFI-Neustart, Datenträgerverwaltung, Geräte-Manager, Zuverlässigkeitsverlauf) und 28 Softwarepakete über winget, jede Installation mit Rückweg über die Seite *Änderungen*.
 * **Interaktives HTML5-Dashboard:** 100 % offline-fähiges Fluent 2-Dashboard für flexible Multi-System-Vergleiche. Ermöglicht die synoptische Gegenüberstellung beliebiger Systeme aus der Datenbank gegen hinterlegte Referenzprofile (Desktop High-End, Mittelklasse, Notebook, Mini-PC), inklusive Bestwert-Hervorhebung, Canvas-Sensorverlaufskurven (mit Benchmark-Fallback) und physikalischem 230V-Netzteil-Effizienzkalkulator mit EU-Wirkungsgradkurven (80 PLUS).
 
 ---

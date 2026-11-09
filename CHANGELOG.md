@@ -1,6 +1,20 @@
-# Changelog - Leos Minibench
+﻿# Changelog - Leos Minibench
 
 Alle wesentlichen Änderungen an Leos Minibench werden in diesem Dokument festgehalten.
+
+## v4.05 (09.11.2026)
+
+### Neu
+* **Optimierung:** Bereits aktive Einträge stehen auf An und sind gesperrt; Vorlagen ändern sie nicht. Zähler für gewählte und bereits aktive Einträge getrennt.
+* **Optimierung im Lauf:** Bereits aktive Einträge werden vor dem Lauf erkannt und übersprungen („bereits aktiv“ im Bericht); ohne offene Einträge kein Wiederherstellungspunkt.
+* **Tools:** CPU-Z, GPU-Z (auch mit Versionsnummer im Dateinamen) und MSI Afterburner, erkannt im Tools-Ordner oder als Installation.
+* **Softwarepakete:** 28 Programme in sechs Gruppen, Liste als Tabelle (Kern\Softwarepakete.psd1); installierte Programme werden im Hintergrund erkannt und gesperrt.
+
+### Verbessert
+* **Tools:** Kompakte Zeilen in zwei Spalten statt hoher Karten in halber Breite; Knöpfe im Seitenkopf; Abschnitt Netzlaufwerk entfällt (steht in den Einstellungen); Texte nennen die Seite Änderungen.
+
+### Behoben
+* **Tests:** Drei Fälle des Selbsttests der Oberfläche (Update.Versionsvergleich, Ergebnis.Einordnung, Ergebnis.Laufwerkspillen) fehlten in der Liste von Oberflaeche.Tests.ps1; die Prüfung „jeder Fall wird hier geprüft“ hätte unter Windows angeschlagen.
 
 ## v4.04 (08.11.2026)
 

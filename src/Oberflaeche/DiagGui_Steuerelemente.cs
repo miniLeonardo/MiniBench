@@ -1132,6 +1132,18 @@ public class ToggleSwitch : Control
         }
     }
 
+    // ab v4.05: gesperrt (Optimierung: Eintrag ist auf diesem PC schon so eingestellt). Der Schalter zeigt seinen Stand
+    // in Grün, reagiert nicht auf Klick und Leertaste und wird nicht ausgegraut wie ein deaktiviertes Element.
+    bool locked;
+    public bool Locked
+    {
+        get { return locked; }
+        set { if (locked != value) { locked = value; Cursor = value ? Cursors.Default : Cursors.Hand; AccessibleDescription = value ? "gesperrt" : null; Invalidate(); } }
+    }
+
+    // Umschalten durch den Nutzer (Klick, Leertaste, Klick auf die Zeile); gesperrt ohne Wirkung
+    public void UserToggle() { if (!locked) Checked = !Checked; }
+
     protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
     protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
     protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
@@ -1142,7 +1154,7 @@ public class ToggleSwitch : Control
         if (e.Button == MouseButtons.Left)
         {
             Focus();
-            Checked = !Checked;
+            UserToggle();
         }
         base.OnMouseClick(e);
     }
@@ -1151,7 +1163,7 @@ public class ToggleSwitch : Control
     {
         if (e.KeyCode == Keys.Space)
         {
-            Checked = !Checked;
+            UserToggle();
             e.Handled = true;
         }
         base.OnKeyDown(e);
@@ -1177,7 +1189,7 @@ public class ToggleSwitch : Control
         {
             if (isChecked)
             {
-                Color fillColor = hover ? UI.AccentHover : UI.Accent;
+                Color fillColor = locked ? UI.Ok : hover ? UI.AccentHover : UI.Accent;
                 using (SolidBrush b = new SolidBrush(fillColor)) g.FillPath(b, trackPath);
                 using (Pen p = new Pen(fillColor, 1f)) g.DrawPath(p, trackPath);
             }
@@ -1424,6 +1436,15 @@ public class CategoryPickerItem : Control
         Invalidate();
     }
 
+    // ab v4.05: bereits aktive Einträge (Optimierung) als grüne Pille neben dem Zähler, 0 = keine Pille
+    int activeCount = 0;
+    public int ActiveCount { get { return activeCount; } set { if (activeCount != value) { activeCount = value; Invalidate(); } } }
+    public void SetCounts(int chk, int total, int active)
+    {
+        checkedCount = chk; totalCount = total; activeCount = active;
+        Invalidate();
+    }
+
     protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
     protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
     protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
@@ -1507,6 +1528,27 @@ public class CategoryPickerItem : Control
                 g.FillPath(sb, bp);
 
             TextRenderer.DrawText(g, badgeText, fb, br, bfg, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+
+            if (activeCount > 0)
+            {
+                // grüne Pille "5 ✓" links neben dem Zähler
+                string at = activeCount.ToString();
+                using (Font fi = UI.SymbolFont(7f))
+                {
+                    Size asz = TextRenderer.MeasureText(g, at, fb, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding);
+                    int icoW = UI.S(10);
+                    int aw = asz.Width + icoW + UI.S(14);
+                    Rectangle ar = new Rectangle(badgeX - aw - UI.S(4), badgeY, aw, badgeH);
+                    Color abg = UI.IsDark ? Color.FromArgb(28, 58, 36) : Color.FromArgb(221, 244, 228);
+                    Color afg = UI.IsDark ? Color.FromArgb(120, 214, 140) : Color.FromArgb(16, 112, 58);
+                    using (GraphicsPath ap = UI.Round(new RectangleF(ar.X, ar.Y, ar.Width - 1, ar.Height - 1), (badgeH - 1) / 2f))
+                    using (SolidBrush asb = new SolidBrush(abg))
+                        g.FillPath(asb, ap);
+                    TextRenderer.DrawText(g, at, fb, new Rectangle(ar.X + UI.S(6), ar.Y, asz.Width + UI.S(2), ar.Height), afg, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                    TextRenderer.DrawText(g, UI.IcoCheck, fi, new Rectangle(ar.X + UI.S(7) + asz.Width, ar.Y, icoW + UI.S(2), ar.Height), afg, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                    badgeW += aw + UI.S(4);
+                }
+            }
         }
 
         int textW = Width - x - badgeW - UI.S(14);
@@ -1718,7 +1760,7 @@ public class SettingRow : Control
         if (e.Button == MouseButtons.Left)
         {
             Focus();
-            if (toggle != null) toggle.Checked = !toggle.Checked;
+            if (toggle != null) toggle.UserToggle();
         }
         base.OnMouseClick(e);
     }
@@ -1727,7 +1769,7 @@ public class SettingRow : Control
     {
         if (e.KeyCode == Keys.Space)
         {
-            if (toggle != null) toggle.Checked = !toggle.Checked;
+            if (toggle != null) toggle.UserToggle();
             e.Handled = true;
         }
         base.OnKeyDown(e);
@@ -2001,6 +2043,108 @@ public class FluentCard : Control
             }
         }
     }
+}
+
+// ab v4.05: kompakte Zeile der Seite Tools (Werkzeug oder Windows-Schnellstarter). Zwei Textzeilen statt der 68 px hohen
+// FluentCard: oben Name und Zustand, darunter eine Zeile Beschreibung; rechts die Hauptaktion und optional "…" mit Menü.
+public class ToolRow : Control
+{
+    string title = "", desc = "", icon = "", status = "", statusLevel = "skip";
+    bool hover;
+    Button mainButton, moreButton;
+
+    public ToolRow(string title, string desc, string icon)
+    {
+        this.title = title ?? ""; this.desc = desc ?? ""; this.icon = icon ?? "";
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        BackColor = UI.Panel;
+        Size = new Size(UI.S(480), UI.S(50));
+        Margin = new Padding(0, 0, 0, UI.S(6));
+        AccessibleRole = AccessibleRole.ListItem;
+        AccessibleName = this.title;
+    }
+
+    public string Title { get { return title; } set { title = value ?? ""; AccessibleName = title; Invalidate(); } }
+    public string Description { get { return desc; } set { desc = value ?? ""; Invalidate(); } }
+    public string StatusText { get { return status; } set { status = value ?? ""; Invalidate(); } }
+    public string StatusLevel { get { return statusLevel; } set { statusLevel = value ?? "skip"; Invalidate(); } }
+
+    public Button MainButton
+    {
+        get { return mainButton; }
+        set { if (mainButton != null) Controls.Remove(mainButton); mainButton = value; if (value != null) Controls.Add(value); LayoutControls(); Invalidate(); }
+    }
+
+    // Knopf "…" für seltene Aktionen (Ordner öffnen, Herstellerseite)
+    public Button MoreButton
+    {
+        get { return moreButton; }
+        set { if (moreButton != null) Controls.Remove(moreButton); moreButton = value; if (value != null) Controls.Add(value); LayoutControls(); Invalidate(); }
+    }
+
+    void LayoutControls()
+    {
+        int right = Width - UI.S(10);
+        if (moreButton != null) { moreButton.Location = new Point(right - moreButton.Width, (Height - moreButton.Height) / 2); right -= moreButton.Width + UI.S(6); }
+        if (mainButton != null) mainButton.Location = new Point(right - mainButton.Width, (Height - mainButton.Height) / 2);
+    }
+
+    protected override void OnResize(EventArgs e) { base.OnResize(e); LayoutControls(); }
+    protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+        RectangleF r = new RectangleF(1, 1, Width - 3, Height - 3);
+        Color bg = hover ? (UI.IsDark ? Color.FromArgb(42, 44, 46) : Color.FromArgb(250, 251, 253)) : UI.Panel;
+        Color border = hover ? (UI.IsDark ? Color.FromArgb(80, 82, 85) : Color.FromArgb(209, 213, 219)) : UI.Line;
+        using (GraphicsPath p = UI.Round(r, UI.SF(6)))
+        {
+            using (SolidBrush b = new SolidBrush(bg)) g.FillPath(b, p);
+            using (Pen pen = new Pen(border, 1f)) g.DrawPath(pen, p);
+        }
+        int x = UI.S(12);
+        if (icon.Length > 0)
+        {
+            int ico = UI.S(22);
+            using (Font fi = UI.SymbolFont(12f))
+                TextRenderer.DrawText(g, icon, fi, new Rectangle(x, (Height - ico) / 2, ico, ico), UI.Accent, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            x += ico + UI.S(10);
+        }
+        int right = Width - UI.S(10);
+        if (mainButton != null) right = Math.Min(right, mainButton.Left);
+        if (moreButton != null) right = Math.Min(right, moreButton.Left);
+        int textW = Math.Max(UI.S(60), right - UI.S(10) - x);
+        Font ft = FontTitel, fd = FontDetail;
+        Size tsz = TextRenderer.MeasureText(g, title, ft, new Size(textW, int.MaxValue), TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
+        int th = tsz.Height, dh = desc.Length > 0 ? fd.Height : 0;
+        int y = (Height - th - (dh > 0 ? dh + UI.S(1) : 0)) / 2;
+        TextRenderer.DrawText(g, title, ft, new Rectangle(x, y, textW, th), UI.Text, TextFormatFlags.Left | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
+        if (status.Length > 0)
+        {
+            using (Font fs = new Font("Segoe UI Semibold", 8f))
+            {
+                Size ss = TextRenderer.MeasureText(g, status, fs, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding);
+                int bx = x + Math.Min(tsz.Width, textW) + UI.S(8), bw = ss.Width + UI.S(12), bh = Math.Max(UI.S(16), ss.Height + UI.S(2));
+                if (bx + bw <= x + textW)
+                {
+                    Color sfg, sbg; UI.BadgeColors(statusLevel, out sfg, out sbg);
+                    Rectangle br = new Rectangle(bx, y + (th - bh) / 2, bw, bh);
+                    using (GraphicsPath bp = UI.Round(new RectangleF(br.X, br.Y, br.Width - 1, br.Height - 1), (bh - 1) / 2f)) using (SolidBrush sb = new SolidBrush(sbg)) g.FillPath(sb, bp);
+                    TextRenderer.DrawText(g, status, fs, br, sfg, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                }
+            }
+        }
+        if (dh > 0)
+            TextRenderer.DrawText(g, desc, fd, new Rectangle(x, y + th + UI.S(1), textW, dh), UI.Muted, TextFormatFlags.Left | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
+    }
+
+    static Font fontTitel, fontDetail;
+    static Font FontTitel { get { if (fontTitel == null) fontTitel = new Font("Segoe UI Semibold", 9.5f); return fontTitel; } }
+    static Font FontDetail { get { if (fontDetail == null) fontDetail = new Font("Segoe UI", 8.5f); return fontDetail; } }
 }
 
 class FlatBar : Control

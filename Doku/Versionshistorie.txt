@@ -1,9 +1,18 @@
-LEOS MINIBENCH: VERSIONSHISTORIE
+﻿LEOS MINIBENCH: VERSIONSHISTORIE
 ================================
 
 Neueste Version zuerst. Einzelheiten je Version in Doku\Änderungen_vX.Y.txt (ab 2.2). Für 1.0 bis 2.1 gibt es
 keine Änderungsdateien mehr; die Einträge nennen nur, was im Quelltext und in den Änderungen zu 2.2 belegt ist.
 Die Liste steht auch im Programm (Info-Knopf oben rechts, Quelle: src\Oberflaeche\Versionen.cs).
+
+VERSION 4.05  (09.11.2026)  BEREITS AKTIVE OPTIMIERUNGEN GESPERRT, TOOLS-SEITE KOMPAKT, 28 SOFTWAREPAKETE
+=========================================================================================================
+• Optimierung: Einträge, die auf diesem PC schon so eingestellt sind (Zustand „bereits aktiv“), stehen nach der Hintergrundprüfung auf An und sind gesperrt, gut lesbar in Grün statt ausgegraut. Vorlagen, „Alle an“, „Alle aus“ und geladene eigene Vorlagen ändern sie nicht; der Hinweis nennt den Weg zurück über die Seite Änderungen.
+• Optimierung: Die Seitenleiste zählt gewählte und bereits aktive Einträge getrennt (blaue Pille „3/17“, grüne Pille „5 ✓“), der Kopf der Kategorie nennt „3 gewählt · 5 bereits aktiv · 17 Einträge“.
+• Optimierung im Lauf: Vor dem Wiederherstellungspunkt wird der Zustand jedes gewählten Eintrags geprüft; bereits aktive laufen nicht, sondern stehen als „bereits aktiv“ im Bericht. Bleibt nichts zu ändern, entsteht kein Wiederherstellungspunkt. Angewendete Einträge sind danach ebenfalls gesperrt.
+• Tools: kompakte Zeilen (50 statt 68 px), bei breitem Fenster in zwei Spalten; je Werkzeug Zustand, eine Zeile Beschreibung, „Starten“ oder „Herunterladen“ und ein Menü „…“ mit Speicherort und Herstellerseite. „Neu scannen“ und „Tools-Ordner“ stehen rechts im Seitenkopf. Der Abschnitt Netzlaufwerk entfällt (Einstellungen › Daten und Datenschutz).
+• Neue Werkzeuge CPU-Z, GPU-Z und MSI Afterburner: erkannt im Tools-Ordner oder als Installation, sonst Verweis auf die Herstellerseite. GPU-Z wird mit Versionsnummer im Namen gefunden (GPU-Z*.exe, neueste Version).
+• Softwarepakete: 28 Programme in sechs Gruppen (Browser, Kommunikation, Spiele, Office und PDF, Medien, System und Laufzeiten) als kompakte Liste; die Liste steht als Tabelle in Kern\Softwarepakete.psd1, die winget-Kennung nur im Hinweis. Bereits installierte Programme erkennt ein Hintergrundprozess über winget export, sie sind grün und gesperrt. „Alle an“ entfällt.
 
 VERSION 4.04  (08.11.2026)  VERÖFFENTLICHEN IN EINEM SCHRITT, REFERENZ ÜBER DIE DATENBANK
 =========================================================================================

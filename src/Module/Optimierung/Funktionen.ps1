@@ -828,6 +828,29 @@ function Get-OptEntryState($Entry, $Env = (Get-OptEnvironment)) {
     return [pscustomobject]@{ Id = $Entry.Id; Zustand = $z; Text = (($txt | Select-Object -Unique) -join '; ') }
 }
 
+# Vor der Optimierung (ab v4.05): Einträge, die auf diesem PC schon vollständig so eingestellt sind (Zustand aktiv),
+# werden nicht ausgeführt. Rückgabe: Offen (auszuführen) und Aktiv (Ergebniszeilen "bereits aktiv"). Bis v4.04 lief
+# jede Aktion und meldete "bereits so"; die Oberfläche sperrt solche Einträge, der Lauf prüft trotzdem selbst, weil
+# sich der Zustand seit der Prüfung beim Öffnen geändert haben kann und Aufrufe ohne Oberfläche keine Prüfung haben.
+# Einträge ohne prüfbaren Zustand (nicht prüfbar, teilweise, offen, Fehler beim Prüfen) laufen wie bisher.
+function Split-OptBereitsAktiv($Entries, $Env = (Get-OptEnvironment)) {
+    $offen = @(); $aktiv = @()
+    # Funktionen, Zusatzfeatures und Apps nur einmal abfragen (wie -OptimierungZustand); die Ausführung danach liest frisch
+    $alt = $script:OptCache; $script:OptCache = [ordered]@{}
+    try {
+        foreach ($e in @($Entries)) {
+            $z = ''
+            if (-not (Test-OptCondition $e $Env)) {
+                try { $z = [string](Get-OptEntryState $e $Env).Zustand } catch { $z = '' }
+            }
+            if ($z -eq 'aktiv') {
+                $aktiv += [pscustomobject]@{ Id = $e.Id; Titel = $e.Titel; Kat = $e.Kat; Risiko = $e.Risiko; Ergebnis = 'bereits aktiv'; Aenderungen = 0; Details = 'übersprungen, war vor dem Lauf schon so eingestellt'; Neustart = $false }
+            } else { $offen += $e }
+        }
+    } finally { $script:OptCache = $alt }
+    return [pscustomobject]@{ Offen = $offen; Aktiv = $aktiv }
+}
+
 function Invoke-OptEntry($Entry, $Env = (Get-OptEnvironment)) {
     $why = Test-OptCondition $Entry $Env
     if ($why) { return [pscustomobject]@{ Id = $Entry.Id; Titel = $Entry.Titel; Kat = $Entry.Kat; Risiko = $Entry.Risiko; Ergebnis = 'übersprungen'; Aenderungen = 0; Details = $why; Neustart = $false } }
@@ -874,7 +897,7 @@ function Get-OptMetricRows($Before, $After) {
 
 # ---------- HTML-Bericht ----------
 function New-OptHtml {
-    $cls = @{ 'angewendet' = 'ok'; 'bereits so' = 'skip'; 'übersprungen' = 'skip'; 'nicht vorhanden' = 'skip'; 'teilweise' = 'warn'; 'Fehler' = 'crit' }
+    $cls = @{ 'angewendet' = 'ok'; 'bereits so' = 'skip'; 'bereits aktiv' = 'skip'; 'übersprungen' = 'skip'; 'nicht vorhanden' = 'skip'; 'teilweise' = 'warn'; 'Fehler' = 'crit' }
     $log = @($script:OptLog)
     $sb = New-Object System.Text.StringBuilder
     $n = @($log | Where-Object { $_.Ergebnis -in 'angewendet', 'teilweise' }).Count

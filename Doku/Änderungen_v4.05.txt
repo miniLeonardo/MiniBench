@@ -1,0 +1,144 @@
+﻿LEOS MINIBENCH 4.05: ÄNDERUNGEN
+===============================
+
+Optimierung zeigt bereits aktive Einträge als gesperrt und führt sie nicht erneut aus, die Seite Tools ist kompakt und
+um CPU-Z, GPU-Z und MSI Afterburner ergänzt, die Softwarepakete stehen als Tabelle mit 28 Programmen in sechs Gruppen.
+Messabläufe, Berichtsaufbau und Datenbankformat sind unverändert.
+
+
+1. OPTIMIERUNG: BEREITS AKTIVE EINTRÄGE GESPERRT
+  Vorher                      Die Hintergrundprüfung beim Start setzte nur das Etikett "bereits aktiv"; der Schalter daneben
+                              stand auf Aus und ließ sich umschalten. Gewählte Einträge liefen im Lauf erneut und meldeten
+                              "bereits so".
+  Jetzt                       Sobald die Prüfung (-OptimierungZustand) einen Eintrag als aktiv meldet, steht sein Schalter auf
+                              An und ist gesperrt: grüne Spur statt Akzentfarbe, Klick auf Schalter oder Zeile und Leertaste
+                              wirken nicht, nichts wird ausgegraut. Das Etikett "bereits aktiv" bleibt, der Hinweis beginnt mit
+                              "Ist auf diesem PC schon so eingestellt. Zurücknehmen auf der Seite Änderungen." Bis das Ergebnis
+                              da ist, verhalten sich die Schalter wie bisher. "teilweise" wird nicht gesperrt.
+  Vorlagen                    Minimal, Leos Empfehlung, Erweitert, "Alle an", "Alle aus", "Alles abwählen" und geladene eigene
+                              Vorlagen ändern die Anzeige gesperrter Einträge nicht. Die Auswahl einer Vorlage wird weiter
+                              vollständig gespeichert, auch für gesperrte Einträge, damit eine Vorlage auf einem anderen PC
+                              gleich wirkt. Gespeicherte Vorlagen bleiben kompatibel (Feld Opt.Auswahl unverändert).
+  Zähler                      Seitenleiste: blaue Pille gewählt von gesamt ("3/17"), daneben grüne Pille "5 ✓" für bereits
+                              aktive. Kopf der Kategorie: "3 gewählt · 5 bereits aktiv · 17 Einträge". Gesperrte Einträge
+                              zählen nicht als gewählt, auch nicht in der Zeitschätzung und im Startdialog. Die Spalte der
+                              Kategorien ist dafür 22 px breiter.
+  Laufergebnis                @@OPTE mit "angewendet", "bereits so" oder "bereits aktiv" sperrt den Eintrag danach ebenfalls.
+
+
+2. OPTIMIERUNG IM LAUF: BEREITS AKTIVE EINTRÄGE ÜBERSPRUNGEN
+  Vorher                      Jede gewählte Aktion lief und meldete "bereits so", wenn sich nichts änderte. Vor der ersten
+                              Kategorie entstand immer ein Wiederherstellungspunkt.
+  Jetzt                       Am Ende der Vorbereitung prüft Split-OptBereitsAktiv den Zustand jedes gewählten Eintrags
+                              (Funktionen, Zusatzfeatures und Apps werden dafür einmal abgefragt). Aktive Einträge laufen
+                              nicht; sie stehen mit "bereits aktiv" und "übersprungen, war vor dem Lauf schon so eingestellt"
+                              in Bericht und Zusammenfassung und gehen als @@OPTE an die Oberfläche. Einträge mit Zustand
+                              teilweise, offen, nicht prüfbar oder mit Fehler bei der Prüfung laufen wie bisher. Die Prüfung
+                              läuft auch bei Aufrufen ohne Oberfläche und fängt Änderungen seit dem Start der Oberfläche ab.
+  Wiederherstellungspunkt     Bleibt nach der Prüfung kein Eintrag übrig, entsteht keiner ("Alle gewählten Einträge sind auf
+                              diesem PC bereits aktiv; kein Wiederherstellungspunkt nötig."). Alte Wiederherstellungspunkte
+                              löschen bleibt davon unberührt.
+  Oberfläche                  SelectedOptIds() übergibt nur Einträge, die nicht gesperrt sind.
+
+
+3. SEITE TOOLS
+  Vorher                      Karten mit 68 px Höhe in fester Gruppenbreite (780 px); auf einem 1920er Bildschirm blieb die
+                              rechte Hälfte leer. Drei Werkzeuge, ein Abschnitt Netzlaufwerk (doppelt zu den Einstellungen),
+                              "Neu scannen" und "Tools-Ordner" als eigene Zeile, Hinweise nannten die Seite "Systemänderungen".
+  Jetzt                       Kompakte Zeilen mit 50 px (ToolRow): Symbol, Name, Zustand ("bereit, portabel", "installiert",
+                              "nicht gefunden"), eine Zeile Beschreibung, rechts "Starten" oder "Herunterladen" (öffnet die
+                              Herstellerseite) und "…" mit Speicherort bzw. Ordner für die portable Version und
+                              Herstellerseite. Ab 900 px Inhaltsbreite zwei Spalten, sonst eine. Die sechs portablen Werkzeuge
+                              stehen zusammen, darunter die vier Windows-Schnellstarter als Zeilen. "Neu scannen" und
+                              "Tools-Ordner" stehen rechts im Seitenkopf; "Neu scannen" prüft auch die Softwarepakete.
+  Netzlaufwerk                Abschnitt entfernt; Einrichten steht in den Einstellungen (Daten und Datenschutz) und wird in der
+                              Datenbank abgeglichen.
+
+
+4. NEUE WERKZEUGE: CPU-Z, GPU-Z, MSI AFTERBURNER
+  Erkennung                   Wie Revo und WizTree: Tools-Ordner, bekannte Installationspfade, Uninstall-Einträge der Registry.
+                              Kein automatischer Download.
+  CPU-Z                       Portabel cpuz_x64.exe vor cpuz_x32.exe (Ordner Tools\CPU-Z), installiert
+                              %ProgramFiles%\CPUID\CPU-Z\cpuz.exe; www.cpuid.com/softwares/cpu-z.html.
+  GPU-Z                       Portabel mit Versionsnummer im Namen (GPU-Z.2.71.0.exe, Ordner Tools\GPU-Z). FindToolPath kennt
+                              dafür Platzhalter (GPU-Z*.exe) und wählt die höchste Versionsnummer im Namen, bei gleicher Nummer
+                              die jüngste Datei. Installiert Program Files (x86)\GPU-Z\GPU-Z.exe (Installer 32 Bit) oder über
+                              den Uninstall-Eintrag; www.techpowerup.com/gpuz.
+  MSI Afterburner             Nur als Setup erhältlich, installiert unter Program Files (x86)\MSI Afterburner\MSIAfterburner.exe;
+                              Start mit Administratorrechten, das Setup bietet RivaTuner Statistics Server mit an (Hinweis an
+                              der Zeile); www.msi.com/Landing/afterburner/graphics-cards.
+
+
+5. SOFTWAREPAKETE
+  Vorher                      Neun Programme als einzelne Felder im Quelltext der Oberfläche, Kennung und Name in drei
+                              parallelen Feldern; "Alle an" wählte alles.
+  Liste                       Kern\Softwarepakete.psd1 (Gruppe, Id, Name, Beschreibung), eingebunden in Kern\Softwarepakete.ps1,
+                              an die Oberfläche als Zeilen G|Gruppe und P|Gruppe|Id|Name|Beschreibung (Get-SoftwarePaketGuiLines,
+                              wie der Katalog der Optimierung). 28 Pakete in sechs Gruppen:
+                              Browser: Google Chrome, Mozilla Firefox, Brave, Opera.
+                              Kommunikation: Discord, Zoom, Microsoft Teams, Thunderbird, Telegram.
+                              Spiele: Steam, Epic Games Launcher, GOG Galaxy, EA app, Ubisoft Connect.
+                              Office und PDF: LibreOffice, ONLYOFFICE, Adobe Acrobat Reader, SumatraPDF, Notepad++.
+                              Medien: VLC, OBS Studio, GIMP (GIMP.GIMP.3).
+                              System und Laufzeiten: 7-Zip, WinRAR, PowerToys, KeePassXC, Visual C++ 2015+ x64,
+                              .NET Desktop Runtime 10.
+                              Alle Ids sind im winget-Paketverzeichnis vorhanden (Stand 09.11.2026). Nicht aufgenommen:
+                              WhatsApp (nur Microsoft Store, Erkennung unzuverlässig), Spotify (das Setup verweigert die
+                              Installation mit Administratorrechten), .NET 8 (Unterstützung endet am 10.11.2026).
+  Darstellung                 Je Gruppe eine Zeile, Überschrift links, Pakete in gleich breiten Spalten (154 px, bei schmalem
+                              Fenster umbrochen); die winget-Kennung steht nur im Hinweis. "Alle an" entfällt, "Auswahl leeren"
+                              und der Zähler am Knopf "Ausgewählte installieren (n)" bleiben.
+  Installiert                 Neuer Hilfsmodus -SoftwareZustand: winget export schreibt alle installierten Programme, die winget
+                              einer Quelle zuordnen kann, als JSON; ein Aufruf statt einer Abfrage je Paket, unabhängig von
+                              Sprache und gekürzten Ids der Textausgabe. Je Paket @@PAKZ|Id|installiert oder nicht installiert.
+                              Der Prozess startet beim ersten Öffnen der Seite Tools mit niedriger Priorität, nach "Neu
+                              scannen" und nach Installationen; ein Lauf beendet ihn. Installierte Pakete sind angehakt, grün
+                              und gesperrt und gehen nicht in die Installation. Ohne winget oder ohne Ergebnis bleibt die Liste
+                              wählbar wie bisher; die Installation prüft ohnehin vorher mit winget list.
+  Texte                       Dialog und Hinweise nennen die Seite Änderungen statt Systemänderungen.
+
+
+6. TESTS
+  Selbsttest der Oberfläche   Neue Fälle Optimierung.Sperre (Schalter, Zeile, Vorlage, Lauf), Optimierung.Zaehler,
+                              Tools.Platzhalter (GPU-Z*.exe, Vorrang der Namen), Tools.Raster (Spalten, Zeilenhöhe, Knöpfe),
+                              Softwarepakete.Liste, Softwarepakete.Installiert.
+  Pester                      Optimierung: Überspringen bereits aktiver Einträge, Reihenfolge vor dem Wiederherstellungspunkt.
+                              Aenderungen: Paketliste vollständig (Name, Id, Gruppe, Beschreibung, keine doppelten Ids, gültige
+                              Kennungen), eingeschränkte Sprache, Zeilen für die Oberfläche, winget export, Hilfsmodus mit und
+                              ohne winget. Oberflaeche: Seite Tools ohne Netzlaufwerk, mit den sechs Werkzeugen.
+
+
+GEFUNDEN UND BEHOBEN
+  Oberflaeche.Tests.ps1 listete die Selbsttest-Fälle Update.Versionsvergleich, Ergebnis.Einordnung und
+  Ergebnis.Laufwerkspillen (seit 4.02 und 4.03) nicht; die Prüfung "jeder Fall des Selbsttests wird hier geprüft" hätte
+  unter Windows angeschlagen. Ergänzt.
+  Hinweise der Softwarepakete nannten seit 4.0 die Seite "Systemänderungen", die "Änderungen" heißt.
+  Bei der Codeprüfung: Die erste Fassung der Erkennung gab die Ids als HashSet mit "return ," zurück; über $(...)
+  entrollt, verglich der Aufrufer danach mit Groß- und Kleinschreibung (AGENTS.md, Regel 4). Jetzt Liste mit -contains.
+  Raster der Seite Tools: AutoSize behielt die Höhe der einspaltigen Anordnung beim ersten Aufbau, darunter blieb eine
+  Lücke. Die Höhe wird jetzt beim Anordnen gesetzt.
+
+
+GRENZEN
+  Geprüft mit Bildschirmfotos unter Mono und Xvfb (Hell und Dunkel, Schrift Selawik statt Segoe UI), dem Selbsttest der
+  Oberfläche (45 Fälle bestanden) und den Sandbox-Tests: 909 bestanden, 52 fehlgeschlagen, 53 übersprungen. Die 52
+  Fehlschläge sind dieselben wie auf 2a5cb46 (4.04: 899 bestanden) und brauchen Windows (Bericht, Datenbank, Diagnose,
+  Sensoren, System-Umzug). Unter Windows zu bestätigen: winget export als Administrator (Pakete im Benutzerprofil
+  des angemeldeten Benutzers erscheinen nur, wenn Leos Minibench unter demselben Konto läuft), die Erkennung von GPU-Z
+  über den Uninstall-Eintrag, die Darstellung bei 125 und 150 % Skalierung und das Menü "…" im dunklen Farbschema.
+  Die Sperre gilt bis zum nächsten Start; nach "Rückgängig" auf der Seite Änderungen zeigt erst der nächste Start den
+  Eintrag wieder als offen.
+
+
+UMSTIEG
+  Nichts zu tun. Gespeicherte Vorlagen und Voreinstellungen.json bleiben gültig.
+
+
+QUELLEN
+  winget-Paketverzeichnis: https://github.com/microsoft/winget-pkgs (Manifeste der 28 Ids, CPUID.CPU-Z,
+  TechPowerUp.GPU-Z, Guru3D.Afterburner mit Installationsort)
+  winget export: https://learn.microsoft.com/windows/package-manager/winget/export
+  CPU-Z: https://www.cpuid.com/softwares/cpu-z.html
+  GPU-Z: https://www.techpowerup.com/gpuz/
+  MSI Afterburner: https://www.msi.com/Landing/afterburner/graphics-cards
+  .NET-Unterstützungszeitraum: https://dotnet.microsoft.com/platform/support/policy/dotnet-core

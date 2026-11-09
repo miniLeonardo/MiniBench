@@ -62,6 +62,15 @@ Describe 'Selbsttest der Oberfläche' {
         @{ Fall = 'CategoryPickerItem.Kurztitel' }
         @{ Fall = 'UI.SkalierungDpi' }
         @{ Fall = 'UI.IconByName' }
+        @{ Fall = 'Update.Versionsvergleich' }
+        @{ Fall = 'Ergebnis.Einordnung' }
+        @{ Fall = 'Ergebnis.Laufwerkspillen' }
+        @{ Fall = 'Optimierung.Sperre' }
+        @{ Fall = 'Optimierung.Zaehler' }
+        @{ Fall = 'Tools.Platzhalter' }
+        @{ Fall = 'Tools.Raster' }
+        @{ Fall = 'Softwarepakete.Liste' }
+        @{ Fall = 'Softwarepakete.Installiert' }
     ) {
         Assert-GuiSelbsttest $Fall
     }
@@ -101,6 +110,24 @@ Describe 'Verträge zwischen Oberfläche und Arbeitsprozess' {
         $script:Gui | Should -Match '-SoftwareInstallieren'
         $script:Gui | Should -Not -Match 'install --id'
         $script:Gui | Should -Match '"@@PAKET\|"'
+        # ab v4.05: Liste aus Kern\Softwarepakete.psd1, installierte Pakete über -SoftwareZustand im Hintergrund
+        $script:Gui | Should -Match '-SoftwareZustand'
+        $script:Gui | Should -Match '"@@PAKZ\|"'
+        $script:Gui | Should -Not -Match 'new string\[\] \{ "Google\.Chrome"'
+        (Get-SrcText 'Oberflaeche/Oberflaeche.ps1') | Should -Match '\[DiagGui\]::SoftwarePakete = \[string\[\]\]\(Get-SoftwarePaketGuiLines\)'
+    }
+    It 'Seite Tools ohne Abschnitt Netzlaufwerk und mit den neuen Werkzeugen (ab v4.05)' {
+        $seiten = Get-SrcText 'Oberflaeche/DiagGui_Seiten.cs'
+        $a = $seiten.IndexOf('Control BuildToolsPage()'); $e = $seiten.IndexOf('FlowLayoutPanel ToolRaster()')
+        $tools = $seiten.Substring($a, $e - $a)
+        $tools | Should -Not -Match 'Netzlaufwerk'
+        $tools | Should -Not -Match 'Systemänderungen'
+        foreach ($w in 'CPU-Z', 'GPU-Z', 'MSI Afterburner', 'Revo Uninstaller', 'MiniTool Partition Wizard', 'WizTree') { $tools | Should -Match ([regex]::Escape('ToolZeile("' + $w + '"')) }
+        $tools | Should -Match '"GPU-Z\*\.exe"'
+        $tools | Should -Match 'cpuid\.com/softwares/cpu-z\.html'
+        $tools | Should -Match 'techpowerup\.com/gpuz'
+        $tools | Should -Match 'msi\.com/Landing/afterburner'
+        $tools | Should -Match 'RivaTuner'
     }
     It 'jede gespeicherte Voreinstellung wird beim Laden wieder angewendet' {
         $put = @([regex]::Matches($script:Gui, 'Put(?:C|Cb)\(d, "([^"]+)"') | ForEach-Object { $_.Groups[1].Value })
@@ -138,7 +165,7 @@ Describe 'Projektregeln der Oberfläche' {
         # Felder der Oberfläche mit Bedienelementen. Abgedeckt ist ein Feld durch Tip(feld, ...), Tip(feld[...], ...) oder
         # eine foreach-Liste direkt vor Tip(...). Ausnahmen: Teile eigener Steuerelemente (die Karte trägt den Hinweis),
         # das Protokollfeld und die nicht angezeigte Vergleichsliste.
-        $ausnahmen = @('actionButton', 'secondaryButton', 'toggle', 'txtLog', 'clbCompare')
+        $ausnahmen = @('actionButton', 'secondaryButton', 'mainButton', 'moreButton', 'toggle', 'txtLog', 'clbCompare')
         $types = 'CheckBox|ComboBox|Button|LinkLabel|TextBox|RadioButton|ToggleSwitch|FluentCard|NumericUpDown|TrackBar|CheckedListBox|DarkComboBox'
         $felder = @([regex]::Matches($script:Gui, "(?m)^    (?:public |private |internal |static |readonly )*(?:$types)(?:\[\])?\s+([\w\s,]+);") |
             ForEach-Object { $_.Groups[1].Value -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^\w+$' } | Sort-Object -Unique)

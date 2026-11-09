@@ -89,6 +89,7 @@ param(
     [switch]$OptWerkzeugeHolen,
     # Seite Tools (ab v3.53): Softwarepakete über winget installieren, "Id=Name;Id=Name" (Hilfsmodus der Oberfläche)
     [string]$SoftwareInstallieren = '',
+    [switch]$SoftwareZustand,
     # Ablage (ab v3.54): Abgleich mit dem Netzlaufwerk, Läufe entfernen (ins Archiv) und umbenennen (Hilfsmodi der Oberfläche)
     [switch]$Abgleich,
     [switch]$AbgleichLoeschen,
@@ -246,7 +247,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
 }
 #endregion
 
-$ScriptVersion = '4.04'
+$ScriptVersion = '4.05'
 $AppName       = 'Leos Minibench'
 # Eingebettete Referenzprofile für Leos Minibench (v3.0)
 $script:EmbeddedReferences = @{
@@ -3925,6 +3926,57 @@ function Set-KeptTool([string]$Name, [bool]$Kept) {
 $script:WingetFristSek       = 1200   # je Paket; große Pakete (Office, Steam) brauchen auf langsamen Leitungen lange
 $script:WingetFristListeSek  = 120
 $script:WingetFristEntfSek   = 900
+$script:WingetFristExportSek = 240    # winget export für die Erkennung installierter Pakete (ab v4.05)
+
+# Paketliste der Oberfläche (ab v4.05 als Tabelle in Softwarepakete.psd1, vorher neun feste Felder in DiagGui_Seiten.cs)
+$script:SoftwareKatalog = (
+# Softwarepakete der Seite Tools (ab v4.05): Gruppe, winget-Id, Name in der Oberfläche, Beschreibung im Hinweis.
+# Die Ids sind im winget-Paketverzeichnis (github.com/microsoft/winget-pkgs) geprüft. Reihenfolge der Gruppen und
+# Pakete wie in der Oberfläche. Nur Daten, keine Befehle (eingeschränkte Sprache).
+@{
+    Gruppen = @('Browser', 'Kommunikation', 'Spiele', 'Office und PDF', 'Medien', 'System und Laufzeiten')
+    Pakete  = @(
+        @{ Gruppe = 'Browser'; Id = 'Google.Chrome'; Name = 'Google Chrome'; Beschreibung = 'Webbrowser von Google' }
+        @{ Gruppe = 'Browser'; Id = 'Mozilla.Firefox'; Name = 'Mozilla Firefox'; Beschreibung = 'Webbrowser von Mozilla' }
+        @{ Gruppe = 'Browser'; Id = 'Brave.Brave'; Name = 'Brave'; Beschreibung = 'Webbrowser auf Chromium-Grundlage mit Werbeblocker' }
+        @{ Gruppe = 'Browser'; Id = 'Opera.Opera'; Name = 'Opera'; Beschreibung = 'Webbrowser auf Chromium-Grundlage' }
+        @{ Gruppe = 'Kommunikation'; Id = 'Discord.Discord'; Name = 'Discord'; Beschreibung = 'Chat und Sprachkanäle' }
+        @{ Gruppe = 'Kommunikation'; Id = 'Zoom.Zoom'; Name = 'Zoom'; Beschreibung = 'Videokonferenzen' }
+        @{ Gruppe = 'Kommunikation'; Id = 'Microsoft.Teams'; Name = 'Microsoft Teams'; Beschreibung = 'Teams für Arbeit und Schule' }
+        @{ Gruppe = 'Kommunikation'; Id = 'Mozilla.Thunderbird'; Name = 'Thunderbird'; Beschreibung = 'E-Mail und Kalender von Mozilla' }
+        @{ Gruppe = 'Kommunikation'; Id = 'Telegram.TelegramDesktop'; Name = 'Telegram'; Beschreibung = 'Messenger für den Desktop' }
+        @{ Gruppe = 'Spiele'; Id = 'Valve.Steam'; Name = 'Steam'; Beschreibung = 'Spieleplattform von Valve' }
+        @{ Gruppe = 'Spiele'; Id = 'EpicGames.EpicGamesLauncher'; Name = 'Epic Games Launcher'; Beschreibung = 'Spieleplattform von Epic Games' }
+        @{ Gruppe = 'Spiele'; Id = 'GOG.Galaxy'; Name = 'GOG Galaxy'; Beschreibung = 'Spieleplattform von GOG' }
+        @{ Gruppe = 'Spiele'; Id = 'ElectronicArts.EADesktop'; Name = 'EA app'; Beschreibung = 'Spieleplattform von Electronic Arts' }
+        @{ Gruppe = 'Spiele'; Id = 'Ubisoft.Connect'; Name = 'Ubisoft Connect'; Beschreibung = 'Spieleplattform von Ubisoft' }
+        @{ Gruppe = 'Office und PDF'; Id = 'TheDocumentFoundation.LibreOffice'; Name = 'LibreOffice'; Beschreibung = 'Office-Paket mit Textverarbeitung, Tabellen und Präsentationen' }
+        @{ Gruppe = 'Office und PDF'; Id = 'ONLYOFFICE.DesktopEditors'; Name = 'ONLYOFFICE'; Beschreibung = 'Office-Programme mit hoher Kompatibilität zu Microsoft-Formaten' }
+        @{ Gruppe = 'Office und PDF'; Id = 'Adobe.Acrobat.Reader.64-bit'; Name = 'Adobe Acrobat Reader'; Beschreibung = 'PDF-Anzeige von Adobe (64 Bit)' }
+        @{ Gruppe = 'Office und PDF'; Id = 'SumatraPDF.SumatraPDF'; Name = 'SumatraPDF'; Beschreibung = 'Schlanke PDF- und E-Book-Anzeige' }
+        @{ Gruppe = 'Office und PDF'; Id = 'Notepad++.Notepad++'; Name = 'Notepad++'; Beschreibung = 'Texteditor mit Syntaxhervorhebung' }
+        @{ Gruppe = 'Medien'; Id = 'VideoLAN.VLC'; Name = 'VLC'; Beschreibung = 'Medienwiedergabe für fast alle Formate' }
+        @{ Gruppe = 'Medien'; Id = 'OBSProject.OBSStudio'; Name = 'OBS Studio'; Beschreibung = 'Bildschirmaufnahme und Streaming' }
+        @{ Gruppe = 'Medien'; Id = 'GIMP.GIMP.3'; Name = 'GIMP'; Beschreibung = 'Bildbearbeitung (Version 3)' }
+        @{ Gruppe = 'System und Laufzeiten'; Id = '7zip.7zip'; Name = '7-Zip'; Beschreibung = 'Packprogramm' }
+        @{ Gruppe = 'System und Laufzeiten'; Id = 'RARLab.WinRAR'; Name = 'WinRAR'; Beschreibung = 'Packprogramm für RAR und ZIP (Testversion, Lizenz für dauerhafte Nutzung)' }
+        @{ Gruppe = 'System und Laufzeiten'; Id = 'Microsoft.PowerToys'; Name = 'PowerToys'; Beschreibung = 'Werkzeugsammlung von Microsoft' }
+        @{ Gruppe = 'System und Laufzeiten'; Id = 'KeePassXCTeam.KeePassXC'; Name = 'KeePassXC'; Beschreibung = 'Passwortverwaltung, Datenbank liegt lokal' }
+        @{ Gruppe = 'System und Laufzeiten'; Id = 'Microsoft.VCRedist.2015+.x64'; Name = 'Visual C++ 2015+ x64'; Beschreibung = 'Laufzeitbibliotheken, die viele Programme und Spiele brauchen' }
+        @{ Gruppe = 'System und Laufzeiten'; Id = 'Microsoft.DotNet.DesktopRuntime.10'; Name = '.NET Runtime 10'; Beschreibung = '.NET Desktop Runtime 10, Laufzeit für .NET-Programme mit Oberfläche (aktuelle LTS)' }
+    )
+}
+)
+function Get-SoftwarePakete { return @($script:SoftwareKatalog.Pakete) }
+function Get-SoftwareGruppen { return @($script:SoftwareKatalog.Gruppen) }
+
+# Zeilen für die Oberfläche: G|Gruppe und P|Gruppe|Id|Name|Beschreibung (Trennzeichen in Texten ersetzt)
+function Get-SoftwarePaketGuiLines {
+    $z = @()
+    foreach ($g in (Get-SoftwareGruppen)) { $z += ('G|{0}' -f $g) }
+    foreach ($p in (Get-SoftwarePakete)) { $z += ('P|{0}|{1}|{2}|{3}' -f (@($p.Gruppe, $p.Id, $p.Name, $p.Beschreibung) | ForEach-Object { ([string]$_) -replace '[|\r\n]', ' ' })) }
+    return $z
+}
 
 # Paketkennung prüfen (nur Zeichen, die winget-Ids haben; schützt die Befehlszeile)
 function Test-WingetId([string]$Id) { return ([string]$Id -match '^[A-Za-z0-9][A-Za-z0-9\.\+_\-]{1,99}$') }
@@ -4013,6 +4065,44 @@ function Invoke-SoftwarePakete([string]$Spec) {
         Write-Host $r.Text
     }
     return [pscustomobject]$sum
+}
+
+# Installierte Pakete in einem Aufruf (ab v4.05): winget export schreibt alle installierten Programme, die winget einer
+# Quelle zuordnen kann, als JSON (Sources[].Packages[].PackageIdentifier). Die Textausgabe von winget list kürzt lange
+# Ids mit "…" und ist sprachabhängig; das JSON nicht. Rückgabe: Liste der Ids, $null wenn nicht feststellbar.
+function Get-WingetInstallierteIds([string]$Exe) {
+    $f = Join-Path ([IO.Path]::GetTempPath()) ('LeosMinibench-winget-{0}.json' -f $PID)
+    try {
+        Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue
+        $r = Invoke-Winget $Exe ('export -o "{0}" --accept-source-agreements --disable-interactivity' -f $f) $script:WingetFristExportSek
+        if ($r.TimedOut -or -not (Test-Path -LiteralPath $f)) { return $null }
+        return [pscustomobject]@{ Ids = @(ConvertFrom-WingetExport ([IO.File]::ReadAllText($f, [Text.Encoding]::UTF8))) }
+    } catch { return $null }
+    finally { Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue }
+}
+
+function ConvertFrom-WingetExport([string]$Json) {
+    $j = $Json | ConvertFrom-Json
+    $ids = @()
+    foreach ($src in @($j.Sources)) { foreach ($p in @($src.Packages)) { if ($p.PackageIdentifier) { $ids += [string]$p.PackageIdentifier } } }
+    return $ids
+}
+
+# Hilfsmodus der Oberfläche: -SoftwareZustand. Je Paket der Liste @@PAKZ|Id|installiert oder nicht installiert,
+# am Ende @@RESULT|Anzahl installiert (-1: nicht feststellbar, dann keine PAKZ-Zeilen). Ändert nichts.
+function Invoke-SoftwareZustand {
+    $exe = Find-Winget
+    $r = $null
+    if ($exe) { $r = Get-WingetInstallierteIds $exe }
+    if ($null -eq $r) { return -1 }
+    $ids = @($r.Ids)
+    $n = 0
+    foreach ($p in (Get-SoftwarePakete)) {
+        $da = ($ids -contains [string]$p.Id)   # -contains vergleicht ohne Groß- und Kleinschreibung
+        if ($da) { $n++ }
+        Send-GuiEvent 'PAKZ' $p.Id $(if ($da) { 'installiert' } else { 'nicht installiert' })
+    }
+    return $n
 }
 
 # Rückgängig (Seite Änderungen): nur deinstallieren, was noch installiert ist. Ist das nicht feststellbar oder scheitert
@@ -5925,6 +6015,29 @@ function Get-OptEntryState($Entry, $Env = (Get-OptEnvironment)) {
     return [pscustomobject]@{ Id = $Entry.Id; Zustand = $z; Text = (($txt | Select-Object -Unique) -join '; ') }
 }
 
+# Vor der Optimierung (ab v4.05): Einträge, die auf diesem PC schon vollständig so eingestellt sind (Zustand aktiv),
+# werden nicht ausgeführt. Rückgabe: Offen (auszuführen) und Aktiv (Ergebniszeilen "bereits aktiv"). Bis v4.04 lief
+# jede Aktion und meldete "bereits so"; die Oberfläche sperrt solche Einträge, der Lauf prüft trotzdem selbst, weil
+# sich der Zustand seit der Prüfung beim Öffnen geändert haben kann und Aufrufe ohne Oberfläche keine Prüfung haben.
+# Einträge ohne prüfbaren Zustand (nicht prüfbar, teilweise, offen, Fehler beim Prüfen) laufen wie bisher.
+function Split-OptBereitsAktiv($Entries, $Env = (Get-OptEnvironment)) {
+    $offen = @(); $aktiv = @()
+    # Funktionen, Zusatzfeatures und Apps nur einmal abfragen (wie -OptimierungZustand); die Ausführung danach liest frisch
+    $alt = $script:OptCache; $script:OptCache = [ordered]@{}
+    try {
+        foreach ($e in @($Entries)) {
+            $z = ''
+            if (-not (Test-OptCondition $e $Env)) {
+                try { $z = [string](Get-OptEntryState $e $Env).Zustand } catch { $z = '' }
+            }
+            if ($z -eq 'aktiv') {
+                $aktiv += [pscustomobject]@{ Id = $e.Id; Titel = $e.Titel; Kat = $e.Kat; Risiko = $e.Risiko; Ergebnis = 'bereits aktiv'; Aenderungen = 0; Details = 'übersprungen, war vor dem Lauf schon so eingestellt'; Neustart = $false }
+            } else { $offen += $e }
+        }
+    } finally { $script:OptCache = $alt }
+    return [pscustomobject]@{ Offen = $offen; Aktiv = $aktiv }
+}
+
 function Invoke-OptEntry($Entry, $Env = (Get-OptEnvironment)) {
     $why = Test-OptCondition $Entry $Env
     if ($why) { return [pscustomobject]@{ Id = $Entry.Id; Titel = $Entry.Titel; Kat = $Entry.Kat; Risiko = $Entry.Risiko; Ergebnis = 'übersprungen'; Aenderungen = 0; Details = $why; Neustart = $false } }
@@ -5971,7 +6084,7 @@ function Get-OptMetricRows($Before, $After) {
 
 # ---------- HTML-Bericht ----------
 function New-OptHtml {
-    $cls = @{ 'angewendet' = 'ok'; 'bereits so' = 'skip'; 'übersprungen' = 'skip'; 'nicht vorhanden' = 'skip'; 'teilweise' = 'warn'; 'Fehler' = 'crit' }
+    $cls = @{ 'angewendet' = 'ok'; 'bereits so' = 'skip'; 'bereits aktiv' = 'skip'; 'übersprungen' = 'skip'; 'nicht vorhanden' = 'skip'; 'teilweise' = 'warn'; 'Fehler' = 'crit' }
     $log = @($script:OptLog)
     $sb = New-Object System.Text.StringBuilder
     $n = @($log | Where-Object { $_.Ergebnis -in 'angewendet', 'teilweise' }).Count
@@ -6054,7 +6167,7 @@ function Undo-OptChange($Record) {
 
 #endregion
 #region ---------- Grafische Oberfläche ----------
-if (-not $EventMode -and -not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $SensorLive -and -not $SensorWerkzeugeHolen -and -not $SensorAufraeumen -and -not $OptimierungZustand -and -not $OptWerkzeugeHolen -and -not $SoftwareInstallieren -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardSysteme -and -not $MedianAktualisieren -and -not $Umzug) {
+if (-not $EventMode -and -not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $SensorLive -and -not $SensorWerkzeugeHolen -and -not $SensorAufraeumen -and -not $OptimierungZustand -and -not $SoftwareZustand -and -not $OptWerkzeugeHolen -and -not $SoftwareInstallieren -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardSysteme -and -not $MedianAktualisieren -and -not $Umzug) {
     Write-StartPhase 'Datenordner gefunden'
     # Hardwareabfragen für die Oberfläche (Datenträgerliste, Geräteidentität) laufen parallel zum Laden der Oberfläche
     $hwPs = $null; $hwHandle = $null
@@ -6185,7 +6298,7 @@ public partial class DiagGui : Form
     Dictionary<string, Control> repCatPanels = new Dictionary<string, Control>();
     string curOptKey = "", curRepKey = "";
     CardPanel optDetailCard, repDetailCard;
-    Label lblOptCatTitle, lblOptCatDesc, lblRepCatTitle, lblRepCatDesc;
+    Label lblOptCatTitle, lblOptCatDesc, lblOptCatCount, lblRepCatTitle, lblRepCatDesc;
     LinkLabel lnkOptAll, lnkOptNone, lnkRepAll, lnkRepNone;
     PillButton pillRepUsual, pillRepNone;
     FlowLayoutPanel left;
@@ -7408,7 +7521,7 @@ public partial class DiagGui : Form
             c.BackColor = UI.Bg;
             c.Invalidate();
         }
-        else if (c is FluentCard || c is StartTaskCard || c is SettingRow || c is CategoryPickerItem)
+        else if (c is FluentCard || c is ToolRow || c is StartTaskCard || c is SettingRow || c is CategoryPickerItem)
         {
             c.BackColor = UI.Panel;
             c.Invalidate();
@@ -7480,7 +7593,8 @@ public partial class DiagGui : Form
         }
         else if (c is CheckBox || c is RadioButton)
         {
-            c.ForeColor = c.Enabled ? UI.Text : UI.Muted;
+            // ab v4.05: installierte Softwarepakete (Tag "installiert") bleiben grün
+            c.ForeColor = (c.Tag as string) == "installiert" ? UI.Ok : c.Enabled ? UI.Text : UI.Muted;
         }
         else if (c is LinkLabel)
         {
@@ -7899,6 +8013,8 @@ public partial class DiagGui : Form
         // ab v4.0: Auf Werkzeugseiten (Tools bis Versionen) nur Ablaufzeile und Startknopf, ohne Vorlagen
         if (fo != null && foot != null) { bool modulSeite = i <= 5; if (fo.Visible != modulSeite) { fo.Visible = modulSeite; foot.Height = UI.S(modulSeite ? 76 : 62); } }
         if (i == 3) UpdateLoadExtras();
+        // ab v4.05: installierte Softwarepakete beim ersten Öffnen der Seite Tools im Hintergrund erkennen
+        if (i == 6) { if (!paketGeprueft) StartSoftwareStateCheck(); if (toolsLayout != null) toolsLayout(); }
         ApplyNativeControlThemes();
     }
 
@@ -9036,7 +9152,9 @@ public partial class DiagGui : Form
 
     string OptTipText(OptItem it)
     {
-        StringBuilder t = new StringBuilder((it.Tip ?? "").Replace(" ¶", "\r\n").Replace("¶", "\r\n"));
+        StringBuilder t = new StringBuilder();
+        if (it.Gesperrt) t.Append(OptGesperrtHinweis).Append("\r\n");
+        t.Append((it.Tip ?? "").Replace(" ¶", "\r\n").Replace("¶", "\r\n"));
         t.Append("\r\nRisikostufe: ").Append(ContractStep.RiskLabel(it.Risiko)).Append(it.Risiko == "Aendern" ? " (protokolliert, auf der Seite Änderungen einzeln rücknehmbar)" : " (nicht automatisch umkehrbar, Absicherung über den Wiederherstellungspunkt)");
         t.Append("\r\nNeustart: ").Append(it.Neustart == "immer" ? "nötig" : it.Neustart == "moeglich" ? "kann nötig sein" : "nicht nötig");
         List<string> vList = new List<string>();
@@ -9062,7 +9180,7 @@ public partial class DiagGui : Form
         md.AutoSize = true;
         md.ColumnCount = 2;
         md.RowCount = 1;
-        md.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(240)));
+        md.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(262)));
         md.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         md.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(8));
 
@@ -9098,8 +9216,12 @@ public partial class DiagGui : Form
         lblOptCatTitle = Lbl("", 11f, true, UI.Text);
         lblOptCatDesc = Lbl("", UI.SchriftHinweis, false, UI.Muted);
         lblOptCatDesc.Margin = new Padding(0, UI.S(2), 0, 0);
+        lblOptCatCount = Lbl("", UI.SchriftHinweis, true, UI.Muted);
+        lblOptCatCount.Margin = new Padding(0, UI.S(4), 0, 0);
+        Tip(lblOptCatCount, "Gewählt: wird beim nächsten Lauf geändert. Bereits aktiv: ist auf diesem PC schon so eingestellt, Schalter gesperrt.");
         titleBox.Controls.Add(lblOptCatTitle);
         titleBox.Controls.Add(lblOptCatDesc);
+        titleBox.Controls.Add(lblOptCatCount);
 
         FlowLayoutPanel linkBox = new FlowLayoutPanel();
         linkBox.AutoSize = true;
@@ -9136,7 +9258,7 @@ public partial class DiagGui : Form
             string ico = UI.IconByName(k.Length > 4 ? k[4] : "", UI.IcoOpt);
             CategoryPickerItem picker = new CategoryPickerItem(k[1], ico, k.Length > 3 ? k[3] : k[1]);
             picker.Subtitle = k[2];
-            picker.Width = UI.S(232);
+            picker.Width = UI.S(254);
             string gKey = key;
             picker.Picked += delegate { SelectOptCategory(gKey); };
             Tip(picker, k[2]);
@@ -9161,14 +9283,7 @@ public partial class DiagGui : Form
                 if (bv != null) bv.Tag = "verwaltet";
                 it.VerwaltetBadge = bv;
 
-                OptItem itemRef = it;
-                it.Toggle.CheckedChanged += delegate {
-                    if (itemRef.Box.Checked != itemRef.Toggle.Checked) itemRef.Box.Checked = itemRef.Toggle.Checked;
-                };
-                it.Box.CheckedChanged += delegate {
-                    if (itemRef.Toggle.Checked != itemRef.Box.Checked) itemRef.Toggle.Checked = itemRef.Box.Checked;
-                    UpdateOptCounts();
-                };
+                VerbindeOptEintrag(it, delegate { UpdateOptCounts(); });
 
             }
             rowsPanel.Visible = false;
@@ -9183,13 +9298,13 @@ public partial class DiagGui : Form
         lnkOptAll.LinkClicked += delegate {
             if (curOptKey.Length > 0)
             {
-                foreach (OptItem it in optItems) if (it.Kat == curOptKey && it.Box != null) it.Box.Checked = true;
+                foreach (OptItem it in optItems) if (it.Kat == curOptKey && it.Box != null && !it.Gesperrt) it.Box.Checked = true;
             }
         };
         lnkOptNone.LinkClicked += delegate {
             if (curOptKey.Length > 0)
             {
-                foreach (OptItem it in optItems) if (it.Kat == curOptKey && it.Box != null) it.Box.Checked = false;
+                foreach (OptItem it in optItems) if (it.Kat == curOptKey && it.Box != null && !it.Gesperrt) it.Box.Checked = false;
             }
         };
 
@@ -9253,6 +9368,7 @@ public partial class DiagGui : Form
 
             SettingRow row = new SettingRow(it.Titel, shortDesc, it.Toggle);
             it.Row = row;
+            if (it.Gesperrt) row.Cursor = Cursors.Default;
             row.Width = UI.S(UI.Gruppenbreite - 270);
             if (it.Risiko.Length > 0 && it.Risiko != "Lesen" && it.Risiko != "Aendern") row.AddBadge(RiskBadge(it.Risiko));
             if (it.Neustart == "immer") row.AddBadge(RestartBadge("immer"));
@@ -9285,6 +9401,7 @@ public partial class DiagGui : Form
             {
                 lblOptCatTitle.Text = k[1];
                 lblOptCatDesc.Text = k[2];
+                if (lblOptCatCount != null) lblOptCatCount.Text = OptZaehlerText(OptZaehler(optItems, key));
                 break;
             }
         }
@@ -9317,18 +9434,75 @@ public partial class DiagGui : Form
         if (lblOptInfo != null)
         {
             string name = key == "M" ? "Minimal" : key == "S" ? "Leos Empfehlung" : key == "E" ? "Erweitert" : "";
-            int n = SelectedOptIds().Count;
+            int n = SelectedOptIds().Count, ak = 0;
+            foreach (OptItem it in optItems) if (it.Gesperrt) ak++;
             lblOptInfo.Text = (name.Length > 0 ? "Vorlage " + name + ": " + n + " Einträge gewählt." : "Keine Einträge gewählt.")
+                + (ak > 0 ? " " + ak + " Einträge sind bereits aktiv und bleiben unverändert." : "")
                 + (DomainPc ? "  Dieser PC ist Mitglied einer Domäne" + (skip == 1 ? "; 1 verwalteter Eintrag ist nicht gewählt" : skip > 1 ? "; " + skip + " verwaltete Einträge sind nicht gewählt" : "") + ". Gruppenrichtlinien können Einstellungen wieder überschreiben." : "");
             lblOptInfo.ForeColor = DomainPc ? UI.Warn : UI.Muted;
         }
     }
 
-    List<string> SelectedOptIds()
+    // Für den Lauf: gewählt und nicht bereits aktiv (ab v4.05)
+    List<string> SelectedOptIds() { return GewaehlteOptIds(optItems); }
+
+    // Für Vorlagen: die Auswahl einschließlich gesperrter Einträge, damit eine Vorlage auf einem anderen PC gleich wirkt
+    List<string> ChosenOptIds()
     {
         List<string> r = new List<string>();
         foreach (OptItem it in optItems) if (it.Box != null && it.Box.Checked) r.Add(it.Id);
         return r;
+    }
+
+    public const string OptGesperrtHinweis = "Ist auf diesem PC schon so eingestellt. Zur\u00FCcknehmen auf der Seite \u00C4nderungen.";
+
+    public static List<string> GewaehlteOptIds(List<OptItem> items)
+    {
+        List<string> r = new List<string>();
+        foreach (OptItem it in items) if (it.Box != null && it.Box.Checked && !it.Gesperrt) r.Add(it.Id);
+        return r;
+    }
+
+    // Haken (Auswahl) und Schalter (Anzeige) eines Eintrags verbinden. Gesperrt zeigt der Schalter An und folgt dem
+    // Haken nicht; Klicks auf Schalter und Zeile wirken nicht (ToggleSwitch.Locked).
+    public static void VerbindeOptEintrag(OptItem it, EventHandler geaendert)
+    {
+        OptItem r = it;
+        it.Toggle.CheckedChanged += delegate {
+            if (!r.Gesperrt && r.Box.Checked != r.Toggle.Checked) r.Box.Checked = r.Toggle.Checked;
+        };
+        it.Box.CheckedChanged += delegate {
+            if (!r.Gesperrt && r.Toggle.Checked != r.Box.Checked) r.Toggle.Checked = r.Box.Checked;
+            if (geaendert != null) geaendert(r, EventArgs.Empty);
+        };
+    }
+
+    public static void SperreOptEintrag(OptItem it, bool gesperrt)
+    {
+        if (it == null || it.Toggle == null) return;
+        it.Gesperrt = gesperrt;
+        it.Toggle.Locked = gesperrt;
+        it.Toggle.Checked = gesperrt || (it.Box != null && it.Box.Checked);
+        if (it.Row != null) { it.Row.Cursor = gesperrt ? Cursors.Default : Cursors.Hand; it.Row.Invalidate(); }
+    }
+
+    // Zähler einer Kategorie: [0] gewählt (ohne gesperrte), [1] bereits aktiv, [2] Einträge
+    public static int[] OptZaehler(List<OptItem> items, string kat)
+    {
+        int[] z = new int[3];
+        foreach (OptItem it in items)
+        {
+            if (it.Kat != kat) continue;
+            z[2]++;
+            if (it.Gesperrt) z[1]++;
+            else if (it.Box != null && it.Box.Checked) z[0]++;
+        }
+        return z;
+    }
+
+    public static string OptZaehlerText(int[] z)
+    {
+        return z[0] + " gew\u00E4hlt \u00B7 " + (z[1] > 0 ? z[1] + " bereits aktiv \u00B7 " : "") + z[2] + " Eintr\u00E4ge";
     }
 
     void UpdateOptCounts()
@@ -9336,10 +9510,10 @@ public partial class DiagGui : Form
         foreach (string[] k in optCats)
         {
             string key = k[0];
-            int a = 0, n = 0;
-            foreach (OptItem it in optItems) if (it.Kat == key) { a++; if (it.Box != null && it.Box.Checked) n++; }
-            if (optPickers.ContainsKey(key)) optPickers[key].SetCounts(n, a);
-            if (optCatCount.ContainsKey(key)) optCatCount[key].CountText = n + " von " + a + " gew\u00E4hlt";
+            int[] z = OptZaehler(optItems, key);
+            if (optPickers.ContainsKey(key)) optPickers[key].SetCounts(z[0], z[2], z[1]);
+            if (optCatCount.ContainsKey(key)) optCatCount[key].CountText = z[0] + " von " + z[2] + " gew\u00E4hlt";
+            if (key == curOptKey && lblOptCatCount != null) lblOptCatCount.Text = OptZaehlerText(z);
         }
     }
 
@@ -9422,11 +9596,14 @@ public partial class DiagGui : Form
             if (it == null || it.Box == null) continue;
             it.Zustand = x[2]; it.ZustandText = x.Length > 3 ? x[3].Replace("¦", "|") : "";
             if (it.Zustand == "aktiv") a++; else if (it.Zustand == "teilweise") t++; else if (it.Zustand == "offen") o++; else if (it.Zustand == "nicht zutreffend") nz++; else np++;
+            SperreOptEintrag(it, it.Zustand == "aktiv");
             it.Box.Text = OptBoxText(it); Tip(it.Box, OptTipText(it));
             if (it.Row != null) { string tt = OptTipText(it); Tip(it.Row, tt); if (it.Toggle != null) Tip(it.Toggle, tt); }
         }
-        SetText(lblOptState, (a + t + o + nz + np) == 0 ? "Zustand nicht lesbar: keine Rückmeldung vom Arbeitsprozess." : "Zustand auf diesem PC: " + a + " bereits aktiv, " + t + " teilweise, " + o + " offen, " + nz + " nicht zutreffend, " + np + " nicht prüfbar (Bereinigung, Werkzeuge)." + (user.Length > 0 ? "  " + user + "." : ""));
+        SetText(lblOptState, (a + t + o + nz + np) == 0 ? "Zustand nicht lesbar: keine Rückmeldung vom Arbeitsprozess." : "Zustand auf diesem PC: " + a + " bereits aktiv (Schalter gesperrt), " + t + " teilweise, " + o + " offen, " + nz + " nicht zutreffend, " + np + " nicht prüfbar (Bereinigung, Werkzeuge)." + (user.Length > 0 ? "  " + user + "." : ""));
         lblOptState.ForeColor = UI.Muted;
+        UpdateOptCounts();
+        UpdateSummary();
     }
 
     // Ergebnis eines Eintrags während des Laufs (@@OPTE|Id|Ergebnis|Änderungen|Details): Häkchen zeigt den neuen Stand
@@ -9435,9 +9612,13 @@ public partial class DiagGui : Form
         OptItem it = optItems.Find(delegate(OptItem i) { return i.Id == Get(p, 1); });
         if (it == null || it.Box == null) return;
         string erg = Get(p, 2);
-        it.Zustand = (erg == "angewendet" || erg == "bereits so") ? "aktiv" : erg;
+        it.Zustand = (erg == "angewendet" || erg == "bereits so" || erg == "bereits aktiv") ? "aktiv" : erg;
         it.ZustandText = Get(p, 4).Replace("¦", "|");
+        // ab v4.05: angewendete und bereits aktive Einträge danach gesperrt
+        SperreOptEintrag(it, it.Zustand == "aktiv");
         it.Box.Text = OptBoxText(it); Tip(it.Box, OptTipText(it));
+        if (it.Row != null) { string tt = OptTipText(it); Tip(it.Row, tt); if (it.Toggle != null) Tip(it.Toggle, tt); }
+        UpdateOptCounts();
     }
 
     void FetchOptTools()
@@ -9456,7 +9637,7 @@ public partial class DiagGui : Form
         int ver = 0;
         foreach (OptItem it in optItems)
         {
-            if (!it.Box.Checked) continue;
+            if (!it.Box.Checked || it.Gesperrt) continue;
             if (it.Verwaltet && DomainPc) ver++;
             if (punkte != null) punkte.Add(new StartPunkt("Optimierung", it.Titel, it.Risiko, it.Neustart));
         }
@@ -10039,7 +10220,7 @@ public partial class DiagGui : Form
             t = m + 1;
         }
         else if (mod == 3) { for (int i = 0; i < repChk.Length; i++) if (repChk[i].Checked) t += repMinutes[i]; }
-        else if (mod == 4) { int n = 0; foreach (OptItem it in optItems) if (it.Box.Checked) { n++; t += it.Minuten; } t += 1 + n / 40; }
+        else if (mod == 4) { int n = 0; foreach (OptItem it in optItems) if (it.Box.Checked && !it.Gesperrt) { n++; t += it.Minuten; } t += 1 + n / 40; }
         return t;
     }
 
@@ -10658,7 +10839,7 @@ public partial class DiagGui : Form
         PutCb(d, "Last.AbbruchCpu", cmbLAbortCpu); PutCb(d, "Last.AbbruchGpu", cmbLAbortGpu);
         for (int i = 0; i < repKeys.Length && repChk != null; i++) d["Rep." + repKeys[i]] = repChk[i].Checked;
         PutC(d, "Rep.Wiederherstellungspunkt", chkRestorePoint);
-        d["Opt.Auswahl"] = String.Join(",", SelectedOptIds().ToArray());
+        d["Opt.Auswahl"] = String.Join(",", ChosenOptIds().ToArray());
         PutC(d, "Opt.Wiederherstellungspunkt", chkOptRestore);
         PutC(d, "Allg.Anonymisieren", chkAnon);
         if (cmbDriver != null) d["Sensor.Treiber"] = driverValues[Math.Max(0, cmbDriver.SelectedIndex)];
@@ -11014,6 +11195,7 @@ public partial class DiagGui : Form
         }
         catch (Exception ex) { MessageBox.Show(this, "PowerShell konnte nicht gestartet werden: " + ex.Message, "Leos Minibench", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
         StopOptStateCheck();   // Messungen nicht durch den Zustandsprozess belasten
+        StopSoftwareStateCheck();
         running = true;
         for (int i = 0; i < nav.Count; i++) { nav[i].Running = false; nav[i].Invalidate(); }
         contentHost.Visible = false;
@@ -11297,6 +11479,7 @@ public partial class DiagGui : Form
     {
         // Live-Ansicht sauber beenden, damit ein vorübergehend installierter Treiber entfernt wird
         if (liveRunning) StopLiveAndWait();
+        StopSoftwareStateCheck();
         StopOptStateCheck();
         if (!running) { CleanupDriver(); return; }
         if (MessageBox.Show(this, "Der Lauf ist noch aktiv. Abbrechen und schließen?", "Leos Minibench", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) { e.Cancel = true; return; }
@@ -12451,6 +12634,18 @@ public class ToggleSwitch : Control
         }
     }
 
+    // ab v4.05: gesperrt (Optimierung: Eintrag ist auf diesem PC schon so eingestellt). Der Schalter zeigt seinen Stand
+    // in Grün, reagiert nicht auf Klick und Leertaste und wird nicht ausgegraut wie ein deaktiviertes Element.
+    bool locked;
+    public bool Locked
+    {
+        get { return locked; }
+        set { if (locked != value) { locked = value; Cursor = value ? Cursors.Default : Cursors.Hand; AccessibleDescription = value ? "gesperrt" : null; Invalidate(); } }
+    }
+
+    // Umschalten durch den Nutzer (Klick, Leertaste, Klick auf die Zeile); gesperrt ohne Wirkung
+    public void UserToggle() { if (!locked) Checked = !Checked; }
+
     protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
     protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
     protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
@@ -12461,7 +12656,7 @@ public class ToggleSwitch : Control
         if (e.Button == MouseButtons.Left)
         {
             Focus();
-            Checked = !Checked;
+            UserToggle();
         }
         base.OnMouseClick(e);
     }
@@ -12470,7 +12665,7 @@ public class ToggleSwitch : Control
     {
         if (e.KeyCode == Keys.Space)
         {
-            Checked = !Checked;
+            UserToggle();
             e.Handled = true;
         }
         base.OnKeyDown(e);
@@ -12496,7 +12691,7 @@ public class ToggleSwitch : Control
         {
             if (isChecked)
             {
-                Color fillColor = hover ? UI.AccentHover : UI.Accent;
+                Color fillColor = locked ? UI.Ok : hover ? UI.AccentHover : UI.Accent;
                 using (SolidBrush b = new SolidBrush(fillColor)) g.FillPath(b, trackPath);
                 using (Pen p = new Pen(fillColor, 1f)) g.DrawPath(p, trackPath);
             }
@@ -12743,6 +12938,15 @@ public class CategoryPickerItem : Control
         Invalidate();
     }
 
+    // ab v4.05: bereits aktive Einträge (Optimierung) als grüne Pille neben dem Zähler, 0 = keine Pille
+    int activeCount = 0;
+    public int ActiveCount { get { return activeCount; } set { if (activeCount != value) { activeCount = value; Invalidate(); } } }
+    public void SetCounts(int chk, int total, int active)
+    {
+        checkedCount = chk; totalCount = total; activeCount = active;
+        Invalidate();
+    }
+
     protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
     protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
     protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
@@ -12826,6 +13030,27 @@ public class CategoryPickerItem : Control
                 g.FillPath(sb, bp);
 
             TextRenderer.DrawText(g, badgeText, fb, br, bfg, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+
+            if (activeCount > 0)
+            {
+                // grüne Pille "5 ✓" links neben dem Zähler
+                string at = activeCount.ToString();
+                using (Font fi = UI.SymbolFont(7f))
+                {
+                    Size asz = TextRenderer.MeasureText(g, at, fb, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding);
+                    int icoW = UI.S(10);
+                    int aw = asz.Width + icoW + UI.S(14);
+                    Rectangle ar = new Rectangle(badgeX - aw - UI.S(4), badgeY, aw, badgeH);
+                    Color abg = UI.IsDark ? Color.FromArgb(28, 58, 36) : Color.FromArgb(221, 244, 228);
+                    Color afg = UI.IsDark ? Color.FromArgb(120, 214, 140) : Color.FromArgb(16, 112, 58);
+                    using (GraphicsPath ap = UI.Round(new RectangleF(ar.X, ar.Y, ar.Width - 1, ar.Height - 1), (badgeH - 1) / 2f))
+                    using (SolidBrush asb = new SolidBrush(abg))
+                        g.FillPath(asb, ap);
+                    TextRenderer.DrawText(g, at, fb, new Rectangle(ar.X + UI.S(6), ar.Y, asz.Width + UI.S(2), ar.Height), afg, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                    TextRenderer.DrawText(g, UI.IcoCheck, fi, new Rectangle(ar.X + UI.S(7) + asz.Width, ar.Y, icoW + UI.S(2), ar.Height), afg, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                    badgeW += aw + UI.S(4);
+                }
+            }
         }
 
         int textW = Width - x - badgeW - UI.S(14);
@@ -13037,7 +13262,7 @@ public class SettingRow : Control
         if (e.Button == MouseButtons.Left)
         {
             Focus();
-            if (toggle != null) toggle.Checked = !toggle.Checked;
+            if (toggle != null) toggle.UserToggle();
         }
         base.OnMouseClick(e);
     }
@@ -13046,7 +13271,7 @@ public class SettingRow : Control
     {
         if (e.KeyCode == Keys.Space)
         {
-            if (toggle != null) toggle.Checked = !toggle.Checked;
+            if (toggle != null) toggle.UserToggle();
             e.Handled = true;
         }
         base.OnKeyDown(e);
@@ -13320,6 +13545,108 @@ public class FluentCard : Control
             }
         }
     }
+}
+
+// ab v4.05: kompakte Zeile der Seite Tools (Werkzeug oder Windows-Schnellstarter). Zwei Textzeilen statt der 68 px hohen
+// FluentCard: oben Name und Zustand, darunter eine Zeile Beschreibung; rechts die Hauptaktion und optional "…" mit Menü.
+public class ToolRow : Control
+{
+    string title = "", desc = "", icon = "", status = "", statusLevel = "skip";
+    bool hover;
+    Button mainButton, moreButton;
+
+    public ToolRow(string title, string desc, string icon)
+    {
+        this.title = title ?? ""; this.desc = desc ?? ""; this.icon = icon ?? "";
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        BackColor = UI.Panel;
+        Size = new Size(UI.S(480), UI.S(50));
+        Margin = new Padding(0, 0, 0, UI.S(6));
+        AccessibleRole = AccessibleRole.ListItem;
+        AccessibleName = this.title;
+    }
+
+    public string Title { get { return title; } set { title = value ?? ""; AccessibleName = title; Invalidate(); } }
+    public string Description { get { return desc; } set { desc = value ?? ""; Invalidate(); } }
+    public string StatusText { get { return status; } set { status = value ?? ""; Invalidate(); } }
+    public string StatusLevel { get { return statusLevel; } set { statusLevel = value ?? "skip"; Invalidate(); } }
+
+    public Button MainButton
+    {
+        get { return mainButton; }
+        set { if (mainButton != null) Controls.Remove(mainButton); mainButton = value; if (value != null) Controls.Add(value); LayoutControls(); Invalidate(); }
+    }
+
+    // Knopf "…" für seltene Aktionen (Ordner öffnen, Herstellerseite)
+    public Button MoreButton
+    {
+        get { return moreButton; }
+        set { if (moreButton != null) Controls.Remove(moreButton); moreButton = value; if (value != null) Controls.Add(value); LayoutControls(); Invalidate(); }
+    }
+
+    void LayoutControls()
+    {
+        int right = Width - UI.S(10);
+        if (moreButton != null) { moreButton.Location = new Point(right - moreButton.Width, (Height - moreButton.Height) / 2); right -= moreButton.Width + UI.S(6); }
+        if (mainButton != null) mainButton.Location = new Point(right - mainButton.Width, (Height - mainButton.Height) / 2);
+    }
+
+    protected override void OnResize(EventArgs e) { base.OnResize(e); LayoutControls(); }
+    protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+        RectangleF r = new RectangleF(1, 1, Width - 3, Height - 3);
+        Color bg = hover ? (UI.IsDark ? Color.FromArgb(42, 44, 46) : Color.FromArgb(250, 251, 253)) : UI.Panel;
+        Color border = hover ? (UI.IsDark ? Color.FromArgb(80, 82, 85) : Color.FromArgb(209, 213, 219)) : UI.Line;
+        using (GraphicsPath p = UI.Round(r, UI.SF(6)))
+        {
+            using (SolidBrush b = new SolidBrush(bg)) g.FillPath(b, p);
+            using (Pen pen = new Pen(border, 1f)) g.DrawPath(pen, p);
+        }
+        int x = UI.S(12);
+        if (icon.Length > 0)
+        {
+            int ico = UI.S(22);
+            using (Font fi = UI.SymbolFont(12f))
+                TextRenderer.DrawText(g, icon, fi, new Rectangle(x, (Height - ico) / 2, ico, ico), UI.Accent, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            x += ico + UI.S(10);
+        }
+        int right = Width - UI.S(10);
+        if (mainButton != null) right = Math.Min(right, mainButton.Left);
+        if (moreButton != null) right = Math.Min(right, moreButton.Left);
+        int textW = Math.Max(UI.S(60), right - UI.S(10) - x);
+        Font ft = FontTitel, fd = FontDetail;
+        Size tsz = TextRenderer.MeasureText(g, title, ft, new Size(textW, int.MaxValue), TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
+        int th = tsz.Height, dh = desc.Length > 0 ? fd.Height : 0;
+        int y = (Height - th - (dh > 0 ? dh + UI.S(1) : 0)) / 2;
+        TextRenderer.DrawText(g, title, ft, new Rectangle(x, y, textW, th), UI.Text, TextFormatFlags.Left | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
+        if (status.Length > 0)
+        {
+            using (Font fs = new Font("Segoe UI Semibold", 8f))
+            {
+                Size ss = TextRenderer.MeasureText(g, status, fs, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding);
+                int bx = x + Math.Min(tsz.Width, textW) + UI.S(8), bw = ss.Width + UI.S(12), bh = Math.Max(UI.S(16), ss.Height + UI.S(2));
+                if (bx + bw <= x + textW)
+                {
+                    Color sfg, sbg; UI.BadgeColors(statusLevel, out sfg, out sbg);
+                    Rectangle br = new Rectangle(bx, y + (th - bh) / 2, bw, bh);
+                    using (GraphicsPath bp = UI.Round(new RectangleF(br.X, br.Y, br.Width - 1, br.Height - 1), (bh - 1) / 2f)) using (SolidBrush sb = new SolidBrush(sbg)) g.FillPath(sb, bp);
+                    TextRenderer.DrawText(g, status, fs, br, sfg, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                }
+            }
+        }
+        if (dh > 0)
+            TextRenderer.DrawText(g, desc, fd, new Rectangle(x, y + th + UI.S(1), textW, dh), UI.Muted, TextFormatFlags.Left | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
+    }
+
+    static Font fontTitel, fontDetail;
+    static Font FontTitel { get { if (fontTitel == null) fontTitel = new Font("Segoe UI Semibold", 9.5f); return fontTitel; } }
+    static Font FontDetail { get { if (fontDetail == null) fontDetail = new Font("Segoe UI", 8.5f); return fontDetail; } }
 }
 
 class FlatBar : Control
@@ -13987,12 +14314,15 @@ public class ContractStep
 }
 
 // Katalogeintrag der Optimierung (Get-OptGuiLines)
-class OptItem
+public class OptItem
 {
     public string Id = "", Kat = "", Risiko = "", Neustart = "", Vorlagen = "", Bedingung = "", Titel = "", Tip = "", Zustand = "", ZustandText = "";
     public bool Verwaltet; public int Minuten; public CheckBox Box; public ToggleSwitch Toggle; public SettingRow Row;
     public Badge StateBadge;   // ab v3.64: Zustand auf diesem PC als Etikett neben dem Eintrag
     public Badge VerwaltetBadge;   // ab v4.01: Etikett "verwaltet", die Zeile selbst entsteht erst beim Öffnen der Kategorie
+    // ab v4.05: Zustand "aktiv" (Hintergrundprüfung oder Ergebnis eines Laufs). Der Schalter steht dann auf An und ist
+    // gesperrt; Box hält weiter die Auswahl aus Vorlage oder Hand (wird gespeichert), ausgeführt wird der Eintrag nicht.
+    public bool Gesperrt;
 }
 
 // Netzlaufwerk als Spiegel der Nutzerdaten (ab v3.54). Die Oberfläche arbeitet immer im Datenordner auf dem Stick;
@@ -15679,248 +16009,374 @@ public partial class DiagGui
         MessageBox.Show(this, lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Keine Rückmeldung vom Arbeitsprozess.", "Rückgängig", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
-    // ab v3.64: Seite ohne eigenen Bildlaufbereich (vorher zwei Bildlaufleisten), Werkzeugkarten mit Zustandsetikett und
-    // festen Knopfspalten, Netzlaufwerk als eigener Bereich, Paketauswahl ohne IDs im Text
+    // ab v4.05: kompakte Zeilen statt 68 px hoher Karten, bei breitem Fenster in zwei Spalten (vorher feste Gruppenbreite,
+    // die rechte Hälfte blieb leer). Die sechs portablen Werkzeuge stehen zusammen, darunter die Windows-Schnellstarter
+    // und die Softwarepakete als Liste in Spalten je Gruppe. Der Abschnitt Netzlaufwerk entfällt (Einstellungen › Daten
+    // und Datenschutz). "Neu scannen" und "Tools-Ordner" stehen rechts im Seitenkopf.
+    Action toolsLayout;
+    Panel toolsKopf;
+    List<FlowLayoutPanel> toolsRaster = new List<FlowLayoutPanel>();
+    List<FlowLayoutPanel> paketZeilen = new List<FlowLayoutPanel>();
+    Dictionary<string, CheckBox> paketBoxen = new Dictionary<string, CheckBox>(StringComparer.OrdinalIgnoreCase);
+    Dictionary<string, string[]> paketInfo = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);   // Id -> Name, Beschreibung
+    Label lblPaketZustand;
+    public static string[] SoftwarePakete = new string[0];   // Zeilen aus Get-SoftwarePaketGuiLines (G|Gruppe, P|Gruppe|Id|Name|Beschreibung)
+
+    // Breite der Inhaltsfläche der Seiten (ohne Seitenrand und Bildlaufleiste)
+    int SeitenBreite()
+    {
+        if (content == null) return UI.S(UI.Gruppenbreite);
+        int w = content.ClientSize.Width - content.Padding.Horizontal - UI.S(4);
+        return Math.Max(UI.S(UI.Gruppenbreite), w);
+    }
+
+    // Zwei Spalten ab dieser Breite, sonst eine (Zeilen bleiben mindestens 440 px breit)
+    public static int ToolSpalten(int breite) { return breite >= UI.S(900) ? 2 : 1; }
+
     Control BuildToolsPage()
     {
-        FlowLayoutPanel f = Page("Tools", "Portable Werkzeuge und Windows-Schnellstarter für gründliche Deinstallation, Partitionierung, Speicherplatzanalyse, Geräte und den Neustart in die Firmware.", -1);
+        FlowLayoutPanel f = Page("Tools", "Portable Werkzeuge, Windows-Schnellstarter und Softwarepakete über winget.", -1);
+        toolsRaster.Clear(); paketZeilen.Clear(); paketBoxen.Clear(); paketInfo.Clear();
 
-        FlowLayoutPanel topBar = Row(); topBar.Margin = new Padding(0, UI.S(UI.Abstand1), 0, 0);
-        Button btnRefreshTools = UI.Secondary("Neu scannen");
-        btnRefreshTools.Margin = new Padding(0);
-        Tip(btnRefreshTools, "Prüft erneut auf vorhandene portable Werkzeuge und Systeminstallationen.");
-        Button btnOpenToolsDir = UI.Secondary("Tools-Ordner");
-        btnOpenToolsDir.Margin = new Padding(UI.S(8), 0, 0, 0);
+        // Seitenkopf: Titel und Einleitung links, die beiden Knöpfe rechts
+        Control lt = f.Controls[0], lh = f.Controls[1];
+        f.Controls.Clear();
+        TableLayoutPanel kopf = new TableLayoutPanel(); kopf.ColumnCount = 2; kopf.RowCount = 1; kopf.AutoSize = true; kopf.Margin = new Padding(0);
+        kopf.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); kopf.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        FlowLayoutPanel kt = new FlowLayoutPanel(); kt.FlowDirection = FlowDirection.TopDown; kt.WrapContents = false; kt.AutoSize = true; kt.Margin = new Padding(0);
+        kt.Controls.Add(lt); kt.Controls.Add(lh);
+        FlowLayoutPanel kb = new FlowLayoutPanel(); kb.AutoSize = true; kb.WrapContents = false; kb.Margin = new Padding(0, UI.S(4), 0, 0); kb.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        Button btnRefreshTools = UI.Secondary("Neu scannen"); btnRefreshTools.Margin = new Padding(0);
+        Tip(btnRefreshTools, "Prüft erneut auf portable Werkzeuge im Tools-Ordner und auf Installationen, dazu die installierten Softwarepakete.");
+        Button btnOpenToolsDir = UI.Secondary("Tools-Ordner"); btnOpenToolsDir.Margin = new Padding(UI.S(8), 0, 0, 0);
         Tip(btnOpenToolsDir, "Öffnet den Ordner Minibench-Daten\\Tools im Windows Explorer.");
-        btnOpenToolsDir.Click += delegate {
-            string td = Path.Combine(dataDir, "Tools");
-            try { Directory.CreateDirectory(td); } catch { }
-            OpenShell(td);
+        btnOpenToolsDir.Click += delegate { string td = Path.Combine(dataDir, "Tools"); try { Directory.CreateDirectory(td); } catch { } OpenShell(td); };
+        kb.Controls.Add(btnRefreshTools); kb.Controls.Add(btnOpenToolsDir);
+        kopf.Controls.Add(kt, 0, 0); kopf.Controls.Add(kb, 1, 0);
+        toolsKopf = kopf;
+        f.Controls.Add(kopf);
+
+        // 1. Portable Werkzeuge (CPU-Z, GPU-Z, MSI Afterburner, Revo, Partition Wizard, WizTree)
+        f.Controls.Add(Section("Portable Werkzeuge"));
+        f.Controls.Add(Hint("Liegt ein Werkzeug im Ordner Minibench-Daten\\Tools, startet Leos Minibench diese Version ohne Installation, sonst eine vorhandene Installation. Heruntergeladen wird nichts automatisch.", 0));
+        FlowLayoutPanel rw = ToolRaster(); f.Controls.Add(rw);
+        Action fuelleWerkzeuge = delegate {
+            rw.SuspendLayout();
+            rw.Controls.Clear();
+            string pf = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), pf86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+            rw.Controls.Add(ToolZeile("CPU-Z", "Prozessor, Mainboard, Arbeitsspeicher mit Timings.", UI.IcoCpu, "CPU-Z",
+                new string[] { "cpuz_x64.exe", "cpuz_x32.exe", "cpuz.exe" }, new string[] { "CPU-Z" },
+                new string[] { Path.Combine(pf, @"CPUID\CPU-Z\cpuz.exe"), Path.Combine(pf86, @"CPUID\CPU-Z\cpuz.exe") },
+                "https://www.cpuid.com/softwares/cpu-z.html", ""));
+            rw.Controls.Add(ToolZeile("GPU-Z", "Grafikkarte mit Takt, Sensoren, PCIe und BIOS.", UI.IcoGpu, "GPU-Z",
+                new string[] { "GPU-Z*.exe" }, new string[] { "GPU-Z" },
+                new string[] { Path.Combine(pf86, @"GPU-Z\GPU-Z.exe"), Path.Combine(pf, @"GPU-Z\GPU-Z.exe") },
+                "https://www.techpowerup.com/gpuz/", "Portabel: GPU-Z.<Version>.exe in den Tools-Ordner legen und beim ersten Start \"Nein\" für die Installation wählen; bei mehreren Dateien gilt die neueste Version."));
+            rw.Controls.Add(ToolZeile("MSI Afterburner", "Takt, Lüfterkurve und Overlay der Grafikkarte.", UI.IcoFlame, "MSIAfterburner",
+                new string[] { "MSIAfterburner.exe" }, new string[] { "MSI Afterburner" },
+                new string[] { Path.Combine(pf86, @"MSI Afterburner\MSIAfterburner.exe"), Path.Combine(pf, @"MSI Afterburner\MSIAfterburner.exe") },
+                "https://www.msi.com/Landing/afterburner/graphics-cards", "Nur als Setup erhältlich; es braucht Administratorrechte und bietet RivaTuner Statistics Server (Overlay, Bildratenbegrenzung) zur Installation mit an."));
+            rw.Controls.Add(ToolZeile("Revo Uninstaller", "Gründlich deinstallieren, mit Resten.", UI.IcoEntfernen, "RevoUninstaller",
+                new string[] { "RevoUPort.exe", "RevoUnin.exe", "RevoUninPro.exe", "RevoUninstaller_Portable.exe" }, new string[] { "Revo Uninstaller" },
+                new string[] { Path.Combine(pf, @"VS Revo Group\Revo Uninstaller\RevoUnin.exe"), Path.Combine(pf86, @"VS Revo Group\Revo Uninstaller\RevoUnin.exe"),
+                    Path.Combine(pf, @"VS Revo Group\Revo Uninstaller Pro\RevoUninPro.exe"), Path.Combine(pf86, @"VS Revo Group\Revo Uninstaller Pro\RevoUninPro.exe") },
+                "https://www.revouninstaller.com/revo-uninstaller-free-download/", ""));
+            rw.Controls.Add(ToolZeile("MiniTool Partition Wizard", "Partitionieren und Dateisysteme konvertieren.", UI.IcoDisk, "PartitionWizard",
+                new string[] { "partitionwizard.exe", "PartitionWizard.exe", "MiniToolPartitionWizard.exe" }, new string[] { "Partition Wizard", "MiniTool Partition Wizard" },
+                new string[] { Path.Combine(pf, @"MiniTool Partition Wizard 12\partitionwizard.exe"), Path.Combine(pf86, @"MiniTool Partition Wizard 12\partitionwizard.exe"),
+                    Path.Combine(pf, @"MiniTool Partition Wizard\partitionwizard.exe"), Path.Combine(pf86, @"MiniTool Partition Wizard\partitionwizard.exe") },
+                "https://www.partitionwizard.com/free-partition-manager.html", ""));
+            rw.Controls.Add(ToolZeile("WizTree", "Speicherplatzanalyse direkt aus der MFT.", UI.IcoTorte, "WizTree",
+                new string[] { "WizTree64.exe", "WizTree.exe" }, new string[] { "WizTree" },
+                new string[] { Path.Combine(pf, @"WizTree\WizTree64.exe"), Path.Combine(pf, @"WizTree\WizTree.exe"), Path.Combine(pf86, @"WizTree\WizTree.exe") },
+                "https://diskanalyzer.com/download", ""));
+            rw.ResumeLayout(true);
         };
-        topBar.Controls.Add(btnRefreshTools);
-        topBar.Controls.Add(btnOpenToolsDir);
-        f.Controls.Add(topBar);
+        fuelleWerkzeuge();
 
-        FlowLayoutPanel pnlCards = new FlowLayoutPanel();
-        pnlCards.AutoSize = true; pnlCards.FlowDirection = FlowDirection.TopDown; pnlCards.WrapContents = false;
-        pnlCards.BackColor = UI.Panel; pnlCards.Margin = new Padding(0);
-
-        Action populateCards = delegate {
-            pnlCards.SuspendLayout();
-            pnlCards.Controls.Clear();
-            int cardW = UI.S(UI.Gruppenbreite); int cardH = UI.S(68);
-
-            // 1. Portable Werkzeuge
-            pnlCards.Controls.Add(Section("Portable Werkzeuge"));
-            pnlCards.Controls.Add(Hint("Liegen portable Versionen im Ordner Minibench-Daten\\Tools, nutzt Leos Minibench diese ohne Installation, sonst eine vorhandene Systeminstallation.", 0));
-
-            pnlCards.Controls.Add(ToolCard("Revo Uninstaller", "Gründliche Deinstallation von Programmen mit Registry- und Dateiresten.", UI.IcoEntfernen,
-                "RevoUninstaller", new string[] { "RevoUPort.exe", "RevoUnin.exe", "RevoUninPro.exe", "RevoUninstaller_Portable.exe" }, new string[] { "Revo Uninstaller" },
-                new string[] {
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"VS Revo Group\Revo Uninstaller\RevoUnin.exe"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), @"VS Revo Group\Revo Uninstaller\RevoUnin.exe"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"VS Revo Group\Revo Uninstaller Pro\RevoUninPro.exe"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), @"VS Revo Group\Revo Uninstaller Pro\RevoUninPro.exe") },
-                "https://www.revouninstaller.com/revo-uninstaller-free-download/", cardW, cardH));
-            pnlCards.Controls.Add(ToolCard("MiniTool Partition Wizard", "Laufwerke partitionieren, Dateisysteme konvertieren und Datenträger verwalten.", UI.IcoDisk,
-                "PartitionWizard", new string[] { "partitionwizard.exe", "PartitionWizard.exe", "MiniToolPartitionWizard.exe" }, new string[] { "Partition Wizard", "MiniTool Partition Wizard" },
-                new string[] {
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"MiniTool Partition Wizard 12\partitionwizard.exe"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), @"MiniTool Partition Wizard 12\partitionwizard.exe"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"MiniTool Partition Wizard\partitionwizard.exe"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), @"MiniTool Partition Wizard\partitionwizard.exe") },
-                "https://www.partitionwizard.com/free-partition-manager.html", cardW, cardH));
-            pnlCards.Controls.Add(ToolCard("WizTree", "Schnelle Speicherplatzanalyse direkt aus der MFT des Laufwerks.", UI.IcoTorte,
-                "WizTree", new string[] { "WizTree64.exe", "WizTree.exe" }, new string[] { "WizTree" },
-                new string[] {
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"WizTree\WizTree64.exe"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"WizTree\WizTree.exe"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), @"WizTree\WizTree.exe") },
-                "https://diskanalyzer.com/download", cardW, cardH));
-
-            // 2. Softwarepakete installieren (winget)
-            pnlCards.Controls.Add(Section("Softwarepakete installieren"));
-            pnlCards.Controls.Add(Hint("Stille Installation gängiger Programme über den Windows-Paket-Manager (winget). Jede Installation steht danach auf der Seite Systemänderungen und lässt sich dort wieder entfernen.", 0));
-
-            // ab v3.65 als abgerundete Karte wie die Werkzeugkarten (vorher eckiger Rahmen)
-            CardPanel pnlWgBox = new CardPanel();
-            pnlWgBox.MinimumSize = new Size(cardW, 0);
-            pnlWgBox.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(12));
-            pnlWgBox.AutoSize = true;
-            pnlWgBox.Margin = new Padding(0, 0, 0, UI.S(12));
-
-            FlowLayoutPanel pnlWgInner = new FlowLayoutPanel();
-            pnlWgInner.Dock = DockStyle.Fill;
-            pnlWgInner.AutoSize = true;
-            pnlWgInner.FlowDirection = FlowDirection.TopDown;
-            pnlWgInner.WrapContents = false;
-
-            string wingetPath;
-            bool hasWinget = IsWingetAvailable(out wingetPath);
-
-            CheckBox chkChrome = Chk("Google Chrome", false); Tip(chkChrome, "Webbrowser Google Chrome, winget-Paket Google.Chrome");
-            CheckBox chkFirefox = Chk("Mozilla Firefox", false); Tip(chkFirefox, "Webbrowser Mozilla Firefox, winget-Paket Mozilla.Firefox");
-            CheckBox chkOpera = Chk("Opera", false); Tip(chkOpera, "Webbrowser Opera, winget-Paket Opera.Opera");
-            CheckBox chkSteam = Chk("Steam", false); Tip(chkSteam, "Spieleplattform Steam, winget-Paket Valve.Steam");
-            CheckBox chkDiscord = Chk("Discord", false); Tip(chkDiscord, "Chat- und Sprachprogramm Discord, winget-Paket Discord.Discord");
-            CheckBox chkNpp = Chk("Notepad++", false); Tip(chkNpp, "Texteditor Notepad++, winget-Paket Notepad++.Notepad++");
-            CheckBox chkOnlyOffice = Chk("ONLYOFFICE Desktop Editors", false); Tip(chkOnlyOffice, "Office-Programme ONLYOFFICE, winget-Paket ONLYOFFICE.DesktopEditors");
-            CheckBox chk7zip = Chk("7-Zip", false); Tip(chk7zip, "Packprogramm 7-Zip, winget-Paket 7zip.7zip");
-            CheckBox chkVlc = Chk("VLC Media Player", false); Tip(chkVlc, "Medienwiedergabe VLC, winget-Paket VideoLAN.VLC");
-            string[] cats = new string[] { "Web-Browser", "Gaming und Chat", "Produktivität und Werkzeuge" };
-            CheckBox[][] rows = new CheckBox[][] { new CheckBox[] { chkChrome, chkFirefox, chkOpera }, new CheckBox[] { chkSteam, chkDiscord }, new CheckBox[] { chkNpp, chkOnlyOffice, chk7zip, chkVlc } };
-            for (int ci = 0; ci < cats.Length; ci++)
+        // 2. Windows-Schnellstarter
+        f.Controls.Add(Section("Windows-Schnellstarter"));
+        FlowLayoutPanel rs = ToolRaster(); f.Controls.Add(rs);
+        ToolRow rUefi = new ToolRow("Ins BIOS/UEFI neu starten", "Sofortiger Neustart in das UEFI-Setup (shutdown /r /fw /t 0), nach Rückfrage.", UI.IcoAdmin);
+        Button bUefi = UI.Secondary("Neu starten"); bUefi.MinimumSize = new Size(UI.S(110), 0); bUefi.Margin = new Padding(0);
+        Tip(bUefi, "Prüft auf UEFI-Unterstützung und führt nach Bestätigung 'shutdown.exe /r /fw /t 0' aus.");
+        bUefi.Click += delegate {
+            if (!IsUefiFirmware())
             {
-                Label lc = Lbl(cats[ci], UI.SchriftText, true, UI.Text); lc.Margin = new Padding(0, ci == 0 ? 0 : UI.S(4), 0, UI.S(4)); pnlWgInner.Controls.Add(lc);
-                FlowLayoutPanel r = Row(); r.Margin = new Padding(0, 0, 0, UI.S(8));
-                foreach (CheckBox cb in rows[ci]) { cb.Margin = new Padding(UI.S(4), UI.S(3), UI.S(12), UI.S(3)); r.Controls.Add(cb); }
-                pnlWgInner.Controls.Add(r);
+                MessageBox.Show(this, "Dieser Computer verwendet ein klassisches BIOS oder meldet keine Unterstützung für den direkten Neustart in die UEFI-Firmware.", "BIOS/UEFI-Neustart", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
             }
-
-            FlowLayoutPanel rowWgActions = Row();
-            rowWgActions.Margin = new Padding(0, UI.S(4), 0, 0);
-            CheckBox[] allWgBoxes = new CheckBox[] { chkChrome, chkFirefox, chkOpera, chkSteam, chkDiscord, chkNpp, chkOnlyOffice, chk7zip, chkVlc };
-            string[] allWgIds = new string[] { "Google.Chrome", "Mozilla.Firefox", "Opera.Opera", "Valve.Steam", "Discord.Discord", "Notepad++.Notepad++", "ONLYOFFICE.DesktopEditors", "7zip.7zip", "VideoLAN.VLC" };
-            string[] allWgNames = new string[] { "Google Chrome", "Mozilla Firefox", "Opera", "Steam", "Discord", "Notepad++", "ONLYOFFICE Desktop Editors", "7-Zip", "VLC Media Player" };
-
-            Button btnInstallWg = UI.Primary("Ausgewählte installieren");
-            btnInstallWg.Margin = new Padding(0); btnInstallWg.Font = new Font("Segoe UI Semibold", UI.SchriftText); btnInstallWg.Padding = new Padding(UI.S(14), UI.S(3), UI.S(14), UI.S(3));
-            LinkLabel lnkWgAll = new LinkLabel(); lnkWgAll.Text = "Alle an"; lnkWgAll.AutoSize = true;
-            lnkWgAll.Margin = new Padding(UI.S(16), UI.S(7), UI.S(8), 0); lnkWgAll.LinkColor = UI.Accent;
-            Tip(lnkWgAll, "Alle Softwarepakete auswählen.");
-            LinkLabel lnkWgNone = new LinkLabel(); lnkWgNone.Text = "Alle aus"; lnkWgNone.AutoSize = true;
-            lnkWgNone.Margin = new Padding(0, UI.S(7), UI.S(8), 0); lnkWgNone.LinkColor = UI.Accent;
-            Tip(lnkWgNone, "Alle Softwarepakete abwählen.");
-            Label lblWgStatus = Lbl("", UI.SchriftHinweis, false, UI.Muted);
-            lblWgStatus.Margin = new Padding(UI.S(12), UI.S(7), 0, 0);
-            EventHandler wgCount = delegate {
-                int n = 0; foreach (CheckBox cb in allWgBoxes) if (cb.Checked) n++;
-                SetText(btnInstallWg, n > 0 ? "Ausgewählte installieren (" + n + ")" : "Ausgewählte installieren");
-            };
-            foreach (CheckBox cb in allWgBoxes) cb.CheckedChanged += wgCount;
-            lnkWgAll.LinkClicked += delegate { foreach (CheckBox cb in allWgBoxes) cb.Checked = true; };
-            lnkWgNone.LinkClicked += delegate { foreach (CheckBox cb in allWgBoxes) cb.Checked = false; };
-
-            if (!hasWinget)
-            {
-                btnInstallWg.Enabled = false;
-                lblWgStatus.Text = "winget ist auf diesem System nicht installiert.";
-                lblWgStatus.ForeColor = UI.Warn;
-                Tip(btnInstallWg, "winget ist auf diesem System nicht installiert.");
-            }
-            else
-            {
-                Tip(btnInstallWg, "Installiert die markierten Programme über winget im Hintergrund. Jede Installation steht danach auf der Seite Systemänderungen und lässt sich dort wieder entfernen; schon vorhandene Programme bleiben unberührt.");
-                btnInstallWg.Click += delegate {
-                    List<int> selIndices = new List<int>();
-                    for (int i = 0; i < allWgBoxes.Length; i++) {
-                        if (allWgBoxes[i].Checked) selIndices.Add(i);
-                    }
-                    if (selIndices.Count == 0) {
-                        MessageBox.Show(this, "Bitte mindestens ein Programm zur Installation auswählen.", "Softwarepakete installieren", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        return;
-                    }
-                    InstallWingetPackagesAsync(selIndices, allWgIds, allWgNames, lblWgStatus, btnInstallWg, allWgBoxes, lnkWgAll, lnkWgNone);
-                };
-            }
-
-            rowWgActions.Controls.Add(btnInstallWg);
-            rowWgActions.Controls.Add(lnkWgAll);
-            rowWgActions.Controls.Add(lnkWgNone);
-            rowWgActions.Controls.Add(lblWgStatus);
-
-            pnlWgInner.Controls.Add(rowWgActions);
-            pnlWgBox.Controls.Add(pnlWgInner);
-            pnlCards.Controls.Add(pnlWgBox);
-
-            // 3. Netzlaufwerk (vorher als Knopf zwischen den Werkzeugknöpfen)
-            pnlCards.Controls.Add(Section("Netzlaufwerk"));
-            FluentCard cNas = new FluentCard("Netzlaufwerk als Spiegel", "Berichte und Datenbank zusätzlich auf einem Netzlaufwerk spiegeln.", UI.IcoNetz);
-            cNas.Width = cardW; cNas.Height = cardH;
-            Button bNas = UI.Secondary("Einrichten ..."); bNas.MinimumSize = new Size(UI.S(130), 0);
-            Tip(bNas, "Richtet ein Netzlaufwerk als Spiegel der Berichte und der Datenbank ein. Werkzeuge bleiben immer auf dem Stick.");
-            bNas.Click += delegate { ShowConnectNasDialog(); };
-            cNas.ActionButton = bNas;
-            Tip(cNas, "Netzlaufwerk als Spiegel von Berichten und Datenbank. Abgeglichen wird nur über Aktualisieren; Werkzeuge bleiben immer auf dem Stick.");
-            pnlCards.Controls.Add(cNas);
-
-            // 4. Schnellstarter
-            pnlCards.Controls.Add(Section("Schnellstarter"));
-            pnlCards.Controls.Add(Hint("Direkter Aufruf der Windows-Verwaltungskonsolen und Neustart in die Firmware.", 0));
-
-            FluentCard cUefi = new FluentCard("Ins BIOS/UEFI neu starten", "Startet den Computer sofort neu und öffnet das UEFI-Setup (shutdown /r /fw /t 0).", "");
-            cUefi.Width = cardW; cUefi.Height = cardH;
-            Button bUefi = UI.Secondary("Neu starten"); bUefi.MinimumSize = new Size(UI.S(130), 0);
-            Tip(bUefi, "Prüft auf UEFI-Unterstützung und führt nach Bestätigung 'shutdown.exe /r /fw /t 0' aus.");
-            bUefi.Click += delegate {
-                if (!IsUefiFirmware())
-                {
-                    MessageBox.Show(this, "Dieser Computer verwendet ein klassisches BIOS oder meldet keine Unterstützung für den direkten Neustart in die UEFI-Firmware.", "BIOS/UEFI-Neustart", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-                if (MessageBox.Show(this, "Den Computer jetzt sofort neu starten und die UEFI/BIOS-Einstellungen öffnen?\r\n\r\nVorher alle geöffneten Dokumente und Arbeiten sichern.", "Ins BIOS/UEFI neu starten", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
-                {
-                    StartAdminProcess("shutdown.exe", "/r /fw /t 0");
-                }
-            };
-            cUefi.ActionButton = bUefi;
-            Tip(cUefi, "Startet das System neu und leitet direkt in das UEFI-Setup weiter.");
-            pnlCards.Controls.Add(cUefi);
-
-            pnlCards.Controls.Add(LauncherCard("Datenträgerverwaltung", "Partitionen anlegen, verkleinern und Laufwerksbuchstaben zuweisen (diskmgmt.msc).", UI.IcoOrdner, "diskmgmt.msc", "", cardW, cardH));
-            pnlCards.Controls.Add(LauncherCard("Geräte-Manager", "Hardware, Treiber und Ressourcen prüfen (devmgmt.msc).", UI.IcoGeraete, "devmgmt.msc", "", cardW, cardH));
-            pnlCards.Controls.Add(LauncherCard("Zuverlässigkeitsverlauf", "Stabilitätsindex mit Abstürzen, Warnungen und Fehlern im Zeitverlauf (perfmon /rel).", UI.IcoDiag, "perfmon.exe", "/rel", cardW, cardH));
-
-            pnlCards.ResumeLayout(true);
+            if (MessageBox.Show(this, "Den Computer jetzt sofort neu starten und die UEFI/BIOS-Einstellungen öffnen?\r\n\r\nVorher alle geöffneten Dokumente und Arbeiten sichern.", "Ins BIOS/UEFI neu starten", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                StartAdminProcess("shutdown.exe", "/r /fw /t 0");
         };
+        rUefi.MainButton = bUefi;
+        Tip(rUefi, "Startet das System neu und leitet direkt in das UEFI-Setup weiter.");
+        rs.Controls.Add(rUefi);
+        rs.Controls.Add(LauncherRow("Datenträgerverwaltung", "Partitionen anlegen, verkleinern, Laufwerksbuchstaben (diskmgmt.msc).", UI.IcoOrdner, "diskmgmt.msc", ""));
+        rs.Controls.Add(LauncherRow("Geräte-Manager", "Hardware, Treiber und Ressourcen prüfen (devmgmt.msc).", UI.IcoGeraete, "devmgmt.msc", ""));
+        rs.Controls.Add(LauncherRow("Zuverlässigkeitsverlauf", "Stabilitätsindex mit Abstürzen und Fehlern im Zeitverlauf (perfmon /rel).", UI.IcoDiag, "perfmon.exe", "/rel"));
 
-        btnRefreshTools.Click += delegate { populateCards(); ApplyThemeRecursive(pnlCards); };
-        populateCards();
-        f.Controls.Add(pnlCards);
+        // 3. Softwarepakete (winget), Liste aus Kern\Softwarepakete.psd1
+        f.Controls.Add(Section("Softwarepakete installieren"));
+        f.Controls.Add(Hint("Stille Installation über den Windows-Paket-Manager (winget). Jede Installation steht danach auf der Seite Änderungen und lässt sich dort wieder entfernen. Schon installierte Programme sind grün und gesperrt.", 0));
+        BuildSoftwareListe(f);
+
+        btnRefreshTools.Click += delegate { fuelleWerkzeuge(); ApplyThemeRecursive(rw); if (toolsLayout != null) toolsLayout(); StartSoftwareStateCheck(); };
+
+        toolsLayout = delegate {
+            int w = SeitenBreite();
+            int sp = ToolSpalten(w), gap = UI.S(12);
+            int zw = sp == 2 ? (w - gap) / 2 : w;
+            if (toolsKopf != null) toolsKopf.MinimumSize = new Size(w, 0);
+            foreach (FlowLayoutPanel r in toolsRaster)
+            {
+                // Größe selbst setzen: AutoSize behielt die Höhe der einspaltigen Anordnung beim ersten Aufbau
+                r.SuspendLayout();
+                int h = 0;
+                for (int i = 0; i < r.Controls.Count; i++)
+                {
+                    Control c = r.Controls[i];
+                    c.Width = zw;
+                    c.Margin = new Padding(0, 0, sp == 2 && i % 2 == 0 ? gap : 0, UI.S(6));
+                    if (i % sp == 0) h += c.Height + UI.S(6);
+                }
+                r.Size = new Size(w + 1, h);
+                r.ResumeLayout(true);
+            }
+            foreach (FlowLayoutPanel z in paketZeilen) { z.MaximumSize = new Size(Math.Max(UI.S(200), w - UI.S(160)), 0); }
+        };
+        if (content != null) content.Resize += delegate { if (toolsLayout != null) toolsLayout(); };
+        toolsLayout();
         return f;
     }
 
-    // Karte eines portablen Werkzeugs: Zustand als Etikett, links "Ordner", rechts die Hauptaktion (Starten oder Herunterladen)
-    FluentCard ToolCard(string title, string desc, string icon, string subDir, string[] exeNames, string[] regNames, string[] direct, string downloadUrl, int w, int h)
+    FlowLayoutPanel ToolRaster()
     {
-        FluentCard c = new FluentCard(title, desc, icon); c.Width = w; c.Height = h;
-        string path = FindToolPath(subDir, exeNames, regNames, direct);
-        Button bMain, bFolder = UI.Secondary("Ordner");
-        if (!String.IsNullOrEmpty(path))
+        FlowLayoutPanel r = new FlowLayoutPanel(); r.FlowDirection = FlowDirection.LeftToRight; r.WrapContents = true; r.AutoSize = false;
+        r.BackColor = UI.Panel; r.Margin = new Padding(0); r.Padding = new Padding(0);
+        toolsRaster.Add(r);
+        return r;
+    }
+
+    // Softwarepakete: je Gruppe eine Zeile mit der Überschrift links und den Paketen in gleich breiten Spalten
+    void BuildSoftwareListe(FlowLayoutPanel f)
+    {
+        List<string> gruppen = new List<string>();
+        List<string[]> pakete = new List<string[]>();
+        LiesPaketListe(SoftwarePakete, gruppen, pakete);
+        if (pakete.Count == 0) { f.Controls.Add(Hint("Die Paketliste fehlt (Skript ohne Kern\\Softwarepakete.psd1).", 0)); return; }
+
+        string[] allWgIds = new string[pakete.Count], allWgNames = new string[pakete.Count];
+        CheckBox[] allWgBoxes = new CheckBox[pakete.Count];
+        TableLayoutPanel t = new TableLayoutPanel(); t.ColumnCount = 2; t.AutoSize = true; t.AutoSizeMode = AutoSizeMode.GrowAndShrink; t.Margin = new Padding(0, 0, 0, UI.S(4));
+        t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(156))); t.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        int row = 0;
+        foreach (string g in gruppen)
         {
-            bool portable = path.IndexOf("Minibench-Daten", StringComparison.OrdinalIgnoreCase) >= 0;
-            c.StatusText = portable ? "Bereit, portabel" : "Bereit, installiert"; c.StatusLevel = "ok";
-            bMain = UI.Primary("Starten");
-            bMain.Image = UI.GlyphImage(UI.IcoAdmin, UI.OnAccent, UI.S(20)); bMain.Tag = UI.IcoAdmin; bMain.ImageAlign = ContentAlignment.MiddleLeft; bMain.TextImageRelation = TextImageRelation.ImageBeforeText;
-            Tip(bMain, "Startet " + title + " mit Administratorrechten (" + path + ").");
-            string p = path; bMain.Click += delegate { StartAdminProcess(p, ""); };
-            Tip(bFolder, "Öffnet den Speicherort von " + title + ".");
-            bFolder.Click += delegate { OpenSelect(p); };
+            Label lg = Lbl(g, UI.SchriftText, true, UI.Text); lg.Margin = new Padding(0, UI.S(4), UI.S(8), 0);
+            FlowLayoutPanel z = new FlowLayoutPanel(); z.AutoSize = true; z.AutoSizeMode = AutoSizeMode.GrowAndShrink; z.WrapContents = true; z.Margin = new Padding(0, 0, 0, UI.S(2));
+            for (int i = 0; i < pakete.Count; i++)
+            {
+                if (pakete[i][0] != g) continue;
+                CheckBox cb = Chk(pakete[i][2], false);
+                cb.AutoSize = false; cb.Size = new Size(UI.S(154), UI.S(24)); cb.Margin = new Padding(0, 0, UI.S(4), 0); cb.AutoEllipsis = true;
+                Tip(cb, PaketTip(pakete[i][2], pakete[i][3], pakete[i][1], false));
+                allWgIds[i] = pakete[i][1]; allWgNames[i] = pakete[i][2]; allWgBoxes[i] = cb;
+                paketBoxen[pakete[i][1]] = cb; paketInfo[pakete[i][1]] = new string[] { pakete[i][2], pakete[i][3] };
+                z.Controls.Add(cb);
+            }
+            paketZeilen.Add(z);
+            t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            t.Controls.Add(lg, 0, row); t.Controls.Add(z, 1, row); row++;
+        }
+        f.Controls.Add(t);
+
+        FlowLayoutPanel rowWgActions = Row(); rowWgActions.Margin = new Padding(0, UI.S(6), 0, 0);
+        string wingetPath;
+        bool hasWinget = IsWingetAvailable(out wingetPath);
+        Button btnInstallWg = UI.Primary("Ausgewählte installieren");
+        btnInstallWg.Margin = new Padding(0); btnInstallWg.Font = new Font("Segoe UI Semibold", UI.SchriftText); btnInstallWg.Padding = new Padding(UI.S(14), UI.S(3), UI.S(14), UI.S(3));
+        LinkLabel lnkWgNone = new LinkLabel(); lnkWgNone.Text = "Auswahl leeren"; lnkWgNone.AutoSize = true;
+        lnkWgNone.Margin = new Padding(UI.S(16), UI.S(7), UI.S(8), 0); lnkWgNone.LinkColor = UI.Accent;
+        Tip(lnkWgNone, "Alle gewählten Softwarepakete abwählen.");
+        Label lblWgStatus = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblWgStatus.Margin = new Padding(UI.S(12), UI.S(7), 0, 0);
+        lblPaketZustand = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblPaketZustand.Margin = new Padding(0, UI.S(6), 0, 0);
+        EventHandler wgCount = delegate {
+            int n = AuswahlPakete(allWgBoxes).Count;
+            SetText(btnInstallWg, n > 0 ? "Ausgewählte installieren (" + n + ")" : "Ausgewählte installieren");
+        };
+        foreach (CheckBox cb in allWgBoxes) cb.CheckedChanged += wgCount;
+        lnkWgNone.LinkClicked += delegate { foreach (CheckBox cb in allWgBoxes) if (cb.AutoCheck) cb.Checked = false; };
+        if (!hasWinget)
+        {
+            btnInstallWg.Enabled = false;
+            lblWgStatus.Text = "winget ist auf diesem System nicht installiert."; lblWgStatus.ForeColor = UI.Warn;
+            Tip(btnInstallWg, "winget ist auf diesem System nicht installiert.");
         }
         else
         {
-            c.StatusText = "Nicht gefunden"; c.StatusLevel = "warn";
-            bMain = UI.Primary("Herunterladen");
-            Tip(bMain, "Öffnet die Downloadseite von " + title + " im Standardbrowser. Die portable Version gehört in Minibench-Daten\\Tools\\" + subDir + ".");
-            string u = downloadUrl; bMain.Click += delegate { OpenShell(u); };
-            Tip(bFolder, "Erstellt und öffnet den Ordner Minibench-Daten\\Tools\\" + subDir + " für die portable Version.");
-            string sd = subDir; bFolder.Click += delegate { string d = Path.Combine(dataDir, "Tools\\" + sd); try { Directory.CreateDirectory(d); } catch { } OpenShell(d); };
+            Tip(btnInstallWg, "Installiert die markierten Programme über winget im Hintergrund. Jede Installation steht danach auf der Seite Änderungen und lässt sich dort wieder entfernen; schon vorhandene Programme bleiben unberührt.");
+            btnInstallWg.Click += delegate {
+                List<int> selIndices = AuswahlPakete(allWgBoxes);
+                if (selIndices.Count == 0)
+                {
+                    MessageBox.Show(this, "Bitte mindestens ein Programm zur Installation auswählen.", "Softwarepakete installieren", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                InstallWingetPackagesAsync(selIndices, allWgIds, allWgNames, lblWgStatus, btnInstallWg, allWgBoxes, lnkWgNone);
+            };
         }
-        bMain.Font = new Font("Segoe UI Semibold", UI.SchriftText); bMain.Padding = new Padding(UI.S(10), UI.S(3), UI.S(10), UI.S(3));
-        bMain.MinimumSize = new Size(UI.S(140), 0); bFolder.MinimumSize = new Size(UI.S(90), 0);
-        c.ActionButton = bMain; c.SecondaryButton = bFolder;
-        Tip(c, title + ": " + desc + (String.IsNullOrEmpty(path) ? " Erwartet in Minibench-Daten\\Tools\\" + subDir + " oder als Systeminstallation." : " Gefunden: " + path));
+        rowWgActions.Controls.Add(btnInstallWg); rowWgActions.Controls.Add(lnkWgNone); rowWgActions.Controls.Add(lblWgStatus);
+        f.Controls.Add(rowWgActions);
+        f.Controls.Add(lblPaketZustand);
+    }
+
+    // Zeilen G|Gruppe und P|Gruppe|Id|Name|Beschreibung lesen; Pakete einer nicht genannten Gruppe bekommen eine eigene
+    // Gruppe am Ende (nichts geht verloren)
+    public static void LiesPaketListe(string[] lines, List<string> gruppen, List<string[]> pakete)
+    {
+        foreach (string l in lines ?? new string[0])
+        {
+            string[] x = (l ?? "").Split('|');
+            if (x.Length >= 2 && x[0] == "G" && x[1].Length > 0 && !gruppen.Contains(x[1])) gruppen.Add(x[1]);
+            else if (x.Length >= 5 && x[0] == "P" && x[2].Length > 0) pakete.Add(new string[] { x[1], x[2], x[3].Length > 0 ? x[3] : x[2], x[4] });
+        }
+        foreach (string[] p in pakete) if (!gruppen.Contains(p[0])) gruppen.Add(p[0]);
+    }
+
+    // Gewählte Pakete ohne schon installierte (die sind angehakt, aber gesperrt)
+    public static List<int> AuswahlPakete(CheckBox[] boxen)
+    {
+        List<int> r = new List<int>();
+        for (int i = 0; i < boxen.Length; i++) if (boxen[i] != null && boxen[i].Checked && boxen[i].AutoCheck) r.Add(i);
+        return r;
+    }
+
+    static string PaketTip(string name, string beschreibung, string id, bool installiert)
+    {
+        return (installiert ? "Ist auf diesem PC schon installiert (laut winget). " : "") + name + ": " + beschreibung + ". winget-Paket " + id + ".";
+    }
+
+    // Paket als installiert kennzeichnen: Haken gesetzt und gesperrt, Schrift grün (nicht ausgegraut)
+    public static void MarkierePaket(CheckBox cb, bool installiert)
+    {
+        if (cb == null) return;
+        if (installiert) { cb.AutoCheck = false; cb.Checked = true; cb.Tag = "installiert"; cb.ForeColor = UI.Ok; cb.Cursor = Cursors.Default; }
+        else if ((cb.Tag as string) == "installiert") { cb.AutoCheck = true; cb.Checked = false; cb.Tag = null; cb.ForeColor = UI.Text; cb.Cursor = Cursors.Default; }
+    }
+
+    // Installierte Pakete im Hintergrund erkennen (-SoftwareZustand, winget export), mit niedriger Priorität wie die
+    // Zustandsprüfung der Optimierung. Startet beim ersten Öffnen der Seite Tools, nach "Neu scannen" und nach Installationen.
+    Process paketProc;
+    bool paketGeprueft;
+    void StartSoftwareStateCheck()
+    {
+        if (paketProc != null || running || paketBoxen.Count == 0 || String.IsNullOrEmpty(psExe) || String.IsNullOrEmpty(script)) return;
+        string wp; if (!IsWingetAvailable(out wp)) return;
+        paketGeprueft = true;
+        List<string> got = new List<string>();
+        ProcessStartInfo psi = new ProcessStartInfo(psExe, "-NoProfile -ExecutionPolicy Bypass -File \"" + script + "\" -EventMode -SoftwareZustand" + (dataDir.Length > 0 ? " -DatenDir \"" + dataDir.TrimEnd('\\') + "\"" : ""));
+        psi.UseShellExecute = false; psi.CreateNoWindow = true; psi.RedirectStandardOutput = true; psi.StandardOutputEncoding = new UTF8Encoding(false);
+        Process p = new Process(); p.StartInfo = psi;
+        bool fertig = false;
+        MethodInvoker abschluss = delegate {
+            if (fertig) return; fertig = true;
+            List<string> lines; lock (got) lines = new List<string>(got);
+            try { BeginInvoke(new MethodInvoker(delegate { ApplySoftwareState(lines); try { p.Dispose(); } catch { } paketProc = null; })); } catch { }
+        };
+        p.OutputDataReceived += delegate(object s, DataReceivedEventArgs e) {
+            if (e.Data == null) { abschluss(); return; }
+            if (e.Data.StartsWith("@@PAKZ|") || e.Data.StartsWith("@@RESULT|")) lock (got) got.Add(e.Data);
+        };
+        try { p.Start(); p.BeginOutputReadLine(); try { p.PriorityClass = ProcessPriorityClass.BelowNormal; } catch { } }
+        catch (Exception ex) { SetText(lblPaketZustand, "Installierte Programme nicht lesbar: " + ex.Message); try { p.Dispose(); } catch { } return; }
+        paketProc = p;
+        SetText(lblPaketZustand, "Installierte Programme werden im Hintergrund erkannt …");
+        System.Windows.Forms.Timer wd = new System.Windows.Forms.Timer(); wd.Interval = 300000;
+        wd.Tick += delegate { wd.Stop(); wd.Dispose(); if (!fertig) { try { if (!p.HasExited) KillProc(p); } catch { } abschluss(); } };
+        wd.Start();
+    }
+
+    void StopSoftwareStateCheck()
+    {
+        Process p = paketProc;
+        if (p == null) return;
+        try { if (!p.HasExited) KillProc(p); } catch { }
+    }
+
+    void ApplySoftwareState(List<string> lines)
+    {
+        int n = 0, gelesen = 0;
+        foreach (string l in lines)
+        {
+            string id; bool inst;
+            if (!ParsePaketZustand(l, out id, out inst)) continue;
+            gelesen++;
+            CheckBox cb; if (!paketBoxen.TryGetValue(id, out cb)) continue;
+            MarkierePaket(cb, inst);
+            if (inst) n++;
+            string[] info; if (paketInfo.TryGetValue(id, out info)) Tip(cb, PaketTip(info[0], info[1], id, inst));
+        }
+        SetText(lblPaketZustand, gelesen == 0 ? "Installierte Programme nicht erkannt (winget export ohne Ergebnis)." : n == 0 ? "Keines der Programme ist auf diesem PC installiert." : n + (n == 1 ? " Programm ist" : " Programme sind") + " schon installiert (grün, Haken gesperrt).");
+    }
+
+    // @@PAKZ|Id|installiert oder nicht installiert
+    public static bool ParsePaketZustand(string line, out string id, out bool installiert)
+    {
+        id = ""; installiert = false;
+        if (line == null || !line.StartsWith("@@PAKZ|")) return false;
+        string[] x = line.Split('|');
+        if (x.Length < 3 || x[1].Length == 0) return false;
+        id = x[1]; installiert = x[2] == "installiert";
+        return true;
+    }
+
+    // Zeile eines portablen Werkzeugs: Zustand als Etikett, Hauptaktion Starten (gefunden) oder Herunterladen (Herstellerseite),
+    // im Menü "…" Ordner öffnen und Herstellerseite
+    ToolRow ToolZeile(string title, string desc, string icon, string subDir, string[] exeNames, string[] regNames, string[] direct, string downloadUrl, string zusatz)
+    {
+        ToolRow c = new ToolRow(title, desc, icon);
+        string path = FindToolPath(subDir, exeNames, regNames, direct);
+        Button bMain;
+        string u = downloadUrl, sd = subDir;
+        ContextMenu cm = new ContextMenu();
+        if (!String.IsNullOrEmpty(path))
+        {
+            bool portable = path.IndexOf("Minibench-Daten", StringComparison.OrdinalIgnoreCase) >= 0;
+            c.StatusText = portable ? "bereit, portabel" : "installiert"; c.StatusLevel = "ok";
+            bMain = UI.Primary("Starten");
+            bMain.Image = UI.GlyphImage(UI.IcoAdmin, UI.OnAccent, UI.S(18)); bMain.Tag = UI.IcoAdmin; bMain.ImageAlign = ContentAlignment.MiddleLeft; bMain.TextImageRelation = TextImageRelation.ImageBeforeText;
+            Tip(bMain, "Startet " + title + " mit Administratorrechten (" + path + ").");
+            string p = path; bMain.Click += delegate { StartAdminProcess(p, ""); };
+            cm.MenuItems.Add(new MenuItem("Speicherort öffnen", delegate { OpenSelect(p); }));
+        }
+        else
+        {
+            c.StatusText = "nicht gefunden"; c.StatusLevel = "warn";
+            bMain = UI.Secondary("Herunterladen");
+            Tip(bMain, "Öffnet die Herstellerseite von " + title + " im Standardbrowser. Eine portable Version gehört in Minibench-Daten\\Tools\\" + subDir + ".");
+            bMain.Click += delegate { OpenShell(u); };
+            cm.MenuItems.Add(new MenuItem("Ordner Tools\\" + subDir + " öffnen", delegate { string d = Path.Combine(dataDir, "Tools\\" + sd); try { Directory.CreateDirectory(d); } catch { } OpenShell(d); }));
+        }
+        cm.MenuItems.Add(new MenuItem("Herstellerseite öffnen", delegate { OpenShell(u); }));
+        bMain.Font = new Font("Segoe UI Semibold", UI.SchriftText); bMain.Padding = new Padding(UI.S(8), UI.S(2), UI.S(8), UI.S(2));
+        bMain.MinimumSize = new Size(UI.S(126), 0); bMain.Margin = new Padding(0);
+        Button bMore = UI.Secondary("…"); bMore.AutoSize = false; bMore.Size = new Size(UI.S(32), bMain.PreferredSize.Height); bMore.Padding = new Padding(0); bMore.Margin = new Padding(0);
+        bMore.Click += delegate { cm.Show(bMore, new Point(0, bMore.Height)); };
+        Tip(bMore, "Weitere Aktionen: " + (String.IsNullOrEmpty(path) ? "Ordner für die portable Version öffnen" : "Speicherort öffnen") + ", Herstellerseite öffnen.");
+        c.MainButton = bMain; c.MoreButton = bMore;
+        Tip(c, title + ": " + desc + (String.IsNullOrEmpty(path) ? " Erwartet in Minibench-Daten\\Tools\\" + subDir + " oder als Installation." : " Gefunden: " + path) + (zusatz.Length > 0 ? " " + zusatz : ""));
         return c;
     }
 
-    // Karte eines Windows-Schnellstarters mit einem Knopf "Öffnen"
-    FluentCard LauncherCard(string title, string desc, string icon, string exe, string args, int w, int h)
+    // Zeile eines Windows-Schnellstarters mit einem Knopf "Öffnen"
+    ToolRow LauncherRow(string title, string desc, string icon, string exe, string args)
     {
-        FluentCard c = new FluentCard(title, desc, icon); c.Width = w; c.Height = h;
-        Button b = UI.Secondary("Öffnen"); b.MinimumSize = new Size(UI.S(130), 0);
+        ToolRow c = new ToolRow(title, desc, icon);
+        Button b = UI.Secondary("Öffnen"); b.MinimumSize = new Size(UI.S(110), 0); b.Margin = new Padding(0);
         Tip(b, "Öffnet " + title + " (" + exe + (args.Length > 0 ? " " + args : "") + ").");
         string e = exe, a = args; b.Click += delegate { StartAdminProcess(e, a); };
-        c.ActionButton = b;
+        c.MainButton = b;
         Tip(c, title + ": " + desc);
         return c;
     }
@@ -15980,6 +16436,67 @@ public partial class DiagGui
         }
     }
 
+    // Programm in einem Ordner nach Namen suchen (Reihenfolge = Vorrang). Ab v4.05 auch mit Platzhaltern (GPU-Z*.exe):
+    // dann gilt die Datei mit der höchsten Versionsnummer im Namen, bei gleicher Nummer die jüngste.
+    public static string SucheProgramm(string dir, string[] exeNames)
+    {
+        if (exeNames == null || String.IsNullOrEmpty(dir)) return null;
+        foreach (string en in exeNames)
+        {
+            try
+            {
+                if (en.IndexOf('*') >= 0 || en.IndexOf('?') >= 0)
+                {
+                    string n = NeuesteDatei(Directory.GetFiles(dir, en));
+                    if (n != null) return n;
+                }
+                else
+                {
+                    string p = Path.Combine(dir, en);
+                    if (File.Exists(p)) return p;
+                }
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    // Höchste Versionsnummer im Dateinamen (GPU-Z.2.71.0.exe vor GPU-Z.2.9.0.exe), Dateien ohne Nummer zuletzt
+    public static string NeuesteDatei(string[] files)
+    {
+        if (files == null || files.Length == 0) return null;
+        string best = null; long[] bestV = null; DateTime bestT = DateTime.MinValue;
+        foreach (string f in files)
+        {
+            long[] v = VersionImNamen(Path.GetFileNameWithoutExtension(f));
+            DateTime t = DateTime.MinValue; try { t = File.GetLastWriteTimeUtc(f); } catch { }
+            int c = best == null ? 1 : VergleicheVersion(v, bestV);
+            if (c > 0 || (c == 0 && t > bestT)) { best = f; bestV = v; bestT = t; }
+        }
+        return best;
+    }
+
+    static long[] VersionImNamen(string name)
+    {
+        System.Text.RegularExpressions.Match m = System.Text.RegularExpressions.Regex.Match(name ?? "", @"\d+(\.\d+)+|\d+");
+        if (!m.Success) return new long[0];
+        string[] t = m.Value.Split('.');
+        long[] r = new long[t.Length];
+        for (int i = 0; i < t.Length; i++) long.TryParse(t[i], out r[i]);
+        return r;
+    }
+
+    static int VergleicheVersion(long[] a, long[] b)
+    {
+        int n = Math.Max(a.Length, b.Length);
+        for (int i = 0; i < n; i++)
+        {
+            long x = i < a.Length ? a[i] : -1, y = i < b.Length ? b[i] : -1;
+            if (x != y) return x > y ? 1 : -1;
+        }
+        return 0;
+    }
+
     public string FindToolPath(string subDir, string[] exeNames, string[] registryNames, string[] directPaths)
     {
         // 1. Portable im Minibench-Daten Ordner suchen
@@ -15988,14 +16505,8 @@ public partial class DiagGui
             string tdir = Path.Combine(dataDir, "Tools\\" + subDir);
             if (Directory.Exists(tdir))
             {
-                if (exeNames != null)
-                {
-                    foreach (string en in exeNames)
-                    {
-                        string p = Path.Combine(tdir, en);
-                        if (File.Exists(p)) return p;
-                    }
-                }
+                string pt = SucheProgramm(tdir, exeNames);
+                if (pt != null) return pt;
                 try
                 {
                     string[] files = Directory.GetFiles(tdir, "*.exe");
@@ -16060,14 +16571,8 @@ public partial class DiagGui
                                                     string cleanLoc = loc.Trim('"', ' ');
                                                     if (Directory.Exists(cleanLoc))
                                                     {
-                                                        if (exeNames != null)
-                                                        {
-                                                            foreach (string en in exeNames)
-                                                            {
-                                                                string p = Path.Combine(cleanLoc, en);
-                                                                if (File.Exists(p)) return p;
-                                                            }
-                                                        }
+                                                        string pl = SucheProgramm(cleanLoc, exeNames);
+                                                        if (pl != null) return pl;
                                                         string[] ef = Directory.GetFiles(cleanLoc, "*.exe");
                                                         if (ef.Length > 0) return ef[0];
                                                     }
@@ -16119,19 +16624,20 @@ public partial class DiagGui
         return true;
     }
 
-    public void InstallWingetPackagesAsync(List<int> selIndices, string[] allWgIds, string[] allWgNames, Label lblWgStatus, Button btnInstallWg, CheckBox[] allWgBoxes, LinkLabel lnkWgAll, LinkLabel lnkWgNone)
+    public void InstallWingetPackagesAsync(List<int> selIndices, string[] allWgIds, string[] allWgNames, Label lblWgStatus, Button btnInstallWg, CheckBox[] allWgBoxes, LinkLabel lnkWgNone)
     {
         StringBuilder m = new StringBuilder();
         m.AppendLine("Diese Programme werden über winget installiert (Risikostufe Eingriff):");
         m.AppendLine();
         foreach (int i in selIndices) m.AppendLine("·  " + allWgNames[i] + " (" + allWgIds[i] + ")");
         m.AppendLine();
-        m.AppendLine("Jede Installation steht danach auf der Seite Systemänderungen und lässt sich dort wieder entfernen. Schon vorhandene Programme bleiben unberührt. Je Programm gilt eine Frist von 20 Minuten.");
+        m.AppendLine("Jede Installation steht danach auf der Seite Änderungen und lässt sich dort wieder entfernen. Schon vorhandene Programme bleiben unberührt. Je Programm gilt eine Frist von 20 Minuten.");
         if (MessageBox.Show(this, m.ToString(), "Softwarepakete installieren", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
 
         btnInstallWg.Enabled = false;
         foreach (CheckBox cb in allWgBoxes) cb.Enabled = false;
-        lnkWgAll.Enabled = false; lnkWgNone.Enabled = false;
+        lnkWgNone.Enabled = false;
+        StopSoftwareStateCheck();
         lblWgStatus.Text = "winget wird gestartet ..."; lblWgStatus.ForeColor = UI.Accent;
 
         string spec = WingetSpec(selIndices, allWgIds, allWgNames);
@@ -16176,8 +16682,8 @@ public partial class DiagGui
             {
                 BeginInvoke(new MethodInvoker(delegate {
                     btnInstallWg.Enabled = true;
-                    foreach (CheckBox cb in allWgBoxes) cb.Enabled = true;
-                    lnkWgAll.Enabled = true; lnkWgNone.Enabled = true;
+                    foreach (CheckBox cb in allWgBoxes) { cb.Enabled = true; if ((cb.Tag as string) == "installiert") cb.ForeColor = UI.Ok; }
+                    lnkWgNone.Enabled = true;
                     string[] r = result.Split('|');
                     int ok = 0, da = 0, bad = 0;
                     if (r.Length >= 3) { int.TryParse(r[0], out ok); int.TryParse(r[1], out da); int.TryParse(r[2], out bad); }
@@ -16185,6 +16691,7 @@ public partial class DiagGui
                     lblWgStatus.Text = String.Format("Abgeschlossen: {0} installiert, {1} schon vorhanden, {2} fehlgeschlagen.", ok, da, bad);
                     lblWgStatus.ForeColor = bad == 0 ? UI.Ok : UI.Warn;
                     ReloadDb();
+                    StartSoftwareStateCheck();
                     if (bad > 0)
                     {
                         string all; lock (texte) all = String.Join("\r\n", texte.ToArray());
@@ -19974,6 +20481,13 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.05", "09.11.2026", "Bereits aktive Optimierungen gesperrt, Tools-Seite kompakt, 28 Softwarepakete",
+            "\u2022 Optimierung: Eintr\u00E4ge, die auf diesem PC schon so eingestellt sind (Zustand \u201Ebereits aktiv\u201C), stehen nach der Hintergrundpr\u00FCfung auf An und sind gesperrt, gut lesbar in Gr\u00FCn statt ausgegraut. Vorlagen, \u201EAlle an\u201C, \u201EAlle aus\u201C und geladene eigene Vorlagen \u00E4ndern sie nicht; der Hinweis nennt den Weg zur\u00FCck \u00FCber die Seite \u00C4nderungen.\r\n" +
+            "\u2022 Optimierung: Die Seitenleiste z\u00E4hlt gew\u00E4hlte und bereits aktive Eintr\u00E4ge getrennt (blaue Pille \u201E3/17\u201C, gr\u00FCne Pille \u201E5 \u2713\u201C), der Kopf der Kategorie nennt \u201E3 gew\u00E4hlt \u00B7 5 bereits aktiv \u00B7 17 Eintr\u00E4ge\u201C.\r\n" +
+            "\u2022 Optimierung im Lauf: Vor dem Wiederherstellungspunkt wird der Zustand jedes gew\u00E4hlten Eintrags gepr\u00FCft; bereits aktive laufen nicht, sondern stehen als \u201Ebereits aktiv\u201C im Bericht. Bleibt nichts zu \u00E4ndern, entsteht kein Wiederherstellungspunkt. Angewendete Eintr\u00E4ge sind danach ebenfalls gesperrt.\r\n" +
+            "\u2022 Tools: kompakte Zeilen (50 statt 68 px), bei breitem Fenster in zwei Spalten; je Werkzeug Zustand, eine Zeile Beschreibung, \u201EStarten\u201C oder \u201EHerunterladen\u201C und ein Men\u00FC \u201E\u2026\u201C mit Speicherort und Herstellerseite. \u201ENeu scannen\u201C und \u201ETools-Ordner\u201C stehen rechts im Seitenkopf. Der Abschnitt Netzlaufwerk entf\u00E4llt (Einstellungen \u203A Daten und Datenschutz).\r\n" +
+            "\u2022 Neue Werkzeuge CPU-Z, GPU-Z und MSI Afterburner: erkannt im Tools-Ordner oder als Installation, sonst Verweis auf die Herstellerseite. GPU-Z wird mit Versionsnummer im Namen gefunden (GPU-Z*.exe, neueste Version).\r\n" +
+            "\u2022 Softwarepakete: 28 Programme in sechs Gruppen (Browser, Kommunikation, Spiele, Office und PDF, Medien, System und Laufzeiten) als kompakte Liste; die Liste steht als Tabelle in Kern\\Softwarepakete.psd1, die winget-Kennung nur im Hinweis. Bereits installierte Programme erkennt ein Hintergrundprozess \u00FCber winget export, sie sind gr\u00FCn und gesperrt. \u201EAlle an\u201C entf\u00E4llt."),
         new Eintrag("4.04", "08.11.2026", "Veröffentlichen in einem Schritt, Referenz über die Datenbank",
             "\u2022 Seite Benchmark: Der Haken \u201EDieses System als Referenz (100 %) festlegen\u201C entf\u00E4llt. Eine Referenz legt man in der Datenbank fest (Lauf markieren, Aktionen \u203A Als Referenz festlegen), wo der Lauf mit seinen Werten sichtbar ist. Ein Hinweis unter der Auswahl der Referenz nennt den Weg.\r\n" +
             "\u2022 Veroeffentlichen.ps1 erledigt alles in einem Aufruf: pr\u00FCft, dass alles committet ist und Aktueller Build zur Version passt, \u00FCbertr\u00E4gt main und den Tag, installiert und meldet die GitHub CLI bei Bedarf an und erstellt das Release mit LMB.exe und Pr\u00FCfsumme.\r\n" +
@@ -20332,6 +20846,7 @@ public static class Versionshistorie
             Write-StartPhase ('Datenpflege: {0}' -f $dp.Kurz)
         } catch { }
         try { [DiagGui]::OptKatalog = [string[]](Get-OptGuiLines) } catch { }
+        try { [DiagGui]::SoftwarePakete = [string[]](Get-SoftwarePaketGuiLines) } catch { }
         Write-StartPhase 'Katalog der Optimierung gelesen'
         # Datenträger für die Auswahl im Benchmark und im Lasttest: Nummer|Name|Bus|Medium|Größe|Buchstaben|USB
         $diskList = [System.Collections.Generic.List[string]]::new()
@@ -20514,7 +21029,7 @@ function Test-StepEnabled([string]$Key) {
     return $false
 }
 
-if (-not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $SensorLive -and -not $SensorWerkzeugeHolen -and -not $SensorAufraeumen -and -not $OptimierungZustand -and -not $OptWerkzeugeHolen -and -not $SoftwareInstallieren -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardModus -and -not $DashboardSysteme -and -not $MedianAktualisieren -and -not $Umzug) {
+if (-not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $SensorLive -and -not $SensorWerkzeugeHolen -and -not $SensorAufraeumen -and -not $OptimierungZustand -and -not $SoftwareZustand -and -not $OptWerkzeugeHolen -and -not $SoftwareInstallieren -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardModus -and -not $DashboardSysteme -and -not $MedianAktualisieren -and -not $Umzug) {
     # Berichte landen ausschließlich im Datenordner neben dem Programm (z. B. auf dem USB-Stick)
     if (-not $OutputDir) {
         $base = $(if ($script:DataDir) { Join-Path $script:DataDir 'Berichte' } else { Join-Path $env:TEMP 'LeosMinibench-Berichte' })
@@ -28806,7 +29321,7 @@ function Read-Minidumps {
 #endregion
 
 #region ---------- C#-Testroutinen (RAM, CPU, Energiesparen) ----------
-if ($FullLanguage -and -not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $SensorLive -and -not $SensorWerkzeugeHolen -and -not $SensorAufraeumen -and -not $OptimierungZustand -and -not $OptWerkzeugeHolen -and -not $SoftwareInstallieren -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardModus -and -not $DashboardSysteme -and -not $MedianAktualisieren -and -not $Umzug -and -not ('DiagDiskStress' -as [type])) {
+if ($FullLanguage -and -not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $SensorLive -and -not $SensorWerkzeugeHolen -and -not $SensorAufraeumen -and -not $OptimierungZustand -and -not $SoftwareZustand -and -not $OptWerkzeugeHolen -and -not $SoftwareInstallieren -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardModus -and -not $DashboardSysteme -and -not $MedianAktualisieren -and -not $Umzug -and -not ('DiagDiskStress' -as [type])) {
     $csCode = @'
 using System;
 using System.ComponentModel;
@@ -33015,7 +33530,7 @@ $script:SensorNotes = New-Object System.Collections.Generic.List[string]
 $script:SensorSnapshot = $null
 $script:SensorDb = [ordered]@{}
 
-if ($FullLanguage -and -not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $SensorWerkzeugeHolen -and -not $SensorAufraeumen -and -not $OptimierungZustand -and -not $OptWerkzeugeHolen -and -not $SoftwareInstallieren -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardModus -and -not $DashboardSysteme -and -not $MedianAktualisieren -and -not $Umzug -and -not ('DiagSensors' -as [type])) {
+if ($FullLanguage -and -not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $SensorWerkzeugeHolen -and -not $SensorAufraeumen -and -not $OptimierungZustand -and -not $SoftwareZustand -and -not $OptWerkzeugeHolen -and -not $SoftwareInstallieren -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardModus -and -not $DashboardSysteme -and -not $MedianAktualisieren -and -not $Umzug -and -not ('DiagSensors' -as [type])) {
     $sensCode = @'
 using System;
 using System.Collections;
@@ -35299,6 +35814,12 @@ if ($SoftwareInstallieren) {
     $r = Invoke-SoftwarePakete $SoftwareInstallieren
     Send-GuiEvent 'RESULT' $r.Installiert $r.Bereits $r.Fehler
     exit $(if ($r.Fehler) { 1 } else { 0 })
+}
+# Seite Tools (ab v4.05): installierte Softwarepakete im Hintergrund erkennen, je Paket @@PAKZ, am Ende @@RESULT|Anzahl
+if ($SoftwareZustand) {
+    $n = Invoke-SoftwareZustand
+    Send-GuiEvent 'RESULT' $n
+    exit 0
 }
 if ($OptWerkzeugeHolen) {
     $r = Install-OptTools
@@ -39458,6 +39979,16 @@ if ($ModOpt) {
         $script:OptMetricOpts = @{ MitFunktionen = $mitF; MitApps = $mitA }
         Hide-Sub
         Add-Line ('  Kennzahlen vorher: {0}' -f (($script:OptMetricsBefore.Keys | ForEach-Object { '{0} {1}' -f $_, $script:OptMetricsBefore[$_] }) -join ', '))
+        # ab v4.05: bereits aktive Einträge nicht ausführen (Bericht: "bereits aktiv", Oberfläche: Schalter gesperrt)
+        Show-Sub 'Zustand der gewählten Einträge' 'bereits aktive werden übersprungen' -1
+        $sp = Split-OptBereitsAktiv @($script:OptSel | Where-Object { $_.Id -ne 'Wiederherstellungspunkte' }) $envO
+        Hide-Sub
+        if (@($sp.Aktiv).Count) {
+            foreach ($r in @($sp.Aktiv)) { $script:OptLog.Add($r); Send-GuiEvent 'OPTE' $r.Id $r.Ergebnis $r.Aenderungen $r.Details }
+            $ids = @($sp.Aktiv | ForEach-Object { $_.Id })
+            $script:OptSel = @($script:OptSel | Where-Object { $ids -notcontains $_.Id })
+            Add-Line ('  Bereits aktiv, übersprungen: {0} ({1}).' -f @($sp.Aktiv).Count, (@($sp.Aktiv | ForEach-Object { $_.Titel }) -join ', '))
+        }
     }
 
     if ($script:OptSelIds -contains 'Wiederherstellungspunkte') {
@@ -39469,7 +40000,11 @@ if ($ModOpt) {
             if ($r.Ergebnis -in 'angewendet', 'teilweise' -and $script:RestorePointNo) { Add-Line ('  Der Wiederherstellungspunkt dieses Laufs ({0}) wurde mit gelöscht, es wird ein neuer angelegt.' -f $script:RestorePointNo); $script:RestorePointNo = $null }
         }
     }
-    if (-not $OptOhneWiederherstellungspunkt -and -not $script:RestorePointNo) {
+    # Bleibt nach dem Abgleich nichts zu ändern, entfällt der Wiederherstellungspunkt (ab v4.05)
+    $script:OptZuTun = @($script:OptSel | Where-Object { $_.Id -ne 'Wiederherstellungspunkte' }).Count
+    if (-not $script:OptZuTun) {
+        Add-Line '  Alle gewählten Einträge sind auf diesem PC bereits aktiv; kein Wiederherstellungspunkt nötig.'
+    } elseif (-not $OptOhneWiederherstellungspunkt -and -not $script:RestorePointNo) {
         Invoke-Section 'Optimierung: Wiederherstellungspunkt anlegen' {
             Show-Sub 'Wiederherstellungspunkt' 'wird angelegt' -1
             $rp = New-RestorePointLogged 'Optimierung' ('Leos Minibench vor Optimierung {0:dd.MM.yyyy HH:mm}' -f (Get-Date))
@@ -39528,7 +40063,7 @@ if ($ModOpt) {
         $ein = @($log | Where-Object { $_.Risiko -eq 'Eingriff' -and $_.Ergebnis -in 'angewendet', 'teilweise' }).Count
         Add-Sub 'Zusammenfassung'
         Add-Line ('  {0} von {1} Einträgen angewendet, {2} Einzeländerungen, davon {3} Eingriffe ohne automatisches Rückgängig.' -f $n, $log.Count, $chg, $ein)
-        Add-Line ('  Bereits wie gewünscht: {0}, übersprungen (Bedingung oder nicht vorhanden): {1}, mit Fehlern: {2}.' -f @($log | Where-Object { $_.Ergebnis -eq 'bereits so' }).Count, @($log | Where-Object { $_.Ergebnis -in 'übersprungen', 'nicht vorhanden' }).Count, @($log | Where-Object { $_.Ergebnis -in 'Fehler', 'teilweise' }).Count)
+        Add-Line ('  Bereits wie gewünscht: {0} (davon {3} vor dem Lauf erkannt und nicht ausgeführt), übersprungen (Bedingung oder nicht vorhanden): {1}, mit Fehlern: {2}.' -f @($log | Where-Object { $_.Ergebnis -in 'bereits so', 'bereits aktiv' }).Count, @($log | Where-Object { $_.Ergebnis -in 'übersprungen', 'nicht vorhanden' }).Count, @($log | Where-Object { $_.Ergebnis -in 'Fehler', 'teilweise' }).Count, @($log | Where-Object { $_.Ergebnis -eq 'bereits aktiv' }).Count)
         Add-Line '  Änderungen der Stufe Ändern nimmt die Seite Änderungen einzeln zurück; Eingriffe stehen dort mit dem Weg zurück.'
         Add-Line '  Einstellungen von Explorer, Taskleiste und Maus gelten nach dem nächsten Ab- und Anmelden.'
         if ($n) { Add-Finding INFO 'Optimierung' ('{0} Einstellungen angewendet ({1} Einzeländerungen). Rückgängig auf der Seite Änderungen; einige gelten erst nach Abmelden oder Neustart.' -f $n, $chg) }

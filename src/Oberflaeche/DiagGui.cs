@@ -64,7 +64,7 @@ public partial class DiagGui : Form
     Dictionary<string, Control> repCatPanels = new Dictionary<string, Control>();
     string curOptKey = "", curRepKey = "";
     CardPanel optDetailCard, repDetailCard;
-    Label lblOptCatTitle, lblOptCatDesc, lblRepCatTitle, lblRepCatDesc;
+    Label lblOptCatTitle, lblOptCatDesc, lblOptCatCount, lblRepCatTitle, lblRepCatDesc;
     LinkLabel lnkOptAll, lnkOptNone, lnkRepAll, lnkRepNone;
     PillButton pillRepUsual, pillRepNone;
     FlowLayoutPanel left;
@@ -1287,7 +1287,7 @@ public partial class DiagGui : Form
             c.BackColor = UI.Bg;
             c.Invalidate();
         }
-        else if (c is FluentCard || c is StartTaskCard || c is SettingRow || c is CategoryPickerItem)
+        else if (c is FluentCard || c is ToolRow || c is StartTaskCard || c is SettingRow || c is CategoryPickerItem)
         {
             c.BackColor = UI.Panel;
             c.Invalidate();
@@ -1359,7 +1359,8 @@ public partial class DiagGui : Form
         }
         else if (c is CheckBox || c is RadioButton)
         {
-            c.ForeColor = c.Enabled ? UI.Text : UI.Muted;
+            // ab v4.05: installierte Softwarepakete (Tag "installiert") bleiben grün
+            c.ForeColor = (c.Tag as string) == "installiert" ? UI.Ok : c.Enabled ? UI.Text : UI.Muted;
         }
         else if (c is LinkLabel)
         {
@@ -1778,6 +1779,8 @@ public partial class DiagGui : Form
         // ab v4.0: Auf Werkzeugseiten (Tools bis Versionen) nur Ablaufzeile und Startknopf, ohne Vorlagen
         if (fo != null && foot != null) { bool modulSeite = i <= 5; if (fo.Visible != modulSeite) { fo.Visible = modulSeite; foot.Height = UI.S(modulSeite ? 76 : 62); } }
         if (i == 3) UpdateLoadExtras();
+        // ab v4.05: installierte Softwarepakete beim ersten Öffnen der Seite Tools im Hintergrund erkennen
+        if (i == 6) { if (!paketGeprueft) StartSoftwareStateCheck(); if (toolsLayout != null) toolsLayout(); }
         ApplyNativeControlThemes();
     }
 
@@ -2915,7 +2918,9 @@ public partial class DiagGui : Form
 
     string OptTipText(OptItem it)
     {
-        StringBuilder t = new StringBuilder((it.Tip ?? "").Replace(" ¶", "\r\n").Replace("¶", "\r\n"));
+        StringBuilder t = new StringBuilder();
+        if (it.Gesperrt) t.Append(OptGesperrtHinweis).Append("\r\n");
+        t.Append((it.Tip ?? "").Replace(" ¶", "\r\n").Replace("¶", "\r\n"));
         t.Append("\r\nRisikostufe: ").Append(ContractStep.RiskLabel(it.Risiko)).Append(it.Risiko == "Aendern" ? " (protokolliert, auf der Seite Änderungen einzeln rücknehmbar)" : " (nicht automatisch umkehrbar, Absicherung über den Wiederherstellungspunkt)");
         t.Append("\r\nNeustart: ").Append(it.Neustart == "immer" ? "nötig" : it.Neustart == "moeglich" ? "kann nötig sein" : "nicht nötig");
         List<string> vList = new List<string>();
@@ -2941,7 +2946,7 @@ public partial class DiagGui : Form
         md.AutoSize = true;
         md.ColumnCount = 2;
         md.RowCount = 1;
-        md.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(240)));
+        md.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(262)));
         md.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         md.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(8));
 
@@ -2977,8 +2982,12 @@ public partial class DiagGui : Form
         lblOptCatTitle = Lbl("", 11f, true, UI.Text);
         lblOptCatDesc = Lbl("", UI.SchriftHinweis, false, UI.Muted);
         lblOptCatDesc.Margin = new Padding(0, UI.S(2), 0, 0);
+        lblOptCatCount = Lbl("", UI.SchriftHinweis, true, UI.Muted);
+        lblOptCatCount.Margin = new Padding(0, UI.S(4), 0, 0);
+        Tip(lblOptCatCount, "Gewählt: wird beim nächsten Lauf geändert. Bereits aktiv: ist auf diesem PC schon so eingestellt, Schalter gesperrt.");
         titleBox.Controls.Add(lblOptCatTitle);
         titleBox.Controls.Add(lblOptCatDesc);
+        titleBox.Controls.Add(lblOptCatCount);
 
         FlowLayoutPanel linkBox = new FlowLayoutPanel();
         linkBox.AutoSize = true;
@@ -3015,7 +3024,7 @@ public partial class DiagGui : Form
             string ico = UI.IconByName(k.Length > 4 ? k[4] : "", UI.IcoOpt);
             CategoryPickerItem picker = new CategoryPickerItem(k[1], ico, k.Length > 3 ? k[3] : k[1]);
             picker.Subtitle = k[2];
-            picker.Width = UI.S(232);
+            picker.Width = UI.S(254);
             string gKey = key;
             picker.Picked += delegate { SelectOptCategory(gKey); };
             Tip(picker, k[2]);
@@ -3040,14 +3049,7 @@ public partial class DiagGui : Form
                 if (bv != null) bv.Tag = "verwaltet";
                 it.VerwaltetBadge = bv;
 
-                OptItem itemRef = it;
-                it.Toggle.CheckedChanged += delegate {
-                    if (itemRef.Box.Checked != itemRef.Toggle.Checked) itemRef.Box.Checked = itemRef.Toggle.Checked;
-                };
-                it.Box.CheckedChanged += delegate {
-                    if (itemRef.Toggle.Checked != itemRef.Box.Checked) itemRef.Toggle.Checked = itemRef.Box.Checked;
-                    UpdateOptCounts();
-                };
+                VerbindeOptEintrag(it, delegate { UpdateOptCounts(); });
 
             }
             rowsPanel.Visible = false;
@@ -3062,13 +3064,13 @@ public partial class DiagGui : Form
         lnkOptAll.LinkClicked += delegate {
             if (curOptKey.Length > 0)
             {
-                foreach (OptItem it in optItems) if (it.Kat == curOptKey && it.Box != null) it.Box.Checked = true;
+                foreach (OptItem it in optItems) if (it.Kat == curOptKey && it.Box != null && !it.Gesperrt) it.Box.Checked = true;
             }
         };
         lnkOptNone.LinkClicked += delegate {
             if (curOptKey.Length > 0)
             {
-                foreach (OptItem it in optItems) if (it.Kat == curOptKey && it.Box != null) it.Box.Checked = false;
+                foreach (OptItem it in optItems) if (it.Kat == curOptKey && it.Box != null && !it.Gesperrt) it.Box.Checked = false;
             }
         };
 
@@ -3132,6 +3134,7 @@ public partial class DiagGui : Form
 
             SettingRow row = new SettingRow(it.Titel, shortDesc, it.Toggle);
             it.Row = row;
+            if (it.Gesperrt) row.Cursor = Cursors.Default;
             row.Width = UI.S(UI.Gruppenbreite - 270);
             if (it.Risiko.Length > 0 && it.Risiko != "Lesen" && it.Risiko != "Aendern") row.AddBadge(RiskBadge(it.Risiko));
             if (it.Neustart == "immer") row.AddBadge(RestartBadge("immer"));
@@ -3164,6 +3167,7 @@ public partial class DiagGui : Form
             {
                 lblOptCatTitle.Text = k[1];
                 lblOptCatDesc.Text = k[2];
+                if (lblOptCatCount != null) lblOptCatCount.Text = OptZaehlerText(OptZaehler(optItems, key));
                 break;
             }
         }
@@ -3196,18 +3200,75 @@ public partial class DiagGui : Form
         if (lblOptInfo != null)
         {
             string name = key == "M" ? "Minimal" : key == "S" ? "Leos Empfehlung" : key == "E" ? "Erweitert" : "";
-            int n = SelectedOptIds().Count;
+            int n = SelectedOptIds().Count, ak = 0;
+            foreach (OptItem it in optItems) if (it.Gesperrt) ak++;
             lblOptInfo.Text = (name.Length > 0 ? "Vorlage " + name + ": " + n + " Einträge gewählt." : "Keine Einträge gewählt.")
+                + (ak > 0 ? " " + ak + " Einträge sind bereits aktiv und bleiben unverändert." : "")
                 + (DomainPc ? "  Dieser PC ist Mitglied einer Domäne" + (skip == 1 ? "; 1 verwalteter Eintrag ist nicht gewählt" : skip > 1 ? "; " + skip + " verwaltete Einträge sind nicht gewählt" : "") + ". Gruppenrichtlinien können Einstellungen wieder überschreiben." : "");
             lblOptInfo.ForeColor = DomainPc ? UI.Warn : UI.Muted;
         }
     }
 
-    List<string> SelectedOptIds()
+    // Für den Lauf: gewählt und nicht bereits aktiv (ab v4.05)
+    List<string> SelectedOptIds() { return GewaehlteOptIds(optItems); }
+
+    // Für Vorlagen: die Auswahl einschließlich gesperrter Einträge, damit eine Vorlage auf einem anderen PC gleich wirkt
+    List<string> ChosenOptIds()
     {
         List<string> r = new List<string>();
         foreach (OptItem it in optItems) if (it.Box != null && it.Box.Checked) r.Add(it.Id);
         return r;
+    }
+
+    public const string OptGesperrtHinweis = "Ist auf diesem PC schon so eingestellt. Zur\u00FCcknehmen auf der Seite \u00C4nderungen.";
+
+    public static List<string> GewaehlteOptIds(List<OptItem> items)
+    {
+        List<string> r = new List<string>();
+        foreach (OptItem it in items) if (it.Box != null && it.Box.Checked && !it.Gesperrt) r.Add(it.Id);
+        return r;
+    }
+
+    // Haken (Auswahl) und Schalter (Anzeige) eines Eintrags verbinden. Gesperrt zeigt der Schalter An und folgt dem
+    // Haken nicht; Klicks auf Schalter und Zeile wirken nicht (ToggleSwitch.Locked).
+    public static void VerbindeOptEintrag(OptItem it, EventHandler geaendert)
+    {
+        OptItem r = it;
+        it.Toggle.CheckedChanged += delegate {
+            if (!r.Gesperrt && r.Box.Checked != r.Toggle.Checked) r.Box.Checked = r.Toggle.Checked;
+        };
+        it.Box.CheckedChanged += delegate {
+            if (!r.Gesperrt && r.Toggle.Checked != r.Box.Checked) r.Toggle.Checked = r.Box.Checked;
+            if (geaendert != null) geaendert(r, EventArgs.Empty);
+        };
+    }
+
+    public static void SperreOptEintrag(OptItem it, bool gesperrt)
+    {
+        if (it == null || it.Toggle == null) return;
+        it.Gesperrt = gesperrt;
+        it.Toggle.Locked = gesperrt;
+        it.Toggle.Checked = gesperrt || (it.Box != null && it.Box.Checked);
+        if (it.Row != null) { it.Row.Cursor = gesperrt ? Cursors.Default : Cursors.Hand; it.Row.Invalidate(); }
+    }
+
+    // Zähler einer Kategorie: [0] gewählt (ohne gesperrte), [1] bereits aktiv, [2] Einträge
+    public static int[] OptZaehler(List<OptItem> items, string kat)
+    {
+        int[] z = new int[3];
+        foreach (OptItem it in items)
+        {
+            if (it.Kat != kat) continue;
+            z[2]++;
+            if (it.Gesperrt) z[1]++;
+            else if (it.Box != null && it.Box.Checked) z[0]++;
+        }
+        return z;
+    }
+
+    public static string OptZaehlerText(int[] z)
+    {
+        return z[0] + " gew\u00E4hlt \u00B7 " + (z[1] > 0 ? z[1] + " bereits aktiv \u00B7 " : "") + z[2] + " Eintr\u00E4ge";
     }
 
     void UpdateOptCounts()
@@ -3215,10 +3276,10 @@ public partial class DiagGui : Form
         foreach (string[] k in optCats)
         {
             string key = k[0];
-            int a = 0, n = 0;
-            foreach (OptItem it in optItems) if (it.Kat == key) { a++; if (it.Box != null && it.Box.Checked) n++; }
-            if (optPickers.ContainsKey(key)) optPickers[key].SetCounts(n, a);
-            if (optCatCount.ContainsKey(key)) optCatCount[key].CountText = n + " von " + a + " gew\u00E4hlt";
+            int[] z = OptZaehler(optItems, key);
+            if (optPickers.ContainsKey(key)) optPickers[key].SetCounts(z[0], z[2], z[1]);
+            if (optCatCount.ContainsKey(key)) optCatCount[key].CountText = z[0] + " von " + z[2] + " gew\u00E4hlt";
+            if (key == curOptKey && lblOptCatCount != null) lblOptCatCount.Text = OptZaehlerText(z);
         }
     }
 
@@ -3301,11 +3362,14 @@ public partial class DiagGui : Form
             if (it == null || it.Box == null) continue;
             it.Zustand = x[2]; it.ZustandText = x.Length > 3 ? x[3].Replace("¦", "|") : "";
             if (it.Zustand == "aktiv") a++; else if (it.Zustand == "teilweise") t++; else if (it.Zustand == "offen") o++; else if (it.Zustand == "nicht zutreffend") nz++; else np++;
+            SperreOptEintrag(it, it.Zustand == "aktiv");
             it.Box.Text = OptBoxText(it); Tip(it.Box, OptTipText(it));
             if (it.Row != null) { string tt = OptTipText(it); Tip(it.Row, tt); if (it.Toggle != null) Tip(it.Toggle, tt); }
         }
-        SetText(lblOptState, (a + t + o + nz + np) == 0 ? "Zustand nicht lesbar: keine Rückmeldung vom Arbeitsprozess." : "Zustand auf diesem PC: " + a + " bereits aktiv, " + t + " teilweise, " + o + " offen, " + nz + " nicht zutreffend, " + np + " nicht prüfbar (Bereinigung, Werkzeuge)." + (user.Length > 0 ? "  " + user + "." : ""));
+        SetText(lblOptState, (a + t + o + nz + np) == 0 ? "Zustand nicht lesbar: keine Rückmeldung vom Arbeitsprozess." : "Zustand auf diesem PC: " + a + " bereits aktiv (Schalter gesperrt), " + t + " teilweise, " + o + " offen, " + nz + " nicht zutreffend, " + np + " nicht prüfbar (Bereinigung, Werkzeuge)." + (user.Length > 0 ? "  " + user + "." : ""));
         lblOptState.ForeColor = UI.Muted;
+        UpdateOptCounts();
+        UpdateSummary();
     }
 
     // Ergebnis eines Eintrags während des Laufs (@@OPTE|Id|Ergebnis|Änderungen|Details): Häkchen zeigt den neuen Stand
@@ -3314,9 +3378,13 @@ public partial class DiagGui : Form
         OptItem it = optItems.Find(delegate(OptItem i) { return i.Id == Get(p, 1); });
         if (it == null || it.Box == null) return;
         string erg = Get(p, 2);
-        it.Zustand = (erg == "angewendet" || erg == "bereits so") ? "aktiv" : erg;
+        it.Zustand = (erg == "angewendet" || erg == "bereits so" || erg == "bereits aktiv") ? "aktiv" : erg;
         it.ZustandText = Get(p, 4).Replace("¦", "|");
+        // ab v4.05: angewendete und bereits aktive Einträge danach gesperrt
+        SperreOptEintrag(it, it.Zustand == "aktiv");
         it.Box.Text = OptBoxText(it); Tip(it.Box, OptTipText(it));
+        if (it.Row != null) { string tt = OptTipText(it); Tip(it.Row, tt); if (it.Toggle != null) Tip(it.Toggle, tt); }
+        UpdateOptCounts();
     }
 
     void FetchOptTools()
@@ -3335,7 +3403,7 @@ public partial class DiagGui : Form
         int ver = 0;
         foreach (OptItem it in optItems)
         {
-            if (!it.Box.Checked) continue;
+            if (!it.Box.Checked || it.Gesperrt) continue;
             if (it.Verwaltet && DomainPc) ver++;
             if (punkte != null) punkte.Add(new StartPunkt("Optimierung", it.Titel, it.Risiko, it.Neustart));
         }
@@ -3918,7 +3986,7 @@ public partial class DiagGui : Form
             t = m + 1;
         }
         else if (mod == 3) { for (int i = 0; i < repChk.Length; i++) if (repChk[i].Checked) t += repMinutes[i]; }
-        else if (mod == 4) { int n = 0; foreach (OptItem it in optItems) if (it.Box.Checked) { n++; t += it.Minuten; } t += 1 + n / 40; }
+        else if (mod == 4) { int n = 0; foreach (OptItem it in optItems) if (it.Box.Checked && !it.Gesperrt) { n++; t += it.Minuten; } t += 1 + n / 40; }
         return t;
     }
 
@@ -4537,7 +4605,7 @@ public partial class DiagGui : Form
         PutCb(d, "Last.AbbruchCpu", cmbLAbortCpu); PutCb(d, "Last.AbbruchGpu", cmbLAbortGpu);
         for (int i = 0; i < repKeys.Length && repChk != null; i++) d["Rep." + repKeys[i]] = repChk[i].Checked;
         PutC(d, "Rep.Wiederherstellungspunkt", chkRestorePoint);
-        d["Opt.Auswahl"] = String.Join(",", SelectedOptIds().ToArray());
+        d["Opt.Auswahl"] = String.Join(",", ChosenOptIds().ToArray());
         PutC(d, "Opt.Wiederherstellungspunkt", chkOptRestore);
         PutC(d, "Allg.Anonymisieren", chkAnon);
         if (cmbDriver != null) d["Sensor.Treiber"] = driverValues[Math.Max(0, cmbDriver.SelectedIndex)];
@@ -4893,6 +4961,7 @@ public partial class DiagGui : Form
         }
         catch (Exception ex) { MessageBox.Show(this, "PowerShell konnte nicht gestartet werden: " + ex.Message, "Leos Minibench", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
         StopOptStateCheck();   // Messungen nicht durch den Zustandsprozess belasten
+        StopSoftwareStateCheck();
         running = true;
         for (int i = 0; i < nav.Count; i++) { nav[i].Running = false; nav[i].Invalidate(); }
         contentHost.Visible = false;
@@ -5176,6 +5245,7 @@ public partial class DiagGui : Form
     {
         // Live-Ansicht sauber beenden, damit ein vorübergehend installierter Treiber entfernt wird
         if (liveRunning) StopLiveAndWait();
+        StopSoftwareStateCheck();
         StopOptStateCheck();
         if (!running) { CleanupDriver(); return; }
         if (MessageBox.Show(this, "Der Lauf ist noch aktiv. Abbrechen und schließen?", "Leos Minibench", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) { e.Cancel = true; return; }

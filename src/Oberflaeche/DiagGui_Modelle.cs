@@ -223,12 +223,15 @@ public class ContractStep
 }
 
 // Katalogeintrag der Optimierung (Get-OptGuiLines)
-class OptItem
+public class OptItem
 {
     public string Id = "", Kat = "", Risiko = "", Neustart = "", Vorlagen = "", Bedingung = "", Titel = "", Tip = "", Zustand = "", ZustandText = "";
     public bool Verwaltet; public int Minuten; public CheckBox Box; public ToggleSwitch Toggle; public SettingRow Row;
     public Badge StateBadge;   // ab v3.64: Zustand auf diesem PC als Etikett neben dem Eintrag
     public Badge VerwaltetBadge;   // ab v4.01: Etikett "verwaltet", die Zeile selbst entsteht erst beim Öffnen der Kategorie
+    // ab v4.05: Zustand "aktiv" (Hintergrundprüfung oder Ergebnis eines Laufs). Der Schalter steht dann auf An und ist
+    // gesperrt; Box hält weiter die Auswahl aus Vorlage oder Hand (wird gespeichert), ausgeführt wird der Eintrag nicht.
+    public bool Gesperrt;
 }
 
 // Netzlaufwerk als Spiegel der Nutzerdaten (ab v3.54). Die Oberfläche arbeitet immer im Datenordner auf dem Stick;

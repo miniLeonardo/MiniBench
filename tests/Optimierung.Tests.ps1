@@ -192,6 +192,29 @@ Describe 'Einträge ausführen und zurücknehmen' {
         $u.Rueckgaengig | Should -Be 2
         $script:reg.Count | Should -Be 0
     }
+    It 'Lauf überspringt bereits aktive Einträge (ab v4.05), offene und teilweise laufen' {
+        $a = [pscustomobject]@{ Id = 'A1'; Titel = 'Schon so'; Kat = 'Datenschutz'; Risiko = 'Aendern'; Neustart = 'nie'; Bedingung = ''; Aktionen = @(@{ Art = 'Reg'; Pfad = 'HKLM:\SOFTWARE\T'; Name = 'A'; Wert = 0; Typ = 'DWord' }) }
+        $o = [pscustomobject]@{ Id = 'O1'; Titel = 'Offen'; Kat = 'Datenschutz'; Risiko = 'Aendern'; Neustart = 'nie'; Bedingung = ''; Aktionen = @(@{ Art = 'Reg'; Pfad = 'HKLM:\SOFTWARE\T'; Name = 'B'; Wert = 1; Typ = 'DWord' }) }
+        $t = [pscustomobject]@{ Id = 'T3'; Titel = 'Teilweise'; Kat = 'Datenschutz'; Risiko = 'Aendern'; Neustart = 'nie'; Bedingung = ''; Aktionen = @(@{ Art = 'Reg'; Pfad = 'HKLM:\SOFTWARE\T'; Name = 'A'; Wert = 0; Typ = 'DWord' }, @{ Art = 'Reg'; Pfad = 'HKLM:\SOFTWARE\T'; Name = 'C'; Wert = 1; Typ = 'DWord' }) }
+        $w = [pscustomobject]@{ Id = 'W1'; Titel = 'Nur Win10'; Kat = 'Bedienung'; Risiko = 'Aendern'; Neustart = 'nie'; Bedingung = 'Win10'; Aktionen = @(@{ Art = 'Reg'; Pfad = 'HKLM:\SOFTWARE\T'; Name = 'A'; Wert = 0; Typ = 'DWord' }) }
+        $script:reg['HKLM:\SOFTWARE\T|A'] = @{ Vorhanden = $true; Wert = 0; Typ = 'DWord' }
+        $sp = MinibenchTest\Split-OptBereitsAktiv @($a, $o, $t, $w) $optEnv
+        @($sp.Aktiv | ForEach-Object { $_.Id }) | Should -Be @('A1')
+        @($sp.Offen | ForEach-Object { $_.Id }) | Should -Be @('O1', 'T3', 'W1')
+        $sp.Aktiv[0].Ergebnis | Should -Be 'bereits aktiv'
+        $sp.Aktiv[0].Details | Should -Match 'übersprungen'
+        Should -Invoke -ModuleName MinibenchTest Set-RegValueState -Times 0
+    }
+    It 'Ablauf: Abgleich vor dem Wiederherstellungspunkt, ohne offene Einträge kein Wiederherstellungspunkt' {
+        $a = Get-PartText 'Module\Optimierung\Ablauf.ps1'
+        $split = $a.IndexOf('Split-OptBereitsAktiv')
+        $rp = $a.IndexOf("Invoke-Section 'Optimierung: Wiederherstellungspunkt anlegen'")
+        $split | Should -BeGreaterThan 0
+        $rp | Should -BeGreaterThan $split
+        $a | Should -Match 'if \(-not \$script:OptZuTun\)'
+        $a | Should -Match "Send-GuiEvent 'OPTE' \`$r\.Id \`$r\.Ergebnis"
+        (Get-PartText 'Module\Optimierung\Funktionen.ps1') | Should -Match "'bereits aktiv' = 'skip'"
+    }
     It 'Bedingung nicht erfüllt: übersprungen, nichts geschrieben' {
         $e = [pscustomobject]@{ Id = 'T2'; Titel = 'Nur Win10'; Kat = 'Bedienung'; Risiko = 'Aendern'; Neustart = 'nie'; Bedingung = 'Win10'; Aktionen = @(@{ Art = 'Reg'; Pfad = 'HKLM:\X'; Name = 'A'; Wert = 1; Typ = 'DWord' }) }
         (MinibenchTest\Invoke-OptEntry $e $optEnv).Ergebnis | Should -Be 'übersprungen'

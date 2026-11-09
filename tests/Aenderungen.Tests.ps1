@@ -368,3 +368,74 @@ Describe 'Aufruf von winget' {
         (Get-ModuleVar 'WingetFristSek') | Should -BeLessOrEqual 3600
     }
 }
+
+# Seite Tools (ab v4.05): Paketliste als Tabelle (Kern\Softwarepakete.psd1), installierte Pakete über winget export
+Describe 'Paketliste der Seite Tools' {
+    BeforeAll {
+        Import-MinibenchTestModule -Parts 'Kern\Risiko.ps1', 'Kern\Geraeteidentitaet.ps1', 'Kern\Aenderungen.ps1', 'Kern\Softwarepakete.ps1' -Functions 'Get-SafeName', 'Invoke-External', 'Show-Sub', 'Hide-Sub', 'Write-Heartbeat', 'Send-GuiEvent'
+    }
+    It 'ist vollständig: Gruppe, Id, Name und Beschreibung je Paket, keine doppelten Ids' {
+        $p = @(MinibenchTest\Get-SoftwarePakete)
+        $g = @(MinibenchTest\Get-SoftwareGruppen)
+        $p.Count | Should -BeGreaterOrEqual 20
+        $p.Count | Should -BeLessOrEqual 30
+        $g.Count | Should -Be 6
+        foreach ($x in $p) {
+            foreach ($f in 'Gruppe', 'Id', 'Name', 'Beschreibung') { [string]$x[$f] | Should -Not -BeNullOrEmpty -Because ('{0}: {1}' -f $x.Id, $f) }
+            $g | Should -Contain $x.Gruppe
+            MinibenchTest\Test-WingetId $x.Id | Should -BeTrue -Because $x.Id
+            ([string]$x.Name + [string]$x.Beschreibung) | Should -Not -Match '\|'
+        }
+        @($p | Group-Object { $_.Id.ToLowerInvariant() } | Where-Object { $_.Count -gt 1 }).Count | Should -Be 0
+        foreach ($k in $g) { @($p | Where-Object { $_.Gruppe -eq $k }).Count | Should -BeGreaterThan 0 -Because $k }
+    }
+    It 'ist eingeschränkte Sprache (nur Daten)' {
+        $f = Join-Path $global:MinibenchSrcRoot 'Kern/Softwarepakete.psd1'
+        $d = Import-PowerShellDataFile -LiteralPath $f
+        @($d.Pakete).Count | Should -Be @(MinibenchTest\Get-SoftwarePakete).Count
+    }
+    It 'Zeilen für die Oberfläche: je Gruppe G, je Paket P mit fünf Feldern' {
+        $z = @(MinibenchTest\Get-SoftwarePaketGuiLines)
+        @($z | Where-Object { $_ -like 'G|*' }).Count | Should -Be @(MinibenchTest\Get-SoftwareGruppen).Count
+        $pz = @($z | Where-Object { $_ -like 'P|*' })
+        $pz.Count | Should -Be @(MinibenchTest\Get-SoftwarePakete).Count
+        foreach ($l in $pz) { @($l -split '\|').Count | Should -Be 5 }
+    }
+    It 'winget export: Ids aus allen Quellen, ohne Unterscheidung von Groß- und Kleinschreibung' {
+        $j = '{"Sources":[{"Packages":[{"PackageIdentifier":"7zip.7zip"},{"PackageIdentifier":"Google.Chrome"}],"SourceDetails":{"Name":"winget"}},{"Packages":[{"PackageIdentifier":"9NKSQGP7F2NH"}]}]}'
+        $ids = @(MinibenchTest\ConvertFrom-WingetExport $j)
+        $ids.Count | Should -Be 3
+        ($ids -contains 'google.chrome') | Should -BeTrue
+        @(MinibenchTest\ConvertFrom-WingetExport '{"Sources":[]}').Count | Should -Be 0
+    }
+    It 'Zustand: je Paket ein Ereignis, Anzahl installierter als Ergebnis' {
+        $script:ev = [System.Collections.Generic.List[string]]::new()
+        Mock -ModuleName MinibenchTest Send-GuiEvent { $script:ev.Add((@($Kind) + @($Parts)) -join "|") }
+        Mock -ModuleName MinibenchTest Find-Winget { 'winget.exe' }
+        Mock -ModuleName MinibenchTest Get-WingetInstallierteIds { [pscustomobject]@{ Ids = @('7zip.7zip', 'VIDEOLAN.VLC') } }
+        $n = MinibenchTest\Invoke-SoftwareZustand
+        $n | Should -Be 2
+        $script:ev.Count | Should -Be @(MinibenchTest\Get-SoftwarePakete).Count
+        $script:ev | Should -Contain 'PAKZ|7zip.7zip|installiert'
+        $script:ev | Should -Contain 'PAKZ|VideoLAN.VLC|installiert'
+        $script:ev | Should -Contain 'PAKZ|Google.Chrome|nicht installiert'
+    }
+    It 'Zustand ohne winget oder ohne Export: -1 und keine Ereignisse' {
+        $script:ev = [System.Collections.Generic.List[string]]::new()
+        Mock -ModuleName MinibenchTest Send-GuiEvent { $script:ev.Add((@($Kind) + @($Parts)) -join "|") }
+        Mock -ModuleName MinibenchTest Find-Winget { '' }
+        MinibenchTest\Invoke-SoftwareZustand | Should -Be -1
+        Mock -ModuleName MinibenchTest Find-Winget { 'winget.exe' }
+        Mock -ModuleName MinibenchTest Get-WingetInstallierteIds { $null }
+        MinibenchTest\Invoke-SoftwareZustand | Should -Be -1
+        $script:ev.Count | Should -Be 0
+    }
+    It 'Export läuft mit Frist und räumt die Datei weg' {
+        Mock -ModuleName MinibenchTest Invoke-External { [pscustomobject]@{ ExitCode = 0; Output = ''; Error = ''; TimedOut = $true } }
+        $r = & (Get-Module MinibenchTest) { Get-WingetInstallierteIds 'winget.exe' }
+        $r | Should -BeNullOrEmpty
+        Should -Invoke -ModuleName MinibenchTest Invoke-External -Times 1 -ParameterFilter { $Arguments -match '^export -o ' -and $TimeoutSec -eq 240 }
+        @(Get-ChildItem ([IO.Path]::GetTempPath()) -Filter ('LeosMinibench-winget-{0}.json' -f $PID)).Count | Should -Be 0
+    }
+}
+

@@ -10,6 +10,22 @@
 $script:WingetFristSek       = 1200   # je Paket; große Pakete (Office, Steam) brauchen auf langsamen Leitungen lange
 $script:WingetFristListeSek  = 120
 $script:WingetFristEntfSek   = 900
+$script:WingetFristExportSek = 240    # winget export für die Erkennung installierter Pakete (ab v4.05)
+
+# Paketliste der Oberfläche (ab v4.05 als Tabelle in Softwarepakete.psd1, vorher neun feste Felder in DiagGui_Seiten.cs)
+$script:SoftwareKatalog = (
+#>> EINBINDEN Kern\Softwarepakete.psd1
+)
+function Get-SoftwarePakete { return @($script:SoftwareKatalog.Pakete) }
+function Get-SoftwareGruppen { return @($script:SoftwareKatalog.Gruppen) }
+
+# Zeilen für die Oberfläche: G|Gruppe und P|Gruppe|Id|Name|Beschreibung (Trennzeichen in Texten ersetzt)
+function Get-SoftwarePaketGuiLines {
+    $z = @()
+    foreach ($g in (Get-SoftwareGruppen)) { $z += ('G|{0}' -f $g) }
+    foreach ($p in (Get-SoftwarePakete)) { $z += ('P|{0}|{1}|{2}|{3}' -f (@($p.Gruppe, $p.Id, $p.Name, $p.Beschreibung) | ForEach-Object { ([string]$_) -replace '[|\r\n]', ' ' })) }
+    return $z
+}
 
 # Paketkennung prüfen (nur Zeichen, die winget-Ids haben; schützt die Befehlszeile)
 function Test-WingetId([string]$Id) { return ([string]$Id -match '^[A-Za-z0-9][A-Za-z0-9\.\+_\-]{1,99}$') }
@@ -98,6 +114,44 @@ function Invoke-SoftwarePakete([string]$Spec) {
         Write-Host $r.Text
     }
     return [pscustomobject]$sum
+}
+
+# Installierte Pakete in einem Aufruf (ab v4.05): winget export schreibt alle installierten Programme, die winget einer
+# Quelle zuordnen kann, als JSON (Sources[].Packages[].PackageIdentifier). Die Textausgabe von winget list kürzt lange
+# Ids mit "…" und ist sprachabhängig; das JSON nicht. Rückgabe: Liste der Ids, $null wenn nicht feststellbar.
+function Get-WingetInstallierteIds([string]$Exe) {
+    $f = Join-Path ([IO.Path]::GetTempPath()) ('LeosMinibench-winget-{0}.json' -f $PID)
+    try {
+        Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue
+        $r = Invoke-Winget $Exe ('export -o "{0}" --accept-source-agreements --disable-interactivity' -f $f) $script:WingetFristExportSek
+        if ($r.TimedOut -or -not (Test-Path -LiteralPath $f)) { return $null }
+        return [pscustomobject]@{ Ids = @(ConvertFrom-WingetExport ([IO.File]::ReadAllText($f, [Text.Encoding]::UTF8))) }
+    } catch { return $null }
+    finally { Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue }
+}
+
+function ConvertFrom-WingetExport([string]$Json) {
+    $j = $Json | ConvertFrom-Json
+    $ids = @()
+    foreach ($src in @($j.Sources)) { foreach ($p in @($src.Packages)) { if ($p.PackageIdentifier) { $ids += [string]$p.PackageIdentifier } } }
+    return $ids
+}
+
+# Hilfsmodus der Oberfläche: -SoftwareZustand. Je Paket der Liste @@PAKZ|Id|installiert oder nicht installiert,
+# am Ende @@RESULT|Anzahl installiert (-1: nicht feststellbar, dann keine PAKZ-Zeilen). Ändert nichts.
+function Invoke-SoftwareZustand {
+    $exe = Find-Winget
+    $r = $null
+    if ($exe) { $r = Get-WingetInstallierteIds $exe }
+    if ($null -eq $r) { return -1 }
+    $ids = @($r.Ids)
+    $n = 0
+    foreach ($p in (Get-SoftwarePakete)) {
+        $da = ($ids -contains [string]$p.Id)   # -contains vergleicht ohne Groß- und Kleinschreibung
+        if ($da) { $n++ }
+        Send-GuiEvent 'PAKZ' $p.Id $(if ($da) { 'installiert' } else { 'nicht installiert' })
+    }
+    return $n
 }
 
 # Rückgängig (Seite Änderungen): nur deinstallieren, was noch installiert ist. Ist das nicht feststellbar oder scheitert

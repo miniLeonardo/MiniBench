@@ -64,7 +64,8 @@ Describe 'Vollständigkeit der Quelltextdateien' {
             'src\Kern\Grafiktest.cs', 'src\Kern\Sensoren.cs', 'src\Kern\Testroutinen.cs',
             'src\Oberflaeche\DiagGui.cs', 'src\Oberflaeche\DiagGui_Steuerelemente.cs',
             'src\Oberflaeche\DiagGui_Modelle.cs', 'src\Oberflaeche\DiagGui_Vergleich.cs',
-            'src\Oberflaeche\DiagGui_Seiten.cs', 'src\Oberflaeche\Start.cs', 'src\Oberflaeche\Versionen.cs'
+            'src\Oberflaeche\DiagGui_Seiten.cs', 'src\Oberflaeche\Start.cs', 'src\Oberflaeche\Versionen.cs',
+            'src\Kern\Softwarepakete.psd1'
         )
         foreach ($f in $all) {
             # relativer Pfad mit \ wie im Bauplan (unter Linux trennt das Dateisystem mit /)

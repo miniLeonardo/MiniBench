@@ -41,6 +41,16 @@ if ($ModOpt) {
         $script:OptMetricOpts = @{ MitFunktionen = $mitF; MitApps = $mitA }
         Hide-Sub
         Add-Line ('  Kennzahlen vorher: {0}' -f (($script:OptMetricsBefore.Keys | ForEach-Object { '{0} {1}' -f $_, $script:OptMetricsBefore[$_] }) -join ', '))
+        # ab v4.05: bereits aktive Einträge nicht ausführen (Bericht: "bereits aktiv", Oberfläche: Schalter gesperrt)
+        Show-Sub 'Zustand der gewählten Einträge' 'bereits aktive werden übersprungen' -1
+        $sp = Split-OptBereitsAktiv @($script:OptSel | Where-Object { $_.Id -ne 'Wiederherstellungspunkte' }) $envO
+        Hide-Sub
+        if (@($sp.Aktiv).Count) {
+            foreach ($r in @($sp.Aktiv)) { $script:OptLog.Add($r); Send-GuiEvent 'OPTE' $r.Id $r.Ergebnis $r.Aenderungen $r.Details }
+            $ids = @($sp.Aktiv | ForEach-Object { $_.Id })
+            $script:OptSel = @($script:OptSel | Where-Object { $ids -notcontains $_.Id })
+            Add-Line ('  Bereits aktiv, übersprungen: {0} ({1}).' -f @($sp.Aktiv).Count, (@($sp.Aktiv | ForEach-Object { $_.Titel }) -join ', '))
+        }
     }
 
     if ($script:OptSelIds -contains 'Wiederherstellungspunkte') {
@@ -52,7 +62,11 @@ if ($ModOpt) {
             if ($r.Ergebnis -in 'angewendet', 'teilweise' -and $script:RestorePointNo) { Add-Line ('  Der Wiederherstellungspunkt dieses Laufs ({0}) wurde mit gelöscht, es wird ein neuer angelegt.' -f $script:RestorePointNo); $script:RestorePointNo = $null }
         }
     }
-    if (-not $OptOhneWiederherstellungspunkt -and -not $script:RestorePointNo) {
+    # Bleibt nach dem Abgleich nichts zu ändern, entfällt der Wiederherstellungspunkt (ab v4.05)
+    $script:OptZuTun = @($script:OptSel | Where-Object { $_.Id -ne 'Wiederherstellungspunkte' }).Count
+    if (-not $script:OptZuTun) {
+        Add-Line '  Alle gewählten Einträge sind auf diesem PC bereits aktiv; kein Wiederherstellungspunkt nötig.'
+    } elseif (-not $OptOhneWiederherstellungspunkt -and -not $script:RestorePointNo) {
         Invoke-Section 'Optimierung: Wiederherstellungspunkt anlegen' {
             Show-Sub 'Wiederherstellungspunkt' 'wird angelegt' -1
             $rp = New-RestorePointLogged 'Optimierung' ('Leos Minibench vor Optimierung {0:dd.MM.yyyy HH:mm}' -f (Get-Date))
@@ -111,7 +125,7 @@ if ($ModOpt) {
         $ein = @($log | Where-Object { $_.Risiko -eq 'Eingriff' -and $_.Ergebnis -in 'angewendet', 'teilweise' }).Count
         Add-Sub 'Zusammenfassung'
         Add-Line ('  {0} von {1} Einträgen angewendet, {2} Einzeländerungen, davon {3} Eingriffe ohne automatisches Rückgängig.' -f $n, $log.Count, $chg, $ein)
-        Add-Line ('  Bereits wie gewünscht: {0}, übersprungen (Bedingung oder nicht vorhanden): {1}, mit Fehlern: {2}.' -f @($log | Where-Object { $_.Ergebnis -eq 'bereits so' }).Count, @($log | Where-Object { $_.Ergebnis -in 'übersprungen', 'nicht vorhanden' }).Count, @($log | Where-Object { $_.Ergebnis -in 'Fehler', 'teilweise' }).Count)
+        Add-Line ('  Bereits wie gewünscht: {0} (davon {3} vor dem Lauf erkannt und nicht ausgeführt), übersprungen (Bedingung oder nicht vorhanden): {1}, mit Fehlern: {2}.' -f @($log | Where-Object { $_.Ergebnis -in 'bereits so', 'bereits aktiv' }).Count, @($log | Where-Object { $_.Ergebnis -in 'übersprungen', 'nicht vorhanden' }).Count, @($log | Where-Object { $_.Ergebnis -in 'Fehler', 'teilweise' }).Count, @($log | Where-Object { $_.Ergebnis -eq 'bereits aktiv' }).Count)
         Add-Line '  Änderungen der Stufe Ändern nimmt die Seite Änderungen einzeln zurück; Eingriffe stehen dort mit dem Weg zurück.'
         Add-Line '  Einstellungen von Explorer, Taskleiste und Maus gelten nach dem nächsten Ab- und Anmelden.'
         if ($n) { Add-Finding INFO 'Optimierung' ('{0} Einstellungen angewendet ({1} Einzeländerungen). Rückgängig auf der Seite Änderungen; einige gelten erst nach Abmelden oder Neustart.' -f $n, $chg) }

@@ -1,5 +1,5 @@
 ﻿#region ---------- Grafische Oberfläche ----------
-if (-not $EventMode -and -not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $SensorLive -and -not $SensorWerkzeugeHolen -and -not $SensorAufraeumen -and -not $OptimierungZustand -and -not $OptWerkzeugeHolen -and -not $SoftwareInstallieren -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardSysteme -and -not $MedianAktualisieren -and -not $Umzug) {
+if (-not $EventMode -and -not $ImportOrdner -and -not $Vergleich -and -not $Rueckgaengig -and -not $SensorLive -and -not $SensorWerkzeugeHolen -and -not $SensorAufraeumen -and -not $OptimierungZustand -and -not $SoftwareZustand -and -not $OptWerkzeugeHolen -and -not $SoftwareInstallieren -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardSysteme -and -not $MedianAktualisieren -and -not $Umzug) {
     Write-StartPhase 'Datenordner gefunden'
     # Hardwareabfragen für die Oberfläche (Datenträgerliste, Geräteidentität) laufen parallel zum Laden der Oberfläche
     $hwPs = $null; $hwHandle = $null
@@ -88,6 +88,7 @@ if (-not $EventMode -and -not $ImportOrdner -and -not $Vergleich -and -not $Ruec
             Write-StartPhase ('Datenpflege: {0}' -f $dp.Kurz)
         } catch { }
         try { [DiagGui]::OptKatalog = [string[]](Get-OptGuiLines) } catch { }
+        try { [DiagGui]::SoftwarePakete = [string[]](Get-SoftwarePaketGuiLines) } catch { }
         Write-StartPhase 'Katalog der Optimierung gelesen'
         # Datenträger für die Auswahl im Benchmark und im Lasttest: Nummer|Name|Bus|Medium|Größe|Buchstaben|USB
         $diskList = [System.Collections.Generic.List[string]]::new()

@@ -22,6 +22,12 @@ if ($SoftwareInstallieren) {
     Send-GuiEvent 'RESULT' $r.Installiert $r.Bereits $r.Fehler
     exit $(if ($r.Fehler) { 1 } else { 0 })
 }
+# Seite Tools (ab v4.05): installierte Softwarepakete im Hintergrund erkennen, je Paket @@PAKZ, am Ende @@RESULT|Anzahl
+if ($SoftwareZustand) {
+    $n = Invoke-SoftwareZustand
+    Send-GuiEvent 'RESULT' $n
+    exit 0
+}
 if ($OptWerkzeugeHolen) {
     $r = Install-OptTools
     foreach ($m in $r.Meldungen) { Write-Host $m }

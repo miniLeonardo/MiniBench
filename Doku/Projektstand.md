@@ -2,9 +2,23 @@
 
 Gemeinsamer Stand für alle Agenten (Claude, Antigravity). Wird am Ende jeder Version aktualisiert (siehe AGENTS.md).
 
-## Stand: Version 4.04 (08.11.2026)
-Release-Commit "Release v4.04: Veröffentlichen in einem Schritt, Referenz über die Datenbank" von Claude vorbereitet
-(Grundlage Commit 598b8b1, Release v4.03). Erstes Release über Veroeffentlichen.ps1.
+## Stand: Version 4.05 (09.11.2026)
+Release-Commit "Release v4.05: Bereits aktive Optimierungen gesperrt, Tools-Seite kompakt, 28 Softwarepakete" von Claude
+vorbereitet (Grundlage Commit 2a5cb46, Release v4.04), als git bundle übergeben.
+
+Inhalt von 4.05 (Einzelheiten in Doku\Änderungen_v4.05.txt):
+1. Optimierung: bereits aktive Einträge stehen auf An und sind gesperrt (OptItem.Gesperrt, ToggleSwitch.Locked); Vorlagen
+   ändern sie nicht; Zähler gewählt und bereits aktiv getrennt (CategoryPickerItem.ActiveCount, Kopf der Kategorie).
+2. Optimierung im Lauf: Split-OptBereitsAktiv überspringt aktive Einträge ("bereits aktiv"), ohne offene Einträge kein
+   Wiederherstellungspunkt.
+3. Seite Tools: ToolRow (kompakte Zeilen, zwei Spalten ab 900 px), Knöpfe im Seitenkopf, Netzlaufwerk entfernt.
+4. Werkzeuge CPU-Z, GPU-Z (Platzhalter GPU-Z*.exe, neueste Version), MSI Afterburner.
+5. Softwarepakete: Kern\Softwarepakete.psd1 (28 Pakete, 6 Gruppen), Hilfsmodus -SoftwareZustand (winget export, @@PAKZ).
+
+Vorschläge für 4.06 (aus dem Chat zu 4.05, Leonardo wählt aus): siehe Abschnitt "Offene Vorschläge" unten.
+
+## Vorher: Version 4.04 (08.11.2026)
+Release-Commit "Release v4.04: Veröffentlichen in einem Schritt, Referenz über die Datenbank" (Commit 2a5cb46).
 
 Inhalt von 4.04 (Einzelheiten in Doku\Änderungen_v4.04.txt):
 1. Seite Benchmark ohne Haken "Dieses System als Referenz festlegen"; Referenz über Datenbank › Aktionen.
@@ -293,6 +307,15 @@ Inhalt von 3.64 (Einzelheiten in Doku\Änderungen_v3.64.txt):
 4. Rendertest auf sehr schnellen Karten (RTX 3070): hoher Mikroruckler-Anteil und niedriges 1-%-Low nur im Benchmark, nicht im Lasttest.
 5. Update-Funktion unter Windows bestätigen, sobald das Release v4.03 mit LMB.exe und Prüfsumme auf GitHub liegt.
 6. smartctl -X und PCIe-Abfrage unter Last unter Windows bestätigen.
+7. 4.05 unter Windows bestätigen: winget export als Administrator (Pakete im Profil eines anderen Benutzers), GPU-Z über den
+   Uninstall-Eintrag, Seite Tools bei 125 und 150 %, Menü "…" im dunklen Farbschema.
+8. Die Sperre der Optimierung gilt bis zum nächsten Start; nach Rückgängig auf der Seite Änderungen erst dann wieder offen.
+
+## Offene Vorschläge (Stand 4.05, nicht umgesetzt)
+Aus 4.03 offen: Datenbank-Spalte System nur mit PC-Name; Restzeit des Laufs aus den Abschnittszeiten; Aktualisierung der
+Referenz reparieren und transparenter machen; HTML-Bericht mit derselben Kurzfassung wie die Ergebnisseite; KI-Datei
+"In Zwischenablage kopieren"; README mit echten Windows-Aufnahmen von 4.0x. Wartung: nur "Schnellstart deaktivieren" hat
+einen prüfbaren Zustand, dort wäre dieselbe Sperre wie in der Optimierung sinnvoll. Weitere Vorschläge im Chat zu 4.05.
 
 ## Letzter Commit
-Release-Commit v4.04 (Nachfolger von 598b8b1, Release v4.03).
+Release-Commit v4.05 mit Tag v4.05 (Nachfolger von 2a5cb46, Release v4.04), übergeben als MiniBench_v4.05.bundle.
