@@ -2,9 +2,18 @@
 
 Gemeinsamer Stand für alle Agenten (Claude, Antigravity). Wird am Ende jeder Version aktualisiert (siehe AGENTS.md).
 
-## Stand: Version 4.05 (09.11.2026)
-Release-Commit "Release v4.05: Bereits aktive Optimierungen gesperrt, Tools-Seite kompakt, 28 Softwarepakete" von Claude
-vorbereitet (Grundlage Commit 2a5cb46, Release v4.04), als git bundle übergeben.
+## Stand: Version 4.06 (09.11.2026)
+Release-Commit "Release v4.06: Update-Prüfung und Referenz repariert" von Claude vorbereitet (Grundlage ebb4f81,
+Release v4.05), als git bundle übergeben.
+
+Inhalt von 4.06 (Einzelheiten in Doku\Änderungen_v4.06.txt):
+1. Update-Prüfung: "Jetzt suchen" ohne Cache mit Meldung, Cache beim Start 2 h, Ausweg über die Weiterleitung von
+   releases/latest und LMB.exe.sha256, Frist 10 s, Proxy mit Anmeldung. Veroeffentlichen.ps1 hängt LMB.exe.sha256 an.
+2. Median aktualisieren: echte Meldung (vorher immer "fehlgeschlagen"), Median aller Systeme in Referenz_Median.json,
+   eigene Referenz (Referenz.json) hat Vorrang, alter Median ins Archiv, keine Ersatzwerte im Lasttest.
+
+## Vorher: Version 4.05 (09.11.2026)
+Release-Commit "Release v4.05: Bereits aktive Optimierungen gesperrt, Tools-Seite kompakt, 28 Softwarepakete" (Commit ebb4f81).
 
 Inhalt von 4.05 (Einzelheiten in Doku\Änderungen_v4.05.txt):
 1. Optimierung: bereits aktive Einträge stehen auf An und sind gesperrt (OptItem.Gesperrt, ToggleSwitch.Locked); Vorlagen
@@ -15,7 +24,7 @@ Inhalt von 4.05 (Einzelheiten in Doku\Änderungen_v4.05.txt):
 4. Werkzeuge CPU-Z, GPU-Z (Platzhalter GPU-Z*.exe, neueste Version), MSI Afterburner.
 5. Softwarepakete: Kern\Softwarepakete.psd1 (28 Pakete, 6 Gruppen), Hilfsmodus -SoftwareZustand (winget export, @@PAKZ).
 
-Vorschläge für 4.06 (aus dem Chat zu 4.05, Leonardo wählt aus): siehe Abschnitt "Offene Vorschläge" unten.
+Vorschläge für die nächste Version (aus dem Chat zu 4.05, Leonardo wählt aus): siehe Abschnitt "Offene Vorschläge" unten.
 
 ## Vorher: Version 4.04 (08.11.2026)
 Release-Commit "Release v4.04: Veröffentlichen in einem Schritt, Referenz über die Datenbank" (Commit 2a5cb46).
@@ -311,11 +320,13 @@ Inhalt von 3.64 (Einzelheiten in Doku\Änderungen_v3.64.txt):
    Uninstall-Eintrag, Seite Tools bei 125 und 150 %, Menü "…" im dunklen Farbschema.
 8. Die Sperre der Optimierung gilt bis zum nächsten Start; nach Rückgängig auf der Seite Änderungen erst dann wieder offen.
 
+9. 4.06 unter Windows bestätigen: Update 4.05 → 4.06 (vorher Cache\UpdateCheck.json löschen), "Jetzt suchen" hinter dem
+   Proxy, "Median aktualisieren" mit Meldung, Anzeige der geltenden Referenz.
+
 ## Offene Vorschläge (Stand 4.05, nicht umgesetzt)
-Aus 4.03 offen: Datenbank-Spalte System nur mit PC-Name; Restzeit des Laufs aus den Abschnittszeiten; Aktualisierung der
-Referenz reparieren und transparenter machen; HTML-Bericht mit derselben Kurzfassung wie die Ergebnisseite; KI-Datei
+Aus 4.03 offen: Datenbank-Spalte System nur mit PC-Name; Restzeit des Laufs aus den Abschnittszeiten; HTML-Bericht mit derselben Kurzfassung wie die Ergebnisseite; KI-Datei
 "In Zwischenablage kopieren"; README mit echten Windows-Aufnahmen von 4.0x. Wartung: nur "Schnellstart deaktivieren" hat
 einen prüfbaren Zustand, dort wäre dieselbe Sperre wie in der Optimierung sinnvoll. Weitere Vorschläge im Chat zu 4.05.
 
 ## Letzter Commit
-Release-Commit v4.05 mit Tag v4.05 (Nachfolger von 2a5cb46, Release v4.04), übergeben als MiniBench_v4.05.bundle.
+Release-Commit v4.06 mit Tag v4.06 (Nachfolger von ebb4f81, Release v4.05), übergeben als MiniBench_v4.06.bundle.

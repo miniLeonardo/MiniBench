@@ -912,8 +912,9 @@ public partial class DiagGui
             {
                 string raw = File.ReadAllText(target.Path, Encoding.UTF8);
                 File.WriteAllText(dest, raw, new UTF8Encoding(false));
-                UI.Hinweis("Das System \"" + target.DisplayName + "\" wurde als Referenz gespeichert.", "Referenz festgelegt", this);
+                UI.Hinweis("Das System \"" + target.DisplayName + "\" wurde als Referenz gespeichert. Sie gilt ab dem nächsten Lauf, wenn auf der Seite Benchmark \u201EGespeicherte Referenz\u201C gewählt ist, und hat dort Vorrang vor den Median-Referenzen.", "Referenz festgelegt", this);
                 ReloadDb();
+                UpdateRefState();
             }
         }
         catch (Exception ex)

@@ -67,17 +67,24 @@ $notes = $text + "`n`n**Download:** LMB.exe herunterladen und starten (Administr
 $nf = Join-Path ([IO.Path]::GetTempPath()) ('Release_' + $tag + '.md')
 [IO.File]::WriteAllText($nf, $notes, (New-Object Text.UTF8Encoding($false)))
 $name = $(if ($titel) { '{0}: {1}' -f $tag, $titel } else { $tag })
+# ab v4.06: Prüfsumme zusätzlich als Anhang LMB.exe.sha256. Die Update-Prüfung liest sie, wenn die GitHub-API nicht
+# antwortet (Grenze von 60 Abfragen je Stunde) oder der Text des Releases keine SHA-256-Zeile enthält.
+$shaDir = Join-Path ([IO.Path]::GetTempPath()) ('Minibench_' + $tag)
+New-Item -ItemType Directory -Path $shaDir -Force | Out-Null
+$shaFile = Join-Path $shaDir 'LMB.exe.sha256'
+[IO.File]::WriteAllText($shaFile, ('{0}  LMB.exe' -f $sha) + "`n", (New-Object Text.UTF8Encoding($false)))
 
 & gh release view $tag --repo $repo *> $null
 if ($LASTEXITCODE -eq 0) {
-    & gh release upload $tag $exe --repo $repo --clobber
+    & gh release upload $tag $exe $shaFile --repo $repo --clobber
     if ($LASTEXITCODE -eq 0) { & gh release edit $tag --repo $repo --title $name --notes-file $nf --latest }
 } else {
-    $a = @('release', 'create', $tag, $exe, '--repo', $repo, '--title', $name, '--notes-file', $nf, '--latest', '--verify-tag')
+    $a = @('release', 'create', $tag, $exe, $shaFile, '--repo', $repo, '--title', $name, '--notes-file', $nf, '--latest', '--verify-tag')
     if ($Entwurf) { $a += '--draft' }
     & gh @a
 }
 if ($LASTEXITCODE -ne 0) { throw 'gh hat einen Fehler gemeldet (siehe oben).' }
 Remove-Item -LiteralPath $nf -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $shaDir -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host ('Release {0} veröffentlicht: https://github.com/{1}/releases/tag/{0}' -f $tag, $repo) -ForegroundColor Green
 Write-Host ('SHA-256 (LMB.exe): {0}' -f $sha)

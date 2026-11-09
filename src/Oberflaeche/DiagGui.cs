@@ -730,125 +730,214 @@ public partial class DiagGui : Form
         }
     }
 
-    void StartUpdateCheck()
-    {
-        if (!LoadUpdateCheckPreference()) return;
+    // Update-Prüfung (ab v4.06 überarbeitet). Bis v4.05: Ergebnis 24 Stunden im Cache, auch für "Jetzt suchen", nur die
+    // GitHub-API mit 3 s Frist und jeder Fehler still. Eine Prüfung kurz vor einem Release meldete so einen Tag lang
+    // "kein Update" (09.11.2026: 4.04 prüfte um 15:13, 4.05 erschien um 16:11). Die API erlaubt ohne Anmeldung 60 Abfragen
+    // je Stunde und Adresse; hinter dem Netz einer Hochschule ist das schnell erschöpft (403).
+    // Jetzt: Cache höchstens 2 Stunden und nur beim automatischen Start, "Jetzt suchen" fragt immer neu und meldet das
+    // Ergebnis. Scheitert die API, liest die Prüfung die Weiterleitung von github.com/.../releases/latest (zählt nicht zur
+    // API-Grenze) und die Prüfsumme aus dem Anhang LMB.exe.sha256. Prüfsumme sonst aus dem Text des Releases oder dem
+    // digest des Anhangs. Systemproxy mit den Anmeldedaten des Benutzers.
+    public const string UpdateRepo = "miniLeonardo/MiniBench";
+    public const double UpdateCacheStunden = 2;
 
+    public class UpdateInfo
+    {
+        public string Tag = "", Url = "", Sha256 = "", Body = "", Fehler = "", Quelle = "";
+    }
+
+    public static string ShaAusText(string text)
+    {
+        System.Text.RegularExpressions.Match m = System.Text.RegularExpressions.Regex.Match(text ?? "", @"(?:SHA-?256(?:\s*\(LMB\.exe\))?[:\s]+)([a-fA-F0-9]{64})");
+        if (m.Success) return m.Groups[1].Value.ToLowerInvariant();
+        m = System.Text.RegularExpressions.Regex.Match((text ?? "").Trim(), @"^([a-fA-F0-9]{64})\b");
+        return m.Success ? m.Groups[1].Value.ToLowerInvariant() : "";
+    }
+
+    // "https://github.com/x/y/releases/tag/v4.05" -> "v4.05"
+    public static string TagAusAdresse(string url)
+    {
+        System.Text.RegularExpressions.Match m = System.Text.RegularExpressions.Regex.Match(url ?? "", @"/releases/tag/([^/?#]+)");
+        return m.Success ? Uri.UnescapeDataString(m.Groups[1].Value) : "";
+    }
+
+    public static string DownloadAdresse(string tag) { return "https://github.com/" + UpdateRepo + "/releases/download/" + tag + "/LMB.exe"; }
+
+    // Antwort von /releases/latest der API lesen: Tag, Text, Adresse und Prüfsumme von LMB.exe (Text, sonst digest)
+    public static UpdateInfo LiesReleaseJson(string json)
+    {
+        UpdateInfo u = new UpdateInfo(); u.Quelle = "GitHub-API";
+        System.Web.Script.Serialization.JavaScriptSerializer js = new System.Web.Script.Serialization.JavaScriptSerializer();
+        Dictionary<string, object> d = js.DeserializeObject(json) as Dictionary<string, object>;
+        if (d == null) { u.Fehler = "Antwort der GitHub-API nicht lesbar."; return u; }
+        object o;
+        if (d.TryGetValue("tag_name", out o) && o != null) u.Tag = o.ToString().Trim();
+        if (d.TryGetValue("body", out o) && o != null) u.Body = o.ToString();
+        string digest = "";
+        if (d.TryGetValue("assets", out o) && o is object[])
+            foreach (object a in (object[])o)
+            {
+                Dictionary<string, object> ad = a as Dictionary<string, object>;
+                if (ad == null || !ad.ContainsKey("name") || ad["name"] == null) continue;
+                if (!ad["name"].ToString().Equals("LMB.exe", StringComparison.OrdinalIgnoreCase)) continue;
+                if (ad.ContainsKey("browser_download_url") && ad["browser_download_url"] != null) u.Url = ad["browser_download_url"].ToString();
+                if (ad.ContainsKey("digest") && ad["digest"] != null) digest = ad["digest"].ToString();
+            }
+        u.Sha256 = ShaAusText(u.Body);
+        if (u.Sha256.Length == 0 && digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase)) u.Sha256 = ShaAusText(digest.Substring(7));
+        if (u.Tag.Length == 0) u.Fehler = "Die GitHub-API nennt kein Release.";
+        return u;
+    }
+
+    static void NetzVorbereiten()
+    {
+        System.Net.ServicePointManager.SecurityProtocol = (System.Net.SecurityProtocolType)3072; // Tls12
+        try { if (System.Net.WebRequest.DefaultWebProxy != null) System.Net.WebRequest.DefaultWebProxy.Credentials = System.Net.CredentialCache.DefaultNetworkCredentials; } catch { }
+    }
+
+    static System.Net.HttpWebRequest NeueAnfrage(string url, int fristMs)
+    {
+        System.Net.HttpWebRequest req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(url);
+        req.Timeout = fristMs; req.ReadWriteTimeout = fristMs; req.UserAgent = "LeosMinibench"; req.Method = "GET";
+        return req;
+    }
+
+    static string FehlerText(Exception ex)
+    {
+        System.Net.WebException we = ex as System.Net.WebException;
+        if (we != null && we.Response is System.Net.HttpWebResponse)
+        {
+            int c = (int)((System.Net.HttpWebResponse)we.Response).StatusCode;
+            if (c == 403 || c == 429) return "GitHub hat die Abfrage abgelehnt (" + c + ", Grenze von 60 Abfragen je Stunde und Netz erreicht)";
+            return "GitHub antwortet mit " + c;
+        }
+        if (we != null && we.Status == System.Net.WebExceptionStatus.Timeout) return "keine Antwort von GitHub innerhalb der Frist";
+        return ex.Message;
+    }
+
+    // Neuestes Release abfragen: erst die API, sonst die Weiterleitung von releases/latest und LMB.exe.sha256
+    static UpdateInfo FrageGitHub()
+    {
+        NetzVorbereiten();
+        string apiFehler = "";
+        try
+        {
+            System.Net.HttpWebRequest req = NeueAnfrage("https://api.github.com/repos/" + UpdateRepo + "/releases/latest", 10000);
+            req.Accept = "application/vnd.github+json";
+            using (System.Net.HttpWebResponse resp = (System.Net.HttpWebResponse)req.GetResponse())
+            using (StreamReader sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+            {
+                UpdateInfo u = LiesReleaseJson(sr.ReadToEnd());
+                if (u.Fehler.Length == 0)
+                {
+                    if (u.Url.Length == 0) u.Url = DownloadAdresse(u.Tag);
+                    if (u.Sha256.Length == 0) u.Sha256 = LiesShaAnhang(u.Tag);
+                    return u;
+                }
+                apiFehler = u.Fehler;
+            }
+        }
+        catch (Exception ex) { apiFehler = FehlerText(ex); }
+
+        UpdateInfo w = new UpdateInfo(); w.Quelle = "github.com (Weiterleitung)";
+        try
+        {
+            System.Net.HttpWebRequest req = NeueAnfrage("https://github.com/" + UpdateRepo + "/releases/latest", 10000);
+            req.AllowAutoRedirect = false;
+            using (System.Net.HttpWebResponse resp = (System.Net.HttpWebResponse)req.GetResponse())
+            {
+                w.Tag = TagAusAdresse(resp.Headers["Location"] ?? "");
+                if (w.Tag.Length == 0) w.Tag = TagAusAdresse(resp.ResponseUri != null ? resp.ResponseUri.ToString() : "");
+            }
+            if (w.Tag.Length == 0) { w.Fehler = "API: " + apiFehler + "; github.com nennt kein Release."; return w; }
+            w.Url = DownloadAdresse(w.Tag);
+            w.Sha256 = LiesShaAnhang(w.Tag);
+        }
+        catch (Exception ex) { w.Fehler = "API: " + apiFehler + "; github.com: " + FehlerText(ex); }
+        return w;
+    }
+
+    // Prüfsumme aus dem Anhang LMB.exe.sha256 (legt Veroeffentlichen.ps1 ab v4.06 an); leer, wenn es ihn nicht gibt
+    static string LiesShaAnhang(string tag)
+    {
+        try
+        {
+            System.Net.HttpWebRequest req = NeueAnfrage("https://github.com/" + UpdateRepo + "/releases/download/" + tag + "/LMB.exe.sha256", 10000);
+            using (System.Net.HttpWebResponse resp = (System.Net.HttpWebResponse)req.GetResponse())
+            using (StreamReader sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                return ShaAusText(sr.ReadToEnd());
+        }
+        catch { return ""; }
+    }
+
+    void StartUpdateCheck() { StartUpdateCheck(false); }
+
+    bool updateCheckLaeuft;
+    void StartUpdateCheck(bool manuell)
+    {
+        if (!manuell && !LoadUpdateCheckPreference()) return;
+        if (updateCheckLaeuft) return;
+        updateCheckLaeuft = true;
         System.Threading.Thread t = new System.Threading.Thread(delegate() {
+            UpdateInfo u = null;
             try
             {
                 string cacheDir = Path.Combine(dataDir, "Cache");
                 string cacheFile = Path.Combine(cacheDir, "UpdateCheck.json");
-                string tag = "";
-                string body = "";
-                string dlUrl = "";
-                string sha = "";
-                bool useCache = false;
-
-                if (File.Exists(cacheFile))
+                System.Web.Script.Serialization.JavaScriptSerializer js = new System.Web.Script.Serialization.JavaScriptSerializer();
+                if (!manuell && File.Exists(cacheFile) && DateTime.UtcNow.Subtract(new FileInfo(cacheFile).LastWriteTimeUtc).TotalHours < UpdateCacheStunden)
                 {
-                    FileInfo fi = new FileInfo(cacheFile);
-                    if (DateTime.UtcNow.Subtract(fi.LastWriteTimeUtc).TotalHours < 24)
+                    try
+                    {
+                        Dictionary<string, object> cd = js.DeserializeObject(File.ReadAllText(cacheFile, Encoding.UTF8)) as Dictionary<string, object>;
+                        if (cd != null && cd.ContainsKey("Tag") && cd["Tag"] != null && cd["Tag"].ToString().Length > 0)
+                        {
+                            u = new UpdateInfo(); u.Quelle = "Cache";
+                            u.Tag = cd["Tag"].ToString();
+                            if (cd.ContainsKey("DownloadUrl") && cd["DownloadUrl"] != null) u.Url = cd["DownloadUrl"].ToString();
+                            if (cd.ContainsKey("Sha256") && cd["Sha256"] != null) u.Sha256 = cd["Sha256"].ToString();
+                            if (cd.ContainsKey("Body") && cd["Body"] != null) u.Body = cd["Body"].ToString();
+                        }
+                    }
+                    catch { u = null; }
+                }
+                if (u == null)
+                {
+                    u = FrageGitHub();
+                    if (u.Fehler.Length == 0)
                     {
                         try
                         {
-                            System.Web.Script.Serialization.JavaScriptSerializer js = new System.Web.Script.Serialization.JavaScriptSerializer();
-                            Dictionary<string, object> cd = js.DeserializeObject(File.ReadAllText(cacheFile, Encoding.UTF8)) as Dictionary<string, object>;
-                            if (cd != null)
-                            {
-                                if (cd.ContainsKey("Tag") && cd["Tag"] != null) tag = cd["Tag"].ToString();
-                                if (cd.ContainsKey("DownloadUrl") && cd["DownloadUrl"] != null) dlUrl = cd["DownloadUrl"].ToString();
-                                if (cd.ContainsKey("Sha256") && cd["Sha256"] != null) sha = cd["Sha256"].ToString();
-                                if (cd.ContainsKey("Body") && cd["Body"] != null) body = cd["Body"].ToString();
-                                useCache = true;
-                            }
-                        }
-                        catch { }
-                    }
-                }
-
-                if (!useCache)
-                {
-                    System.Net.ServicePointManager.SecurityProtocol = (System.Net.SecurityProtocolType)3072; // Tls12
-                    System.Net.HttpWebRequest req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create("https://api.github.com/repos/miniLeonardo/MiniBench/releases/latest");
-                    req.Timeout = 3000;
-                    req.ReadWriteTimeout = 3000;
-                    req.UserAgent = "LeosMinibench";
-                    req.Method = "GET";
-
-                    using (System.Net.HttpWebResponse resp = (System.Net.HttpWebResponse)req.GetResponse())
-                    using (StreamReader sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
-                    {
-                        string json = sr.ReadToEnd();
-                        System.Web.Script.Serialization.JavaScriptSerializer js = new System.Web.Script.Serialization.JavaScriptSerializer();
-                        Dictionary<string, object> dict = js.DeserializeObject(json) as Dictionary<string, object>;
-                        if (dict != null)
-                        {
-                            if (dict.ContainsKey("tag_name") && dict["tag_name"] != null) tag = dict["tag_name"].ToString().Trim();
-                            if (dict.ContainsKey("body") && dict["body"] != null) body = dict["body"].ToString();
-                            if (dict.ContainsKey("assets") && dict["assets"] is object[])
-                            {
-                                object[] assets = (object[])dict["assets"];
-                                foreach (object a in assets)
-                                {
-                                    if (a is Dictionary<string, object>)
-                                    {
-                                        Dictionary<string, object> ad = (Dictionary<string, object>)a;
-                                        if (ad.ContainsKey("name") && ad["name"] != null && ad["name"].ToString().Equals("LMB.exe", StringComparison.OrdinalIgnoreCase))
-                                        {
-                                            if (ad.ContainsKey("browser_download_url")) dlUrl = ad["browser_download_url"].ToString();
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                            System.Text.RegularExpressions.Match mSha = System.Text.RegularExpressions.Regex.Match(body, @"(?:SHA-?256(?:\s*\(LMB\.exe\))?[:\s]+)([a-fA-F0-9]{64})");
-                            if (mSha.Success) sha = mSha.Groups[1].Value.ToLowerInvariant();
-
-                            try
-                            {
-                                if (!Directory.Exists(cacheDir)) Directory.CreateDirectory(cacheDir);
-                                Dictionary<string, string> cDict = new Dictionary<string, string>();
-                                cDict["CheckedAt"] = DateTime.UtcNow.ToString("o");
-                                cDict["Tag"] = tag;
-                                cDict["DownloadUrl"] = dlUrl;
-                                cDict["Sha256"] = sha;
-                                cDict["Body"] = body;
-                                File.WriteAllText(cacheFile, js.Serialize(cDict), Encoding.UTF8);
-                            }
-                            catch { }
-                        }
-                    }
-                }
-
-                if (!String.IsNullOrEmpty(tag))
-                {
-                    string cleanRemote = tag.TrimStart('v', 'V', ' ');
-                    string cleanLocal = this.version.TrimStart('v', 'V', ' ');
-                    bool isNewer = IsNewerVersion(cleanRemote, cleanLocal);
-
-                    if (isNewer)
-                    {
-                        AvailableUpdateVersion = tag;
-                        AvailableUpdateUrl = dlUrl;
-                        AvailableUpdateSha256 = sha;
-                        AvailableUpdateBody = body;
-                        HasUpdateAvailable = true;
-
-                        try
-                        {
-                            BeginInvoke(new MethodInvoker(delegate() {
-                                ApplyUpdateBadge(tag);
-                            }));
+                            if (!Directory.Exists(cacheDir)) Directory.CreateDirectory(cacheDir);
+                            Dictionary<string, string> c = new Dictionary<string, string>();
+                            c["CheckedAt"] = DateTime.UtcNow.ToString("o"); c["Tag"] = u.Tag; c["DownloadUrl"] = u.Url; c["Sha256"] = u.Sha256; c["Body"] = u.Body; c["Quelle"] = u.Quelle;
+                            File.WriteAllText(cacheFile, js.Serialize(c), Encoding.UTF8);
                         }
                         catch { }
                     }
                 }
             }
-            catch
+            catch (Exception ex) { u = new UpdateInfo(); u.Fehler = ex.Message; }
+
+            bool neuer = u.Fehler.Length == 0 && u.Tag.Length > 0 && IsNewerVersion(u.Tag.TrimStart('v', 'V', ' '), this.version.TrimStart('v', 'V', ' '));
+            if (neuer)
             {
-                // Silent fail
+                AvailableUpdateVersion = u.Tag; AvailableUpdateUrl = u.Url; AvailableUpdateSha256 = u.Sha256; AvailableUpdateBody = u.Body;
+                HasUpdateAvailable = true;
             }
+            UpdateInfo r = u;
+            try
+            {
+                BeginInvoke(new MethodInvoker(delegate() {
+                    updateCheckLaeuft = false;
+                    if (neuer) ApplyUpdateBadge(r.Tag);
+                    if (!manuell) return;
+                    if (r.Fehler.Length > 0) UI.Hinweis("Die Suche nach Updates ist fehlgeschlagen:\r\n\r\n" + r.Fehler, "Minibench-Update", this);
+                    else if (neuer) UI.Hinweis("Version " + r.Tag.TrimStart('v', 'V') + " ist verfügbar. Oben rechts auf „Update verfügbar“ klicken, um sie zu installieren." + (r.Sha256.Length == 0 ? "\r\n\r\nDas Release nennt keine Prüfsumme; die Datei kann nach dem Herunterladen nicht geprüft werden." : ""), "Minibench-Update", this);
+                    else UI.Hinweis("Leos Minibench " + this.version + " ist aktuell (neuestes Release auf GitHub: " + r.Tag + ").", "Minibench-Update", this);
+                }));
+            }
+            catch { updateCheckLaeuft = false; }
         });
         t.IsBackground = true;
         t.Start();
@@ -887,7 +976,7 @@ public partial class DiagGui : Form
 
             Cursor.Current = Cursors.WaitCursor;
 
-            System.Net.ServicePointManager.SecurityProtocol = (System.Net.SecurityProtocolType)3072; // Tls12, auch ohne vorherige Prüfung im selben Prozess
+            NetzVorbereiten(); // Tls12 und Proxy, auch ohne vorherige Prüfung im selben Prozess
             if (running) { UI.Hinweis("Während eines Laufs ist kein Update möglich.", "Update", this); return; }
             using (System.Net.WebClient wc = new System.Net.WebClient())
             {
@@ -1086,9 +1175,9 @@ public partial class DiagGui : Form
 
             ToggleSwitch tgUpd = new ToggleSwitch(); tgUpd.Checked = LoadUpdateCheckPreference();
             Tip(tgUpd, "Prüft beim Start im Hintergrund, ob eine neuere Version vorliegt. Heruntergeladen wird nur auf Nachfrage.");
-            FlowLayoutPanel fUpd = Zeile(gAll, "Nach Updates suchen", "Höchstens einmal am Tag bei GitHub, heruntergeladen wird nur auf Nachfrage. Installiert: " + this.version + (HasUpdateAvailable ? ", verfügbar: " + AvailableUpdateVersion.TrimStart('v') : "") + ".", tgUpd);
+            FlowLayoutPanel fUpd = Zeile(gAll, "Nach Updates suchen", "Beim Start höchstens alle zwei Stunden bei GitHub, heruntergeladen wird nur auf Nachfrage. Installiert: " + this.version + (HasUpdateAvailable ? ", verfügbar: " + AvailableUpdateVersion.TrimStart('v') : "") + ".", tgUpd);
             LinkLabel lnkUpd = new LinkLabel(); lnkUpd.Text = "Jetzt suchen"; lnkUpd.AutoSize = true; lnkUpd.LinkColor = UI.Accent; lnkUpd.ActiveLinkColor = UI.AccentHover; lnkUpd.LinkBehavior = LinkBehavior.HoverUnderline; lnkUpd.Margin = new Padding(0, UI.S(4), 0, 0);
-            lnkUpd.LinkClicked += delegate { StartUpdateCheck(); lnkUpd.Text = "Prüfung läuft, das Ergebnis erscheint oben in der Kopfzeile"; lnkUpd.Enabled = false; };
+            lnkUpd.LinkClicked += delegate { StartUpdateCheck(true); lnkUpd.Text = "Prüfung läuft, das Ergebnis erscheint gleich"; lnkUpd.Enabled = false; };
             Tip(lnkUpd, "Fragt sofort bei GitHub nach einer neueren Version.");
             fUpd.Controls.Add(lnkUpd);
 
@@ -1695,8 +1784,8 @@ public partial class DiagGui : Form
         Tip(cmbGpuSel, "Welche Grafikeinheiten der Rendertest belastet: alle, nur die Grafikkarte, nur die Prozessorgrafik oder eine bestimmte. Gilt für Benchmark und Lasttest.");
         Tip(cmbGpuRes, "Auflösung des Rendertests. Bilder/s sind nur bei gleicher Auflösung vergleichbar, die Punktzahl auch über Auflösungen.");
         Tip(cmbGpuShow, "Fenster: Vorschau des Rendertests. Vollbild: erste Grafikeinheit im Vollbild. Ohne Anzeige: misst unsichtbar (Esc entfällt).");
-        Tip(cmbRef, "System oder Medianwert, gegen den die Messungen in Prozent angegeben werden (100 % = Referenz). Gespeicherte Referenz: Referenz.json im Datenordner; Median: aus allen passenden Läufen der Datenbank.");
-        Tip(btnUpdateMed, "Berechnet die Median-Referenzen für alle Systeme, Notebooks und Desktops aus der Datenbank neu und speichert sie als Referenz.json, Referenz_Notebook.json und Referenz_Desktop.json.");
+        Tip(cmbRef, "System oder Medianwert, gegen den die Messungen in Prozent angegeben werden (100 % = Referenz). Gespeicherte Referenz: die eigene Referenz (Referenz.json, festgelegt in der Datenbank), sonst der gespeicherte Median der Geräteklasse; Median: aus allen passenden Läufen der Datenbank.");
+        Tip(btnUpdateMed, "Berechnet die Median-Referenzen für alle Systeme, Notebooks und Desktops aus der Datenbank neu und speichert sie als Referenz_Median.json, Referenz_Notebook.json und Referenz_Desktop.json. Die eigene Referenz (Referenz.json) bleibt unverändert.");
         // Lasttest
         Tip(chkLCpu, "Alle logischen Prozessoren rechnen mit Ergebnisprüfung; Rechenfehler deuten auf Instabilität (Übertaktung, Spannung, Kühlung, Netzteil). Läuft in einem eigenen Prozess ohne Unterbrechungen. Mit Sensoren gibt es Takt- und Temperaturverlauf und den Drosselnachweis. Ersetzt ab v2.7 den CPU-Stabilitätstest der Diagnose.");
         Tip(chkLRam, "Mustertest über einen Teil des freien Arbeitsspeichers mit Bitfehlerprüfung. Neben der CPU-Last läuft er mit niedriger Priorität auf einem Viertel der Threads.");
@@ -2146,12 +2235,13 @@ public partial class DiagGui : Form
         btnUpdateMed = UI.Secondary("Median aktualisieren");
         btnUpdateMed.Click += delegate {
             if (running) return;
+            // ab v4.06: Ergebnis aus @@RESULT und den Zeilen des Arbeitsprozesses. Bis v4.05 suchte die Oberfläche eine eigene
+            // Statuszeile, die nie gesendet wurde, und meldete immer "Aktualisierung fehlgeschlagen", auch wenn die
+            // Dateien geschrieben waren.
             List<string> lines;
-            string res = RunHelperPumped("-MedianAktualisieren", out lines, 60);
-            string msg = "Aktualisierung fehlgeschlagen.";
-            foreach (string l in lines) if (l.StartsWith("@@STATUS|")) msg = l.Substring(9);
-            MessageBox.Show(this, msg, "Median-Referenz", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            FillRefLists();
+            string res = RunHelperPumped("-MedianAktualisieren", out lines, 180);
+            MessageBox.Show(this, MedianErgebnisText(res, lines), "Median-Referenz", MessageBoxButtons.OK, res.Length > 0 && !res.StartsWith("Keine") ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+            FillRefLists(); UpdateRefState();
         };
         r2.Controls.Add(btnUpdateMed);
         f.Controls.Add(r2);
@@ -2214,6 +2304,31 @@ public partial class DiagGui : Form
         return gb >= 1024 ? (gb / 1024).ToString("0.0", CultureInfo.GetCultureInfo("de-DE")) + " TB" : gb.ToString("0", CultureInfo.GetCultureInfo("de-DE")) + " GB";
     }
 
+    public static string MedianErgebnisText(string result, List<string> lines)
+    {
+        StringBuilder b = new StringBuilder();
+        b.Append(String.IsNullOrEmpty(result) ? "Der Arbeitsprozess hat kein Ergebnis gemeldet; die Median-Referenzen sind unverändert." : result + ".");
+        if (lines != null && lines.Count > 0) { b.Append("\r\n\r\n"); b.Append(String.Join("\r\n", lines.ToArray())); }
+        return b.ToString();
+    }
+
+    // Name, Datum und Rechner einer Referenzdatei im Datenordner; leer, wenn sie fehlt oder unlesbar ist
+    string[] RefDatei(string name)
+    {
+        try
+        {
+            string f = dataDir.Length > 0 ? Path.Combine(dataDir, name) : "";
+            if (f.Length == 0 || !File.Exists(f)) return null;
+            System.Web.Script.Serialization.JavaScriptSerializer js = new System.Web.Script.Serialization.JavaScriptSerializer();
+            Dictionary<string, object> d = js.DeserializeObject(File.ReadAllText(f, Encoding.UTF8)) as Dictionary<string, object>;
+            if (d == null) return null;
+            object n, dt, c; string dat = d.TryGetValue("Datum", out dt) ? Convert.ToString(dt) : "";
+            DateTime x; if (DateTime.TryParseExact(dat.Length >= 10 ? dat.Substring(0, 10) : dat, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out x)) dat = x.ToString("dd.MM.yyyy");
+            return new string[] { d.TryGetValue("Name", out n) ? Convert.ToString(n) : name, dat, d.TryGetValue("Computer", out c) ? Convert.ToString(c) : "" };
+        }
+        catch { return null; }
+    }
+
     void UpdateRefState()
     {
         if (lblRefState == null || cmbRef == null) return;
@@ -2223,9 +2338,17 @@ public partial class DiagGui : Form
         {
             string st = SavedRefText();
             warn = st.Length == 0;
-            t = warn ? "Noch keine Referenz gespeichert: Im Datenordner liegt keine Referenz.json." : st;
+            t = warn ? "Keine Referenz festgelegt: Im Datenordner liegt weder eine eigene Referenz (Referenz.json) noch ein Median. Prozentwerte beziehen sich dann auf das eingebaute Referenzprofil." : st;
         }
-        else if (i >= 1 && i <= 3) t = "Median aus den Systemen der Vergleichsdatenbank (" + db.FindAll(delegate(DbEntry e) { return e.HasBench; }).Count + " mit Benchmark).";
+        else if (i >= 1 && i <= 3)
+        {
+            // ab v4.06: zeigt, welcher Median gilt und von wann (vorher nur die Anzahl der Läufe in der Datenbank)
+            string datei = i == 1 ? "Referenz_Median.json" : i == 2 ? "Referenz_Notebook.json" : "Referenz_Desktop.json";
+            string[] r = RefDatei(datei);
+            int n = db.FindAll(delegate(DbEntry e) { return e.HasBench; }).Count;
+            t = r != null ? r[0] + (r[1].Length > 0 ? ", berechnet am " + r[1] : "") + " (" + datei + "). \u201EMedian aktualisieren\u201C berechnet ihn aus den " + n + " Läufen mit Benchmark neu."
+                          : "Noch nicht gespeichert: Der Lauf bildet den Median aus der Datenbank (" + n + " Läufe mit Benchmark). \u201EMedian aktualisieren\u201C speichert ihn als " + datei + ".";
+        }
         else t = "Einzelner gespeicherter Lauf als Bezug.";
         SetText(lblRefState, t);
         lblRefState.ForeColor = warn ? UI.Warn : UI.Muted;
@@ -4264,38 +4387,18 @@ public partial class DiagGui : Form
     }
 
     // Referenz (ab v2.65 nur noch die mit "Dieses System als Referenz festlegen" gespeicherte, keine eingebauten Werte)
+    // Text zur gespeicherten Referenz in derselben Reihenfolge wie Get-SavedReference (ab v4.06): eigene Referenz
+    // (Referenz.json, kein alter Median), sonst der Median der Geräteklasse, sonst der andere, sonst die alte Ablage
     string SavedRefText()
     {
-        try
+        string[] r = RefDatei("Referenz.json");
+        if (r != null && r[2] != "Median") return "Eigene Referenz: " + r[0] + (r[1].Length > 0 ? " vom " + r[1] : "") + " (Referenz.json, festgelegt in der Datenbank).";
+        string dev = HwIsLaptop ? "Referenz_Notebook.json" : "Referenz_Desktop.json", alt = HwIsLaptop ? "Referenz_Desktop.json" : "Referenz_Notebook.json";
+        foreach (string f in new string[] { dev, alt, "PC-Diagnose-Referenz.json" })
         {
-            string f = "";
-            if (dataDir.Length > 0)
-            {
-                string devFile = HwIsLaptop ? "Referenz_Notebook.json" : "Referenz_Desktop.json";
-                string devPath = Path.Combine(dataDir, devFile);
-                if (File.Exists(devPath)) f = devPath;
-                else
-                {
-                    string stdPath = Path.Combine(dataDir, "Referenz.json");
-                    if (File.Exists(stdPath)) f = stdPath;
-                    else
-                    {
-                        string altPath = Path.Combine(dataDir, "PC-Diagnose-Referenz.json");
-                        if (File.Exists(altPath)) f = altPath;
-                    }
-                }
-            }
-            if (f.Length > 0 && File.Exists(f))
-            {
-                System.Web.Script.Serialization.JavaScriptSerializer js = new System.Web.Script.Serialization.JavaScriptSerializer();
-                Dictionary<string, object> d = js.DeserializeObject(File.ReadAllText(f, Encoding.UTF8)) as Dictionary<string, object>;
-                object n, dt; string name = d != null && d.TryGetValue("Name", out n) ? Convert.ToString(n) : "";
-                string dat = d != null && d.TryGetValue("Datum", out dt) ? Convert.ToString(dt) : "";
-                DateTime x; if (DateTime.TryParseExact(dat, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out x)) dat = x.ToString("dd.MM.yyyy");
-                if (name.Length > 0) return "Gespeicherte Referenz: " + name + (dat.Length > 0 ? " vom " + dat : "");
-            }
+            string[] m = RefDatei(f);
+            if (m != null) return "Keine eigene Referenz festgelegt, es gilt " + m[0] + (m[1].Length > 0 ? " vom " + m[1] : "") + " (" + f + "). Eigene Referenz: Datenbank, Lauf markieren, Aktionen \u203A Als Referenz festlegen.";
         }
-        catch { }
         return "";
     }
 

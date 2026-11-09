@@ -5,6 +5,15 @@ Neueste Version zuerst. Einzelheiten je Version in Doku\Änderungen_vX.Y.txt (ab
 keine Änderungsdateien mehr; die Einträge nennen nur, was im Quelltext und in den Änderungen zu 2.2 belegt ist.
 Die Liste steht auch im Programm (Info-Knopf oben rechts, Quelle: src\Oberflaeche\Versionen.cs).
 
+VERSION 4.06  (09.11.2026)  UPDATE-PRÜFUNG UND REFERENZ REPARIERT
+=================================================================
+• Update-Prüfung: „Jetzt suchen“ fragt immer neu bei GitHub und meldet das Ergebnis. Bis v4.05 galt das Ergebnis einer Prüfung 24 Stunden, auch für „Jetzt suchen“; eine Prüfung kurz vor einem Release meldete so einen Tag lang kein Update. Beim Start gilt das letzte Ergebnis jetzt höchstens zwei Stunden.
+• Update-Prüfung: Antwortet die GitHub-API nicht (Grenze von 60 Abfragen je Stunde und Netz, Frist), liest Leos Minibench die neueste Version über github.com und die Prüfsumme aus dem neuen Anhang LMB.exe.sha256. Frist 10 statt 3 Sekunden, Systemproxy mit Anmeldung des Benutzers.
+• Median aktualisieren: Die Meldung lautete immer „Aktualisierung fehlgeschlagen“, auch wenn die Dateien geschrieben waren. Jetzt nennt sie je Datei Geräteklasse, Anzahl der Systeme, Messgrößen und die einbezogenen PCs.
+• Referenz: Der Median aller Systeme überschrieb bisher Referenz.json, die in der Datenbank festgelegte eigene Referenz, und der Median der Geräteklasse hatte Vorrang vor ihr. Jetzt steht der Median in Referenz_Median.json, die eigene Referenz geht vor, ein alter Median in Referenz.json kommt ins Archiv.
+• Referenz: Die Seite Benchmark zeigt, welche Referenz gilt und von wann; Median-Dateien enthalten nur gemessene Lasttestwerte (vorher feste Ersatzwerte ohne Messung).
+• Veroeffentlichen.ps1 hängt LMB.exe.sha256 an das Release an.
+
 VERSION 4.05  (09.11.2026)  BEREITS AKTIVE OPTIMIERUNGEN GESPERRT, TOOLS-SEITE KOMPAKT, 28 SOFTWAREPAKETE
 =========================================================================================================
 • Optimierung: Einträge, die auf diesem PC schon so eingestellt sind (Zustand „bereits aktiv“), stehen nach der Hintergrundprüfung auf An und sind gesperrt, gut lesbar in Grün statt ausgegraut. Vorlagen, „Alle an“, „Alle aus“ und geladene eigene Vorlagen ändern sie nicht; der Hinweis nennt den Weg zurück über die Seite Änderungen.

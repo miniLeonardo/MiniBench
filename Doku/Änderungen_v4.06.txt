@@ -1,0 +1,81 @@
+﻿LEOS MINIBENCH 4.06: ÄNDERUNGEN
+===============================
+
+Reparaturversion nach den ersten Rückmeldungen zu 4.05: Die Update-Prüfung fand 4.05 nicht, und "Median aktualisieren"
+meldete einen Fehler. Messabläufe, Berichtsaufbau und Datenbankformat sind unverändert.
+
+
+1. UPDATE-PRÜFUNG
+  Befund                      Am 09.11.2026 prüfte 4.04 um 15:13 und speicherte "neueste Version v4.04" in
+                              Minibench-Daten\Cache\UpdateCheck.json. Release 4.05 erschien um 16:11. Das gespeicherte
+                              Ergebnis galt 24 Stunden, auch für "Jetzt suchen" in den Einstellungen; jeder Fehler (Frist
+                              3 s, Ablehnung durch GitHub) blieb still. Die GitHub-API erlaubt ohne Anmeldung 60 Abfragen je
+                              Stunde und Adresse, im Netz einer Hochschule teilen sich viele Rechner diese Grenze.
+  Jetzt                       "Jetzt suchen" fragt immer neu und meldet das Ergebnis (aktuell, Update verfügbar, Fehler mit
+                              Grund). Beim Start gilt ein gespeichertes Ergebnis höchstens zwei Stunden; gespeichert wird nur
+                              ein erfolgreiches. Frist 10 s, Systemproxy mit den Anmeldedaten des Benutzers (auch beim
+                              Herunterladen).
+  Ausweg                      Lehnt die API ab oder antwortet nicht, liest die Prüfung die Weiterleitung von
+                              github.com/miniLeonardo/MiniBench/releases/latest (zählt nicht zur API-Grenze), bildet daraus
+                              die Download-Adresse und holt die Prüfsumme aus dem Anhang LMB.exe.sha256. In der Sandbox
+                              geprüft: API gesperrt, Ausweg fand v4.05.
+  Prüfsumme                   Aus der Zeile "SHA-256 (LMB.exe): ..." im Text des Releases, sonst aus dem digest, den GitHub
+                              zu jedem Anhang führt, sonst aus LMB.exe.sha256. Fehlt alles, sagt "Jetzt suchen" das.
+  Veroeffentlichen.ps1        Hängt LMB.exe.sha256 ("<hash>  LMB.exe") an das Release an.
+
+
+2. MEDIAN AKTUALISIEREN UND REFERENZ
+  Meldung                     Die Oberfläche suchte eine Statuszeile, die der Arbeitsprozess nie sendet, und meldete
+                              deshalb immer "Aktualisierung fehlgeschlagen", auch wenn die Dateien geschrieben waren (so
+                              am 09.11.2026 um 16:41). Jetzt aus @@RESULT und den Zeilen des Arbeitsprozesses: je Datei
+                              Geräteklasse, Anzahl der Systeme, Messgrößen und die ersten acht PCs. Frist 180 statt 60 s.
+  Referenz.json               "Median aktualisieren" schrieb den Median aller Systeme in Referenz.json, die Datei der eigenen
+                              Referenz (Datenbank, Aktionen, Als Referenz festlegen). Jetzt Referenz_Median.json. Ein alter
+                              Median in Referenz.json (Rechner "Median") kommt beim nächsten "Median aktualisieren" ins
+                              Archiv des Datenordners und zählt beim Lesen nicht als eigene Referenz.
+  Vorrang                     "Gespeicherte Referenz" nahm bisher zuerst den Median der eigenen Geräteklasse
+                              (Referenz_Desktop.json bzw. Referenz_Notebook.json); eine in der Datenbank festgelegte Referenz
+                              wirkte nicht mehr, sobald einmal ein Median gespeichert war. Jetzt: eigene Referenz, dann Median
+                              der Geräteklasse, dann der andere, dann die alte Ablage PC-Diagnose-Referenz.json, dann das
+                              eingebaute Profil. Oberfläche (SavedRefText) und Arbeitsprozess (Get-SavedReference) gleich.
+  Anzeige                     Unter der Auswahl der Referenz steht, welche gilt: "Eigene Referenz: TORRENT vom 01.11.2026
+                              (Referenz.json ...)" oder "Keine eigene Referenz festgelegt, es gilt Median Desktop-PCs ...";
+                              bei den Median-Einträgen Name und Datum der Datei oder dass sie noch nicht gespeichert ist.
+  Gemessene Werte             Median-Dateien enthielten ohne Lasttestdaten feste Ersatzwerte (Desktop 75 °C, 85 W, 98 %
+                              Taktstabilität; Notebook 86 °C, 45 W), die im Dashboard wie gemessen erschienen (AGENTS.md,
+                              Vorgabe 11). Jetzt nur gemessene Medianwerte; fehlen alle, entfällt der Abschnitt Lasttest.
+                              Neu: Feld Systeme mit den Namen der einbezogenen PCs.
+
+
+3. TESTS
+  Selbsttest der Oberfläche   Update.Release (Tag, Adresse und Prüfsumme aus Text, digest, LMB.exe.sha256, Weiterleitung),
+                              Referenz.Median (Meldung aus dem Ergebnis).
+  Pester                      Datenbank: Referenz_Median.json, eigene Referenz bleibt, alter Median ins Archiv, keine
+                              Ersatzwerte, Vorrang der eigenen Referenz. Oberflaeche: "Jetzt suchen" ohne Cache, Ausweg über
+                              github.com, keine Statuszeile mehr, Veroeffentlichen.ps1 mit LMB.exe.sha256.
+
+
+GEFUNDEN UND BEHOBEN
+  Alles oben unter 1 und 2 (Update-Cache, stille Fehler, Meldung von Median aktualisieren, Überschreiben und Vorrang der
+  Referenz, Ersatzwerte im Median).
+  Release v4.05 auf GitHub trägt den Titel "MiniBench v4.04 (stable)" und im Text keine SHA-256-Zeile; LMB.exe ist
+  angehängt (digest stimmt mit dem Testbau überein). Veroeffentlichen.ps1 setzt Titel und Text beim nächsten Aufruf.
+
+
+GRENZEN
+  4.04 und 4.05 prüfen noch mit dem alten Verfahren. Damit 4.04 oder 4.05 das Update auf 4.06 findet, Minibench-Daten\
+  Cache\UpdateCheck.json löschen (oder 24 Stunden warten) und die GitHub-API muss antworten. Ab 4.06 nicht mehr nötig.
+  Eine vor 4.06 überschriebene eigene Referenz lässt sich nicht wiederherstellen: in der Datenbank erneut festlegen.
+  Sandbox: 913 bestanden, 52 fehlgeschlagen (dieselben wie auf 4.04 und 4.05, brauchen Windows), 55 übersprungen;
+  Selbsttest der Oberfläche 47 Fälle bestanden.
+  Unter Windows zu bestätigen: Weiterleitung von releases/latest hinter dem Proxy der ULB, Meldungen von "Jetzt suchen".
+
+
+UMSTIEG
+  Nach dem Update einmal "Median aktualisieren" (Seite Benchmark) und, falls gewünscht, die eigene Referenz in der
+  Datenbank neu festlegen.
+
+
+QUELLEN
+  GitHub REST API, Grenzen ohne Anmeldung: https://docs.github.com/rest/using-the-rest-api/rate-limits-for-the-rest-api
+  Neuestes Release über die Weiterleitung: https://docs.github.com/repositories/releasing-projects-on-github/linking-to-releases

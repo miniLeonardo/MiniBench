@@ -86,14 +86,20 @@ function Get-SavedReference([string]$Path = '') {
     $preferredRef = if ($isNb) { 'Referenz_Notebook.json' } else { 'Referenz_Desktop.json' }
     $altRef = if ($isNb) { 'Referenz_Desktop.json' } else { 'Referenz_Notebook.json' }
     $preferredEmbedded = if ($isNb) { 'Notebook_Standard.json' } else { 'Referenz_Desktop.json' }
+    # ab v4.06: Die eigene Referenz (Referenz.json, festgelegt in der Datenbank) hat Vorrang vor dem Median der
+    # Geräteklasse. Bis v4.05 stand Referenz_Desktop.json bzw. Referenz_Notebook.json davor: Sobald "Median aktualisieren"
+    # einmal lief, galt auf jedem PC der Median, eine in der Datenbank festgelegte Referenz wirkte nie.
     if ($script:DataDir) {
+        $cands += (Join-Path $script:DataDir 'Referenz.json')
         if (-not $Path) { $cands += (Join-Path $script:DataDir $preferredRef) }
-        $cands += (Join-Path $script:DataDir 'Referenz.json'), (Join-Path $script:DataDir $altRef), (Join-Path $script:DataDir 'PC-Diagnose-Referenz.json')
+        $cands += (Join-Path $script:DataDir $altRef), (Join-Path $script:DataDir 'PC-Diagnose-Referenz.json')
     }
     foreach ($f in $cands) {
         if (-not $f -or -not (Test-Path -LiteralPath $f)) { continue }
         $j = Read-JsonFile $f
         if (-not $j) { continue }
+        # Median aller Systeme, den "Median aktualisieren" bis v4.05 in Referenz.json schrieb: keine eigene Referenz
+        if (-not $Path -and [IO.Path]::GetFileName($f) -eq 'Referenz.json' -and [string]$j.Computer -eq 'Median') { continue }
         $w = ConvertTo-ValueTable $j.Werte
         if (-not $w.Count) { continue }
         $h = @{}
@@ -167,14 +173,29 @@ function Update-BenchReferenceMedians([string]$DataDir = $script:DataDir) {
         $res.Zeilen.Add('Keine validen Systeme in der Vergleichsdatenbank gefunden.')
         return $res
     }
+    # ab v4.06: Median aller Systeme in Referenz_Median.json; bis v4.05 überschrieb er Referenz.json, die eigene Referenz
+    # aus der Datenbank. Ein solcher alter Median in Referenz.json kommt ins Archiv des Datenordners.
+    $alt = Join-Path $DataDir 'Referenz.json'
+    if (Test-Path -LiteralPath $alt) {
+        $aj = Read-JsonFile $alt
+        if ($aj -and [string]$aj.Computer -eq 'Median') {
+            try {
+                $arc = Join-Path $DataDir 'Archiv'
+                if (-not (Test-Path -LiteralPath $arc)) { New-Item -ItemType Directory -Path $arc -Force | Out-Null }
+                $ziel = Join-Path $arc ('Referenz_Median_vor_4.06_{0}.json' -f (Get-Date).ToString('yyyyMMdd_HHmmss', $script:Inv))
+                Move-Item -LiteralPath $alt -Destination $ziel -Force -ErrorAction Stop
+                $res.Zeilen.Add(('Referenz.json enthielt einen Median (vor v4.06) statt einer eigenen Referenz und liegt jetzt in {0}. Eine eigene Referenz legt die Datenbank fest (Aktionen, Als Referenz festlegen).' -f $ziel))
+            } catch { $res.Zeilen.Add(('Referenz.json (alter Median) konnte nicht ins Archiv verschoben werden: {0}' -f $_.Exception.Message)) }
+        }
+    }
     $targets = @(
-        @{ Name = 'aller Systeme'; File = 'Referenz.json'; Items = $allEntries }
+        @{ Name = 'aller Systeme'; File = 'Referenz_Median.json'; Items = $allEntries }
         @{ Name = 'Notebooks'; File = 'Referenz_Notebook.json'; Items = @($allEntries | Where-Object { Test-EntryIsNotebook $_ }) }
         @{ Name = 'Desktop-PCs'; File = 'Referenz_Desktop.json'; Items = @($allEntries | Where-Object { -not (Test-EntryIsNotebook $_) }) }
     )
     foreach ($t in $targets) {
         $items = @($t.Items)
-        if (-not $items.Count) { continue }
+        if (-not $items.Count) { $res.Zeilen.Add(('{0}: keine passenden Systeme in der Datenbank, unverändert.' -f $t.File)); continue }
         $w = [ordered]@{}
         $h = [ordered]@{}
         $keys = @($items | ForEach-Object { $_.Werte.Keys } | Where-Object { $_ -ne 'GPU|STUTTER' } | Select-Object -Unique)
@@ -220,16 +241,14 @@ function Update-BenchReferenceMedians([string]$DataDir = $script:DataDir) {
         $medGpuW    = if ($gpuWs.Count) { Get-Median $gpuWs } else { $null }
         $medAbfall  = if ($abfalls.Count) { Get-Median $abfalls } else { $null }
 
-        $isNb = ($t.File -match 'Notebook')
-        $objLasttest = [ordered]@{
-            CpuTempMax     = $(if ($null -ne $medCpuTemp) { [math]::Round($medCpuTemp) } else { $(if ($isNb) { 86 } else { 75 }) })
-            GpuTempMax     = $(if ($null -ne $medGpuTemp) { [math]::Round($medGpuTemp) } else { $(if ($isNb) { 74 } else { 68 }) })
-            CpuWMax        = $(if ($null -ne $medCpuW) { [math]::Round($medCpuW) } else { $(if ($isNb) { 45 } else { 85 }) })
-            GpuWMax        = $(if ($null -ne $medGpuW) { [math]::Round($medGpuW) } else { $(if ($isNb) { 35 } else { 160 }) })
-            Drosselung     = 'keine'
-            Taktstabilitaet = $(if ($null -ne $medAbfall) { [math]::Round(100 - $medAbfall, 1) } else { $(if ($isNb) { 88.0 } else { 98.0 }) })
-            TaktAbfall     = $(if ($null -ne $medAbfall) { [math]::Round($medAbfall, 1) } else { $(if ($isNb) { 12.0 } else { 2.0 }) })
-        }
+        # Nur gemessene Werte (AGENTS.md, Vorgabe 11). Bis v4.05 standen ohne Lasttestdaten feste Ersatzwerte darin
+        # (Desktop 75 °C, 85 W, Notebook 86 °C ...), die im Dashboard wie gemessen aussahen.
+        $objLasttest = [ordered]@{}
+        if ($null -ne $medCpuTemp) { $objLasttest.CpuTempMax = [math]::Round($medCpuTemp) }
+        if ($null -ne $medGpuTemp) { $objLasttest.GpuTempMax = [math]::Round($medGpuTemp) }
+        if ($null -ne $medCpuW) { $objLasttest.CpuWMax = [math]::Round($medCpuW) }
+        if ($null -ne $medGpuW) { $objLasttest.GpuWMax = [math]::Round($medGpuW) }
+        if ($null -ne $medAbfall) { $objLasttest.Taktstabilitaet = [math]::Round(100 - $medAbfall, 1); $objLasttest.TaktAbfall = [math]::Round($medAbfall, 1) }
         $obj = [ordered]@{
             Format   = 'PC-Diagnose-DB/2'
             Name     = ('Median {0} ({1} {2})' -f $t.Name, $items.Count, $(if ($items.Count -eq 1) { 'System' } else { 'Systeme' }))
@@ -249,14 +268,16 @@ function Update-BenchReferenceMedians([string]$DataDir = $script:DataDir) {
             Werte    = $w
             Herkunft = $h
             Befunde  = [ordered]@{ Kritisch = 0; Warnungen = 0; Hinweise = 0; Liste = @() }
-            Lasttest = $objLasttest
+            Systeme  = @($items | ForEach-Object { [string]$_.Name } | Where-Object { $_ } | Sort-Object -Unique)
         }
+        if ($objLasttest.Count) { $obj.Lasttest = $objLasttest }
         $dest = Join-Path $DataDir $t.File
         try {
             [IO.File]::WriteAllText($dest, ($obj | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($true)))
             $res.Dateien.Add($dest)
             $res.Aktualisiert++
-            $res.Zeilen.Add(('{0}: {1} Werte aus {2} Systemen gespeichert' -f $t.File, $w.Count, $items.Count))
+            $namen = @($obj.Systeme)
+            $res.Zeilen.Add(('{0}: Median {1} aus {2} {3}, {4} Messgrößen ({5}{6})' -f $t.File, $t.Name, $items.Count, $(if ($items.Count -eq 1) { 'System' } else { 'Systemen' }), $w.Count, (@($namen | Select-Object -First 8) -join ', '), $(if ($namen.Count -gt 8) { ' und {0} weitere' -f ($namen.Count - 8) } else { '' })))
         } catch {
             $res.Zeilen.Add(('Fehler beim Schreiben von {0}: {1}' -f $t.File, $_.Exception.Message))
         }
@@ -275,7 +296,7 @@ function Import-BenchReference {
         $targetFile = switch ($medType) {
             'notebook' { 'Referenz_Notebook.json' }
             'desktop'  { 'Referenz_Desktop.json' }
-            default    { 'Referenz.json' }
+            default    { 'Referenz_Median.json' }
         }
         $specificPath = $(if ($script:DataDir) { Join-Path $script:DataDir $targetFile } else { '' })
         if ($specificPath -and (Test-Path -LiteralPath $specificPath)) {
@@ -679,7 +700,7 @@ function New-MultiLineSvg {
 if ($MedianAktualisieren) {
     $res = Update-BenchReferenceMedians -DataDir $script:DataDir
     foreach ($z in $res.Zeilen) { Write-Host ('  ' + $z) }
-    $kurz = ('{0} Referenzdateien aktualisiert' -f $res.Dateien.Count)
+    $kurz = $(if ($res.Dateien.Count) { '{0} Median-Referenzen gespeichert' -f $res.Dateien.Count } else { 'Keine Median-Referenz gespeichert' })
     Write-Host ('Median-Referenz: {0}.' -f $kurz)
     Send-GuiEvent 'RESULT' $kurz
     exit 0

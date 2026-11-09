@@ -2,6 +2,19 @@
 
 Alle wesentlichen Änderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v4.06 (09.11.2026)
+
+### Behoben
+* **Update-Prüfung:** „Jetzt suchen“ fragt immer neu und meldet das Ergebnis; das Ergebnis beim Start gilt höchstens zwei Stunden statt 24. Bis v4.05 fand eine kurz vor dem Release laufende Prüfung einen Tag lang kein Update.
+* **Update-Prüfung:** Ausweg über github.com und den Anhang LMB.exe.sha256, wenn die GitHub-API ablehnt (60 Abfragen je Stunde und Netz) oder nicht antwortet; Frist 10 s, Systemproxy mit Anmeldung.
+* **Median aktualisieren:** meldete immer „fehlgeschlagen“; jetzt das Ergebnis je Datei mit den einbezogenen Systemen.
+* **Referenz:** Der Median aller Systeme überschrieb Referenz.json (eigene Referenz aus der Datenbank) und der Median der Geräteklasse ging der eigenen Referenz vor. Jetzt Referenz_Median.json, eigene Referenz zuerst, alter Median ins Archiv.
+* **Median-Referenzen:** nur gemessene Lasttestwerte, keine Ersatzwerte.
+
+### Verbessert
+* **Seite Benchmark:** zeigt, welche Referenz gilt, aus welcher Datei und von wann.
+* **Veröffentlichen:** Anhang LMB.exe.sha256 am Release.
+
 ## v4.05 (09.11.2026)
 
 ### Neu

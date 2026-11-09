@@ -56,6 +56,8 @@ public static class GuiSelbsttest
         Fall("Tools.Raster", ToolsRaster);
         Fall("Softwarepakete.Liste", SoftwareListe);
         Fall("Softwarepakete.Installiert", SoftwareInstalliert);
+        Fall("Update.Release", UpdateRelease);
+        Fall("Referenz.Median", ReferenzMedian);
         foreach (string l in outLines) System.Console.WriteLine(l);
         return 0;
     }
@@ -751,5 +753,32 @@ public static class GuiSelbsttest
         Ist(!a.Checked && a.AutoCheck, "nach Deinstallation wieder wählbar");
         DiagGui.MarkierePaket(b, false);
         Ist(b.Checked && b.AutoCheck, "nie installiert markiertes Paket behält die Auswahl");
+    }
+
+    // ab v4.06: Update-Prüfung liest Tag, Adresse und Prüfsumme aus Text, digest oder LMB.exe.sha256
+    static void UpdateRelease()
+    {
+        string h = "f663f67d146bd8d7ae4544ed9b4c473c06f2cec1c59220dde518555c9adbdcf5";
+        DiagGui.UpdateInfo u = DiagGui.LiesReleaseJson("{\"tag_name\":\"v4.06\",\"body\":\"Text\\n\\nSHA-256 (LMB.exe): " + h.ToUpperInvariant() + "\\n\",\"assets\":[{\"name\":\"LMB.exe\",\"browser_download_url\":\"https://x/LMB.exe\"}]}");
+        Ist(u.Tag == "v4.06" && u.Url == "https://x/LMB.exe" && u.Sha256 == h && u.Fehler == "", "Prüfsumme aus dem Text: " + u.Sha256);
+        u = DiagGui.LiesReleaseJson("{\"tag_name\":\"v4.05\",\"body\":\"Release v4.05\",\"assets\":[{\"name\":\"LMB.exe\",\"browser_download_url\":\"https://x/LMB.exe\",\"digest\":\"sha256:" + h + "\"}]}");
+        Ist(u.Sha256 == h, "Prüfsumme aus digest, wenn der Text keine nennt");
+        u = DiagGui.LiesReleaseJson("{\"message\":\"API rate limit exceeded\"}");
+        Ist(u.Tag == "" && u.Fehler.Length > 0, "Antwort ohne Release ist ein Fehler");
+        Ist(DiagGui.TagAusAdresse("https://github.com/miniLeonardo/MiniBench/releases/tag/v4.05") == "v4.05", "Tag aus der Weiterleitung");
+        Ist(DiagGui.TagAusAdresse("https://github.com/miniLeonardo/MiniBench/releases") == "", "ohne Tag leer");
+        Ist(DiagGui.ShaAusText(h + "  LMB.exe\n") == h, "Format von LMB.exe.sha256");
+        Ist(DiagGui.DownloadAdresse("v4.06") == "https://github.com/miniLeonardo/MiniBench/releases/download/v4.06/LMB.exe", "Download-Adresse");
+        Ist(DiagGui.UpdateCacheStunden <= 2, "Cache höchstens zwei Stunden");
+        Ist(DiagGui.IsNewerVersion("4.05", "4.04") && !DiagGui.IsNewerVersion("v4.04".TrimStart('v'), "4.05"), "Vergleich");
+    }
+
+    // ab v4.06: Meldung von "Median aktualisieren" aus dem Ergebnis (vorher immer "fehlgeschlagen")
+    static void ReferenzMedian()
+    {
+        System.Collections.Generic.List<string> l = new System.Collections.Generic.List<string>(new string[] { "Referenz_Median.json: Median aller Systeme aus 5 Systemen, 23 Messgrößen (A, B)" });
+        string t = DiagGui.MedianErgebnisText("3 Median-Referenzen gespeichert", l);
+        Ist(t.StartsWith("3 Median-Referenzen gespeichert.") && t.Contains("Referenz_Median.json"), "Ergebnis und Zeilen: " + t);
+        Ist(DiagGui.MedianErgebnisText("", new System.Collections.Generic.List<string>()).Contains("kein Ergebnis"), "ohne Ergebnis");
     }
 }

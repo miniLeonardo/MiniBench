@@ -11,6 +11,13 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.06", "09.11.2026", "Update-Pr\u00FCfung und Referenz repariert",
+            "\u2022 Update-Pr\u00FCfung: \u201EJetzt suchen\u201C fragt immer neu bei GitHub und meldet das Ergebnis. Bis v4.05 galt das Ergebnis einer Pr\u00FCfung 24 Stunden, auch f\u00FCr \u201EJetzt suchen\u201C; eine Pr\u00FCfung kurz vor einem Release meldete so einen Tag lang kein Update. Beim Start gilt das letzte Ergebnis jetzt h\u00F6chstens zwei Stunden.\r\n" +
+            "\u2022 Update-Pr\u00FCfung: Antwortet die GitHub-API nicht (Grenze von 60 Abfragen je Stunde und Netz, Frist), liest Leos Minibench die neueste Version \u00FCber github.com und die Pr\u00FCfsumme aus dem neuen Anhang LMB.exe.sha256. Frist 10 statt 3 Sekunden, Systemproxy mit Anmeldung des Benutzers.\r\n" +
+            "\u2022 Median aktualisieren: Die Meldung lautete immer \u201EAktualisierung fehlgeschlagen\u201C, auch wenn die Dateien geschrieben waren. Jetzt nennt sie je Datei Ger\u00E4teklasse, Anzahl der Systeme, Messgr\u00F6\u00DFen und die einbezogenen PCs.\r\n" +
+            "\u2022 Referenz: Der Median aller Systeme \u00FCberschrieb bisher Referenz.json, die in der Datenbank festgelegte eigene Referenz, und der Median der Ger\u00E4teklasse hatte Vorrang vor ihr. Jetzt steht der Median in Referenz_Median.json, die eigene Referenz geht vor, ein alter Median in Referenz.json kommt ins Archiv.\r\n" +
+            "\u2022 Referenz: Die Seite Benchmark zeigt, welche Referenz gilt und von wann; Median-Dateien enthalten nur gemessene Lasttestwerte (vorher feste Ersatzwerte ohne Messung).\r\n" +
+            "\u2022 Veroeffentlichen.ps1 h\u00E4ngt LMB.exe.sha256 an das Release an."),
         new Eintrag("4.05", "09.11.2026", "Bereits aktive Optimierungen gesperrt, Tools-Seite kompakt, 28 Softwarepakete",
             "\u2022 Optimierung: Eintr\u00E4ge, die auf diesem PC schon so eingestellt sind (Zustand \u201Ebereits aktiv\u201C), stehen nach der Hintergrundpr\u00FCfung auf An und sind gesperrt, gut lesbar in Gr\u00FCn statt ausgegraut. Vorlagen, \u201EAlle an\u201C, \u201EAlle aus\u201C und geladene eigene Vorlagen \u00E4ndern sie nicht; der Hinweis nennt den Weg zur\u00FCck \u00FCber die Seite \u00C4nderungen.\r\n" +
             "\u2022 Optimierung: Die Seitenleiste z\u00E4hlt gew\u00E4hlte und bereits aktive Eintr\u00E4ge getrennt (blaue Pille \u201E3/17\u201C, gr\u00FCne Pille \u201E5 \u2713\u201C), der Kopf der Kategorie nennt \u201E3 gew\u00E4hlt \u00B7 5 bereits aktiv \u00B7 17 Eintr\u00E4ge\u201C.\r\n" +

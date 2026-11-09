@@ -71,6 +71,8 @@ Describe 'Selbsttest der Oberfläche' {
         @{ Fall = 'Tools.Raster' }
         @{ Fall = 'Softwarepakete.Liste' }
         @{ Fall = 'Softwarepakete.Installiert' }
+        @{ Fall = 'Update.Release' }
+        @{ Fall = 'Referenz.Median' }
     ) {
         Assert-GuiSelbsttest $Fall
     }
@@ -115,6 +117,16 @@ Describe 'Verträge zwischen Oberfläche und Arbeitsprozess' {
         $script:Gui | Should -Match '"@@PAKZ\|"'
         $script:Gui | Should -Not -Match 'new string\[\] \{ "Google\.Chrome"'
         (Get-SrcText 'Oberflaeche/Oberflaeche.ps1') | Should -Match '\[DiagGui\]::SoftwarePakete = \[string\[\]\]\(Get-SoftwarePaketGuiLines\)'
+    }
+    It 'Update-Prüfung: Jetzt suchen ohne Cache, Ausweg über github.com, Median-Meldung aus dem Ergebnis (ab v4.06)' {
+        $script:Gui | Should -Match 'StartUpdateCheck\(true\)'
+        $script:Gui | Should -Match 'releases/latest'
+        $script:Gui | Should -Match 'AllowAutoRedirect = false'
+        $script:Gui | Should -Match 'LMB\.exe\.sha256'
+        $script:Gui | Should -Not -Match '@@STATUS'
+        $script:Gui | Should -Match 'MedianErgebnisText\(res, lines\)'
+        (Get-RepoText 'Veroeffentlichen.ps1') | Should -Match 'release upload \$tag \$exe \$shaFile'
+        (Get-RepoText 'Veroeffentlichen.ps1') | Should -Match '''release'', ''create'', \$tag, \$exe, \$shaFile'
     }
     It 'Seite Tools ohne Abschnitt Netzlaufwerk und mit den neuen Werkzeugen (ab v4.05)' {
         $seiten = Get-SrcText 'Oberflaeche/DiagGui_Seiten.cs'

@@ -213,11 +213,52 @@ Describe 'Verlaufs-Abfragefunktion (Get-DbDeviceRuns)' {
         Set-ModuleVar 'DataDir' $dataDir
         $res = MinibenchTest\Update-BenchReferenceMedians -DataDir $dataDir
         $res.Aktualisiert | Should -BeGreaterThan 0
-        Test-Path (Join-Path $dataDir 'Referenz.json') | Should -BeTrue
-        $refJson = Read-DatenpflegeJson (Join-Path $dataDir 'Referenz.json')
+        # ab v4.06 in Referenz_Median.json; Referenz.json gehört der eigenen Referenz aus der Datenbank
+        Test-Path (Join-Path $dataDir 'Referenz.json') | Should -BeFalse
+        $refJson = Read-DatenpflegeJson (Join-Path $dataDir 'Referenz_Median.json')
         $refJson.Format | Should -Be 'PC-Diagnose-DB/2'
         $refJson.Name | Should -Match 'Median aller Systeme'
         $refJson.Werte.'CPU|ST' | Should -BeGreaterThan 0
+        @($refJson.Systeme).Count | Should -BeGreaterThan 0
+        ($res.Zeilen -join ' ') | Should -Match 'Referenz_Median\.json: Median aller Systeme aus \d+ System'
+    }
+    It 'Median aktualisieren lässt die eigene Referenz stehen und verschiebt einen alten Median aus Referenz.json ins Archiv' {
+        $null = New-Db
+        $dataDir = New-TestDir 'data'
+        Set-ModuleVar 'DataDir' $dataDir
+        $eigen = '{"Format":"PC-Diagnose-DB/2","Name":"TORRENT","Computer":"TORRENT","Datum":"2026-11-01","Werte":{"CPU|ST":3000}}'
+        [IO.File]::WriteAllText((Join-Path $dataDir 'Referenz.json'), $eigen)
+        [void](MinibenchTest\Update-BenchReferenceMedians -DataDir $dataDir)
+        [IO.File]::ReadAllText((Join-Path $dataDir 'Referenz.json')) | Should -Be $eigen
+        [IO.File]::WriteAllText((Join-Path $dataDir 'Referenz.json'), '{"Format":"PC-Diagnose-DB/2","Name":"Median aller Systeme (3 Systeme)","Computer":"Median","Werte":{"CPU|ST":2000}}')
+        $res = MinibenchTest\Update-BenchReferenceMedians -DataDir $dataDir
+        Test-Path (Join-Path $dataDir 'Referenz.json') | Should -BeFalse
+        @(Get-ChildItem (Join-Path $dataDir 'Archiv') -Filter 'Referenz_Median_vor_4.06_*.json').Count | Should -Be 1
+        ($res.Zeilen -join ' ') | Should -Match 'Archiv'
+    }
+    It 'Median enthält nur gemessene Lasttestwerte (keine Ersatzwerte)' {
+        $db = New-TestDir 'db1'
+        [IO.File]::WriteAllText((Join-Path $db 'A_20261101_100000.json'), '{"Format":"PC-Diagnose-DB/2","Name":"A","Computer":"A","Datum":"2026-11-01 10:00","System":"Gigabyte B650","Werte":{"CPU|ST":3000}}')
+        Set-ModuleVar 'DbDir' $db
+        $dataDir = New-TestDir 'data'
+        [void](MinibenchTest\Update-BenchReferenceMedians -DataDir $dataDir)
+        $j = Read-DatenpflegeJson (Join-Path $dataDir 'Referenz_Desktop.json')
+        $j.PSObject.Properties.Name | Should -Not -Contain 'Lasttest'
+        (Get-Content -Raw (Join-Path $dataDir 'Referenz_Desktop.json')) | Should -Not -Match 'CpuTempMax'
+    }
+    It 'gespeicherte Referenz: eigene Referenz vor dem Median der Geräteklasse, alter Median in Referenz.json zählt nicht' {
+        $dataDir = New-TestDir 'data'
+        Set-ModuleVar 'DataDir' $dataDir
+        Set-ModuleVar 'DbDir' (New-TestDir 'leer')
+        [IO.File]::WriteAllText((Join-Path $dataDir 'Referenz_Desktop.json'), '{"Format":"PC-Diagnose-DB/2","Name":"Median Desktop-PCs (4 Systeme)","Computer":"Median","Werte":{"CPU|ST":2000}}')
+        [IO.File]::WriteAllText((Join-Path $dataDir 'Referenz_Notebook.json'), '{"Format":"PC-Diagnose-DB/2","Name":"Median Notebooks (2 Systeme)","Computer":"Median","Werte":{"CPU|ST":1500}}')
+        [IO.File]::WriteAllText((Join-Path $dataDir 'Referenz.json'), '{"Format":"PC-Diagnose-DB/2","Name":"Median aller Systeme (6 Systeme)","Computer":"Median","Werte":{"CPU|ST":1800}}')
+        Mock -ModuleName MinibenchTest Test-IsNotebookSystem { $false }
+        (MinibenchTest\Get-SavedReference).Name | Should -Match 'Median Desktop-PCs'
+        [IO.File]::WriteAllText((Join-Path $dataDir 'Referenz.json'), '{"Format":"PC-Diagnose-DB/2","Name":"TORRENT (Ryzen 5 7600X)","Computer":"TORRENT","Werte":{"CPU|ST":3000}}')
+        $r = MinibenchTest\Get-SavedReference
+        $r.Name | Should -Be 'TORRENT (Ryzen 5 7600X)'
+        $r.Werte['CPU|ST'] | Should -Be 3000
     }
     It 'Import-BenchReference lädt Geräteklassen-Mediane' {
         $null = New-Db
