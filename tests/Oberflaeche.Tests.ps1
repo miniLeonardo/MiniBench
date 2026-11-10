@@ -73,6 +73,13 @@ Describe 'Selbsttest der Oberfläche' {
         @{ Fall = 'Softwarepakete.Installiert' }
         @{ Fall = 'Update.Release' }
         @{ Fall = 'Referenz.Median' }
+        @{ Fall = 'Akzent.Farben' }
+        @{ Fall = 'Akzent.Windows' }
+        @{ Fall = 'Bewegung.Zeitgeber' }
+        @{ Fall = 'Bewegung.Abgeschaltet' }
+        @{ Fall = 'Ringanzeige' }
+        @{ Fall = 'Ergebnis.Ordner' }
+        @{ Fall = 'Einstellungen.Werte' }
     ) {
         Assert-GuiSelbsttest $Fall
     }
@@ -129,7 +136,7 @@ Describe 'Verträge zwischen Oberfläche und Arbeitsprozess' {
         (Get-RepoText 'Veroeffentlichen.ps1') | Should -Match '''release'', ''create'', \$tag, \$exe, \$shaFile'
     }
     It 'Seite Tools ohne Abschnitt Netzlaufwerk und mit den neuen Werkzeugen (ab v4.05)' {
-        $seiten = Get-SrcText 'Oberflaeche/DiagGui_Seiten.cs'
+        $seiten = Get-GuiText
         $a = $seiten.IndexOf('Control BuildToolsPage()'); $e = $seiten.IndexOf('FlowLayoutPanel ToolRaster()')
         $tools = $seiten.Substring($a, $e - $a)
         $tools | Should -Not -Match 'Netzlaufwerk'
@@ -213,12 +220,12 @@ Describe 'Kategoriesymbole (ab v4.01)' {
         foreach ($n in $namen) { $ui | Should -Match ('public const string {0} = ' -f $n) -Because $n }
     }
     It 'Optimierung zeigt Kurztitel und Symbol aus dem Katalog' {
-        $gui = Get-SrcText 'Oberflaeche/DiagGui.cs'
+        $gui = Get-GuiText
         $gui | Should -Match 'UI\.IconByName\('
         $gui | Should -Match 'new CategoryPickerItem\(k\[1\], ico, '
     }
     It 'Seitenkopf ohne Schalter "beim Start ausführen", Fußleiste ohne globale Optionen' {
-        $gui = Get-SrcText 'Oberflaeche/DiagGui.cs'
+        $gui = Get-GuiText
         $gui | Should -Not -Match 'Lbl\("beim Start ausführen"'
         $gui | Should -Not -Match 'chkSingleWindow'
         $gui | Should -Not -Match 'fo\.Controls\.Add\((chkAnon|chkSingleWindow|lnkAblage)\)'
@@ -227,7 +234,7 @@ Describe 'Kategoriesymbole (ab v4.01)' {
 
 Describe 'Einstellungen und Ergebnisseite (ab v4.02)' {
     It 'Einstellungen auf einer Seite ohne Reiter je Option' {
-        $gui = Get-SrcText 'Oberflaeche/DiagGui.cs'
+        $gui = Get-GuiText
         $m = [regex]::Match($gui, '(?s)void ShowSettingsDialog\(\).*?\n    void SaveWindowPreferences')
         $m.Success | Should -BeTrue
         $m.Value | Should -Not -Match 'CategoryPickerItem'
@@ -235,22 +242,73 @@ Describe 'Einstellungen und Ergebnisseite (ab v4.02)' {
         $m.Value | Should -Match 'Gruppe\("Daten und Datenschutz"\)'
     }
     It 'Einordnung gegenüber der Referenz ohne Wertung als Durchschnitt' {
-        $seiten = Get-SrcText 'Oberflaeche/DiagGui_Seiten.cs'
+        $seiten = Get-GuiText
         $seiten | Should -Not -Match '"Unterdurchschnittlich"|"Hervorragend"'
         $seiten | Should -Match 'static string RatingWord'
         $seiten | Should -Match '"nicht gemessen"'
     }
     It 'Protokoll schreibt Abschnittszeilen nur einmal' {
-        $gui = Get-SrcText 'Oberflaeche/DiagGui.cs'
+        $gui = Get-GuiText
         $gui | Should -Not -Match 'log\.AppendLine\(">> "'
     }
 }
 
 Describe 'Benchmark ohne Referenz-Haken (ab v4.04)' {
     It 'Referenz wird nur noch in der Datenbank festgelegt' {
-        $gui = Get-SrcText 'Oberflaeche/DiagGui.cs'
+        $gui = Get-GuiText
         $gui | Should -Not -Match 'chkRefSave'
         $gui | Should -Match 'Aktionen \\u203A Als Referenz festlegen'
         (Get-SrcText 'Oberflaeche/DiagGui_Vergleich.cs') | Should -Match 'Als Referenz festlegen \(persistent\)'
+    }
+}
+
+Describe 'Eine Datei je Seite, Startzeit, Akzentfarbe und Bewegung (ab v4.07)' {
+    It 'jede Seite der Oberfläche hat eine eigene Datei, keine davon ist größer als 2000 Zeilen' {
+        $namen = @(Get-GuiQuellen | ForEach-Object { [IO.Path]::GetFileName($_) })
+        foreach ($n in 'DiagGui_Startseite.cs', 'DiagGui_Diagnose.cs', 'DiagGui_Benchmark.cs', 'DiagGui_Lasttest.cs', 'DiagGui_Wartung.cs', 'DiagGui_Optimierung.cs',
+            'DiagGui_Tools.cs', 'DiagGui_Sensoren.cs', 'DiagGui_Umzug.cs', 'DiagGui_Vergleich.cs', 'DiagGui_Aenderungen.cs', 'DiagGui_Versionen.cs',
+            'DiagGui_Einstellungen.cs', 'DiagGui_Ergebnis.cs', 'DiagGui_Lauf.cs', 'Bewegung.cs') { $namen | Should -Contain $n }
+        $namen | Should -Not -Contain 'DiagGui_Seiten.cs'
+        foreach ($f in Get-GuiQuellen) {
+            if ([IO.Path]::GetFileName($f) -eq 'DiagGui_Steuerelemente.cs') { continue }
+            @([IO.File]::ReadAllLines($f)).Count | Should -BeLessThan 2000 -Because ([IO.Path]::GetFileName($f))
+        }
+    }
+    It 'using-Zeilen stehen nur in DiagGui.cs, jede Seitendatei ist eine Teilklasse' {
+        foreach ($f in @(Get-GuiQuellen | Select-Object -Skip 1)) {
+            $t = [IO.File]::ReadAllText($f, [Text.Encoding]::UTF8)
+            $t | Should -Not -Match '(?m)^using\s' -Because ([IO.Path]::GetFileName($f))
+            if ([IO.Path]::GetFileName($f) -match '^DiagGui_(?!Steuerelemente|Modelle)') { $t | Should -Match 'public partial class DiagGui' -Because ([IO.Path]::GetFileName($f)) }
+        }
+    }
+    It 'die Hardwareabfrage beim Start fragt nur die gebrauchten Eigenschaften ab' {
+        $o = Get-SrcText 'Oberflaeche/Oberflaeche.ps1'
+        $a = $o.IndexOf('[void]$hwPs.AddScript({'); $e = $o.IndexOf('$hwHandle = $hwPs.BeginInvoke()')
+        $a | Should -BeGreaterThan 0; $e | Should -BeGreaterThan $a
+        $block = $o.Substring($a, $e - $a)
+        $abfragen = @([regex]::Matches($block, 'Get-CimInstance[^|\r\n)]*'))
+        $abfragen.Count | Should -BeGreaterThan 8
+        foreach ($q in $abfragen) { $q.Value | Should -Match '-Property ' -Because $q.Value }
+        $block | Should -Match 'Win32_Processor -Property Name, NumberOfCores, NumberOfLogicalProcessors'
+    }
+    It 'Datenbank und Änderungsprotokoll werden beim Start gleichzeitig vorgeladen' {
+        $gui = Get-GuiText
+        $gui | Should -Match '(?s)changeDir = [^\n]+\n\s+StartDbVorladen\(\);'
+        $gui | Should -Match 'dbVorThread\.Join\(\)'
+        $gui | Should -Match 'Seiten aufgebaut \('
+    }
+    It 'Seitenwechsel blendet über, außer bei der Seite Versionen, und die Ergebnisseite startet die Bewegung' {
+        $gui = Get-GuiText
+        $gui | Should -Match 'i != versionPage && curPage != versionPage\) \? Ueberblendung\.Aufnahme\(content\)'
+        $gui | Should -Match 'Ueberblendung\.Starte\(content, vorher\)'
+        $gui | Should -Match '(?s)PopulateResultDashboard\(\);\s+runView\.Visible = false;\s+ZeigeErgebnis\(\);'
+        $gui | Should -Match 'Bewegung\.Starte\(resultDashboard, Bewegung\.DauerErgebnis'
+    }
+    It 'Einstellungen bieten Akzentfarbe und Animationen, beides wird vor dem Farbschema geladen' {
+        $gui = Get-GuiText
+        $gui | Should -Match 'Zeile\(gAll, "Akzentfarbe"'
+        $gui | Should -Match 'Zeile\(gAll, "Animationen"'
+        $gui | Should -Match '(?s)LoadAkzentPreference\(\);\s+UI\.SetTheme\(isDark\);'
+        $gui | Should -Not -Match 'Color\.FromArgb\(100, 180, 246\)|Color\.FromArgb\(0, 100, 190\)' -Because 'feste Blautöne folgen sonst der Akzentfarbe nicht'
     }
 }

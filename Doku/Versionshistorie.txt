@@ -5,6 +5,16 @@ Neueste Version zuerst. Einzelheiten je Version in Doku\Änderungen_vX.Y.txt (ab
 keine Änderungsdateien mehr; die Einträge nennen nur, was im Quelltext und in den Änderungen zu 2.2 belegt ist.
 Die Liste steht auch im Programm (Info-Knopf oben rechts, Quelle: src\Oberflaeche\Versionen.cs).
 
+VERSION 4.07  (10.11.2026)  EINE DATEI JE SEITE, KÜRZERER START, AKZENTFARBE UND DEZENTE BEWEGUNG
+=================================================================================================
+• Akzentfarbe: In den Einstellungen wählbar (Blau, Türkis, Violett, Pink, Orange oder die Akzentfarbe aus Windows). Sie gilt sofort für Schalter, Knöpfe, Markierungen und Verweise, in beiden Farbschemata mit geprüftem Kontrast. Etiketten mit Bedeutung (Ändern, Warnung, Kritisch) behalten ihre Farbe.
+• Ergebnisseite: Die Punktzahl zählt hoch, die Balken im Vergleich füllen sich, jede Komponente trägt einen Ring mit ihrem Anteil an der Referenz (voller Ring = 100 %). Alles dauert 0,7 s und zeigt nur gemessene Werte.
+• Seitenwechsel mit kurzer Überblendung (0,14 s). Braucht ein PC für das Bild der Seite länger als 45 ms, bleibt sie für diesen Programmlauf aus. Einstellungen › Animationen schaltet jede Bewegung ab; sie bleibt auch aus, wenn Windows Animationen abgeschaltet hat oder eine Remotesitzung läuft.
+• Startzeit: Die Oberfläche wird nicht bei jedem Start übersetzt, sondern liegt bereits als DLL im Cache (Stick: 0,65 s Laden statt 2,5 s Übersetzen, nur der erste Start einer Version übersetzt). Neu: Die Hardwareabfrage fragt nur die gebrauchten Eigenschaften ab (Win32_Processor ermittelte sonst nebenbei die Auslastung, was den Start aufhielt), die Datenpflege läuft nur noch, wenn sich Datenbank oder Berichte geändert haben (bisher 0,8 bis 1,5 s je Start), Datenbank und Änderungsprotokoll werden gleichzeitig gelesen.
+• Start.log nennt jetzt die Dauer der Hardwareabfrage und die Aufbauzeit jeder Seite.
+• Ergebnisseite: Ein Datenbankeintrag ohne Berichtsordner (importiert oder Referenz) passte bisher auf jeden Lauf; stand er alphabetisch vorn, zeigte die Ergebnisseite Punktzahl und Hardware eines anderen PCs.
+• Quelltext: Jede Seite der Oberfläche hat eine eigene Datei (DiagGui_<Seite>.cs statt zwei Dateien mit 5.371 und 3.988 Zeilen), ohne Änderung am Verhalten. Doku\Projektstand.md von 332 auf 91 Zeilen gekürzt.
+
 VERSION 4.06  (09.11.2026)  UPDATE-PRÜFUNG UND REFERENZ REPARIERT
 =================================================================
 • Update-Prüfung: „Jetzt suchen“ fragt immer neu bei GitHub und meldet das Ergebnis. Bis v4.05 galt das Ergebnis einer Prüfung 24 Stunden, auch für „Jetzt suchen“; eine Prüfung kurz vor einem Release meldete so einen Tag lang kein Update. Beim Start gilt das letzte Ergebnis jetzt höchstens zwei Stunden.

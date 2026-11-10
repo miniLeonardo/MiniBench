@@ -404,7 +404,7 @@ Describe 'Quelltext: Vorgaben aus dem Praxistest' {
         . (Join-Path $PSScriptRoot 'Hilfen.ps1')
         $script:Src = $global:MinibenchSrcRoot
         $script:Diag = [IO.File]::ReadAllText((Join-Path $script:Src 'Module/Diagnose/Ablauf.ps1'))
-        $script:Gui = [IO.File]::ReadAllText((Join-Path $script:Src 'Oberflaeche/DiagGui.cs'))
+        $script:Gui = Get-GuiText
         $script:Kopf = [IO.File]::ReadAllText((Join-Path $script:Src '00_Kopf.ps1'))
     }
     It 'keine Lizenzbefunde mehr' { $script:Diag | Should -Not -Match "Add-Finding \w+ 'Lizenz'" }

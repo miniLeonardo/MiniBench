@@ -1,0 +1,143 @@
+﻿LEOS MINIBENCH 4.07: ÄNDERUNGEN
+===============================
+
+Aus dem Gespräch vom 10.11.2026 über die nächsten Schritte hat Leonardo fünf Punkte gewählt: eine Datei je Seite,
+kürzerer Start, gestraffte Doku, dezente Bewegung auf der Ergebnisseite und beim Seitenwechsel, wählbare Akzentfarbe.
+Alle übrigen Vorschläge sind abgelehnt (Liste in Doku\Projektstand.md). Messabläufe, Berichte, Datenbankformat und
+Ereigniskanal sind unverändert.
+
+
+1. EINE DATEI JE SEITE
+  Vorher                      DiagGui.cs (5.371 Zeilen) und DiagGui_Seiten.cs (3.988 Zeilen) enthielten zusammen fast alle Seiten,
+                              dazu Einstellungen, Update, Vorlagen und die Laufansicht.
+  Jetzt                       DiagGui.cs (Rahmen, rund 1.050 Zeilen) und 18 Dateien DiagGui_<Seite>.cs als Teilklasse DiagGui.
+                              Größte Datei: DiagGui_Startseite.cs mit rund 1.690 Zeilen. Übersicht in Doku\Projektstand.md.
+  Ohne Verhaltensänderung     Die Aufteilung hat ein Skript an den Grenzen der Methoden vorgenommen. Geprüft: Jede Zeile der
+                              beiden alten Dateien steht genau einmal in den neuen (hinzugekommen sind nur die Köpfe
+                              "public partial class DiagGui" der neuen Dateien), die Oberfläche übersetzt mit C# 5, der
+                              Selbsttest bestand direkt nach der Aufteilung mit denselben 47 Fällen wie davor.
+  Tests                       Tests, die Quelltext prüfen, lesen den Gesamttext der Oberfläche (Get-GuiText in
+                              tests\Hilfen.ps1) statt einer bestimmten Datei. Neu: keine Seitendatei über 2.000 Zeilen,
+                              using-Zeilen nur in DiagGui.cs.
+
+
+2. STARTZEIT
+  Frage                       Wird die Oberfläche bei jedem Start neu übersetzt? Nein. Add-CachedType legt sie als DLL in
+                              Minibench-Daten\Cache ab; übersetzt wird nur beim ersten Start einer Version auf einem Stick.
+  Messung                     Start.log aus dem Projektordner, 16 Starts mit 4.01 bis 4.06. Vom Stick mit Cache im Mittel
+                              4,2 s: PowerShell und Einlesen des Skripts 1,0 s, Oberfläche aus dem Cache 0,65 s,
+                              Datenpflege 0,8 s, Warten auf die Hardwareabfrage 0,3 s, Datenbank 0,6 s, Seiten 0,6 s. Ohne
+                              Cache 10,5 s (Übersetzen 2,5 s). Auf ULB-PC10039 von der Festplatte 9 s, davon 2,8 s für
+                              PowerShell und Skript.
+  Hardwareabfrage             Sie läuft neben dem Laden der Oberfläche und bestimmte vom Stick die Wartezeit: Alles davor
+                              zusammen dauerte rund 1,9 s, und der Start musste trotzdem noch 0,3 s auf sie warten. Jede der
+                              zehn Abfragen nennt jetzt nur die gebrauchten Eigenschaften (-Property). Ohne diese Angabe
+                              ermittelt WMI alle Eigenschaften, bei Win32_Processor auch LoadPercentage (die Auslastung), was
+                              nach verbreiteter Erfahrung rund eine Sekunde kostet. Erwartung: bis zu einer Sekunde weniger;
+                              in der Sandbox nicht messbar (kein WMI), deshalb unter Windows nachmessen. Start.log nennt die Dauer: "Hardwareabfrage abgeschlossen (Abfrage n ms)".
+  Datenpflege                 Las bei jedem Start jede Datei der Datenbank und den Kopf jedes Berichts. Jetzt nur, wenn sich
+                              der Datenstand geändert hat (Programmversion, Messreihe, Anzahl und jüngste Änderung in
+                              Datenbank, Berichte und Vergleiche, laufende Läufe, Anzahl der Einträge in Laufzeit,
+                              smartmontools, Übersetzungen im Cache) oder wenn bei der letzten Prüfung noch ein frischer
+                              Lauf geschützt war (jünger als 60 Minuten). Stand in Cache\Datenpflege.json. "Aufräumen" in
+                              der Datenbank prüft wie bisher immer.
+  Datenbank                   Datenbank und Änderungsprotokoll (im Projektordner 0,7 MB und 1,7 MB JSON) werden gleichzeitig
+                              gelesen und schon ab dem Beginn des Fensteraufbaus, nicht erst nach Kopfzeile und Farbschema.
+  Start.log                   "Seiten aufgebaut (Start 86 ms, Diagnose 55 ms, ...)": Aufbauzeit je Seite. Die Auswertung
+                              (-StartAuswertung) fasst Phasen wie bisher ohne den Zusatz in Klammern zusammen.
+  Nicht umgesetzt             Das Einbetten der fertigen DLL in LMB.exe bringt gegenüber dem Cache nur beim ersten Start
+                              etwas und nur mit einem Windows-Compiler beim Bau; Seiten erst beim ersten Öffnen aufzubauen
+                              wäre ein Eingriff in viele Querverweise zwischen den Seiten. Der größte verbleibende Anteil
+                              ist PowerShell samt Einlesen des Gesamtskripts (2,6 MB, 214.000 Tokens, in der Sandbox
+                              0,33 s reine Parse-Zeit); siehe Projektstand, Offene Befunde 3.
+
+
+3. AKZENTFARBE
+  Einstellungen               Zeile "Akzentfarbe" mit sechs Farbpunkten: Blau (Standard, unverändert), Türkis, Violett,
+                              Pink, Orange und "wie Windows" (HKCU\Software\Microsoft\Windows\DWM, AccentColor). Wirkt
+                              sofort, auch im geöffneten Dialog; gespeichert als "Akzent" in Einstellungen.json.
+  Farbtöne                    Je Farbschema ein Grundton, daraus gemischt: unter der Maus, gedrückt, dunkel und weich. Die
+                              Windows-Farbe wird so weit abgedunkelt (hell) oder aufgehellt (dunkel), bis Schrift darauf und
+                              sie selbst auf der Seite 4,5:1 erreichen. Der Selbsttest prüft jede Farbe in beiden Schemata.
+  Bedeutungsfarben            Etiketten Ändern (blau), Eingriff, Zerstörend, Zustand und die Befundfarben bleiben, ebenso
+                              Grün ab Referenzniveau in Balken und Ringen.
+  Feste Blautöne              Knöpfe "Dashboard" und "Verlauf" der Startseite und die markierte Zeile in Auswahllisten
+                              nutzten feste Blauwerte; sie folgen jetzt dem Akzent. In Blau weicht der Ton der beiden
+                              Knöpfe dadurch leicht vom bisherigen ab.
+  Farbschema                  Ein Wechsel der Akzentfarbe schreibt das Farbschema nicht fest: Wer Hell oder Dunkel nie
+                              gewählt hat, folgt weiter Windows.
+
+
+4. DEZENTE BEWEGUNG
+  Ergebnisseite               Beim Erscheinen zählt die Punktzahl hoch, die Balken "Leistung im Vergleich" füllen sich und
+                              die Ringe laufen auf ihren Wert: einmal, 0,7 s, schnell beginnend und ruhig auslaufend. Die
+                              Breite der Punktzahl steht vorab fest, damit sich nichts verschiebt.
+  Ringanzeige                 Neu in jeder Kachel mit Vergleichswert: Anteil an der Referenz, voller Ring = 100 %, darüber
+                              bleibt er voll, die Zahl steht in der Mitte. Das Etikett daneben nennt nur noch die Einordnung
+                              ("etwas langsamer"); Prozentzahl und Referenz stehen im Hinweis beim Überfahren. Gezeigt wird
+                              nur, was der Lauf gemessen hat.
+  Seitenwechsel               Die bisherige Seite wird als Bild festgehalten und in 0,14 s über der neuen ausgeblendet.
+                              Dauert die Aufnahme auf einem PC länger als 45 ms, bleibt die Überblendung für diesen
+                              Programmlauf aus. Die Seite Versionen ist ausgenommen (ihr Textfeld lässt sich nicht aufnehmen).
+  Abschalten                  Einstellungen › Animationen. Unabhängig davon bleibt jede Bewegung aus, wenn Windows
+                              "Animationseffekte" abgeschaltet hat oder eine Remotesitzung läuft; dann erscheint sofort der
+                              Endstand.
+  Aufwand                     Ein gemeinsamer Zeitgeber (15 ms) läuft nur, solange ein Übergang läuft, sonst steht er.
+
+
+5. DOKU
+  Projektstand.md             Von 332 auf 91 Zeilen: Stand, Aufbau der Oberfläche, Versionen in je einer Zeile, offene
+                              Befunde, abgelehnte Vorschläge, Fallstricke. Die Inhalte der Versionen 3.64 bis 4.06 standen
+                              dort ein drittes Mal neben CHANGELOG.md und den Änderungsdateien.
+  AGENTS.md                   Aufbau der Oberfläche, Vorgaben 20 bis 23 (eine Datei je Seite, Akzent statt fester Farben,
+                              Bewegung nur über Bewegung.Starte, abgelehnte Vorschläge), Veröffentlichen statt git push.
+  README.md                   Zwei verschiedene Testzahlen (Abzeichen 970+, Text "über 840"): Der Text verweist jetzt auf
+                              das Abzeichen, das Bauen.cmd setzt.
+
+
+6. TESTS
+  Selbsttest der Oberfläche   Akzent.Farben, Akzent.Windows, Bewegung.Zeitgeber, Bewegung.Abgeschaltet, Ringanzeige,
+                              Ergebnis.Ordner, Einstellungen.Werte.
+  Pester                      Datenbank: Datenstand der Datenpflege (gleich ohne Änderung, anders mit neuem Lauf, Bericht und
+                              laufendem Lauf; erledigt erst ohne geschützten Lauf; erneut bei beschädigter Datei, Zeit in
+                              der Zukunft, anderer Version). Oberflaeche: eine Datei je Seite, Hardwareabfrage mit
+                              -Property, Vorladen der Datenbank, Überblendung, Einstellungen.
+
+
+GEFUNDEN UND BEHOBEN
+  Ergebnisseite               Die Seite suchte den Datenbankeintrag ihres Laufs mit outDir.EndsWith(Ordner). Ein Eintrag
+                              ohne Ordner (importiert, Referenz) passt damit auf jeden Lauf; stand er alphabetisch vor dem
+                              richtigen, zeigte die Seite Punktzahl, Hardware und Kacheln eines anderen PCs. In der Sandbox
+                              mit den Testdaten nachgestellt (DESKTOP-F9HRMRR statt TORRENT). Jetzt ErgebnisOrdnerPasst.
+  Verweise der Ergebnisseite  "Referenz ändern" und "Alle Befunde im Bericht" behielten nach einem Wechsel des Farbschemas
+                              die Farbe vom Aufbau.
+  Überblendung                Ein zweiter Seitenwechsel während der Überblendung hätte das Bild der ersten über der Seite
+                              stehen lassen (in der eigenen Durchsicht gefunden, vor der Übergabe behoben).
+  Datenstand                  Erster Entwurf zählte die Änderungszeit von Laufzeit mit; Start.log wächst aber bei jedem
+                              Start, die Datenpflege wäre nie entfallen. Laufzeit und Cache zählen nur mit der Anzahl.
+
+
+GRENZEN
+  Nicht unter Windows geprüft Alles in dieser Version ist in der Linux-Sandbox entstanden. Die Überblendung ließ sich dort
+                              nicht ansehen: Mono nimmt die Kindelemente einer Seite nicht ins Bild auf, der Ablauf
+                              (Aufnahme, Einblenden, Entfernen) ist geprüft, das Bild nicht. Hochzählen, Balken, Ringe,
+                              Akzentfarben und der Dialog Einstellungen sind in Bildschirmfotos unter Mono geprüft, in Hell
+                              und Dunkel bei 100 %.
+  Startzeit                   Der Gewinn ist aus Start.log abgeleitet, nicht gemessen. Vom Stick hängt er an der
+                              Hardwareabfrage; bleibt sie langsam, bringt die entfallene Datenpflege dort wenig.
+  Sandbox                     924 bestanden, 52 fehlgeschlagen, 61 übersprungen. Die 52 sind dieselben wie auf 4.06 (dort 914,
+                              52, 54) und brauchen Windows: Bericht 34, Datenbank 4, Diagnose 3, Lauf 4, Modulvertrag 3,
+                              Sensoren 4. Selbsttest der Oberfläche unter Mono: 54 Fälle bestanden (4.06: 47).
+  Akzentfarbe                 Der HTML-Bericht und das Dashboard im Browser behalten ihr Blau.
+
+
+UMSTIEG
+  Nichts zu tun. Der erste Start von 4.07 übersetzt die Oberfläche einmal neu (wie bei jeder Version) und prüft die
+  Datenpflege einmal vollständig. Danach bitte zweimal starten und Minibench-Daten\Laufzeit\Start.log ansehen.
+
+
+QUELLEN
+  Win32_Processor, Eigenschaft LoadPercentage: https://learn.microsoft.com/windows/win32/cimwin32prov/win32-processor
+  Get-CimInstance -Property: https://learn.microsoft.com/powershell/module/cimcmdlets/get-ciminstance
+  Control.DrawToBitmap (Einschränkungen): https://learn.microsoft.com/dotnet/api/system.windows.forms.control.drawtobitmap
+  SPI_GETCLIENTAREAANIMATION: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-systemparametersinfow

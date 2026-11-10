@@ -705,6 +705,58 @@ Describe 'Datenpflege und Archivierung' {
         Join-Path $lz 'Start.log' | Should -Exist
         Join-Path $lz 'rest.tmp' | Should -Not -Exist
     }
+    # ab v4.07: Der Start überspringt die Datenpflege, solange sich der Datenstand nicht geändert hat
+    It 'Stand bleibt ohne Änderung gleich und ändert sich mit jedem neuen Lauf, Bericht und laufenden Lauf' {
+        $root = New-Leer
+        $db = Join-Path $root 'Datenbank'
+        New-Entry $db 'PC1_20261003_142535' '2.7' 'Diagnose (vollständig)' @{}
+        $a = MinibenchTest\Get-DatenpflegeStand -DataDir $root
+        (MinibenchTest\Get-DatenpflegeStand -DataDir $root).Signatur | Should -Be $a.Signatur
+        New-Entry $db 'PC1_20261004_101010' '2.7' 'Diagnose (vollständig)' @{}
+        $b = MinibenchTest\Get-DatenpflegeStand -DataDir $root
+        $b.Signatur | Should -Not -Be $a.Signatur
+        $null = New-Report (Join-Path $root 'Berichte') 'PC1_20261004_101010'
+        $c = MinibenchTest\Get-DatenpflegeStand -DataDir $root
+        $c.Signatur | Should -Not -Be $b.Signatur
+        New-Item -ItemType Directory (Join-Path $root 'Laufzeit/PC1') -Force | Out-Null
+        [IO.File]::WriteAllText((Join-Path $root 'Laufzeit/PC1/laufend.json'), '{}')
+        (MinibenchTest\Get-DatenpflegeStand -DataDir $root).Signatur | Should -Not -Be $c.Signatur
+    }
+    It 'gilt erst als erledigt, wenn der Stand gespeichert ist und kein frischer Lauf mehr geschützt war' {
+        $root = New-Leer
+        $db = Join-Path $root 'Datenbank'
+        New-Entry $db 'PC1_20261003_142535' '2.7' 'Diagnose (vollständig)' @{}
+        $st = MinibenchTest\Get-DatenpflegeStand -DataDir $root
+        MinibenchTest\Test-DatenpflegeErledigt -DataDir $root -Stand $st -MindestAlterMin 60 | Should -BeFalse -Because 'noch nie geprüft'
+        MinibenchTest\Save-DatenpflegeStand -DataDir $root -Stand $st
+        Join-Path $root 'Cache/Datenpflege.json' | Should -Exist
+        MinibenchTest\Test-DatenpflegeErledigt -DataDir $root -Stand $st -MindestAlterMin 60 | Should -BeFalse -Because 'der Eintrag ist jünger als 60 Minuten und war bei der Prüfung noch geschützt'
+        Set-Alter (Join-Path $db 'PC1_20261003_142535.json') 3
+        $st = MinibenchTest\Get-DatenpflegeStand -DataDir $root
+        MinibenchTest\Save-DatenpflegeStand -DataDir $root -Stand $st
+        MinibenchTest\Test-DatenpflegeErledigt -DataDir $root -Stand $st -MindestAlterMin 60 | Should -BeTrue
+        New-Entry $db 'PC1_20261004_101010' '2.7' 'Diagnose (vollständig)' @{}
+        MinibenchTest\Test-DatenpflegeErledigt -DataDir $root -Stand (MinibenchTest\Get-DatenpflegeStand -DataDir $root) -MindestAlterMin 60 | Should -BeFalse -Because 'neuer Eintrag'
+    }
+    It 'prüft erneut bei beschädigter Standdatei, Zeit in der Zukunft und anderer Programmversion' {
+        $root = New-Leer
+        $st = MinibenchTest\Get-DatenpflegeStand -DataDir $root
+        MinibenchTest\Save-DatenpflegeStand -DataDir $root -Stand $st
+        MinibenchTest\Test-DatenpflegeErledigt -DataDir $root -Stand $st | Should -BeTrue -Because 'leerer Datenordner, nichts geschützt'
+        $f = Join-Path $root 'Cache/Datenpflege.json'
+        [IO.File]::WriteAllText($f, ('{{"Zeit":"{0}","Signatur":"{1}"}}' -f [datetime]::UtcNow.AddHours(2).ToString('o'), $st.Signatur))
+        MinibenchTest\Test-DatenpflegeErledigt -DataDir $root -Stand $st | Should -BeFalse
+        [IO.File]::WriteAllText($f, 'kaputt')
+        MinibenchTest\Test-DatenpflegeErledigt -DataDir $root -Stand $st | Should -BeFalse
+        MinibenchTest\Save-DatenpflegeStand -DataDir $root -Stand $st
+        Set-ModuleVar 'ScriptVersion' '99.0'
+        try { MinibenchTest\Test-DatenpflegeErledigt -DataDir $root -Stand (MinibenchTest\Get-DatenpflegeStand -DataDir $root) | Should -BeFalse }
+        finally { Set-ModuleVar 'ScriptVersion' (Get-MinibenchVersion) }
+    }
+    It 'der Start der Oberfläche prüft den Stand vor der Datenpflege und speichert ihn danach' {
+        $o = Get-SrcText 'Oberflaeche/Oberflaeche.ps1'
+        $o | Should -Match '(?s)Test-DatenpflegeErledigt.*?Invoke-Datenpflege -DataDir \$script:DataDir -MindestAlterMin 60.*?Save-DatenpflegeStand'
+    }
 }
 
 Describe 'Lauf importieren und Verknüpfung (.minibench, .zip, .json, Ordner)' {

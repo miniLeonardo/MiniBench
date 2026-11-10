@@ -104,6 +104,12 @@ function Get-GuiQuellen {
     return @($names | ForEach-Object { Join-Path (Join-Path $global:MinibenchSrcRoot 'Oberflaeche') $_ })
 }
 
+# Quelltext der ganzen Oberfläche (alle Teile in der Reihenfolge von Oberflaeche.ps1). Seit 4.07 hat jede Seite eine eigene
+# Datei; Tests suchen deshalb im Gesamttext statt in einer bestimmten Datei.
+function Get-GuiText {
+    return ((Get-GuiQuellen | ForEach-Object { [IO.File]::ReadAllText($_, [Text.Encoding]::UTF8) }) -join "`n")
+}
+
 function Get-GuiUebersetzung {
     if ($global:MinibenchGuiUebersetzung) { return $global:MinibenchGuiUebersetzung }
     # Reste abgebrochener Testläufe (älter als eine Stunde) entfernen

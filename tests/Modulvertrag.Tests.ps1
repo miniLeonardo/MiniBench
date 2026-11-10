@@ -5,7 +5,7 @@ BeforeAll {
     Import-MinibenchTestModule -Parts 'Kern\Risiko.ps1', 'Kern\Modulvertrag.ps1'
     $contracts = Get-ModuleVar 'ModuleContracts'
     $params = Get-ScriptParameters
-    $gui = [IO.File]::ReadAllText((Join-Path $global:MinibenchSrcRoot 'Oberflaeche/DiagGui.cs'))
+    $gui = Get-GuiText
     function Get-CsArray([string]$Name) {
         if ($gui -notmatch ('(?s)string\[\] {0} = new string\[\] \{{(.*?)\}};' -f $Name)) { throw "$Name nicht gefunden" }
         @([regex]::Matches($Matches[1], '"((?:[^"\\]|\\.)*)"') | ForEach-Object { $_.Groups[1].Value })

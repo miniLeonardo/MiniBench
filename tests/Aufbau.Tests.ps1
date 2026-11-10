@@ -62,11 +62,8 @@ Describe 'Vollständigkeit der Quelltextdateien' {
         $known = @(
             'src\00_Kopf.ps1', 'src\Bauplan.txt', 'src\Zusammenbau.ps1', 'src\LeosMinibench.cmd',
             'src\Kern\Grafiktest.cs', 'src\Kern\Sensoren.cs', 'src\Kern\Testroutinen.cs',
-            'src\Oberflaeche\DiagGui.cs', 'src\Oberflaeche\DiagGui_Steuerelemente.cs',
-            'src\Oberflaeche\DiagGui_Modelle.cs', 'src\Oberflaeche\DiagGui_Vergleich.cs',
-            'src\Oberflaeche\DiagGui_Seiten.cs', 'src\Oberflaeche\Start.cs', 'src\Oberflaeche\Versionen.cs',
             'src\Kern\Softwarepakete.psd1'
-        )
+        ) + @(Get-GuiQuellen | ForEach-Object { 'src\Oberflaeche\' + [IO.Path]::GetFileName($_) })
         foreach ($f in $all) {
             # relativer Pfad mit \ wie im Bauplan (unter Linux trennt das Dateisystem mit /)
             $rel = $f.FullName.Substring($global:MinibenchSrcRoot.Length + 1).Replace('/', '\')

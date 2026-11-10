@@ -1,21 +1,24 @@
-# Leos Minibench: Arbeitsrahmen für jede neue Version
+﻿# Leos Minibench: Arbeitsrahmen für jede neue Version
 
 Gilt für jeden Agenten, der an Leos Minibench arbeitet (Claude, Antigravity). Erst lesen, dann ändern.
-Den aktuellen Stand, offene Befunde und Fallstricke beschreibt Doku\Projektstand.md. Wer eine Version abschließt,
-aktualisiert diese Datei, damit der nächste Agent dort weitermachen kann.
+Den aktuellen Stand, den Aufbau der Oberfläche, offene Befunde, abgelehnte Vorschläge und Fallstricke beschreibt
+Doku\Projektstand.md. Wer eine Version abschließt, aktualisiert diese Datei, damit der nächste Agent dort weitermachen
+kann. Sie bleibt kurz: Was eine Version geändert hat, steht in CHANGELOG.md und Doku\Änderungen_vX.Y.txt.
 
 ## Ordner und Aufbau
 
 src                 Quelltext. Reihenfolge der Teile in src\Bauplan.txt. Kern in src\Kern, Berichte in src\Bericht,
                     Module je Ordner src\Module\<Name> mit Vertrag.psd1 (Modulvertrag) und Ablauf.ps1,
-                    Oberfläche in src\Oberflaeche\DiagGui*.cs (C#, Teile in der Reihenfolge aus Oberflaeche.ps1),
+                    Oberfläche in src\Oberflaeche (C#, Teile in der Reihenfolge aus Oberflaeche.ps1): DiagGui.cs als Rahmen
+                    mit den using-Zeilen, eine Datei je Seite (DiagGui_<Seite>.cs, Teilklasse DiagGui), Bewegung.cs,
+                    DiagGui_Steuerelemente.cs (Klasse UI), Übersicht in Doku\Projektstand.md,
                     Versionshistorie in src\Oberflaeche\Versionen.cs, Sensoren in src\Kern\Sensoren.ps1 und .cs,
                     Datenpflege in src\Kern\Datenpflege.ps1, Softwarepakete (winget) in src\Kern\Softwarepakete.ps1,
                     Netzlaufwerk (Abgleich, Entfernen, Umbenennen von Läufen) in src\Kern\Ablage.ps1.
 Bauen.cmd           fügt src zu Aktueller Build\LeosMinibench.ps1 zusammen, führt die Tests aus, baut die .exe, schreibt
                     Stand.txt, passt README.md an (Version, Testanzahl), verschiebt den vorigen Build nach
                     Archiv\v<alte Version>, räumt Aktueller Build\Minibench-Daten auf, committet nach bestandenen
-                    Tests lokal (Nachricht aus Versionen.cs). Übertragen nach GitHub von Hand (git push, Tag vX.Y).
+                    Tests lokal (Nachricht aus Versionen.cs). Übertragen nach GitHub mit Veroeffentlichen.ps1.
                     Bauen.cmd ohnetests baut ohne Tests und ohne Commit.
 Veroeffentlichen.ps1 überträgt main und Tag, richtet gh ein und erstellt das GitHub-Release (LMB.exe als Anhang, SHA-256-Zeile für die
                     Update-Funktion, Text aus CHANGELOG.md). Ab v4.03.
@@ -75,6 +78,15 @@ Minibench-Daten     Datenordner neben der exe: Berichte, Datenbank (JSON, PC-Dia
     *Modul* = Hauptbestandteil (Diagnose, Benchmark, Lasttest, Wartung, Optimierung); *Aufgabe* = Einzelschritt in der Wartung;
     *Einstellung* = Option in der Optimierung; *Vorlage* = gespeicherte Gesamtauswahl (der Begriff „Voreinstellung“ entfällt);
     *Ablauf* = gewählte Module in Ausführungsreihenfolge.
+20. Jede Seite der Oberfläche steht in einer eigenen Datei DiagGui_<Seite>.cs ohne using-Zeilen (die stehen nur in
+    DiagGui.cs). Keine Datei außer DiagGui_Steuerelemente.cs wächst über 2000 Zeilen (Oberflaeche.Tests.ps1 prüft das).
+21. Akzentflächen und Verweise nutzen UI.Accent, AccentHover, AccentActive, AccentDark, AccentSoft und OnAccent, keine
+    festen Farbwerte: Die Akzentfarbe ist wählbar (Einstellungen). Jede neue Akzentfarbe muss in beiden Farbschemata
+    4,5:1 erreichen (Selbsttest Akzent.Farben).
+22. Bewegung nur über Bewegung.Starte: höchstens 700 ms, endet im Zielzustand, zeigt ohne Erlaubnis (Einstellung,
+    Windows ohne Animationen, Remotesitzung) sofort den Endstand. Keine eigenen Zeitgeber für Übergänge.
+23. Vorschläge, die Leonardo abgelehnt hat, stehen in Doku\Projektstand.md (Abgelehnte Vorschläge): nicht umsetzen und
+    nicht erneut vorschlagen.
 
 ## Regeln für Tests
 1. Nach Fachgebiet, nicht nach Version. Verhaltenstests (Funktion im Testmodul aufrufen, Ergebnis prüfen) vor Regex auf
@@ -94,8 +106,8 @@ Minibench-Daten     Datenordner neben der exe: Berichte, Datenbank (JSON, PC-Dia
    zwingend Windows braucht: Set-ItResult -Skipped mit Test-IstWindows.
 
 ## Git
-Repository: https://github.com/miniLeonardo/MiniBench (Zweig main). Bauen.cmd committet nach bestandenen Tests lokal
-übertragen wird von Hand (git push, dazu der Tag vX.Y). Jede Version ein Commit "Release vX.Y: <Titel aus Versionen.cs>". Vor der Arbeit
+Repository: https://github.com/miniLeonardo/MiniBench (Zweig main). Bauen.cmd committet nach bestandenen Tests lokal,
+Veroeffentlichen.ps1 überträgt main und den Tag vX.Y. Jede Version ein Commit "Release vX.Y: <Titel aus Versionen.cs>". Vor der Arbeit
 git log seit dem in Doku\Projektstand.md genannten Commit lesen.
 
 ## Vorgehen in jedem Chat

@@ -2,6 +2,22 @@
 
 Alle wesentlichen Änderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v4.07 (10.11.2026)
+
+### Neu
+* **Akzentfarbe:** in den Einstellungen wählbar (Blau, Türkis, Violett, Pink, Orange, wie Windows), wirkt sofort, in beiden Farbschemata mit geprüftem Kontrast.
+* **Ergebnisseite:** Punktzahl zählt hoch, Balken füllen sich, Ringanzeige je Komponente (voller Ring = 100 % der Referenz).
+* **Seitenwechsel:** kurze Überblendung; „Animationen“ in den Einstellungen schaltet jede Bewegung ab.
+
+### Verbessert
+* **Startzeit:** Hardwareabfrage nur mit den gebrauchten Eigenschaften, Datenpflege nur bei geändertem Datenstand, Datenbank und Änderungsprotokoll gleichzeitig geladen. Die Oberfläche selbst liegt bereits als DLL im Cache und wird nur beim ersten Start einer Version übersetzt.
+* **Start.log:** Dauer der Hardwareabfrage und Aufbauzeit je Seite.
+* **Quelltext:** eine Datei je Seite der Oberfläche (Teilklasse DiagGui), ohne Änderung am Verhalten.
+* **Doku:** Projektstand.md auf Stand, Aufbau, offene Befunde, abgelehnte Vorschläge und Fallstricke gekürzt.
+
+### Behoben
+* **Ergebnisseite:** Ein Datenbankeintrag ohne Berichtsordner passte auf jeden Lauf; die Seite konnte Punktzahl und Hardware eines anderen PCs zeigen.
+
 ## v4.06 (09.11.2026)
 
 ### Behoben

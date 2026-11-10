@@ -288,6 +288,81 @@ function Invoke-Datenpflege {
     return $res
 }
 
+# ---------- Datenpflege beim Start überspringen, wenn sich nichts geändert hat (ab v4.07) ----------
+# Invoke-Datenpflege liest bei jedem Start jede Datei der Datenbank und den Kopf jedes Berichts (auf dem Stick 0,8 bis
+# 1,5 s). Der Stand fasst zusammen, wovon ihr Ergebnis abhängt: Programmversion, Messreihe, Anzahl und jüngste Änderung
+# in Datenbank, Berichte und Vergleiche, laufende Läufe, Anzahl der Einträge in Laufzeit, Dateien von smartmontools und
+# Übersetzungen im Cache.
+# Ist der Stand gleich dem der letzten Prüfung und lag diese mindestens -MindestAlterMin nach der jüngsten Änderung
+# (frische Läufe sind dann nicht mehr geschützt und wurden schon beurteilt), kann die Prüfung entfallen.
+function Get-DatenpflegeStand([string]$DataDir = $script:DataDir) {
+    $teile = New-Object System.Collections.Generic.List[string]
+    $neueste = [datetime]::MinValue
+    $teile.Add(('v{0}|m{1}' -f [string]$ScriptVersion, [string]$script:MessreiheAb))
+    $ordner = @(
+        @{ Name = 'Datenbank'; Pfad = (Join-Path $DataDir 'Datenbank'); Muster = '*.json'; Art = 'Dateien' },
+        @{ Name = 'Berichte'; Pfad = (Join-Path $DataDir 'Berichte'); Muster = '*'; Art = 'Ordner' },
+        @{ Name = 'Vergleiche'; Pfad = (Join-Path (Join-Path $DataDir 'Berichte') 'Vergleiche'); Muster = '*.html'; Art = 'Dateien' },
+        @{ Name = 'Laufzeit'; Pfad = (Join-Path $DataDir 'Laufzeit'); Muster = '*'; Art = 'Ordner'; NurAnzahl = $true },
+        @{ Name = 'LaufzeitDateien'; Pfad = (Join-Path $DataDir 'Laufzeit'); Muster = '*'; Art = 'Dateien'; NurAnzahl = $true },
+        @{ Name = 'Laufend'; Pfad = (Join-Path $DataDir 'Laufzeit'); Muster = 'laufend.json'; Art = 'Tief' },
+        @{ Name = 'Smart'; Pfad = (Join-Path (Join-Path (Join-Path $DataDir 'Tools') 'smartmontools') 'bin'); Muster = '*'; Art = 'Dateien' },
+        @{ Name = 'Cache'; Pfad = (Join-Path $DataDir 'Cache'); Muster = 'LeosMinibench-*.dll'; Art = 'Dateien'; NurAnzahl = $true }
+    )
+    foreach ($o in $ordner) {
+        $n = 0; $max = [datetime]::MinValue
+        try {
+            if ([IO.Directory]::Exists($o.Pfad)) {
+                $di = New-Object IO.DirectoryInfo($o.Pfad)
+                $liste = $(switch ($o.Art) {
+                        'Ordner' { $di.GetDirectories($o.Muster) }
+                        'Tief' { $di.GetFiles($o.Muster, [IO.SearchOption]::AllDirectories) }
+                        default { $di.GetFiles($o.Muster) }
+                    })
+                foreach ($x in @($liste)) { $n++; if ($x.LastWriteTimeUtc -gt $max) { $max = $x.LastWriteTimeUtc } }
+            }
+        } catch { $n = -1 }
+        # NurAnzahl: Laufzeit (Start.log wächst bei jedem Start, Ordner je PC ändern ihre Zeit beim Arbeiten) und Cache
+        # zählen nur mit der Anzahl; ihre Zeiten sagen nichts über Läufe und schützen keinen.
+        if ($o.NurAnzahl) { $teile.Add(('{0}:{1}' -f $o.Name, $n)) }
+        else {
+            $teile.Add(('{0}:{1}:{2}' -f $o.Name, $n, $max.Ticks))
+            if ($max -gt $neueste) { $neueste = $max }
+        }
+    }
+    return [pscustomobject]@{ Signatur = ($teile -join '|'); Neueste = $neueste }
+}
+
+function Get-DatenpflegeStandDatei([string]$DataDir = $script:DataDir) { return (Join-Path (Join-Path $DataDir 'Cache') 'Datenpflege.json') }
+
+# Wahr, wenn die letzte Prüfung denselben Stand sah und nichts mehr unter dem Schutz für frische Läufe stand.
+function Test-DatenpflegeErledigt {
+    param([string]$DataDir = $script:DataDir, $Stand, [int]$MindestAlterMin = 60)
+    try {
+        $f = Get-DatenpflegeStandDatei $DataDir
+        if (-not $Stand -or -not (Test-Path -LiteralPath $f)) { return $false }
+        $alt = Read-DatenpflegeJson $f
+        if (-not $alt -or [string]$alt.Signatur -ne [string]$Stand.Signatur) { return $false }
+        $zeit = [datetime]::MinValue
+        if (-not [datetime]::TryParse([string]$alt.Zeit, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::RoundtripKind, [ref]$zeit)) { return $false }
+        $zeit = $zeit.ToUniversalTime()
+        # Uhr zurückgestellt oder anderer PC mit abweichender Uhr: lieber prüfen
+        if ($zeit -gt [datetime]::UtcNow.AddMinutes(5)) { return $false }
+        return (($zeit - $Stand.Neueste).TotalMinutes -ge $MindestAlterMin)
+    } catch { return $false }
+}
+
+function Save-DatenpflegeStand([string]$DataDir = $script:DataDir, $Stand) {
+    try {
+        if (-not $Stand) { return }
+        $f = Get-DatenpflegeStandDatei $DataDir
+        $d = Split-Path $f -Parent
+        if (-not (Test-Path -LiteralPath $d)) { New-Item -ItemType Directory -Path $d -Force -ErrorAction Stop | Out-Null }
+        $json = ([pscustomobject]@{ Zeit = [datetime]::UtcNow.ToString('o', [Globalization.CultureInfo]::InvariantCulture); Signatur = [string]$Stand.Signatur } | ConvertTo-Json -Compress)
+        [IO.File]::WriteAllText($f, $json, (New-Object Text.UTF8Encoding($true)))
+    } catch { }
+}
+
 # Aufruf über die Befehlszeile (Bauen.cmd) oder die Oberfläche (Schaltfläche Aufräumen): -Datenpflege [-ArchivDir <Ordner>]
 if ($Datenpflege) {
     $dp = Invoke-Datenpflege -DataDir $script:DataDir -ArchivDir $ArchivDir

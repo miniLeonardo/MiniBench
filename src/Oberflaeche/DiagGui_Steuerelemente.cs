@@ -103,6 +103,97 @@ public static class UI
             SkipBg = Color.FromArgb(243, 244, 246);
             OnAccent = Color.White;                    // auf #0067C0, etwa 5,9:1
         }
+        SetzeAkzent(dark);
+    }
+
+    // ------------------------------------------------------------ Akzentfarbe (ab v4.07)
+    // Wählbar in den Einstellungen. "Blau" ist der bisherige Stand und bleibt unverändert. Jede andere Farbe hat je
+    // Farbschema einen Grundton; Hover, gedrückt, dunkel und weich werden daraus gemischt. "Windows" übernimmt die
+    // Akzentfarbe aus den Windows-Einstellungen. Info-Etiketten (Ändern) bleiben blau: Sie tragen eine Bedeutung.
+    public static string Akzent = "Blau";
+    public static readonly string[] AkzentNamen = new string[] { "Blau", "Türkis", "Violett", "Pink", "Orange", "Windows" };
+
+    public static string AkzentGueltig(string name)
+    {
+        foreach (string n in AkzentNamen) if (String.Equals(n, name, StringComparison.OrdinalIgnoreCase)) return n;
+        return "Blau";
+    }
+
+    // Grundton einer Akzentfarbe: im hellen Schema dunkel genug für weiße Schrift, im dunklen hell genug für dunkle Schrift
+    public static Color AkzentGrundton(string name, bool dark)
+    {
+        switch (AkzentGueltig(name))
+        {
+            case "Türkis": return dark ? Color.FromArgb(77, 208, 196) : Color.FromArgb(0, 121, 107);
+            case "Violett": return dark ? Color.FromArgb(184, 164, 255) : Color.FromArgb(105, 77, 190);
+            case "Pink": return dark ? Color.FromArgb(255, 143, 200) : Color.FromArgb(190, 40, 124);
+            case "Orange": return dark ? Color.FromArgb(255, 184, 108) : Color.FromArgb(176, 80, 8);
+            case "Windows": return MitKontrast(WindowsAkzent(), dark);
+            default: return dark ? Color.FromArgb(76, 194, 255) : Color.FromArgb(0, 103, 192);
+        }
+    }
+
+    // Akzentfarbe aus den Windows-Einstellungen (HKCU\...\DWM\AccentColor, Byte-Reihenfolge ABGR); ohne Wert das eigene Blau
+    public static Color WindowsAkzent()
+    {
+        try
+        {
+            using (Microsoft.Win32.RegistryKey k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\DWM"))
+            {
+                object v = k != null ? k.GetValue("AccentColor") : null;
+                if (v != null) return AusAbgr(unchecked((uint)Convert.ToInt32(v, CultureInfo.InvariantCulture)));
+            }
+        }
+        catch { }
+        return Color.FromArgb(0, 103, 192);
+    }
+
+    public static Color AusAbgr(uint abgr) { return Color.FromArgb((int)(abgr & 0xFF), (int)((abgr >> 8) & 0xFF), (int)((abgr >> 16) & 0xFF)); }
+
+    // Mischt a mit b (t = Anteil von b, 0 bis 1)
+    public static Color Mix(Color a, Color b, double t)
+    {
+        if (t < 0) t = 0; if (t > 1) t = 1;
+        return Color.FromArgb((int)Math.Round(a.R + (b.R - a.R) * t), (int)Math.Round(a.G + (b.G - a.G) * t), (int)Math.Round(a.B + (b.B - a.B) * t));
+    }
+
+    // Beliebige Farbe so weit abdunkeln (hell) oder aufhellen (dunkel), dass Schrift darauf und sie selbst auf der Seite lesbar sind
+    public static Color MitKontrast(Color c, bool dark)
+    {
+        Color ziel = dark ? Color.White : Color.Black;
+        Color flaeche = dark ? Color.FromArgb(36, 37, 38) : Color.White;
+        Color schrift = dark ? Color.FromArgb(18, 19, 20) : Color.White;
+        for (int i = 0; i <= 20; i++)
+        {
+            Color x = Mix(c, ziel, i / 20.0);
+            if (ContrastRatio(x, flaeche) >= 4.5 && ContrastRatio(schrift, x) >= 4.5) return x;
+        }
+        return dark ? Color.FromArgb(76, 194, 255) : Color.FromArgb(0, 103, 192);
+    }
+
+    // Setzt die Akzenttöne des aktuellen Schemas nach UI.Akzent. Blau behält die festen Werte aus SetTheme.
+    public static void SetzeAkzent(bool dark)
+    {
+        Akzent = AkzentGueltig(Akzent);
+        if (Akzent == "Blau") return;
+        Color a = AkzentGrundton(Akzent, dark);
+        Accent = a;
+        if (dark)
+        {
+            AccentHover = Mix(a, Color.White, 0.18);
+            AccentActive = Mix(a, Color.Black, 0.18);
+            AccentDark = Mix(a, Bg, 0.62);
+            AccentSoft = Mix(a, Panel, 0.84);
+            OnAccent = Color.FromArgb(18, 19, 20);
+        }
+        else
+        {
+            AccentHover = Mix(a, Color.Black, 0.14);
+            AccentActive = Mix(a, Color.Black, 0.26);
+            AccentDark = AccentActive;
+            AccentSoft = Mix(a, Color.White, 0.91);
+            OnAccent = Color.White;
+        }
     }
 
     public static int S(int px)
@@ -1089,7 +1180,7 @@ public class DarkComboBox : ComboBox
     {
         if (e.Index < 0) return;
         bool sel = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
-        Color bg = sel ? (UI.IsDark ? UI.AccentSoft : Color.FromArgb(235, 243, 251)) : UI.Panel;
+        Color bg = sel ? UI.AccentSoft : UI.Panel;
         Color fg = sel ? UI.Accent : UI.Text;
         using (SolidBrush b = new SolidBrush(bg)) e.Graphics.FillRectangle(b, e.Bounds);
         string itemText = Items[e.Index] != null ? Items[e.Index].ToString() : "";
@@ -1568,6 +1659,9 @@ public class PercentBar : Control
 {
     double pct;
     public double Percent { get { return pct; } set { pct = value; Invalidate(); } }
+    // ab v4.07: gezeichneter Teil des Werts (0 bis 1), nur für das Einblenden auf der Ergebnisseite
+    double anteil = 1;
+    public double Anteil { get { return anteil; } set { anteil = value < 0 ? 0 : value > 1 ? 1 : value; Invalidate(); } }
     public double Max = 150;
     public PercentBar()
     {
@@ -1581,7 +1675,7 @@ public class PercentBar : Control
         float h = Height - 1, w = Width - 1;
         Color track = UI.IsDark ? Color.FromArgb(52, 56, 62) : Color.FromArgb(226, 229, 234);
         using (GraphicsPath p = UI.Round(new RectangleF(0, 0, w, h), h / 2f)) using (SolidBrush b = new SolidBrush(track)) g.FillPath(b, p);
-        float fw = (float)(Math.Max(0, Math.Min(pct, Max)) / Max * w);
+        float fw = (float)(Math.Max(0, Math.Min(pct, Max)) / Max * w * anteil);
         // Langsamer als die Referenz ist kein Fehler (die Referenz ist meist ein schneller PC): kein Gelb, nur Grün ab Referenzniveau
         Color fill = pct >= 90 ? UI.Ok : UI.Accent;
         if (fw >= h) using (GraphicsPath p = UI.Round(new RectangleF(0, 0, fw, h), h / 2f)) using (SolidBrush b = new SolidBrush(fill)) g.FillPath(b, p);

@@ -58,6 +58,13 @@ public static class GuiSelbsttest
         Fall("Softwarepakete.Installiert", SoftwareInstalliert);
         Fall("Update.Release", UpdateRelease);
         Fall("Referenz.Median", ReferenzMedian);
+        Fall("Akzent.Farben", AkzentFarben);
+        Fall("Akzent.Windows", AkzentWindows);
+        Fall("Bewegung.Zeitgeber", BewegungZeitgeber);
+        Fall("Bewegung.Abgeschaltet", BewegungAbgeschaltet);
+        Fall("Ringanzeige", RingBogen);
+        Fall("Ergebnis.Ordner", ErgebnisOrdner);
+        Fall("Einstellungen.Werte", EinstellungenWerte);
         foreach (string l in outLines) System.Console.WriteLine(l);
         return 0;
     }
@@ -780,5 +787,141 @@ public static class GuiSelbsttest
         string t = DiagGui.MedianErgebnisText("3 Median-Referenzen gespeichert", l);
         Ist(t.StartsWith("3 Median-Referenzen gespeichert.") && t.Contains("Referenz_Median.json"), "Ergebnis und Zeilen: " + t);
         Ist(DiagGui.MedianErgebnisText("", new System.Collections.Generic.List<string>()).Contains("kein Ergebnis"), "ohne Ergebnis");
+    }
+    // ab v4.07: jede Akzentfarbe ist in beiden Farbschemata lesbar, Blau bleibt der bisherige Stand
+    static void AkzentFarben()
+    {
+        bool alt = UI.IsDark; string altA = UI.Akzent;
+        try
+        {
+            UI.Akzent = "Blau"; UI.SetTheme(false);
+            Ist(UI.Accent == Color.FromArgb(0, 103, 192) && UI.AccentSoft == Color.FromArgb(235, 243, 251), "Blau hell unverändert");
+            UI.SetTheme(true);
+            Ist(UI.Accent == Color.FromArgb(76, 194, 255) && UI.AccentHover == Color.FromArgb(96, 205, 255), "Blau dunkel unverändert");
+            Ist(UI.AkzentNamen.Length >= 5 && UI.AkzentNamen[0] == "Blau", "Liste beginnt mit Blau");
+            foreach (string name in UI.AkzentNamen)
+                foreach (bool dark in new bool[] { false, true })
+                {
+                    UI.Akzent = name; UI.SetTheme(dark);
+                    string n = name + (dark ? " dunkel: " : " hell: ");
+                    Ist(UI.ContrastRatio(UI.OnAccent, UI.Accent) >= 4.5, n + "Schrift auf Knopf " + UI.ContrastRatio(UI.OnAccent, UI.Accent).ToString("0.0"));
+                    Ist(UI.ContrastRatio(UI.Accent, UI.Panel) >= 4.5, n + "Verweis auf Seite " + UI.ContrastRatio(UI.Accent, UI.Panel).ToString("0.0"));
+                    Ist(UI.ContrastRatio(UI.Accent, UI.AccentSoft) >= 3.5, n + "Akzent auf weicher Fläche " + UI.ContrastRatio(UI.Accent, UI.AccentSoft).ToString("0.0"));
+                    Ist(UI.ContrastRatio(UI.Text, UI.AccentSoft) >= 7, n + "Text auf weicher Fläche");
+                    Ist(UI.ContrastRatio(UI.OnAccent, UI.AccentHover) >= 4.5, n + "Schrift auf Knopf unter der Maus");
+                    using (Button b = UI.Primary("x")) Ist(b.BackColor == UI.Accent && b.ForeColor == UI.OnAccent, n + "Primärknopf folgt dem Akzent");
+                }
+            Ist(UI.AkzentGueltig("violett") == "Violett" && UI.AkzentGueltig("gibt es nicht") == "Blau" && UI.AkzentGueltig(null) == "Blau", "unbekannte Namen fallen auf Blau");
+            UI.Akzent = "Pink"; UI.SetTheme(false); Color pinkHell = UI.Accent; UI.SetTheme(true);
+            Ist(UI.Accent != pinkHell, "eigener Ton je Farbschema");
+        }
+        finally { UI.Akzent = altA; UI.SetTheme(alt); }
+    }
+
+    // Akzentfarbe aus Windows: Byte-Reihenfolge ABGR, beliebige Farben werden auf lesbaren Kontrast gebracht
+    static void AkzentWindows()
+    {
+        Ist(UI.AusAbgr(0xFF0078D7) == Color.FromArgb(0xD7, 0x78, 0x00), "ABGR gelesen");
+        foreach (Color c in new Color[] { Color.Yellow, Color.White, Color.Black, Color.FromArgb(0, 120, 215), Color.Lime, Color.FromArgb(40, 0, 60) })
+            foreach (bool dark in new bool[] { false, true })
+            {
+                Color x = UI.MitKontrast(c, dark);
+                Color flaeche = dark ? Color.FromArgb(36, 37, 38) : Color.White, schrift = dark ? Color.FromArgb(18, 19, 20) : Color.White;
+                Ist(UI.ContrastRatio(x, flaeche) >= 4.5 && UI.ContrastRatio(schrift, x) >= 4.5, "Kontrast für " + c + (dark ? " dunkel" : " hell"));
+            }
+        Ist(UI.Mix(Color.Black, Color.White, 0.5) == Color.FromArgb(128, 128, 128) && UI.Mix(Color.Red, Color.Blue, 0) == Color.FromArgb(255, 0, 0), "Mischen");
+    }
+
+    // Übergänge enden immer im Zielzustand, der Zeitgeber steht danach still, ein neuer Lauf ersetzt den alten
+    static void BewegungZeitgeber()
+    {
+        bool alt = Bewegung.Aktiv;
+        try
+        {
+            Bewegung.Aktiv = true;
+            if (!Bewegung.Erlaubt) return;   // Remotesitzung oder Windows ohne Animationen: nichts zu prüfen
+            object ziel = new object();
+            System.Collections.Generic.List<double> werte = new System.Collections.Generic.List<double>(); int ende = 0;
+            Bewegung.Starte(ziel, 200, delegate(double t) { werte.Add(t); }, delegate { ende++; });
+            Ist(werte.Count == 1 && werte[0] == 0 && Bewegung.Laufend == 1, "beginnt bei 0");
+            long start = Bewegung.Jetzt;
+            Bewegung.Tick(start + 100);
+            Ist(werte.Count == 2 && werte[1] > 0.8 && werte[1] < 1, "läuft sanft aus: nach der halben Zeit über 80 % (" + werte[1] + ")");
+            Bewegung.Tick(start + 5000);
+            Ist(werte[werte.Count - 1] == 1.0 && ende == 1 && Bewegung.Laufend == 0, "endet genau im Ziel und meldet das Ende einmal");
+            Bewegung.Tick(start + 6000);
+            Ist(ende == 1, "kein zweites Ende");
+            int a = 0, b = 0;
+            Bewegung.Starte(ziel, 200, delegate(double t) { a++; });
+            Bewegung.Starte(ziel, 200, delegate(double t) { b++; });
+            Bewegung.Tick(Bewegung.Jetzt + 5000);
+            Ist(Bewegung.Laufend == 0 && a == 1 && b == 2, "neuer Lauf ersetzt den alten (a " + a + ", b " + b + ")");
+            Bewegung.Starte(ziel, 200, delegate(double t) { throw new System.Exception("x"); });
+            Ist(Bewegung.Laufend == 0, "Fehler im ersten Schritt startet nichts");
+            Ist(Bewegung.Verlauf(0) == 0 && Bewegung.Verlauf(1) == 1 && Bewegung.Verlauf(2) == 1 && Bewegung.Verlauf(0.25) < Bewegung.Verlauf(0.5), "Verlauf steigt von 0 auf 1");
+            Ist(Bewegung.DauerErgebnis <= 800 && Bewegung.DauerSeite <= 200, "kurze Dauer");
+        }
+        finally { Bewegung.Aktiv = alt; }
+    }
+
+    // Abgeschaltet gilt sofort der Endstand, nichts läuft nach
+    static void BewegungAbgeschaltet()
+    {
+        bool alt = Bewegung.Aktiv;
+        try
+        {
+            Bewegung.Aktiv = false;
+            double letzter = -1; int ende = 0;
+            Bewegung.Starte(new object(), 500, delegate(double t) { letzter = t; }, delegate { ende++; });
+            Ist(letzter == 1.0 && ende == 1 && Bewegung.Laufend == 0, "sofort Endstand");
+            using (Panel p = new Panel()) Ist(Ueberblendung.Aufnahme(p) == null, "keine Aufnahme für die Überblendung");
+            using (PercentBar pb = new PercentBar()) { pb.Percent = 80; Ist(pb.Anteil == 1, "Balken zeigt ohne Bewegung den vollen Wert"); pb.Anteil = 5; Ist(pb.Anteil == 1, "Anteil begrenzt"); }
+        }
+        finally { Bewegung.Aktiv = alt; }
+    }
+
+    static void RingBogen()
+    {
+        Ist(RingAnzeige.Bogen(50, 1) == 180f && RingAnzeige.Bogen(100, 1) == 360f && RingAnzeige.Bogen(150, 1) == 360f, "voller Ring = 100 %, darüber bleibt er voll");
+        Ist(RingAnzeige.Bogen(80, 0.5) == 144f && RingAnzeige.Bogen(80, 0) == 0f && RingAnzeige.Bogen(-5, 1) == 0f, "Anteil und Untergrenze");
+        using (RingAnzeige r = new RingAnzeige())
+        {
+            r.Percent = 76; Ist(r.Anteil == 1 && r.Percent == 76, "Vorgabe zeigt den Wert ganz");
+            r.Anteil = -1; Ist(r.Anteil == 0, "Anteil nicht unter 0");
+            using (Bitmap b = new Bitmap(r.Width, r.Height)) r.DrawToBitmap(b, new Rectangle(0, 0, r.Width, r.Height));
+        }
+    }
+
+    // bis v4.06 passte ein Datenbankeintrag ohne Ordner auf jeden Lauf (EndsWith(""))
+    static void ErgebnisOrdner()
+    {
+        Ist(!DiagGui.ErgebnisOrdnerPasst(@"E:\Minibench-Daten\Berichte\PC1_20261110_101500", ""), "leerer Ordner passt nie");
+        Ist(!DiagGui.ErgebnisOrdnerPasst(@"E:\Minibench-Daten\Berichte\PC1_20261110_101500", null) && !DiagGui.ErgebnisOrdnerPasst("", "x"), "ohne Angaben kein Treffer");
+        Ist(DiagGui.ErgebnisOrdnerPasst(@"E:\Minibench-Daten\Berichte\PC1_20261110_101500", @"Berichte\PC1_20261110_101500"), "relativer Ordner");
+        Ist(DiagGui.ErgebnisOrdnerPasst(@"E:\Minibench-Daten\Berichte\PC1_20261110_101500\", @"e:\minibench-daten\Berichte\PC1_20261110_101500"), "ganzer Pfad, Groß- und Kleinschreibung, Trenner am Ende");
+        Ist(DiagGui.ErgebnisOrdnerPasst("E:/Minibench-Daten/Berichte/PC1_20261110_101500", "PC1_20261110_101500"), "nur der Ordnername");
+        Ist(!DiagGui.ErgebnisOrdnerPasst(@"E:\Berichte\XPC1_20261110_101500", "PC1_20261110_101500"), "kein Treffer auf ein Namensende");
+    }
+
+    // Akzentfarbe und Animationen stehen in Einstellungen.json neben den bisherigen Schlüsseln
+    static void EinstellungenWerte()
+    {
+        string f = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "MinibenchEinst_" + System.Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            Ist(DiagGui.LiesEinstellung(f, "Akzent") == null, "fehlende Datei");
+            System.IO.File.WriteAllText(f, "{\"DarkMode\":true,\"GeseheneVersion\":\"3.72\"}", System.Text.Encoding.UTF8);
+            DiagGui.SchreibeEinstellung(f, "Akzent", "Violett");
+            DiagGui.SchreibeEinstellung(f, "Animationen", false);
+            Ist((DiagGui.LiesEinstellung(f, "Akzent") as string) == "Violett", "Akzent gelesen");
+            Ist(System.Convert.ToBoolean(DiagGui.LiesEinstellung(f, "Animationen")) == false, "Animationen gelesen");
+            Ist(System.Convert.ToBoolean(DiagGui.LiesEinstellung(f, "DarkMode")) && (DiagGui.LiesEinstellung(f, "GeseheneVersion") as string) == "3.72", "vorhandene Schlüssel bleiben");
+            System.IO.File.WriteAllText(f, "kaputt");
+            Ist(DiagGui.LiesEinstellung(f, "Akzent") == null, "beschädigte Datei");
+            DiagGui.SchreibeEinstellung(f, "Akzent", "Pink");
+            Ist((DiagGui.LiesEinstellung(f, "Akzent") as string) == "Pink", "beschädigte Datei wird neu angelegt");
+            DiagGui.SchreibeEinstellung("", "Akzent", "Pink");
+        }
+        finally { try { System.IO.File.Delete(f); } catch { } }
     }
 }
