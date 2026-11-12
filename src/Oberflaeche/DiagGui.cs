@@ -50,13 +50,13 @@ public partial class DiagGui : Form
     List<DbEntry> db = new List<DbEntry>();
     Font wsBold;
 
-    Panel setupView, runView, content, head, body, contentHost, mainArea, resultDashboard;
+    Panel setupView, runView, content, head, body, contentHost, mainArea;
+    internal Panel resultDashboard;
     TableLayoutPanel foot;
     PillButton pillPresetMin, pillPresetLeo, pillPresetAdv, pillPresetReset;
     FlowLayoutPanel pnlPresetPills, pnlCustomPresets;
-    Button btnDashBack, btnDashOpenHtml, btnDashFolder, btnDashKi, btnDashVerlauf;
+    Button btnDashOpenHtml, btnDashFolder, btnDashKi, btnDashVerlauf;
     Label lblDashTitle, lblDashMeta;
-    FlowLayoutPanel pnlDashPills;
 
     List<PillButton> optPresetPills = new List<PillButton>();
     Dictionary<string, CategoryPickerItem> optPickers = new Dictionary<string, CategoryPickerItem>();
@@ -73,14 +73,13 @@ public partial class DiagGui : Form
     FlowLayoutPanel fo;
     Panel[] modBanners = new Panel[6];
     Badge badgeSensStatus;
-    List<NavItem> nav = new List<NavItem>();
+    internal List<NavItem> nav = new List<NavItem>();
     List<Control> pages = new List<Control>();
-    int curPage;
+    internal int curPage;
 #pragma warning restore 414
 
     // Diagnose
-    RadioButton rbSchnell, rbVoll, rbCustom;
-    Label lblDiagProfil;
+    internal RadioButton rbSchnell, rbVoll, rbCustom;
     string[] diagKeys = new string[] { "Ereignisse", "Updatesuche", "Integritaet", "Defender", "SmartLang", "Netzwerk", "RamTest", "Energieanalyse" };
     string[] diagText = new string[] {
         "Ereignisprotokolle, Bluescreens, Absturzabbilder, Zuverlässigkeit",
@@ -91,7 +90,7 @@ public partial class DiagGui : Form
         "Netzwerktest: Ping, DNS, HTTPS, Download",
         "RAM-Mustertest unter Windows",
         "Energieeffizienzanalyse (60 s) und DxDiag-Bericht" };
-    CheckBox[] diagChk;
+    internal CheckBox[] diagChk;
     CheckBox chkInstall, chkMem;
     ComboBox cmbDays, cmbSmartMax;
     static readonly int[] smartMinutes = new int[] { 30, 60, 90, 120, 180, 240, 360 };
@@ -138,17 +137,15 @@ public partial class DiagGui : Form
     ComboBox cmbGpuSel, cmbLGpuSel;
     List<string> gpuSelValues = new List<string>();
     // Schneller Modus (ab v2.6): parallele Prüfungen der Diagnose
-    CheckBox chkFast;
-    GroupHeader diagToggle;
-    FlowLayoutPanel diagBody;
+    internal CheckBox chkFast;
     Label lblPar;
     Dictionary<string, string[]> parJobs = new Dictionary<string, string[]>();
     List<string> parOrder = new List<string>();
     // Benchmark
     string[] benchKeys = new string[] { "CPU", "RAM", "GPU", "Disk" };
     string[] benchText = new string[] { "Prozessor", "Arbeitsspeicher", "Grafik", "Laufwerke" };
-    CheckBox[] benchChk;
-    CheckedListBox clbDisks, clbCompare;
+    internal CheckBox[] benchChk;
+    CheckedListBox clbCompare;
     List<string> diskNums = new List<string>();
     ComboBox cmbRef;
     Label lblRefState;
@@ -384,14 +381,8 @@ public partial class DiagGui : Form
         FlowLayoutPanel hr = new FlowLayoutPanel(); hr.Dock = DockStyle.Right; hr.AutoSize = true; hr.FlowDirection = FlowDirection.RightToLeft; hr.WrapContents = false; hr.BackColor = Color.Transparent; hr.Padding = new Padding(0, UI.S(12), UI.S(14), 0);
         Button btnInfo = HeadButton(UI.IcoInfo);
         btnInfo.Click += delegate {
-            if (!running && versionPage >= 0) {
-                if (resultDashboard != null && resultDashboard.Visible) {
-                    resultDashboard.Visible = false;
-                    contentHost.Visible = true;
-                    if (foot != null) foot.Visible = true;
-                }
-                ShowPage(versionPage);
-            }
+            // ab v4.08 ist das Ergebnis eine Seite: Von der Seite Versionen führt der Eintrag Ergebnis wieder zurück
+            if (!running && versionPage >= 0) ShowPage(versionPage);
         };
         Tip(btnInfo, "Info und Versionshistorie: was sich von Version 1.0 bis " + this.version + " geändert hat.");
         hr.Controls.Add(btnInfo);
@@ -423,8 +414,8 @@ public partial class DiagGui : Form
         setupView = BuildSetup();
         StartLog.Phase(seitenZeiten.Length > 0 ? "Seiten aufgebaut (" + seitenZeiten + ")" : "Seiten aufgebaut");
         runView = BuildRun();
-        resultDashboard = (Panel)BuildResultDashboard();
         FillPresets(true);
+        LadeErgebnisAusDatenbank();
         if (LoadStartPagePreference()) ShowPage(0);
         else if (curPage == 0) ShowPage(1);
         UpdateSensStatusBadge();
@@ -437,12 +428,10 @@ public partial class DiagGui : Form
         contentHost.Dock = DockStyle.Fill;
         if (foot != null) foot.Dock = DockStyle.Bottom;
         runView.Dock = DockStyle.Fill; runView.Visible = false;
-        resultDashboard.Dock = DockStyle.Fill; resultDashboard.Visible = false;
 
         mainArea.Controls.Add(contentHost);
         if (foot != null) mainArea.Controls.Add(foot);
         mainArea.Controls.Add(runView);
-        mainArea.Controls.Add(resultDashboard);
         Controls.Add(body); Controls.Add(head);
 
         FormClosing += OnClosing;
@@ -523,11 +512,13 @@ public partial class DiagGui : Form
         dbVor = null; changesVor = null; dbVorThread = null; changesVorThread = null;
     }
 
-    void ReloadDb()
+    internal void ReloadDb()
     {
         LoadDb();
         FillDbList();
         FillRefLists();
+        FuelleLetztesErgebnis();
+        LadeErgebnisAusDatenbank();
         FillChangeList();
         UpdateSensTools();
         if (lblDbPath != null) SetText(lblDbPath, NasAblage.AblageText(dataDir));
@@ -598,6 +589,13 @@ public partial class DiagGui : Form
         navChg = new NavItem("Änderungen", "Protokoll und Rückgängig", UI.IcoChg); navChg.HasCheck = false; Tip(navChg, "Änderungsprotokoll: was Leos Minibench an diesem PC verändert hat, mit Rückgängig."); nav.Add(navChg);
 
         left.Controls.Add(navStart);
+        // ab v4.08: Ergebnis direkt unter Start, sichtbar sobald es ein Ergebnis gibt (letzter Lauf dieses PCs aus der
+        // Datenbank oder der Lauf von eben). Der Eintrag steht außerhalb der Liste nav, deren Stellen den Seiten 0 bis 10
+        // und den Modulen entsprechen.
+        navErgebnis = new NavItem("Ergebnis", "", UI.IcoErgebnis); navErgebnis.HasCheck = false; navErgebnis.HintPille = true; navErgebnis.Visible = false;
+        Tip(navErgebnis, "Ergebnis des letzten Laufs mit Urteil, Vergleich zur Referenz und den Hauptwerten je Komponente.");
+        navErgebnis.Picked += delegate { if (!running && erg != null && ergebnisPage >= 0) ShowPage(ergebnisPage); };
+        left.Controls.Add(navErgebnis);
         Label lm = SideHead("Ablauf"); lm.Margin = new Padding(UI.S(4), UI.S(UI.Abstand4), 0, UI.S(6)); left.Controls.Add(lm);
         for (int i = 1; i < nav.Count; i++)
         {
@@ -613,18 +611,12 @@ public partial class DiagGui : Form
                     if (nav[idx] == navSens && tabs != null) tabs.Selected = 3;
                     return;
                 }
-                if (resultDashboard != null && resultDashboard.Visible)
-                {
-                    resultDashboard.Visible = false;
-                    contentHost.Visible = true;
-                    if (foot != null) foot.Visible = true;
-                }
                 ShowPage(idx);
             };
             nav[i].CheckedChanged += delegate { UpdateSummary(); };
         }
         // ab v2.8 acht Einträge: bei kleinem Fenster mit senkrechter Bildlaufleiste schmaler statt waagerecht zu scrollen
-        left.Layout += delegate { int w = left.ClientSize.Width - left.Padding.Horizontal - 2; if (w > UI.S(150)) foreach (NavItem n in nav) if (n.Width != w) n.Width = w; };
+        left.Layout += delegate { int w = left.ClientSize.Width - left.Padding.Horizontal - 2; if (w > UI.S(150)) { foreach (NavItem n in nav) if (n.Width != w) n.Width = w; if (navErgebnis.Width != w) navErgebnis.Width = w; } };
 
         content = new Panel(); content.Dock = DockStyle.Fill; content.BackColor = UI.Panel; content.Padding = new Padding(UI.S(UI.Seitenrand), UI.S(UI.Seitenrand), UI.S(UI.Seitenrand), UI.S(20)); content.AutoScroll = true;
         contentHost = new Panel(); contentHost.Dock = DockStyle.Fill; contentHost.BackColor = UI.Line; contentHost.Padding = new Padding(1);
@@ -644,6 +636,7 @@ public partial class DiagGui : Form
         pages.Add(BuildDbPage()); SeitenZeit(sbSeiten, swSeite, "Datenbank");
         pages.Add(BuildChangePage()); SeitenZeit(sbSeiten, swSeite, "Änderungen");
         versionPage = pages.Count; pages.Add(BuildVersionPage()); SeitenZeit(sbSeiten, swSeite, "Versionen");
+        resultDashboard = (Panel)BuildResultDashboard(); ergebnisPage = pages.Count; pages.Add(resultDashboard); SeitenZeit(sbSeiten, swSeite, "Ergebnis");
         seitenZeiten = sbSeiten.ToString();
         // ab v3.64 einheitlicher Seitenrand: Seiten ohne Dock stehen an der Position des Innenabstands (vorher bei 0,0,
         // dort wirkte der Innenabstand des Bildlaufbereichs nicht und der Titel klebte am Rahmen)
@@ -751,6 +744,9 @@ public partial class DiagGui : Form
         Tip(rbVoll, "Alle Prüfungen der Liste, ca. " + DiagMinutes(diagVoll) + " Min., mit SMART-Langtest länger.");
         Tip(rbSchnell, "Inventar, Ereignisse, Updatesuche, Netzwerk und ein kurzer RAM-Test (25 % des freien RAM, ein Durchlauf), ca. " + DiagMinutes(diagSchnell) + " Min.");
         Tip(rbCustom, "Die Prüfungen unten frei wählen.");
+        Tip(segUmfang, "Umfang der Diagnose. Schnell: Inventar, Ereignisse, Updatesuche, Netzwerk und ein kurzer RAM-Test (25 % des freien RAM, ein Durchlauf). Vollständig: alle Prüfungen der Liste, mit SMART-Langtest länger. Eigene Auswahl: Prüfungen einzeln wählen; wer einen Schalter umlegt, wechselt dorthin.");
+        Tip(lnkDiagAll, "Schaltet alle Prüfungen ein und wechselt zur eigenen Auswahl.");
+        Tip(lnkDiagNone, "Schaltet alle Prüfungen aus und wechselt zur eigenen Auswahl; es läuft dann nur das Inventar.");
         Tip(chkFast, "Lesende Prüfungen ohne Messcharakter (Updatesuche, Defender, Energieanalyse, Start des SMART-Langtests) laufen nebenher. Messungen wie RAM-Test, Netzwerk, Benchmark und Lasttest warten immer, bis alles andere fertig ist.");
         for (int i = 0; diagChk != null && i < diagChk.Length && i < diagKeys.Length; i++) { string t; if (diagTips.TryGetValue(diagKeys[i], out t)) Tip(diagChk[i], t); }
         Tip(chkInstall, "smartctl liefert SMART-Werte und den Langtest. Liegt es im Tools-Ordner des Datenordners, wird es von dort verwendet, sonst per winget geholt und nach dem Lauf entfernt (oder auf Wunsch behalten). Risikostufe Eingriff.");
@@ -759,7 +755,8 @@ public partial class DiagGui : Form
         Tip(cmbSmartMax, "So lange wartet der Lauf auf das Ergebnis des SMART-Langtests. Danach entsteht der Bericht ohne Langtest; der Test läuft im Laufwerk weiter.");
         // Benchmark
         for (int i = 0; benchChk != null && i < benchChk.Length && i < benchKeys.Length; i++) { string t; if (benchTips.TryGetValue(benchKeys[i], out t)) Tip(benchChk[i], t); }
-        Tip(clbDisks, "Laufwerke für den Laufwerks-Benchmark. Gemessen wird auf dem Volume mit dem meisten freien Platz; USB-Datenträger sind zunächst abgewählt.");
+        Tip(lnkBenchAll, "Schaltet alle vier Messungen ein.");
+        Tip(lnkBenchNone, "Schaltet alle Messungen aus.");
         Tip(cmbGpuSel, "Welche Grafikeinheiten der Rendertest belastet: alle, nur die Grafikkarte, nur die Prozessorgrafik oder eine bestimmte. Gilt für Benchmark und Lasttest.");
         Tip(cmbGpuRes, "Auflösung des Rendertests. Bilder/s sind nur bei gleicher Auflösung vergleichbar, die Punktzahl auch über Auflösungen.");
         Tip(cmbGpuShow, "Fenster: Vorschau des Rendertests. Vollbild: erste Grafikeinheit im Vollbild. Ohne Anzeige: misst unsichtbar (Esc entfällt).");
@@ -838,20 +835,25 @@ public partial class DiagGui : Form
         Tip(tabs, "Befunde: Ergebnisse nach Dringlichkeit. Tests: jede Prüfung mit Ergebnis. Leistung: Benchmark-Werte. Sensoren: Kurven von Benchmark und Lasttest. Protokoll: Ausgabe des Laufs.");
     }
 
-    void ShowPage(int i)
+    internal void ShowPage(int i)
     {
         // ab v4.07: kurze Überblendung von der bisherigen Seite (nur bei sichtbarem Fenster und erlaubter Bewegung)
         // Die Seite Versionen bleibt außen vor: Ihr Textfeld (RichTextBox) lässt sich nicht als Bild aufnehmen.
         Bitmap vorher = (i != curPage && content != null && i != versionPage && curPage != versionPage) ? Ueberblendung.Aufnahme(content) : null;
         curPage = i;
         for (int k = 0; k < nav.Count; k++) nav[k].Selected = (k == i);
+        if (navErgebnis != null) navErgebnis.Selected = (i == ergebnisPage);
+        // Band "Zurück zum Ergebnis" der Seite Benchmark gilt nur bis zum nächsten Seitenwechsel
+        if (bandErgGezeigt) VerbergeErgebnisBand();
         content.AutoScrollPosition = new Point(0, 0);
         for (int k = 0; k < pages.Count; k++) pages[k].Visible = (k == i);
+        if (i == ergebnisPage) ErgebnisSeiteGezeigt();
         // ab v4.0: Auf Werkzeugseiten (Tools bis Versionen) nur Ablaufzeile und Startknopf, ohne Vorlagen
         if (fo != null && foot != null) { bool modulSeite = i <= 5; if (fo.Visible != modulSeite) { fo.Visible = modulSeite; foot.Height = UI.S(modulSeite ? 76 : 62); } }
         if (i == 3) UpdateLoadExtras();
         // ab v4.05: installierte Softwarepakete beim ersten Öffnen der Seite Tools im Hintergrund erkennen
         if (i == 6) { if (!paketGeprueft) StartSoftwareStateCheck(); if (toolsLayout != null) toolsLayout(); }
+        if (i == 1 || i == 2) OrdneModulSeiten();
         ApplyNativeControlThemes();
         if (vorher != null) Ueberblendung.Starte(content, vorher);
     }
@@ -995,6 +997,8 @@ public partial class DiagGui : Form
         else if (k == "neustart") Tip(b, b.Text == "Neustart" ? "Wird erst nach einem Neustart vollständig wirksam." : "Kann einen Neustart brauchen, je nach Zustand des PCs.");
         else if (k == "verwaltet") Tip(b, "Berührt Gruppenrichtlinien oder zentrale Verwaltung; auf Domänen-PCs nicht in den Vorlagen.");
         else if (k == "zustand") Tip(b, "Zustand auf diesem PC, beim Start im Hintergrund gelesen oder vom letzten Lauf.");
+        else if (k == "dauer") Tip(b, "Geschätzte Dauer, wenn dieser Punkt eingeschaltet ist.");
+        else if (k == "nebenher") Tip(b, "Läuft bei paralleler Ausführung neben den übrigen Prüfungen und verlängert die Diagnose dann nicht.");
     }
 
     // ab v3.65: Gruppen als abgerundete Karten (CardPanel) wie die Werkzeugkarten

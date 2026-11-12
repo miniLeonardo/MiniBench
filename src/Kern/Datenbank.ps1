@@ -73,6 +73,9 @@ function Save-DbEntry {
         Akku      = @($script:BatteryInfo | ForEach-Object { [ordered]@{ Name = $_.Name; DesignmWh = $_.DesignmWh; VollmWh = $_.VollmWh; VerschleissProzent = $_.VerschleissProzent; Zyklen = $_.Zyklen
             LaufzeitVollMin = $(if ($_.LaufzeitVoll) { [math]::Round($_.LaufzeitVoll.TotalMinutes) } else { $null }); Quelle = $_.Quelle } })
     }
+    # ab v4.08: optionales Feld Vergleich (Name der Referenz, Prozent je Gruppe) für die Ergebnisseite. Das Format bleibt
+    # PC-Diagnose-DB/2: Ältere Versionen ignorieren das Feld, Einträge ohne das Feld zeigen "nicht gespeichert".
+    if (Get-Command 'Get-DbVergleich' -ErrorAction SilentlyContinue) { $vgl = Get-DbVergleich; if ($vgl) { $o['Vergleich'] = $vgl } }
     $file = Join-Path $script:DbDir ('{0}_{1}.json' -f (Get-SafeName $env:COMPUTERNAME), (Get-Date -Format 'yyyyMMdd_HHmmss'))
     try { [IO.File]::WriteAllText($file, ($o | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false))); return $file } catch { return '' }
 }

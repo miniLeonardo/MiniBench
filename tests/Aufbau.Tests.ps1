@@ -98,6 +98,26 @@ Describe 'Launcher, Startfenster und Anwendungsmanifest' {
         [MinibenchLauncherQuote]::Quote('a"b') | Should -BeExactly '"a\"b"'
         [MinibenchLauncherQuote]::Quote('x\"y z') | Should -BeExactly '"x\\\"y z"'
     }
+    It 'Startfenster zeigt die Version des geladenen Skripts und nennt die Abweichung von der exe (ab v4.08)' {
+        if (-not ('MinibenchLauncherVersion' -as [type])) {
+            $m1 = [regex]::Match($cmd, '(?s)static string SkriptVersion\(string\[\] zeilen\)\s*\{.+?\r?\n    \}')
+            $m2 = [regex]::Match($cmd, '(?s)static string VersionsHinweis\(string exeVersion, string skriptVersion\)\s*\{.+?\r?\n    \}')
+            $m1.Success | Should -BeTrue; $m2.Success | Should -BeTrue
+            Add-Type -TypeDefinition ('using System; public static class MinibenchLauncherVersion { public ' + $m1.Value + ' public ' + $m2.Value + ' }')
+        }
+        [MinibenchLauncherVersion]::SkriptVersion(@('# Kopf', '', "`$ScriptVersion = '4.07'", "`$AppName       = 'Leos Minibench'")) | Should -BeExactly '4.07'
+        [MinibenchLauncherVersion]::SkriptVersion(@([string][char]0xFEFF + "`$ScriptVersion='3.882'")) | Should -BeExactly '3.882'
+        [MinibenchLauncherVersion]::SkriptVersion(@('param()', 'Write-Host x')) | Should -BeExactly ''
+        [MinibenchLauncherVersion]::SkriptVersion($null) | Should -BeExactly ''
+        [MinibenchLauncherVersion]::VersionsHinweis('4.08', '4.08') | Should -BeExactly ''
+        [MinibenchLauncherVersion]::VersionsHinweis('4.08', '') | Should -BeExactly '' -Because 'ohne erkennbare Version kein falscher Alarm'
+        [MinibenchLauncherVersion]::VersionsHinweis('4.08', '4.07') | Should -Match 'LMB\.exe ist Version 4\.08.*Skript 4\.07'
+        # das zusammengebaute Skript trägt die Zeile in den ersten 600 Zeilen, die das Startfenster liest
+        $build = Get-MinibenchBuild
+        $kopf = @($build.Text -split "`r?`n" | Select-Object -First 600)
+        [MinibenchLauncherVersion]::SkriptVersion($kopf) | Should -BeExactly $build.Version
+        $cmd | Should -Match 'sp\.SetVersion\(sv, vh\)'
+    }
     It 'Startphasen: die exe gibt dem Skript die Statusdatei mit, das Skript hängt seine Phase an' {
         $cmd | Should -Match 'EnvironmentVariables\["LEOSMINIBENCH_START"\]'
         # Skript und Oberfläche hängen gleichzeitig an, die exe liest geteilt mit

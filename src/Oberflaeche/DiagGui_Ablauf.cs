@@ -16,7 +16,7 @@ public partial class DiagGui
     }
 
     // Geschätzte Minuten je Modul (Index 0..4 für die 5 Module), ohne Wartezeit auf den SMART-Langtest
-    int ModuleMinutes(int mod)
+    internal int ModuleMinutes(int mod)
     {
         int t = 0;
         if (mod == 0)
@@ -31,7 +31,7 @@ public partial class DiagGui
             if (benchChk[0].Checked) t += kurz ? 1 : 2;
             if (benchChk[1].Checked) t += 1;
             if (benchChk[2].Checked) t += 2;
-            if (benchChk[3].Checked) t += clbDisks.CheckedItems.Count;
+            if (benchChk[3].Checked) t += DiskGewaehlt();
         }
         else if (mod == 2)
         {
@@ -78,6 +78,7 @@ public partial class DiagGui
     void UpdateSummary()
     {
         UpdateDiagSummary();
+        UpdateBenchSummary();
         UpdateLoadTotal();
         if (lblSel == null || btnStart == null || diagChk == null || benchChk == null || repChk == null || chkLCpu == null || chkOptRestore == null) return;
         List<string> m = SelectedModules();
@@ -142,7 +143,7 @@ public partial class DiagGui
             if (benchChk[3].Checked)
             {
                 List<string> dn = new List<string>();
-                for (int i = 0; i < clbDisks.Items.Count && i < diskNums.Count; i++) if (clbDisks.GetItemChecked(i)) dn.Add(diskNums[i]);
+                for (int i = 0; i < diskZeilen.Count && i < diskNums.Count; i++) if (diskZeilen[i].Checked) dn.Add(diskNums[i]);
                 if (dn.Count == 0) { MessageBox.Show(this, "Für den Laufwerks-Benchmark ist kein Laufwerk ausgewählt.", "Leos Minibench", MessageBoxButtons.OK, MessageBoxIcon.Information); ShowPage(2); return; }
                 a.Append(" -BenchLaufwerke ").Append(String.Join(",", dn.ToArray()));
             }

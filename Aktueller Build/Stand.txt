@@ -1,17 +1,17 @@
 ﻿LEOS MINIBENCH: AKTUELLER BUILD
 ===============================
-Version   : 4.07 (Dateiversion 4.7.0.0)
-Gebaut    : 10.11.2026 in der Linux-Sandbox von Claude (Testbau, nicht mit Bauen.cmd)
-Tests     : Sandbox 924 bestanden, 52 fehlgeschlagen (nur ohne Windows, dieselben wie auf 4.06), 61 übersprungen; Selbsttest der Oberfläche 54 Fälle; Windows-Tests stehen aus
-Quelltext : 45 Teile aus src, 41,216 Zeilen
+Version   : 4.08 (Dateiversion 4.8.0.0)
+Gebaut    : 12.11.2026 in der Linux-Sandbox von Claude (Testbau, nicht mit Bauen.cmd)
+Tests     : Sandbox 933 bestanden, 51 fehlgeschlagen (nur ohne Windows, alle schon auf 4.07), 70 übersprungen; Selbsttest der Oberfläche 63 Fälle; Windows-Tests stehen aus
+Quelltext : 45 Teile aus src, 42,224 Zeilen
 
 Dateien (SHA-256 zur Kontrolle auf dem Stick: Get-FileHash <Datei>)
-  LMB.exe                   2,658 KB  497376de9622d7f82d949472df05d1b4c273e609e6f24146219e50adfd67676d
-  LeosMinibench.ps1         2,584 KB  2ade90ea6ee1fb043d0843c32da760a790fbdf6f9ec46e84f56f9190874560ea
-  LeosMinibench.cmd             1 KB  e9d1f704e9dfddc078ed0181c4ee80b59040f15b24203184d83e10442e09844c
-  LMB.cmd                       1 KB  71f6f9665c3251681c678a718203f4d1df958db438b7788e02d6d9743cd6bf6d
+  LMB.exe                    2,725 KB  7f9dd96ecbd5475333a9ad73a5b0c27bf74091a9431cfb81a5b392376512221d
+  LeosMinibench.ps1          2,649 KB  da051d50fb543f0cc8cf4867783c23f23459e6df1b7a9791f9bcb910d303d7cd
+  LeosMinibench.cmd              1 KB  e9d1f704e9dfddc078ed0181c4ee80b59040f15b24203184d83e10442e09844c
+  LMB.cmd                        1 KB  71f6f9665c3251681c678a718203f4d1df958db438b7788e02d6d9743cd6bf6d
 
 Testbau: LMB.exe ist mit dem Mono-Compiler aus demselben Startprogramm wie in Bauen.cmd übersetzt (Symbol, Manifest
 mit Administratorrechten und DPI-Angaben, Versionsangaben). Der nächste Lauf von Bauen.cmd ersetzt ihn.
-Änderungen dieser Version: Doku\Änderungen_v4.07.txt; alle Versionen: Seite Versionen im Programm und Doku\Versionshistorie.txt.
+Änderungen dieser Version: Doku\Änderungen_v4.08.txt; alle Versionen: Seite Versionen im Programm und Doku\Versionshistorie.txt.
 Diesen Ordner nicht von Hand ändern: Bauen.cmd erzeugt ihn bei jedem Bau neu aus src.

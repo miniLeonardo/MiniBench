@@ -5,26 +5,95 @@ public partial class DiagGui
     static readonly string[] benchDetail = new string[] {
         "Einzel- und Mehrkern, AES-256, SHA-256, Kompression",
         "Lesen, Schreiben, Kopieren, Latenz",
-        "Rendertest je Grafikeinheit (Bilder/s, 1-%-Low, Punktzahl), Speicherdurchsatz, Desktop-Komposition, PCIe",
-        "sequentiell und 4K-Zufallszugriff, Auswahl unten" };
+        "Rendertest je Grafikeinheit, Speicherdurchsatz, Desktop-Komposition, PCIe",
+        "Lesen und Schreiben am Stück, 4K-Zufallszugriff" };
+    static readonly string[] benchIcons = new string[] { UI.IcoCpu, UI.IcoRam, UI.IcoGpu, UI.IcoDisk };
+
+    // ab v4.08: Seite im Muster von Wartung und Tools. Links die Karte Messungen mit je einer Zeile (Symbol, Titel,
+    // Beschreibung, Dauer, Schalter); die Einstellungen einer Messung stehen unter ihrer Zeile und nur, wenn sie
+    // eingeschaltet ist. Rechts Referenz und letztes Ergebnis. Die Kontrollkästchen benchChk bleiben als Werte bestehen
+    // (Vorlagen, Zeitschätzung, Start), angezeigt werden Schalter.
+    internal ModulSeite benchSeite;
+    internal SettingRow[] benchRows;
+    Badge[] benchDauer;
+    internal UnterBereich subGpu, subDisk;
+    internal List<LaufwerkZeile> diskZeilen = new List<LaufwerkZeile>();
+    // Sichtbarkeit der Bereiche unter Grafik und Laufwerken als eigener Zustand (für Tests ohne angezeigtes Fenster)
+    internal bool subGpuOffen, subDiskOffen;
+    LinkLabel lnkBenchAll, lnkBenchNone, lnkRefDb, lnkLetztes, lnkBandErg;
+    // Band "Zurück zum Ergebnis": erscheint, wenn die Seite über "Referenz ändern" der Ergebnisseite geöffnet wurde
+    internal Panel bandErg;
+    Label lblBandErg;
+    ZeilenKarte karteLetztes;
+    Label lblLetztScore, lblLetztDatum;
+    FlowLayoutPanel pnlLetztWerte;
 
     Control BuildBenchPage()
     {
-        FlowLayoutPanel f = Page("Benchmark", "Misst die Leistung der gewählten Komponenten und vergleicht sie mit der Referenz, mit früheren Läufen auf diesem PC und mit bereits geprüften Systemen.", 2);
-        f.Controls.Add(Section("Messungen"));
-        benchChk = new CheckBox[benchKeys.Length];
+        FlowLayoutPanel f = Page("Benchmark", "Misst die Leistung der gewählten Komponenten und vergleicht sie mit der Referenz und mit früheren Läufen.", 2);
+        benchSeite = NeueModulSeite(f);
+        bandErg = new Panel(); bandErg.BackColor = UI.AccentSoft; bandErg.Height = UI.S(34); bandErg.Margin = new Padding(0, 0, 0, UI.S(UI.Abstand3)); bandErg.Visible = false;
+        lnkBandErg = new LinkLabel(); lnkBandErg.Text = "\u2190  Zurück zum Ergebnis"; lnkBandErg.AutoSize = true; lnkBandErg.Font = new Font("Segoe UI Semibold", UI.SchriftText);
+        lnkBandErg.LinkColor = UI.Accent; lnkBandErg.ActiveLinkColor = UI.AccentHover; lnkBandErg.LinkBehavior = LinkBehavior.HoverUnderline; lnkBandErg.BackColor = Color.Transparent; lnkBandErg.Location = new Point(UI.S(12), UI.S(8));
+        lnkBandErg.LinkClicked += delegate { ZeigeLetztesErgebnis(); };
+        Tip(lnkBandErg, "Kehrt zur Ergebnisseite zurück. Die dort gezeigten Prozentwerte gehören zur Referenz des Laufs; eine andere Referenz gilt ab dem nächsten Lauf.");
+        lblBandErg = Lbl("", UI.SchriftText, false, UI.Text); lblBandErg.Location = new Point(UI.S(190), UI.S(8));
+        bandErg.Controls.Add(lnkBandErg); bandErg.Controls.Add(lblBandErg);
+        lnkBandErg.SizeChanged += delegate { lblBandErg.Left = lnkBandErg.Right + UI.S(14); };
+        f.Controls.Add(bandErg); f.Controls.SetChildIndex(bandErg, 0); benchSeite.Voll.Add(bandErg);
+
+        ZeilenKarte km = benchSeite.Karte("Messungen", true);
+        lnkBenchAll = KartenVerweis("Alle an"); lnkBenchNone = KartenVerweis("Alle aus");
+        km.KopfRechts.Controls.Add(lnkBenchAll); km.KopfRechts.Controls.Add(lnkBenchNone);
+        lnkBenchAll.LinkClicked += delegate { foreach (CheckBox c in benchChk) c.Checked = true; };
+        lnkBenchNone.LinkClicked += delegate { foreach (CheckBox c in benchChk) c.Checked = false; };
+
+        benchChk = new CheckBox[benchKeys.Length]; benchRows = new SettingRow[benchKeys.Length]; benchDauer = new Badge[benchKeys.Length];
         for (int i = 0; i < benchKeys.Length; i++)
         {
             benchChk[i] = Chk(benchText[i], true);
-            benchChk[i].CheckedChanged += delegate { clbDisks.Enabled = benchChk[3].Checked; UpdateSummary(); };
-            f.Controls.Add(Opt2(benchChk[i], benchDetail[i]));
+            string t; benchTips.TryGetValue(benchKeys[i], out t);
+            benchRows[i] = SchalterZeile(benchChk[i], benchText[i], benchDetail[i], benchIcons[i], t, null);
+            benchDauer[i] = DauerEtikett(BenchMinuten(i)); BadgeTip(benchDauer[i]); benchRows[i].AddBadge(benchDauer[i]);
+            benchChk[i].CheckedChanged += delegate { UpdateSummary(); };
+            km.Zeile(benchRows[i]);
+            if (i == 2)
+            {
+                // Rendertest: Grafikeinheit, Auflösung und Anzeige nebeneinander (gleich eingestellt wie im Lasttest)
+                subGpu = new UnterBereich(); subGpuOffen = true;
+                FeldReihe fr = new FeldReihe();
+                cmbGpuSel = Combo(230, GpuChoiceTexts(), 0); cmbGpuRes = Combo(120, new string[] { "1280x720", "1920x1080" }, 0);
+                cmbGpuShow = Combo(140, new string[] { "Fenster", "Vollbild", "ohne Anzeige" }, 0);
+                fr.Feld("Grafikeinheit", cmbGpuSel); fr.Feld("Auflösung", cmbGpuRes); fr.Feld("Anzeige", cmbGpuShow);
+                subGpu.Inhalt.Controls.Add(fr);
+                Label hg = Lbl("Ergebnis je Grafikeinheit: Ø Bilder/s, 1-%-Low und Punktzahl. Esc im Fenster beendet den Test.", 8.5f, false, UI.Muted); hg.Margin = new Padding(0, UI.S(2), 0, 0);
+                subGpu.Inhalt.Controls.Add(hg);
+                km.Zeile(subGpu);
+            }
+            else if (i == 3)
+            {
+                subDisk = new UnterBereich(); subDiskOffen = true;
+                foreach (string d in disks)
+                {
+                    string[] x = d.Split('|');
+                    if (x.Length < 7) continue;
+                    LaufwerkZeile z = new LaufwerkZeile(x[1], x[2], DiskFrei(x), x[6] != "1" && x[5].Length > 0);
+                    Tip(z, DiskLine(x));
+                    z.CheckedChanged += delegate { UpdateSummary(); };
+                    diskZeilen.Add(z); diskNums.Add(x[0]);
+                    subDisk.Inhalt.Controls.Add(z);
+                }
+                Label hd = Lbl("Testdatei 1 GB je Laufwerk auf dem Volume mit dem meisten freien Platz, wird danach gelöscht. USB-Datenträger sind zunächst abgewählt.", 8.5f, false, UI.Muted); hd.Margin = new Padding(0, UI.S(2), 0, 0);
+                subDisk.Inhalt.Controls.Add(hd);
+                km.Zeile(subDisk);
+            }
         }
-        // ab v4.03 direkt unter den Messungen: Die Referenz bestimmt alle Prozentwerte der Ergebnisseite und stand vorher
-        // ganz unten außerhalb des Sichtbereichs
-        f.Controls.Add(Section("Referenz"));
-        FlowLayoutPanel r2 = Row(); r2.Controls.Add(RowLabel("Referenz (100 %)", 170));
-        cmbRef = Combo(360, new string[0], 0); r2.Controls.Add(cmbRef);
-        btnUpdateMed = UI.Secondary("Median aktualisieren");
+
+        // Referenz: bestimmt alle Prozentwerte der Ergebnisseite
+        ZeilenKarte kr = benchSeite.Karte("Referenz (100 %)", false);
+        cmbRef = Combo(300, new string[0], 0); cmbRef.Margin = new Padding(0, 0, 0, UI.S(6)); kr.Zeile(cmbRef);
+        lblRefState = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblRefState.Margin = new Padding(0, 0, 0, UI.S(8)); kr.Frei(lblRefState);
+        btnUpdateMed = UI.Secondary("Median aktualisieren"); btnUpdateMed.Margin = new Padding(0, 0, 0, UI.S(8));
         btnUpdateMed.Click += delegate {
             if (running) return;
             // ab v4.06: Ergebnis aus @@RESULT und den Zeilen des Arbeitsprozesses. Bis v4.05 suchte die Oberfläche eine eigene
@@ -35,40 +104,113 @@ public partial class DiagGui
             MessageBox.Show(this, MedianErgebnisText(res, lines), "Median-Referenz", MessageBoxButtons.OK, res.Length > 0 && !res.StartsWith("Keine") ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
             FillRefLists(); UpdateRefState();
         };
-        r2.Controls.Add(btnUpdateMed);
-        f.Controls.Add(r2);
-        lblRefState = Hint("", 180); f.Controls.Add(lblRefState);
+        kr.Frei(btnUpdateMed);
         cmbRef.SelectedIndexChanged += delegate { UpdateRefState(); };
         // ab v4.04 ohne Haken "Dieses System als Referenz festlegen": Das geht in der Datenbank über Aktionen, wo der Lauf
         // mit seinen Werten sichtbar ist (Skriptparameter -ReferenzSpeichern bleibt für Aufrufe ohne Oberfläche)
-        f.Controls.Add(Hint("Einen bestimmten Lauf als Referenz festlegen: Seite Datenbank, Lauf markieren, Aktionen \u203A Als Referenz festlegen.", 180));
+        lnkRefDb = KartenVerweis("Eigene Referenz in der Datenbank festlegen"); lnkRefDb.Margin = new Padding(0, 0, 0, UI.S(2));
+        lnkRefDb.LinkClicked += delegate { if (!running) ShowPage(9); };
+        Tip(lnkRefDb, "Öffnet die Seite Datenbank. Dort einen Lauf markieren, dann Aktionen › Als Referenz festlegen: Dieser Lauf ist danach die eigene Referenz (Referenz.json).");
+        kr.Frei(lnkRefDb);
 
-        f.Controls.Add(Section("Laufwerke"));
-        clbDisks = new CheckedListBox(); clbDisks.CheckOnClick = true; clbDisks.Width = UI.S(UI.Gruppenbreite); clbDisks.BorderStyle = BorderStyle.FixedSingle; clbDisks.IntegralHeight = false; clbDisks.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(4)); clbDisks.BackColor = UI.Panel; clbDisks.ForeColor = UI.Text;
-        foreach (string d in disks)
-        {
-            string[] x = d.Split('|');
-            if (x.Length < 7) continue;
-            clbDisks.Items.Add(DiskLine(x), x[6] != "1" && x[5].Length > 0);
-            diskNums.Add(x[0]);
-        }
-        // Höhe nach Anzahl der Einträge (vorher mindestens 48 px, ein Laufwerk stand in einem fast leeren Feld)
-        clbDisks.Height = Math.Max(1, Math.Min(8, clbDisks.Items.Count)) * UI.S(21) + UI.S(6);
-        clbDisks.ItemCheck += delegate { BeginInvoke(new System.Windows.Forms.MethodInvoker(UpdateSummary)); };
-        f.Controls.Add(clbDisks);
-        f.Controls.Add(Hint("Je Laufwerk wird mit einer Testdatei auf dessen Volume mit dem meisten freien Platz gemessen (1 GB, im Kurzlauf 256 MB, danach gelöscht). USB-Datenträger sind zunächst abgewählt.", 4));
-        f.Controls.Add(Section("Rendertest (Grafik)"));
-        FlowLayoutPanel rg0 = Row(); rg0.Controls.Add(RowLabel("Grafikeinheit", 170));
-        cmbGpuSel = Combo(420, GpuChoiceTexts(), 0); rg0.Controls.Add(cmbGpuSel); f.Controls.Add(rg0);
-        FlowLayoutPanel rg = Row(); rg.Controls.Add(RowLabel("Auflösung", 170));
-        cmbGpuRes = Combo(140, new string[] { "1280x720", "1920x1080" }, 0); rg.Controls.Add(cmbGpuRes);
-        rg.Controls.Add(RowLabel("Anzeige", 70)); cmbGpuShow = Combo(170, new string[] { "Fenster", "Vollbild", "ohne Anzeige" }, 0); rg.Controls.Add(cmbGpuShow);
-        f.Controls.Add(rg);
-        f.Controls.Add(Hint("Ergebnis: Ø Bilder/s, 1-%-Low und Punktzahl je Grafikeinheit. Esc im Fenster beendet den Test.", 4));
+        // Letztes Ergebnis dieses PCs aus der Datenbank (nur, wenn es einen Lauf gibt)
+        karteLetztes = benchSeite.Karte("Letztes Ergebnis auf diesem PC", false);
+        lblLetztDatum = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblLetztDatum.Margin = new Padding(0, UI.S(2), 0, 0);
+        karteLetztes.KopfRechts.Controls.Add(lblLetztDatum);
+        lblLetztScore = Lbl("", 17f, true, UI.Accent); lblLetztScore.Tag = "accent"; lblLetztScore.Margin = new Padding(0, 0, 0, UI.S(4)); karteLetztes.Frei(lblLetztScore);
+        pnlLetztWerte = new FlowLayoutPanel(); pnlLetztWerte.FlowDirection = FlowDirection.TopDown; pnlLetztWerte.WrapContents = false; pnlLetztWerte.AutoSize = true; pnlLetztWerte.BackColor = UI.Panel; pnlLetztWerte.Margin = new Padding(0);
+        karteLetztes.Frei(pnlLetztWerte);
+        lnkLetztes = KartenVerweis("Ergebnis ansehen"); lnkLetztes.Margin = new Padding(0, UI.S(6), 0, UI.S(2));
+        lnkLetztes.LinkClicked += delegate { ZeigeLetztesErgebnis(); };
+        Tip(lnkLetztes, "Öffnet die Ergebnisseite mit dem letzten Lauf dieses PCs aus der Datenbank.");
+        karteLetztes.Frei(lnkLetztes);
 
+        f.Controls.Add(benchSeite.Spalten);
         clbCompare = new CheckedListBox(); clbCompare.BackColor = UI.Panel; clbCompare.ForeColor = UI.Text;
         FillRefLists();
+        FuelleLetztesErgebnis();
+        UpdateBenchSummary();
+        benchSeite.Ordne(SeitenBreite());
         return f;
+    }
+
+    // Geschätzte Minuten einer Messung (Index wie benchKeys); Laufwerke: eine Minute je gewähltem Datenträger
+    int BenchMinuten(int i) { return i == 0 ? 2 : i == 1 ? 1 : i == 2 ? 2 : Math.Max(1, DiskGewaehlt()); }
+
+    int DiskGewaehlt() { int n = 0; foreach (LaufwerkZeile z in diskZeilen) if (z.Checked) n++; return n; }
+
+    // Kopf der Seite, Zeile Laufwerke und die Bereiche unter Grafik und Laufwerken nach der Auswahl
+    void UpdateBenchSummary()
+    {
+        if (benchSeite == null || benchChk == null || benchRows == null) return;
+        int n = 0; foreach (CheckBox c in benchChk) if (c.Checked) n++;
+        SetText(benchSeite.Anzahl, n + " von " + benchChk.Length + " Messungen");
+        SetText(benchSeite.Dauer, n > 0 ? "ca. " + MinText(ModuleMinutes(1)) : "keine Messung gewählt");
+        bool gpu = benchChk[2].Checked, disk = benchChk[3].Checked;
+        if (subGpu != null && subGpuOffen != gpu) { subGpuOffen = gpu; subGpu.Visible = gpu; }
+        bool dz = disk && diskZeilen.Count > 0;
+        if (subDisk != null && subDiskOffen != dz) { subDiskOffen = dz; subDisk.Visible = dz; }
+        benchRows[3].Description = benchDetail[3] + (diskZeilen.Count > 0 ? "  ·  " + DiskGewaehlt() + " von " + diskZeilen.Count + " gewählt" : "  ·  kein Datenträger gefunden");
+        if (benchDauer != null && benchDauer[3] != null) SetText(benchDauer[3], MinText(BenchMinuten(3)));
+    }
+
+    // Karte "Letztes Ergebnis auf diesem PC": Punktzahl, Datum und Prozent je Gruppe, soweit gespeichert
+    void FuelleLetztesErgebnis()
+    {
+        if (karteLetztes == null) return;
+        DbEntry e = GetCurrentPcLastRun();
+        bool da = e != null && (e.OverallScore > 0 || e.GruppenPct.Count > 0);
+        karteLetztes.Karte.Visible = da;
+        if (!da) return;
+        System.Globalization.CultureInfo de = System.Globalization.CultureInfo.GetCultureInfo("de-DE");
+        SetText(lblLetztDatum, DatumKurz(e.Datum));
+        SetText(lblLetztScore, e.OverallScore > 0 ? ((int)e.OverallScore).ToString("N0", de) + " Punkte" : "ohne Punktzahl");
+        pnlLetztWerte.Controls.Clear();
+        for (int g = 0; g < resGruppen.Length; g++)
+        {
+            double pct; if (!e.GruppenPct.TryGetValue(resGruppen[g], out pct)) continue;
+            FlowLayoutPanel r = new FlowLayoutPanel(); r.AutoSize = true; r.WrapContents = false; r.BackColor = UI.Panel; r.Margin = new Padding(0, 0, 0, UI.S(4));
+            Label ln = Lbl(resNamen[g], UI.SchriftHinweis, false, UI.Text); ln.AutoSize = false; ln.Size = new Size(UI.S(112), UI.S(18)); ln.Margin = new Padding(0);
+            PercentBar pb = new PercentBar(); pb.Percent = pct; pb.Size = new Size(UI.S(110), UI.S(8)); pb.Margin = new Padding(0, UI.S(6), UI.S(8), 0);
+            Tip(pb, "Strich = Referenz (100 %)" + (e.RefName.Length > 0 ? ": " + e.RefName : "") + ".");
+            Label lv = Lbl(pct.ToString("0") + " %", UI.SchriftHinweis, true, UI.Text); lv.Margin = new Padding(0);
+            r.Controls.Add(ln); r.Controls.Add(pb); r.Controls.Add(lv);
+            pnlLetztWerte.Controls.Add(r);
+        }
+        if (pnlLetztWerte.Controls.Count == 0 && e.HasBench)
+        {
+            Label l = Lbl("Prozentwerte je Gruppe sind bei diesem Lauf nicht gespeichert (Lauf vor Version 4.08).", UI.SchriftHinweis, false, UI.Muted); l.Margin = new Padding(0);
+            l.MaximumSize = new Size(karteLetztes.Innenbreite, 0);
+            pnlLetztWerte.Controls.Add(l);
+        }
+        karteLetztes.Breite(karteLetztes.Karte.Width);
+    }
+
+    // "2026-11-10 14:20" -> "10.11.2026 14:20"; unbekannte Formen bleiben
+    public static string DatumKurz(string datum)
+    {
+        string d = (datum ?? "").Trim(); DateTime x;
+        foreach (string fmt in new string[] { "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm", "yyyy-MM-dd" })
+            if (DateTime.TryParseExact(d, fmt, CultureInfo.InvariantCulture, DateTimeStyles.None, out x)) return x.ToString(fmt.Length > 10 ? "dd.MM.yyyy HH:mm" : "dd.MM.yyyy", CultureInfo.InvariantCulture);
+        return d;
+    }
+
+    // Freier Platz des Volumes, auf dem gemessen wird ("C: 300 GB frei"); ohne Laufwerksbuchstabe steht das da
+    static string DiskFrei(string[] x)
+    {
+        if (x[5].Length == 0) return "kein Laufwerksbuchstabe";
+        string best = ""; long bestFree = -1; string erster = "";
+        foreach (string l in x[5].Split(','))
+        {
+            string t = l.Trim(); if (t.Length == 0) continue;
+            if (erster.Length == 0) erster = t;
+            long free = -1;
+            // USB-Datenträger nicht abfragen (ein schlafendes Laufwerk verzögerte sonst den Start)
+            if (x.Length < 7 || x[6] != "1") try { DriveInfo di = new DriveInfo(t.Substring(0, 1)); if (di.IsReady) free = di.AvailableFreeSpace; } catch { }
+            if (free > bestFree) { bestFree = free; best = t; }
+        }
+        if (bestFree >= 0) return best + " " + GbText(bestFree) + " frei";
+        return erster + (x[4].Length > 0 ? "  ·  " + x[4] : "");
     }
 
     // Laufwerkszeile: Nummer, Name, Bus, Medium, Größe und je Laufwerksbuchstabe der freie Platz; das Ziel der Messung
@@ -130,7 +272,7 @@ public partial class DiagGui
         {
             string st = SavedRefText();
             warn = st.Length == 0;
-            t = warn ? "Keine Referenz festgelegt: Im Datenordner liegt weder eine eigene Referenz (Referenz.json) noch ein Median. Prozentwerte beziehen sich dann auf das eingebaute Referenzprofil." : st;
+            t = warn ? "Keine Referenz festgelegt: Im Datenordner liegt weder eine eigene Referenz noch ein Median. Prozentwerte beziehen sich auf das eingebaute Referenzprofil." : st;
         }
         else if (i >= 1 && i <= 3)
         {
@@ -269,12 +411,12 @@ public partial class DiagGui
     string SavedRefText()
     {
         string[] r = RefDatei("Referenz.json");
-        if (r != null && r[2] != "Median") return "Eigene Referenz: " + r[0] + (r[1].Length > 0 ? " vom " + r[1] : "") + " (Referenz.json, festgelegt in der Datenbank).";
+        if (r != null && r[2] != "Median") return "Eigene Referenz: " + r[0] + (r[1].Length > 0 ? " vom " + r[1] : "") + " (Referenz.json).";
         string dev = HwIsLaptop ? "Referenz_Notebook.json" : "Referenz_Desktop.json", alt = HwIsLaptop ? "Referenz_Desktop.json" : "Referenz_Notebook.json";
         foreach (string f in new string[] { dev, alt, "PC-Diagnose-Referenz.json" })
         {
             string[] m = RefDatei(f);
-            if (m != null) return "Keine eigene Referenz festgelegt, es gilt " + m[0] + (m[1].Length > 0 ? " vom " + m[1] : "") + " (" + f + "). Eigene Referenz: Datenbank, Lauf markieren, Aktionen \u203A Als Referenz festlegen.";
+            if (m != null) return "Keine eigene Referenz festgelegt, es gilt " + m[0] + (m[1].Length > 0 ? " vom " + m[1] : "") + " (" + f + ").";
         }
         return "";
     }

@@ -169,8 +169,20 @@ Describe 'Abgleich mit der Oberfläche' {
             ($gui -match ('bool\[\] {0} = new bool\[\] \{{([^}}]+)\}};' -f $p)) | Should -BeTrue -Because $p
             @($Matches[1] -split ',').Count | Should -Be $n -Because $p
         }
-        ($gui -match 'int\[\] add = new int\[\] \{([^}]+)\};') | Should -BeTrue
+        ($gui -match 'int\[\] diagDauer = new int\[\] \{([^}]+)\};') | Should -BeTrue
         @($Matches[1] -split ',').Count | Should -Be $n
+        # ab v4.08: Kurztitel, Beschreibung und Symbol je Zeile der Karte Prüfungen
+        @(Get-CsArray 'diagKurz').Count | Should -Be $n
+        @(Get-CsArray 'diagDetail').Count | Should -Be $n
+        ($gui -match 'string\[\] diagIcons = new string\[\] \{([^}]+)\};') | Should -BeTrue
+        @($Matches[1] -split ',').Count | Should -Be $n
+    }
+    It 'Etikett "läuft nebenher" der Seite Diagnose = Parallel im Vertrag (ab v4.08)' {
+        ($gui -match 'bool\[\] diagNebenher = new bool\[\] \{([^}]+)\};') | Should -BeTrue
+        $neben = @($Matches[1] -split ',' | ForEach-Object { $_.Trim() -eq 'true' })
+        $pr = @((MinibenchTest\Get-ModuleContract 'Diagnose').Schritte | Where-Object { $_.Typ -eq 'Pruefung' })
+        $neben.Count | Should -Be $pr.Count
+        for ($i = 0; $i -lt $pr.Count; $i++) { $neben[$i] | Should -Be ([bool]$pr[$i].Parallel) -Because $pr[$i].Key }
     }
     It 'feste Plätze der Seite Diagnose zeigen auf die passenden Prüfungen des Vertrags' {
         $keys = @(Get-CsArray 'diagKeys')

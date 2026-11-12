@@ -65,6 +65,15 @@ public static class GuiSelbsttest
         Fall("Ringanzeige", RingBogen);
         Fall("Ergebnis.Ordner", ErgebnisOrdner);
         Fall("Einstellungen.Werte", EinstellungenWerte);
+        Fall("Modulseite.Rahmen", ModulseiteRahmen);
+        Fall("Laufwerkszeile", LaufwerkszeileSchalter);
+        Fall("Umfang.Auswahl", UmfangAuswahl);
+        Fall("Umbruch.Hoehe", UmbruchHoehe);
+        Fall("Ergebnis.Befundzeile", ErgebnisBefundzeile);
+        Fall("Benchmark.Seite", BenchmarkSeite);
+        Fall("Diagnose.Seite", DiagnoseSeite);
+        Fall("Ergebnis.Seitenleiste", ErgebnisSeitenleiste);
+        Fall("Ergebnis.Datenbank", ErgebnisDatenbank);
         foreach (string l in outLines) System.Console.WriteLine(l);
         return 0;
     }
@@ -923,5 +932,320 @@ public static class GuiSelbsttest
             DiagGui.SchreibeEinstellung("", "Akzent", "Pink");
         }
         finally { try { System.IO.File.Delete(f); } catch { } }
+    }
+
+    // ------------------------------------------------------------ ab v4.08: Modulseiten, Ergebnis als Seite
+    static string NeuerDatenordner()
+    {
+        string d = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "MinibenchGui_" + System.Diagnostics.Process.GetCurrentProcess().Id + "_" + System.Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(System.IO.Path.Combine(d, "Datenbank"));
+        // Update-Prüfung aus (kein Netzwerk im Test), Farbschema fest
+        System.IO.File.WriteAllText(System.IO.Path.Combine(d, "Einstellungen.json"), "{\"DarkMode\":false,\"UpdatePruefung\":false,\"StartseiteZeigen\":true}", System.Text.Encoding.UTF8);
+        return d;
+    }
+    static void Raeume(string d) { try { System.IO.Directory.Delete(d, true); } catch { } }
+    static DiagGui NeueOberflaeche(string d, string[] disks) { return new DiagGui("", "", "", d, "4.08", disks ?? new string[0], new string[0], "G-test"); }
+
+    // Datenbankeintrag dieses PCs; mitVergleich und mitBefunden steuern die Felder, die es erst ab 4.08 bzw. bei Läufen gibt
+    static void SchreibeLauf(string d, string datum, bool mitVergleich, bool mitBefunden)
+    {
+        string pc = System.Environment.MachineName;
+        System.Text.StringBuilder b = new System.Text.StringBuilder();
+        b.Append("{\"Format\":\"PC-Diagnose-DB/2\",\"Name\":\"\",\"Computer\":\"").Append(pc).Append("\",\"Datum\":\"").Append(datum).Append("\",\"Quelle\":\"Lauf\",\"Module\":\"Diagnose + Benchmark\",");
+        b.Append("\"Hardware\":{\"CPU\":\"AMD Ryzen 5 7600X\",\"Kerne\":6,\"Threads\":12,\"RAM\":\"32 GB DDR5-6000\",\"GPU\":\"Radeon RX 6800\",\"Datentraeger\":\"Samsung SSD 980 1TB (931,5 GB, NVMe, Healthy)\"},");
+        b.Append("\"Werte\":{\"CPU|MT\":32433,\"CPU|ST\":3086,\"RAM|Lesen\":61.2,\"GPU|REND\":131.2},\"Ordner\":\"Berichte\\\\X_").Append(datum.Replace(" ", "_").Replace(":", "")).Append("\"");
+        if (mitBefunden) b.Append(",\"Befunde\":{\"Kritisch\":1,\"Warnungen\":1,\"Hinweise\":2,\"Liste\":[\"[HINWEIS] Start: Schnellstart ist aktiv.\",\"[WARNUNG] RAM: XMP inaktiv: 2133 statt 3200 MT/s.\",\"[KRITISCH] Laufwerk: SMART meldet Fehler.\",\"[HINWEIS] Treiber: alt.\"]}");
+        if (mitVergleich) b.Append(",\"Vergleich\":{\"Referenz\":\"Median Desktop-PCs (7 Systeme)\",\"Stand\":\"2026-11-10\",\"Gruppen\":{\"CPU\":103,\"GPU\":237,\"RAM\":174}}");
+        b.Append("}");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(System.IO.Path.Combine(d, "Datenbank"), pc + "_" + datum.Replace("-", "").Replace(" ", "_").Replace(":", "") + ".json"), b.ToString(), new System.Text.UTF8Encoding(false));
+    }
+
+    static bool HatText(Control c, string teil)
+    {
+        if (c is Label && c.Text.IndexOf(teil, System.StringComparison.Ordinal) >= 0) return true;
+        foreach (Control k in c.Controls) if (HatText(k, teil)) return true;
+        return false;
+    }
+
+    // Gemeinsamer Rahmen der Seiten Benchmark und Diagnose: Spalten, Karte, Unterbereich, Felder mit Umbruch
+    static void ModulseiteRahmen()
+    {
+        int[] b = DiagGui.ModulSeite.SpaltenBreiten(UI.S(1100), UI.S(16));
+        Ist(b[0] > b[1] && b[0] + b[1] + UI.S(16) == UI.S(1100), "zwei Spalten füllen die Breite: " + b[0] + " + " + b[1]);
+        Ist(System.Math.Abs(b[0] * 100 / (b[0] + b[1]) - 60) <= 1, "links rund 60 %");
+        int[] s = DiagGui.ModulSeite.SpaltenBreiten(UI.S(880), UI.S(16));
+        Ist(s[0] == UI.S(880) && s[1] == UI.S(880), "unter 900 px eine Spalte in voller Breite");
+        DiagGui.ZeilenKarte k = new DiagGui.ZeilenKarte("Messungen");
+        using (k.Karte)
+        {
+            SettingRow r1 = k.Zeile(new SettingRow("Prozessor", "Einzel- und Mehrkern")), r2 = k.Zeile(new SettingRow("Grafik", "Rendertest"));
+            UnterBereich u = k.Zeile(new UnterBereich());
+            FeldReihe fr = new FeldReihe();
+            ComboBox c1 = new DarkComboBox(), c2 = new DarkComboBox(), c3 = new DarkComboBox(); c1.Width = UI.S(230); c2.Width = UI.S(120); c3.Width = UI.S(140);
+            fr.Feld("Grafikeinheit", c1); fr.Feld("Auflösung", c2); fr.Feld("Anzeige", c3);
+            u.Inhalt.Controls.Add(fr);
+            k.Breite(UI.S(640)); k.Karte.PerformLayout(); k.Breite(UI.S(640));
+            Ist(k.Karte.Width == UI.S(640) && r1.Width == k.Innenbreite && r2.Width == k.Innenbreite, "Zeilen in Innenbreite");
+            Ist(u.Width == k.Innenbreite - u.Margin.Horizontal && u.Margin.Left > 0, "Unterbereich eingerückt");
+            Ist(fr.Zeilen == 1, "drei Felder nebeneinander bei 640 px: " + fr.Zeilen);
+            int h1 = fr.Height;
+            k.Breite(UI.S(420)); k.Karte.PerformLayout(); k.Breite(UI.S(420));
+            Ist(fr.Zeilen == 2 && fr.Height > h1, "Umbruch bei 420 px: " + fr.Zeilen + " Zeilen");
+            k.Breite(UI.S(640)); k.Karte.PerformLayout(); k.Breite(UI.S(640));
+            Ist(fr.Zeilen == 1 && fr.Height == h1, "nach dem Verbreitern wieder eine Zeile und die alte Höhe");
+            k.MinHoehe = UI.S(900);
+            Ist(k.Karte.Height == UI.S(900), "Mindesthöhe für gleich hohe Karten");
+        }
+        using (SettingRow r = new SettingRow("Laufwerke", "Lesen und Schreiben"))
+        {
+            Ist(r.Icon == "", "ohne Symbol wie bisher");
+            r.Icon = UI.IcoDisk; r.Width = UI.S(500);
+            r.AddBadge(new Badge("läuft nebenher", "skip")); Badge d = new Badge("2 Min.", "skip"); r.AddBadge(d);
+            Ist(d.Right <= r.Toggle.Left && d.Left > r.Controls[1].Left, "Dauer steht direkt neben dem Schalter");
+            using (Bitmap bmp = new Bitmap(r.Width, r.Height)) r.DrawToBitmap(bmp, new Rectangle(0, 0, r.Width, r.Height));
+        }
+    }
+
+    static void LaufwerkszeileSchalter()
+    {
+        using (LaufwerkZeile z = new LaufwerkZeile("Samsung SSD 980 1TB", "NVMe", "C: 300 GB frei", true))
+        {
+            int n = 0; z.CheckedChanged += delegate { n++; };
+            Ist(z.Checked && z.Laufwerk == "Samsung SSD 980 1TB" && z.Anbindung == "NVMe", "Anfangszustand");
+            z.Checked = true; Ist(n == 0, "gleicher Wert meldet nichts");
+            z.Checked = false; Ist(!z.Checked && n == 1, "abgewählt, ein Ereignis");
+            z.Width = UI.S(420);
+            using (Bitmap bmp = new Bitmap(z.Width, z.Height)) z.DrawToBitmap(bmp, new Rectangle(0, 0, z.Width, z.Height));
+        }
+        using (LaufwerkZeile z = new LaufwerkZeile(null, null, null, false)) { z.Width = UI.S(200); using (Bitmap bmp = new Bitmap(z.Width, z.Height)) z.DrawToBitmap(bmp, new Rectangle(0, 0, z.Width, z.Height)); }
+    }
+
+    static void UmfangAuswahl()
+    {
+        using (FeldAuswahl f = new FeldAuswahl(new string[] { "Schnell", "Vollständig", "Eigene Auswahl" }, new string[] { "", "", "Prüfungen einzeln wählen" }))
+        {
+            int n = 0; f.SelectedChanged += delegate { n++; };
+            Ist(f.Count == 3 && f.Selected == 0, "drei Felder, erstes gewählt");
+            f.Selected = 2; Ist(f.Selected == 2 && n == 1, "Wahl mit Ereignis");
+            f.Selected = 2; f.Selected = 7; f.Selected = -1; Ist(f.Selected == 2 && n == 1, "gleiche und ungültige Wahl ohne Wirkung");
+            Ist(f.FeldBei(1) == 0 && f.FeldBei(f.Width / 2) == 1 && f.FeldBei(f.Width - 2) == 2 && f.FeldBei(f.Width + 5) == -1, "Feld an einer Stelle");
+            f.SetUnterzeile(0, "4 Prüfungen  ·  ca. 4 Min."); Ist(f.Unterzeile(0).StartsWith("4 Prüfungen"), "Unterzeile");
+            using (Bitmap bmp = new Bitmap(f.Width, f.Height)) f.DrawToBitmap(bmp, new Rectangle(0, 0, f.Width, f.Height));
+        }
+    }
+
+    // D.1 aus 4.07: Die Pillen der Kopfkarte behielten die Höhe des ersten, schmalen Aufbaus
+    static void UmbruchHoehe()
+    {
+        using (UmbruchPanel p = new UmbruchPanel())
+        {
+            p.Width = UI.S(220);
+            for (int i = 0; i < 6; i++) { PillLabel l = new PillLabel("Laufwerk " + i); l.Width = UI.S(100); p.Controls.Add(l); }
+            int schmal = p.Height;
+            Ist(p.Zeilen == 3 && schmal > 0, "schmal: drei Zeilen, " + p.Zeilen);
+            p.Width = UI.S(700);
+            Ist(p.Zeilen == 1 && p.Height < schmal && p.Height * 3 <= schmal + UI.S(4), "breit: eine Zeile und entsprechend niedriger (" + p.Height + " statt " + schmal + ")");
+            p.Controls.Clear();
+            Ist(p.Height == 0 && p.Zeilen == 0, "leer ohne Höhe");
+        }
+    }
+
+    static void ErgebnisBefundzeile()
+    {
+        string[] t = DiagGui.BefundTeile("[WARNUNG] RAM: XMP/EXPO inaktiv: Die Module laufen mit 2133 MT/s.");
+        Ist(t[0] == "WARNUNG" && t[1] == "RAM" && t[2] == "XMP/EXPO inaktiv: Die Module laufen mit 2133 MT/s.", "Stufe, Bereich, Text: " + System.String.Join("|", t));
+        t = DiagGui.BefundTeile("[kritisch] Laufwerk C: SMART meldet Fehler");
+        Ist(t[0] == "KRITISCH" && t[1] == "Laufwerk C" && t[2] == "SMART meldet Fehler", "Stufe in Großbuchstaben");
+        t = DiagGui.BefundTeile("freier Text"); Ist(t[0] == "" && t[2] == "freier Text", "ohne Klammer bleibt der Text");
+        Ist(DiagGui.BefundTeile(null)[2] == "", "leer");
+        Ist(DiagGui.DatumKurz("2026-11-10 14:20") == "10.11.2026 14:20" && DiagGui.DatumKurz("2026-11-10") == "10.11.2026" && DiagGui.DatumKurz("2026-11-10 14:20:33") == "10.11.2026 14:20", "Datum");
+        Ist(DiagGui.DatumKurz("gestern") == "gestern" && DiagGui.DatumKurz(null) == "", "unbekannte Form bleibt");
+        System.Collections.Generic.List<string[]> alle = new System.Collections.Generic.List<string[]>();
+        alle.Add(new string[] { "HINWEIS", "A", "h1" }); alle.Add(new string[] { "WARNUNG", "B", "w1" }); alle.Add(new string[] { "KRITISCH", "C", "k1" });
+        alle.Add(new string[] { "WARNUNG", "D", "w2" }); alle.Add(new string[] { "KRITISCH", "E", "k2" }); alle.Add(null);
+        System.Collections.Generic.List<string[]> w = DiagGui.WichtigeBefunde(alle);
+        Ist(w.Count == 4 && w[0][2] == "k1" && w[1][2] == "k2" && w[2][2] == "w1" && w[3][2] == "w2", "kritisch zuerst, sonst Reihenfolge des Laufs");
+    }
+
+    // Seite Benchmark: Schalter und Kontrollkästchen (Werte für Vorlagen und Start) bleiben gleich, Bereiche unter Grafik
+    // und Laufwerken nur bei eingeschalteter Messung, Zeitschätzung und Vorlagen wie vor dem Umbau
+    static void BenchmarkSeite()
+    {
+        string d = NeuerDatenordner();
+        try
+        {
+            using (DiagGui g = NeueOberflaeche(d, new string[] { "0|Samsung SSD 980 1TB|NVMe|SSD|931,5 GB|C:|0", "1|SanDisk Ultra|SATA|SSD|953,9 GB|D:|0", "2|Innostor|USB|Wechselmedium|28,9 GB|H:|1", "kaputt" }))
+            {
+                Ist(g.benchChk.Length == 4 && g.benchRows.Length == 4, "vier Messungen");
+                Ist(g.diskZeilen.Count == 3 && g.diskZeilen[0].Checked && g.diskZeilen[1].Checked && !g.diskZeilen[2].Checked, "Laufwerke: USB zunächst abgewählt, ungültige Zeile entfällt");
+                Ist(g.ModuleMinutes(1) == 2 + 1 + 2 + 2, "Schätzung 7 Min.: " + g.ModuleMinutes(1));
+                Ist(g.benchSeite.Anzahl.Text == "4 von 4 Messungen" && g.benchSeite.Dauer.Text == "ca. 7 Min.", "Seitenkopf: " + g.benchSeite.Anzahl.Text + ", " + g.benchSeite.Dauer.Text);
+                Ist(g.benchRows[3].Description.EndsWith("2 von 3 gewählt"), "Zeile Laufwerke nennt die Auswahl: " + g.benchRows[3].Description);
+                Ist(g.subGpuOffen && g.subDiskOffen, "Bereiche unter Grafik und Laufwerken offen");
+                // Schalter -> Wert
+                g.benchRows[2].Toggle.UserToggle();
+                Ist(!g.benchChk[2].Checked && !g.subGpuOffen && g.subDiskOffen, "Grafik aus: Wert folgt, Rendertest zu");
+                Ist(g.benchSeite.Anzahl.Text == "3 von 4 Messungen" && g.ModuleMinutes(1) == 5, "drei Messungen, 5 Min.");
+                // Wert -> Schalter (Vorlage)
+                g.benchChk[3].Checked = false;
+                Ist(!g.benchRows[3].Checked && !g.subDiskOffen && g.ModuleMinutes(1) == 3, "Laufwerke über den Wert aus: Schalter folgt, Liste zu");
+                g.benchChk[3].Checked = true; g.diskZeilen[2].Checked = true;
+                Ist(g.ModuleMinutes(1) == 6 && g.benchRows[3].Description.EndsWith("3 von 3 gewählt"), "dritter Datenträger zählt mit");
+                // Vorlagen mit den bisherigen Schlüsseln
+                System.Collections.Generic.Dictionary<string, object> v = g.CaptureSettings();
+                Ist(v.ContainsKey("Bench.CPU") && v.ContainsKey("Bench.Disk") && v.ContainsKey("Bench.Referenz") && v.ContainsKey("Gpu.Aufloesung") && v.ContainsKey("Gpu.Auswahl"), "Schlüssel der Vorlagen");
+                Ist(System.Convert.ToBoolean(v["Bench.GPU"]) == false && System.Convert.ToBoolean(v["Bench.Disk"]), "Werte der Vorlage");
+                System.Collections.Generic.Dictionary<string, object> alt = new System.Collections.Generic.Dictionary<string, object>();
+                alt["Bench.CPU"] = false; alt["Bench.RAM"] = true; alt["Bench.GPU"] = true; alt["Bench.Disk"] = false; alt["Gpu.Aufloesung"] = "1920x1080"; alt["Bench.Referenz"] = "Median:Desktop";
+                g.ApplySettings(alt);
+                Ist(!g.benchRows[0].Checked && g.benchRows[1].Checked && g.benchRows[2].Checked && !g.benchRows[3].Checked, "gespeicherte Vorlage stellt die Schalter");
+                Ist(g.subGpuOffen && !g.subDiskOffen && System.Convert.ToString(g.CaptureSettings()["Bench.Referenz"]) == "Median:Desktop" && System.Convert.ToString(g.CaptureSettings()["Gpu.Aufloesung"]) == "1920x1080", "Referenz und Rendertest aus der Vorlage");
+                g.ShowPage(2);
+                Ist(g.benchSeite.Breite > 0 && g.benchSeite.Spalten.Width == g.benchSeite.Breite, "Seite auf Seitenbreite geordnet");
+            }
+        }
+        finally { Raeume(d); }
+    }
+
+    // Seite Diagnose: Profil stellt die Schalter, ein umgelegter Schalter wählt die eigene Auswahl, Vorlagen wie bisher
+    static void DiagnoseSeite()
+    {
+        string d = NeuerDatenordner();
+        try
+        {
+            using (DiagGui g = NeueOberflaeche(d, null))
+            {
+                Ist(g.rbVoll.Checked && g.segUmfang.Selected == 1, "Vorgabe Vollständig");
+                Ist(g.diagRows.Length == 8 && g.diagChk.Length == 8, "acht Prüfungen");
+                foreach (SettingRow r in g.diagRows) Ist(r.Checked && r.Icon.Length > 0 && r.Title.Length > 0 && r.Description.Length > 0, "Zeile mit Symbol, Kurztitel, Beschreibung: " + r.Title);
+                Ist(g.diagSeite.Anzahl.Text == "8 von 8 Prüfungen", g.diagSeite.Anzahl.Text);
+                Ist(g.segUmfang.Unterzeile(0).StartsWith("4 Prüfungen") && g.segUmfang.Unterzeile(1).StartsWith("8 Prüfungen"), "Felder nennen Anzahl und Dauer: " + g.segUmfang.Unterzeile(0));
+                int voll = g.ModuleMinutes(0);
+                Ist(voll == 14 - 5, "Vollständig parallel 9 Min.: " + voll);
+                g.chkFast.Checked = false;
+                Ist(g.ModuleMinutes(0) == 14, "ohne parallele Ausführung 14 Min.");
+                g.chkFast.Checked = true;
+                // Auswahl des Umfangs -> Optionsfeld -> Schalter
+                g.segUmfang.Selected = 0;
+                Ist(g.rbSchnell.Checked && !g.rbVoll.Checked, "Schnell gewählt");
+                Ist(g.diagRows[0].Checked && g.diagRows[1].Checked && !g.diagRows[2].Checked && !g.diagRows[3].Checked && !g.diagRows[4].Checked && g.diagRows[5].Checked && g.diagRows[6].Checked && !g.diagRows[7].Checked, "Profil Schnell stellt die Schalter");
+                Ist(g.rbSchnell.Checked, "das Profil bleibt Schnell, auch wenn es Schalter umgestellt hat");
+                Ist(g.diagSeite.Anzahl.Text == "4 von 8 Prüfungen", g.diagSeite.Anzahl.Text);
+                // Schalter umlegen -> eigene Auswahl, die anderen Schalter bleiben
+                g.diagRows[2].Toggle.UserToggle();
+                Ist(g.rbCustom.Checked && g.segUmfang.Selected == 2, "umgelegter Schalter wechselt zur eigenen Auswahl");
+                Ist(g.diagChk[2].Checked && g.diagChk[0].Checked && !g.diagChk[3].Checked, "nur diese Prüfung geändert");
+                // Optionsfeld von außen (Vorlage, Startseite)
+                g.rbVoll.Checked = true;
+                Ist(g.segUmfang.Selected == 1 && !g.rbCustom.Checked, "Auswahl folgt dem Optionsfeld");
+                foreach (SettingRow r in g.diagRows) Ist(r.Checked, "Vollständig: alle an");
+                System.Collections.Generic.Dictionary<string, object> alt = new System.Collections.Generic.Dictionary<string, object>();
+                alt["Diag.Profil"] = "Benutzerdefiniert"; alt["Diag.Ereignisse"] = true; alt["Diag.Updatesuche"] = false; alt["Diag.Integritaet"] = false; alt["Diag.Defender"] = true;
+                alt["Diag.SmartLang"] = false; alt["Diag.Netzwerk"] = false; alt["Diag.RamTest"] = false; alt["Diag.Energieanalyse"] = false; alt["Diag.SchnellerModus"] = false; alt["Diag.Speicherdiagnose"] = true;
+                g.ApplySettings(alt);
+                Ist(g.rbCustom.Checked && g.segUmfang.Selected == 2, "Vorlage mit eigener Auswahl");
+                Ist(g.diagRows[0].Checked && !g.diagRows[1].Checked && g.diagRows[3].Checked && !g.diagRows[7].Checked && !g.chkFast.Checked, "Vorlage stellt Schalter und Ausführung");
+                System.Collections.Generic.Dictionary<string, object> v = g.CaptureSettings();
+                Ist(System.Convert.ToString(v["Diag.Profil"]) == "Benutzerdefiniert" && System.Convert.ToBoolean(v["Diag.Defender"]) && System.Convert.ToBoolean(v["Diag.Speicherdiagnose"]) && !System.Convert.ToBoolean(v["Diag.SchnellerModus"]), "Vorlage wieder gelesen");
+                alt.Clear(); alt["Diag.Profil"] = "Funktionstest";
+                g.ApplySettings(alt);
+                Ist(g.rbSchnell.Checked, "Vorlage vor v3.64 mit entfallenem Profil lädt als Schnell");
+            }
+            int n = 0; foreach (bool b in DiagGui.diagNebenher) if (b) n++;
+            Ist(DiagGui.diagNebenher.Length == 8 && n == 4, "vier Prüfungen laufen nebenher");
+        }
+        finally { Raeume(d); }
+    }
+
+    // Eintrag Ergebnis in der Seitenleiste, Rückkehr ohne Neuaufbau, Band auf der Seite Benchmark
+    static void ErgebnisSeitenleiste()
+    {
+        string d = NeuerDatenordner();
+        try
+        {
+            using (DiagGui g = NeueOberflaeche(d, null))
+            {
+                Ist(g.erg == null && !g.ergebnisNavSichtbar, "ohne Lauf kein Eintrag Ergebnis");
+                Ist(g.ergebnisPage > 5 && g.nav.Count == 11 && !g.nav.Contains(g.navErgebnis), "Ergebnis ist eine eigene Seite hinter den bisherigen, die Stellen der Module bleiben");
+                g.ZeigeLetztesErgebnis();
+                Ist(g.curPage != g.ergebnisPage, "ohne Ergebnis bleibt die Seite");
+                SchreibeLauf(d, "2026-11-10 14:20", true, true);
+                g.ReloadDb();
+                Ist(g.erg != null && g.ergebnisNavSichtbar && !g.erg.VomLauf, "mit Lauf in der Datenbank erscheint der Eintrag");
+                Ist(g.navErgebnis.Hint == g.erg.Score.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("de-DE")) && g.erg.Score > 0 && g.navErgebnis.HintPille, "Punktzahl als Pille: " + g.navErgebnis.Hint);
+                Ist(g.ergebnisAufbauten == 0, "Aufbau erst beim Öffnen der Seite");
+                g.ZeigeLetztesErgebnis();
+                Ist(g.curPage == g.ergebnisPage && g.navErgebnis.Selected && g.ergebnisAufbauten == 1, "Seite gezeigt, Eintrag markiert, einmal aufgebaut");
+                for (int i = 0; i < g.nav.Count; i++) Ist(!g.nav[i].Selected, "kein Modul markiert, solange das Ergebnis zu sehen ist");
+                g.ShowPage(3); Ist(!g.navErgebnis.Selected && g.nav[3].Selected, "Wechsel weg");
+                g.ShowPage(g.ergebnisPage);
+                Ist(g.ergebnisAufbauten == 1, "Rückkehr ohne Neuaufbau");
+                // Referenz ändern: Seite Benchmark mit Band, das Band gilt bis zum nächsten Seitenwechsel
+                g.ZeigeReferenzwahl();
+                Ist(g.curPage == 2 && g.bandErgGezeigt, "Seite Benchmark mit Band");
+                Ist(HatText(g.bandErg, "10.11.2026 14:20") && HatText(g.bandErg, "Punkte") && HatText(g.bandErg, "ab dem nächsten Lauf"), "Band nennt Datum, Punktzahl und den Hinweis zur Referenz");
+                g.ZeigeLetztesErgebnis();
+                Ist(g.curPage == g.ergebnisPage && !g.bandErgGezeigt && g.ergebnisAufbauten == 1, "zurück zum Ergebnis, Band weg, kein Neuaufbau");
+                g.ZeigeReferenzwahl(); g.ShowPage(2);
+                Ist(!g.bandErgGezeigt, "Seite Benchmark über die Seitenleiste: ohne Band");
+                // neuer Lauf in der Datenbank: Seite baut einmal neu
+                SchreibeLauf(d, "2026-11-11 09:00", false, true);
+                g.ReloadDb(); g.ShowPage(g.ergebnisPage);
+                Ist(g.erg.Datum == "2026-11-11 09:00" && g.ergebnisAufbauten == 2, "neuer letzter Lauf, ein weiterer Aufbau");
+            }
+        }
+        finally { Raeume(d); }
+    }
+
+    // Ergebnis aus einem Datenbankeintrag mit den Feldern von 4.08 und aus älteren Einträgen ohne sie
+    static void ErgebnisDatenbank()
+    {
+        string d = NeuerDatenordner();
+        try
+        {
+            using (DiagGui g = NeueOberflaeche(d, null))
+            {
+                SchreibeLauf(d, "2026-11-10 14:20", true, true);
+                g.ReloadDb(); g.ZeigeLetztesErgebnis();
+                Ist(g.erg.HatVergleich && g.erg.Pct.Count == 3 && g.erg.Pct["CPU"] == 103 && g.erg.Pct["GPU"] == 237 && g.erg.Pct["RAM"] == 174, "Prozent je Gruppe wie gespeichert");
+                Ist(g.erg.RefName == "Median Desktop-PCs (7 Systeme)", "Name der Referenz: " + g.erg.RefName);
+                Ist(g.erg.NK == 1 && g.erg.NW == 1 && g.erg.NI == 2 && g.erg.Befunde.Count == 2 && g.erg.Befunde[0][0] == "KRITISCH" && g.erg.Befunde[1][1] == "RAM", "Befunde: kritisch zuerst, Hinweise nicht in der Liste");
+                Ist(g.lblResVerdict.Text == "1 kritischer Befund", g.lblResVerdict.Text);
+                Ist(HatText(g.kResCmp.Karte, "100 % = Median Desktop-PCs (7 Systeme)") && HatText(g.kResCmp.Karte, "103 %") && HatText(g.kResCmp.Karte, "nicht gemessen"), "Vergleich mit Referenz, Werten und der nicht gemessenen Gruppe");
+                Ist(HatText(g.kResFind.Karte, "SMART meldet Fehler") && HatText(g.kResFind.Karte, "XMP inaktiv"), "Befunde stehen in der Karte");
+                Control letzter = g.kResFind.Inhalt.Controls[g.kResFind.Inhalt.Controls.Count - 1];
+                Ist(letzter == g.lnkResAll, "der Verweis auf den Bericht steht unter den Befunden");
+                Ist(g.pnlResTiles.Controls.Count == 3, "Kacheln nur für gemessene Komponenten: " + g.pnlResTiles.Controls.Count);
+                Ist(g.pnlDashPills.Controls.Count == 4 && g.pnlDashPills.Height > 0 && g.cardResHero.Height < UI.S(160), "Kopfkarte ohne Leerraum: " + g.cardResHero.Height);
+                Ist(g.resultDashboard.Height > g.pnlResTiles.Bottom, "Seite reicht bis unter die Knöpfe");
+
+                // Lauf vor 4.08: Befunde gespeichert, Vergleich nicht
+                SchreibeLauf(d, "2026-11-11 08:00", false, true);
+                g.ReloadDb();
+                Ist(!g.erg.HatVergleich && g.erg.Pct.Count == 0 && g.erg.RefName == "", "ohne Feld Vergleich keine Prozentwerte");
+                Ist(HatText(g.kResCmp.Karte, "nicht gespeichert") && HatText(g.kResCmp.Karte, "Bericht") && !HatText(g.kResCmp.Karte, "100 % ="), "statt Zahlen steht, was fehlt");
+                Ist(g.erg.Befunde.Count == 2 && g.pnlResTiles.Controls.Count == 3, "Befunde und Kacheln bleiben");
+
+                // Eintrag ohne Befunde (Import): nichts erfinden
+                SchreibeLauf(d, "2026-11-12 08:00", false, false);
+                g.ReloadDb();
+                Ist(g.erg.NK < 0 && g.erg.Befunde.Count == 0 && g.lblResVerdict.Text == "Befunde nicht gespeichert", "ohne Befunde: " + g.lblResVerdict.Text);
+                Ist(HatText(g.kResFind.Karte, "nicht gespeichert"), "Karte nennt das Fehlen");
+            }
+            // Lesen der Datenbank selbst: alte Einträge bleiben vollständig, neue Felder sind optional
+            SchreibeLauf(d, "2026-11-09 08:00", true, true);
+            System.Collections.Generic.List<DbEntry> l = DbEntry.Load(System.IO.Path.Combine(d, "Datenbank"));
+            Ist(l.Count == 4, "vier Einträge");
+            int mit = 0; foreach (DbEntry e in l) { Ist(e.HasBench && e.Get("CPU|MT") == 32433, "Werte gelesen"); if (e.HatVergleich) mit++; else Ist(e.GruppenPct.Count == 0 && e.RefName == "", "ohne Feld leer"); }
+            Ist(mit == 2, "zwei Einträge mit Vergleich: " + mit);
+            foreach (string f in System.IO.Directory.GetFiles(System.IO.Path.Combine(root, "tests/Daten/Datenbank".Replace('/', System.IO.Path.DirectorySeparatorChar)), "*.json"))
+            {
+                string ziel = System.IO.Path.Combine(System.IO.Path.Combine(d, "Datenbank"), System.IO.Path.GetFileName(f)); System.IO.File.Copy(f, ziel, true);
+            }
+            l = DbEntry.Load(System.IO.Path.Combine(d, "Datenbank"));
+            Ist(l.Count == 7, "Einträge im Format 1 und 2 nebeneinander: " + l.Count);
+            foreach (DbEntry e in l) if (e.Computer == "TORRENT") Ist(!e.HatVergleich && e.NW >= 0 && e.BefundListe.Count > 0, "Eintrag im Format 1: Befunde gelesen, kein Vergleich");
+        }
+        finally { Raeume(d); }
     }
 }

@@ -2,6 +2,24 @@
 
 Alle wesentlichen Änderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v4.08 (12.11.2026)
+
+### Neu
+* **Ergebnis als Seite:** Eintrag „Ergebnis“ in der Seitenleiste unter Start mit der Punktzahl; die Seite bleibt erreichbar, die Fußleiste bleibt sichtbar, die Bewegung läuft nur beim ersten Anzeigen nach einem Lauf.
+* **Letzter Lauf aus der Datenbank:** Nach dem Programmstart zeigt „Ergebnis“ den letzten Lauf dieses PCs; Startseite und Seite Benchmark führen dorthin.
+* **Zurück zum Ergebnis:** „Referenz ändern“ öffnet die Seite Benchmark mit einem Band, das zurückführt. „Erneut messen“ ersetzt „Zurück“.
+* **Datenbank:** Der Lauf speichert den Vergleich mit der Referenz (Name, Prozent je Gruppe) als optionales Feld, Format weiter PC-Diagnose-DB/2. Ältere Läufe zeigen „nicht gespeichert“.
+* **Startfenster:** zeigt die Version des geladenen Skripts und nennt die Abweichung, wenn neben LMB.exe ein Skript einer anderen Version liegt.
+
+### Verbessert
+* **Seite Benchmark:** Karte Messungen mit Zeilen und Schaltern, Rendertest und Laufwerke unter ihrer Messung, rechts Referenz und letztes Ergebnis, ganze Breite.
+* **Seite Diagnose:** Umfang als Auswahl mit drei Feldern, Prüfungen immer sichtbar als Zeilen mit Schalter und Dauer, rechts Ausführung, Zusätze, Zeiträume.
+* **Gemeinsamer Rahmen** für beide Seiten (DiagGui_Modulseite.cs), unter 900 px Seitenbreite eine Spalte. Vorlagen, Zeitschätzung und Startparameter unverändert.
+
+### Behoben
+* **Ergebnisseite:** Kopfkarte unter Windows unten rund 130 px leer (Bildlaufleiste, Titel abgeschnitten); „Alle Befunde im Bericht“ über statt unter dem Text; zuletzt gewähltes Modul blieb markiert; „100 % =“ nannte den Namen der gespeicherten Referenz nicht.
+* **Startprogramm:** Ein zweiter Start von LMB.exe hielt die Dateien einer laufenden Instanz für Reste (Prozessname LMB statt LeosMinibench).
+
 ## v4.07 (10.11.2026)
 
 ### Neu

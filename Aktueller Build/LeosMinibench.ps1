@@ -247,7 +247,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
 }
 #endregion
 
-$ScriptVersion = '4.07'
+$ScriptVersion = '4.08'
 $AppName       = 'Leos Minibench'
 # Eingebettete Referenzprofile für Leos Minibench (v3.0)
 $script:EmbeddedReferences = @{
@@ -6363,13 +6363,13 @@ public partial class DiagGui : Form
     List<DbEntry> db = new List<DbEntry>();
     Font wsBold;
 
-    Panel setupView, runView, content, head, body, contentHost, mainArea, resultDashboard;
+    Panel setupView, runView, content, head, body, contentHost, mainArea;
+    internal Panel resultDashboard;
     TableLayoutPanel foot;
     PillButton pillPresetMin, pillPresetLeo, pillPresetAdv, pillPresetReset;
     FlowLayoutPanel pnlPresetPills, pnlCustomPresets;
-    Button btnDashBack, btnDashOpenHtml, btnDashFolder, btnDashKi, btnDashVerlauf;
+    Button btnDashOpenHtml, btnDashFolder, btnDashKi, btnDashVerlauf;
     Label lblDashTitle, lblDashMeta;
-    FlowLayoutPanel pnlDashPills;
 
     List<PillButton> optPresetPills = new List<PillButton>();
     Dictionary<string, CategoryPickerItem> optPickers = new Dictionary<string, CategoryPickerItem>();
@@ -6386,14 +6386,13 @@ public partial class DiagGui : Form
     FlowLayoutPanel fo;
     Panel[] modBanners = new Panel[6];
     Badge badgeSensStatus;
-    List<NavItem> nav = new List<NavItem>();
+    internal List<NavItem> nav = new List<NavItem>();
     List<Control> pages = new List<Control>();
-    int curPage;
+    internal int curPage;
 #pragma warning restore 414
 
     // Diagnose
-    RadioButton rbSchnell, rbVoll, rbCustom;
-    Label lblDiagProfil;
+    internal RadioButton rbSchnell, rbVoll, rbCustom;
     string[] diagKeys = new string[] { "Ereignisse", "Updatesuche", "Integritaet", "Defender", "SmartLang", "Netzwerk", "RamTest", "Energieanalyse" };
     string[] diagText = new string[] {
         "Ereignisprotokolle, Bluescreens, Absturzabbilder, Zuverlässigkeit",
@@ -6404,7 +6403,7 @@ public partial class DiagGui : Form
         "Netzwerktest: Ping, DNS, HTTPS, Download",
         "RAM-Mustertest unter Windows",
         "Energieeffizienzanalyse (60 s) und DxDiag-Bericht" };
-    CheckBox[] diagChk;
+    internal CheckBox[] diagChk;
     CheckBox chkInstall, chkMem;
     ComboBox cmbDays, cmbSmartMax;
     static readonly int[] smartMinutes = new int[] { 30, 60, 90, 120, 180, 240, 360 };
@@ -6451,17 +6450,15 @@ public partial class DiagGui : Form
     ComboBox cmbGpuSel, cmbLGpuSel;
     List<string> gpuSelValues = new List<string>();
     // Schneller Modus (ab v2.6): parallele Prüfungen der Diagnose
-    CheckBox chkFast;
-    GroupHeader diagToggle;
-    FlowLayoutPanel diagBody;
+    internal CheckBox chkFast;
     Label lblPar;
     Dictionary<string, string[]> parJobs = new Dictionary<string, string[]>();
     List<string> parOrder = new List<string>();
     // Benchmark
     string[] benchKeys = new string[] { "CPU", "RAM", "GPU", "Disk" };
     string[] benchText = new string[] { "Prozessor", "Arbeitsspeicher", "Grafik", "Laufwerke" };
-    CheckBox[] benchChk;
-    CheckedListBox clbDisks, clbCompare;
+    internal CheckBox[] benchChk;
+    CheckedListBox clbCompare;
     List<string> diskNums = new List<string>();
     ComboBox cmbRef;
     Label lblRefState;
@@ -6697,14 +6694,8 @@ public partial class DiagGui : Form
         FlowLayoutPanel hr = new FlowLayoutPanel(); hr.Dock = DockStyle.Right; hr.AutoSize = true; hr.FlowDirection = FlowDirection.RightToLeft; hr.WrapContents = false; hr.BackColor = Color.Transparent; hr.Padding = new Padding(0, UI.S(12), UI.S(14), 0);
         Button btnInfo = HeadButton(UI.IcoInfo);
         btnInfo.Click += delegate {
-            if (!running && versionPage >= 0) {
-                if (resultDashboard != null && resultDashboard.Visible) {
-                    resultDashboard.Visible = false;
-                    contentHost.Visible = true;
-                    if (foot != null) foot.Visible = true;
-                }
-                ShowPage(versionPage);
-            }
+            // ab v4.08 ist das Ergebnis eine Seite: Von der Seite Versionen führt der Eintrag Ergebnis wieder zurück
+            if (!running && versionPage >= 0) ShowPage(versionPage);
         };
         Tip(btnInfo, "Info und Versionshistorie: was sich von Version 1.0 bis " + this.version + " geändert hat.");
         hr.Controls.Add(btnInfo);
@@ -6736,8 +6727,8 @@ public partial class DiagGui : Form
         setupView = BuildSetup();
         StartLog.Phase(seitenZeiten.Length > 0 ? "Seiten aufgebaut (" + seitenZeiten + ")" : "Seiten aufgebaut");
         runView = BuildRun();
-        resultDashboard = (Panel)BuildResultDashboard();
         FillPresets(true);
+        LadeErgebnisAusDatenbank();
         if (LoadStartPagePreference()) ShowPage(0);
         else if (curPage == 0) ShowPage(1);
         UpdateSensStatusBadge();
@@ -6750,12 +6741,10 @@ public partial class DiagGui : Form
         contentHost.Dock = DockStyle.Fill;
         if (foot != null) foot.Dock = DockStyle.Bottom;
         runView.Dock = DockStyle.Fill; runView.Visible = false;
-        resultDashboard.Dock = DockStyle.Fill; resultDashboard.Visible = false;
 
         mainArea.Controls.Add(contentHost);
         if (foot != null) mainArea.Controls.Add(foot);
         mainArea.Controls.Add(runView);
-        mainArea.Controls.Add(resultDashboard);
         Controls.Add(body); Controls.Add(head);
 
         FormClosing += OnClosing;
@@ -6836,11 +6825,13 @@ public partial class DiagGui : Form
         dbVor = null; changesVor = null; dbVorThread = null; changesVorThread = null;
     }
 
-    void ReloadDb()
+    internal void ReloadDb()
     {
         LoadDb();
         FillDbList();
         FillRefLists();
+        FuelleLetztesErgebnis();
+        LadeErgebnisAusDatenbank();
         FillChangeList();
         UpdateSensTools();
         if (lblDbPath != null) SetText(lblDbPath, NasAblage.AblageText(dataDir));
@@ -6911,6 +6902,13 @@ public partial class DiagGui : Form
         navChg = new NavItem("Änderungen", "Protokoll und Rückgängig", UI.IcoChg); navChg.HasCheck = false; Tip(navChg, "Änderungsprotokoll: was Leos Minibench an diesem PC verändert hat, mit Rückgängig."); nav.Add(navChg);
 
         left.Controls.Add(navStart);
+        // ab v4.08: Ergebnis direkt unter Start, sichtbar sobald es ein Ergebnis gibt (letzter Lauf dieses PCs aus der
+        // Datenbank oder der Lauf von eben). Der Eintrag steht außerhalb der Liste nav, deren Stellen den Seiten 0 bis 10
+        // und den Modulen entsprechen.
+        navErgebnis = new NavItem("Ergebnis", "", UI.IcoErgebnis); navErgebnis.HasCheck = false; navErgebnis.HintPille = true; navErgebnis.Visible = false;
+        Tip(navErgebnis, "Ergebnis des letzten Laufs mit Urteil, Vergleich zur Referenz und den Hauptwerten je Komponente.");
+        navErgebnis.Picked += delegate { if (!running && erg != null && ergebnisPage >= 0) ShowPage(ergebnisPage); };
+        left.Controls.Add(navErgebnis);
         Label lm = SideHead("Ablauf"); lm.Margin = new Padding(UI.S(4), UI.S(UI.Abstand4), 0, UI.S(6)); left.Controls.Add(lm);
         for (int i = 1; i < nav.Count; i++)
         {
@@ -6926,18 +6924,12 @@ public partial class DiagGui : Form
                     if (nav[idx] == navSens && tabs != null) tabs.Selected = 3;
                     return;
                 }
-                if (resultDashboard != null && resultDashboard.Visible)
-                {
-                    resultDashboard.Visible = false;
-                    contentHost.Visible = true;
-                    if (foot != null) foot.Visible = true;
-                }
                 ShowPage(idx);
             };
             nav[i].CheckedChanged += delegate { UpdateSummary(); };
         }
         // ab v2.8 acht Einträge: bei kleinem Fenster mit senkrechter Bildlaufleiste schmaler statt waagerecht zu scrollen
-        left.Layout += delegate { int w = left.ClientSize.Width - left.Padding.Horizontal - 2; if (w > UI.S(150)) foreach (NavItem n in nav) if (n.Width != w) n.Width = w; };
+        left.Layout += delegate { int w = left.ClientSize.Width - left.Padding.Horizontal - 2; if (w > UI.S(150)) { foreach (NavItem n in nav) if (n.Width != w) n.Width = w; if (navErgebnis.Width != w) navErgebnis.Width = w; } };
 
         content = new Panel(); content.Dock = DockStyle.Fill; content.BackColor = UI.Panel; content.Padding = new Padding(UI.S(UI.Seitenrand), UI.S(UI.Seitenrand), UI.S(UI.Seitenrand), UI.S(20)); content.AutoScroll = true;
         contentHost = new Panel(); contentHost.Dock = DockStyle.Fill; contentHost.BackColor = UI.Line; contentHost.Padding = new Padding(1);
@@ -6957,6 +6949,7 @@ public partial class DiagGui : Form
         pages.Add(BuildDbPage()); SeitenZeit(sbSeiten, swSeite, "Datenbank");
         pages.Add(BuildChangePage()); SeitenZeit(sbSeiten, swSeite, "Änderungen");
         versionPage = pages.Count; pages.Add(BuildVersionPage()); SeitenZeit(sbSeiten, swSeite, "Versionen");
+        resultDashboard = (Panel)BuildResultDashboard(); ergebnisPage = pages.Count; pages.Add(resultDashboard); SeitenZeit(sbSeiten, swSeite, "Ergebnis");
         seitenZeiten = sbSeiten.ToString();
         // ab v3.64 einheitlicher Seitenrand: Seiten ohne Dock stehen an der Position des Innenabstands (vorher bei 0,0,
         // dort wirkte der Innenabstand des Bildlaufbereichs nicht und der Titel klebte am Rahmen)
@@ -7064,6 +7057,9 @@ public partial class DiagGui : Form
         Tip(rbVoll, "Alle Prüfungen der Liste, ca. " + DiagMinutes(diagVoll) + " Min., mit SMART-Langtest länger.");
         Tip(rbSchnell, "Inventar, Ereignisse, Updatesuche, Netzwerk und ein kurzer RAM-Test (25 % des freien RAM, ein Durchlauf), ca. " + DiagMinutes(diagSchnell) + " Min.");
         Tip(rbCustom, "Die Prüfungen unten frei wählen.");
+        Tip(segUmfang, "Umfang der Diagnose. Schnell: Inventar, Ereignisse, Updatesuche, Netzwerk und ein kurzer RAM-Test (25 % des freien RAM, ein Durchlauf). Vollständig: alle Prüfungen der Liste, mit SMART-Langtest länger. Eigene Auswahl: Prüfungen einzeln wählen; wer einen Schalter umlegt, wechselt dorthin.");
+        Tip(lnkDiagAll, "Schaltet alle Prüfungen ein und wechselt zur eigenen Auswahl.");
+        Tip(lnkDiagNone, "Schaltet alle Prüfungen aus und wechselt zur eigenen Auswahl; es läuft dann nur das Inventar.");
         Tip(chkFast, "Lesende Prüfungen ohne Messcharakter (Updatesuche, Defender, Energieanalyse, Start des SMART-Langtests) laufen nebenher. Messungen wie RAM-Test, Netzwerk, Benchmark und Lasttest warten immer, bis alles andere fertig ist.");
         for (int i = 0; diagChk != null && i < diagChk.Length && i < diagKeys.Length; i++) { string t; if (diagTips.TryGetValue(diagKeys[i], out t)) Tip(diagChk[i], t); }
         Tip(chkInstall, "smartctl liefert SMART-Werte und den Langtest. Liegt es im Tools-Ordner des Datenordners, wird es von dort verwendet, sonst per winget geholt und nach dem Lauf entfernt (oder auf Wunsch behalten). Risikostufe Eingriff.");
@@ -7072,7 +7068,8 @@ public partial class DiagGui : Form
         Tip(cmbSmartMax, "So lange wartet der Lauf auf das Ergebnis des SMART-Langtests. Danach entsteht der Bericht ohne Langtest; der Test läuft im Laufwerk weiter.");
         // Benchmark
         for (int i = 0; benchChk != null && i < benchChk.Length && i < benchKeys.Length; i++) { string t; if (benchTips.TryGetValue(benchKeys[i], out t)) Tip(benchChk[i], t); }
-        Tip(clbDisks, "Laufwerke für den Laufwerks-Benchmark. Gemessen wird auf dem Volume mit dem meisten freien Platz; USB-Datenträger sind zunächst abgewählt.");
+        Tip(lnkBenchAll, "Schaltet alle vier Messungen ein.");
+        Tip(lnkBenchNone, "Schaltet alle Messungen aus.");
         Tip(cmbGpuSel, "Welche Grafikeinheiten der Rendertest belastet: alle, nur die Grafikkarte, nur die Prozessorgrafik oder eine bestimmte. Gilt für Benchmark und Lasttest.");
         Tip(cmbGpuRes, "Auflösung des Rendertests. Bilder/s sind nur bei gleicher Auflösung vergleichbar, die Punktzahl auch über Auflösungen.");
         Tip(cmbGpuShow, "Fenster: Vorschau des Rendertests. Vollbild: erste Grafikeinheit im Vollbild. Ohne Anzeige: misst unsichtbar (Esc entfällt).");
@@ -7151,20 +7148,25 @@ public partial class DiagGui : Form
         Tip(tabs, "Befunde: Ergebnisse nach Dringlichkeit. Tests: jede Prüfung mit Ergebnis. Leistung: Benchmark-Werte. Sensoren: Kurven von Benchmark und Lasttest. Protokoll: Ausgabe des Laufs.");
     }
 
-    void ShowPage(int i)
+    internal void ShowPage(int i)
     {
         // ab v4.07: kurze Überblendung von der bisherigen Seite (nur bei sichtbarem Fenster und erlaubter Bewegung)
         // Die Seite Versionen bleibt außen vor: Ihr Textfeld (RichTextBox) lässt sich nicht als Bild aufnehmen.
         Bitmap vorher = (i != curPage && content != null && i != versionPage && curPage != versionPage) ? Ueberblendung.Aufnahme(content) : null;
         curPage = i;
         for (int k = 0; k < nav.Count; k++) nav[k].Selected = (k == i);
+        if (navErgebnis != null) navErgebnis.Selected = (i == ergebnisPage);
+        // Band "Zurück zum Ergebnis" der Seite Benchmark gilt nur bis zum nächsten Seitenwechsel
+        if (bandErgGezeigt) VerbergeErgebnisBand();
         content.AutoScrollPosition = new Point(0, 0);
         for (int k = 0; k < pages.Count; k++) pages[k].Visible = (k == i);
+        if (i == ergebnisPage) ErgebnisSeiteGezeigt();
         // ab v4.0: Auf Werkzeugseiten (Tools bis Versionen) nur Ablaufzeile und Startknopf, ohne Vorlagen
         if (fo != null && foot != null) { bool modulSeite = i <= 5; if (fo.Visible != modulSeite) { fo.Visible = modulSeite; foot.Height = UI.S(modulSeite ? 76 : 62); } }
         if (i == 3) UpdateLoadExtras();
         // ab v4.05: installierte Softwarepakete beim ersten Öffnen der Seite Tools im Hintergrund erkennen
         if (i == 6) { if (!paketGeprueft) StartSoftwareStateCheck(); if (toolsLayout != null) toolsLayout(); }
+        if (i == 1 || i == 2) OrdneModulSeiten();
         ApplyNativeControlThemes();
         if (vorher != null) Ueberblendung.Starte(content, vorher);
     }
@@ -7308,6 +7310,8 @@ public partial class DiagGui : Form
         else if (k == "neustart") Tip(b, b.Text == "Neustart" ? "Wird erst nach einem Neustart vollständig wirksam." : "Kann einen Neustart brauchen, je nach Zustand des PCs.");
         else if (k == "verwaltet") Tip(b, "Berührt Gruppenrichtlinien oder zentrale Verwaltung; auf Domänen-PCs nicht in den Vorlagen.");
         else if (k == "zustand") Tip(b, "Zustand auf diesem PC, beim Start im Hintergrund gelesen oder vom letzten Lauf.");
+        else if (k == "dauer") Tip(b, "Geschätzte Dauer, wenn dieser Punkt eingeschaltet ist.");
+        else if (k == "nebenher") Tip(b, "Läuft bei paralleler Ausführung neben den übrigen Prüfungen und verlängert die Diagnose dann nicht.");
     }
 
     // ab v3.65: Gruppen als abgerundete Karten (CardPanel) wie die Werkzeugkarten
@@ -7384,7 +7388,6 @@ public partial class DiagGui
         if (lvDb != null && lvDb.IsHandleCreated) try { SetWindowTheme(lvDb.Handle, subApp, null); } catch { }
         if (lvSens != null && lvSens.IsHandleCreated) try { SetWindowTheme(lvSens.Handle, subApp, null); } catch { }
         if (lvChg != null && lvChg.IsHandleCreated) try { SetWindowTheme(lvChg.Handle, subApp, null); } catch { }
-        if (clbDisks != null && clbDisks.IsHandleCreated) try { SetWindowTheme(clbDisks.Handle, subApp, null); } catch { }
         if (clbCompare != null && clbCompare.IsHandleCreated) try { SetWindowTheme(clbCompare.Handle, subApp, null); } catch { }
         if (txtLog != null && txtLog.IsHandleCreated) try { SetWindowTheme(txtLog.Handle, subApp, null); } catch { }
         ApplyNativeThemeRecursive(this, subApp);
@@ -7492,6 +7495,10 @@ public partial class DiagGui
             // ab v3.64: Warnfelder und gedämpfte Beschriftungen tragen eigene Farben
             foreach (Label w in new Label[] { lblAkku, lblRestoreWarn }) if (w != null) { w.ForeColor = UI.Warn; w.BackColor = UI.WarnBg; }
             foreach (Panel b in modBanners) if (b != null) { b.BackColor = UI.InfoBg; foreach (Control k in b.Controls) { if (k is LinkLabel) ((LinkLabel)k).LinkColor = UI.Accent; else k.ForeColor = UI.Text; } }
+            if (bandErg != null) { bandErg.BackColor = UI.AccentSoft; if (lblBandErg != null) lblBandErg.ForeColor = UI.Text; }
+            // ab v4.08: Zeile zur Referenz und die aufgebaute Ergebnisseite tragen eigene Farben (Warnung, Urteil): neu setzen
+            UpdateRefState(); FuelleLetztesErgebnis();
+            if (erg != null && ergebnisAufbauten > 0 && !ergVeraltet) FuelleErgebnis();
             UpdateLoadEnabled(); ThemeLog();
             if (barAll != null && !done) barAll.Fill = UI.Accent;
             if (barSub != null) barSub.Fill = UI.AccentActive;
@@ -7525,7 +7532,7 @@ public partial class DiagGui
             c.BackColor = UI.Bg;
             c.Invalidate();
         }
-        else if (c is FluentCard || c is ToolRow || c is StartTaskCard || c is SettingRow || c is CategoryPickerItem)
+        else if (c is FluentCard || c is ToolRow || c is StartTaskCard || c is SettingRow || c is CategoryPickerItem || c is LaufwerkZeile || c is FeldAuswahl)
         {
             c.BackColor = UI.Panel;
             c.Invalidate();
@@ -8642,6 +8649,215 @@ public partial class DiagGui
         }
     }
 }
+// Gemeinsamer Rahmen der Modulseiten Benchmark und Diagnose (ab v4.08, Teilklasse DiagGui)
+public partial class DiagGui
+{
+    // Karte mit Titel, optionalen Verweisen rechts im Kopf und Inhalt untereinander. Zeilen, Unterbereiche und Auswahllisten
+    // bekommen die Innenbreite der Karte, Texte brechen an ihr um; die Höhe folgt dem Inhalt.
+    public class ZeilenKarte
+    {
+        public readonly CardPanel Karte = new CardPanel();
+        public readonly FlowLayoutPanel Inhalt = new FlowLayoutPanel();
+        public readonly Panel Kopf = new Panel();
+        public readonly Label Titel;
+        public readonly FlowLayoutPanel KopfRechts = new FlowLayoutPanel();
+        List<Control> breit = new List<Control>();
+
+        public ZeilenKarte(string titel)
+        {
+            Karte.AutoSize = false; Karte.Padding = new Padding(UI.S(16), UI.S(12), UI.S(16), UI.S(10)); Karte.Margin = new Padding(0, 0, 0, UI.S(UI.Abstand3));
+            // GrowAndShrink: in einem Panel ohne eigenes Layout schrumpft ein Element mit AutoSize sonst nie unter seine Startgröße
+            Inhalt.FlowDirection = FlowDirection.TopDown; Inhalt.WrapContents = false; Inhalt.AutoSize = true; Inhalt.AutoSizeMode = AutoSizeMode.GrowAndShrink; Inhalt.BackColor = UI.Panel; Inhalt.Margin = new Padding(0);
+            Inhalt.Location = new Point(Karte.Padding.Left, Karte.Padding.Top);
+            Kopf.BackColor = UI.Panel; Kopf.Height = UI.S(26); Kopf.Margin = new Padding(0, 0, 0, UI.S(6));
+            Titel = Lbl(titel, UI.SchriftGruppe + 0.5f, true, UI.Text); Titel.Location = new Point(0, UI.S(1)); Titel.Margin = new Padding(0);
+            KopfRechts.AutoSize = true; KopfRechts.AutoSizeMode = AutoSizeMode.GrowAndShrink; KopfRechts.WrapContents = false; KopfRechts.BackColor = UI.Panel; KopfRechts.Margin = new Padding(0);
+            Kopf.Controls.Add(Titel); Kopf.Controls.Add(KopfRechts);
+            EventHandler lage = delegate { KopfRechts.Location = new Point(Math.Max(Titel.Right + UI.S(8), Kopf.Width - KopfRechts.Width), UI.S(3)); };
+            Kopf.Resize += lage; KopfRechts.SizeChanged += lage;
+            Inhalt.Controls.Add(Kopf); breit.Add(Kopf);
+            Inhalt.SizeChanged += delegate { Passe(); };
+            Karte.Controls.Add(Inhalt);
+        }
+
+        // Element über die ganze Innenbreite (Zeile, Unterbereich, Auswahlliste)
+        public T Zeile<T>(T c) where T : Control { Inhalt.Controls.Add(c); breit.Add(c); return c; }
+        // Element in seiner eigenen Breite (Knopf, Verweis); Texte brechen an der Innenbreite um
+        public T Frei<T>(T c) where T : Control { Inhalt.Controls.Add(c); return c; }
+
+        // Inhalt bis auf den Kopf entfernen (Ergebnisseite baut ihre Karten je Ergebnis neu); behalten nennt Elemente,
+        // die wiederverwendet und deshalb nicht freigegeben werden
+        public void Leere(params Control[] behalten)
+        {
+            Inhalt.SuspendLayout();
+            while (Inhalt.Controls.Count > 1)
+            {
+                Control c = Inhalt.Controls[1]; Inhalt.Controls.RemoveAt(1); breit.Remove(c);
+                if (behalten == null || Array.IndexOf(behalten, c) < 0) c.Dispose();
+            }
+            Inhalt.ResumeLayout(true);
+        }
+
+        public int Innenbreite { get { return Math.Max(UI.S(160), Karte.Width - Karte.Padding.Horizontal); } }
+
+        public void Breite(int w)
+        {
+            if (Karte.Width != w) Karte.Width = w;
+            int iw = Innenbreite;
+            foreach (Control c in Inhalt.Controls)
+            {
+                int cw = iw - c.Margin.Horizontal;
+                if (breit.Contains(c)) { if (c.Width != cw) c.Width = cw; }
+                else if (c is Label) c.MaximumSize = new Size(cw, 0);
+            }
+            Passe();
+        }
+
+        // Mindesthöhe, damit zwei Karten nebeneinander gleich hoch stehen (Ergebnisseite)
+        int minHoehe;
+        public int MinHoehe { get { return minHoehe; } set { minHoehe = value; Passe(); } }
+        public int InhaltHoehe { get { return Inhalt.Height + Karte.Padding.Vertical; } }
+        void Passe() { int h = Math.Max(minHoehe, Inhalt.Height + Karte.Padding.Vertical); if (Karte.Height != h) Karte.Height = h; }
+    }
+
+    // Seite mit Kopf (Titel und Einleitung links, rechts Anzahl und Dauer) und zwei Spalten mit Karten: links rund 60 %,
+    // rechts rund 40 %, unter 900 px Seitenbreite untereinander (wie ToolSpalten auf der Seite Tools).
+    public class ModulSeite
+    {
+        public readonly Panel Kopf = new Panel();
+        public readonly Label Anzahl, Dauer;
+        public readonly Panel Spalten = new Panel();
+        public readonly FlowLayoutPanel Links = new FlowLayoutPanel(), Rechts = new FlowLayoutPanel();
+        public readonly List<ZeilenKarte> KartenLinks = new List<ZeilenKarte>(), KartenRechts = new List<ZeilenKarte>();
+        // Elemente über die ganze Seitenbreite (Bänder, Auswahl des Umfangs)
+        public readonly List<Control> Voll = new List<Control>();
+        Label titel, einleitung;
+        FlowLayoutPanel rechtsKopf = new FlowLayoutPanel();
+        public int Breite { get; private set; }
+        public bool Zweispaltig { get; private set; }
+
+        // f ist die Seite aus Page(): Titel und Einleitung wandern in den Kopf, das Band "nicht im Ablauf" bleibt darunter
+        public ModulSeite(FlowLayoutPanel f)
+        {
+            titel = (Label)f.Controls[0]; einleitung = (Label)f.Controls[1];
+            f.Controls.Remove(titel); f.Controls.Remove(einleitung);
+            Kopf.BackColor = UI.Panel; Kopf.Margin = new Padding(0, 0, 0, UI.S(UI.Abstand2));
+            titel.Location = new Point(0, 0); einleitung.Margin = new Padding(0);
+            // feste Größe statt AutoSize: Höhe und Umbruch der Einleitung setzt OrdneKopf aus dem gemessenen Text
+            einleitung.MaximumSize = Size.Empty; einleitung.AutoSize = false;
+            Anzahl = Lbl("", 10.5f, true, UI.Text); Anzahl.Margin = new Padding(0); Anzahl.Anchor = AnchorStyles.Right;
+            Dauer = Lbl("", UI.SchriftText, false, UI.Muted); Dauer.Margin = new Padding(0, UI.S(1), 0, 0); Dauer.Anchor = AnchorStyles.Right;
+            rechtsKopf.FlowDirection = FlowDirection.TopDown; rechtsKopf.WrapContents = false; rechtsKopf.AutoSize = true; rechtsKopf.AutoSizeMode = AutoSizeMode.GrowAndShrink; rechtsKopf.BackColor = UI.Panel; rechtsKopf.Margin = new Padding(0);
+            rechtsKopf.Controls.Add(Anzahl); rechtsKopf.Controls.Add(Dauer);
+            Kopf.Controls.Add(titel); Kopf.Controls.Add(einleitung); Kopf.Controls.Add(rechtsKopf);
+            rechtsKopf.SizeChanged += delegate { OrdneKopf(); };
+            f.Controls.Add(Kopf); f.Controls.SetChildIndex(Kopf, 0);
+
+            Spalten.BackColor = UI.Panel; Spalten.Margin = new Padding(0);
+            foreach (FlowLayoutPanel c in new FlowLayoutPanel[] { Links, Rechts })
+            {
+                c.FlowDirection = FlowDirection.TopDown; c.WrapContents = false; c.AutoSize = true; c.AutoSizeMode = AutoSizeMode.GrowAndShrink; c.BackColor = UI.Panel; c.Margin = new Padding(0);
+                c.SizeChanged += delegate { OrdneSpalten(); };
+                Spalten.Controls.Add(c);
+            }
+        }
+
+        public ZeilenKarte Karte(string titelText, bool links)
+        {
+            ZeilenKarte k = new ZeilenKarte(titelText);
+            (links ? KartenLinks : KartenRechts).Add(k);
+            (links ? Links : Rechts).Controls.Add(k.Karte);
+            return k;
+        }
+
+        // Spaltenbreiten bei einer Seitenbreite: links rund 60 %, ab 900 px zweispaltig (sonst beide in voller Breite)
+        public static int[] SpaltenBreiten(int w, int abstand)
+        {
+            if (ToolSpalten(w) < 2) return new int[] { w, w };
+            int l = (w - abstand) * 60 / 100;
+            return new int[] { l, w - abstand - l };
+        }
+
+        // Lage und Höhe des Kopfs aus gemessenen Texten: Die Größe der Beschriftungen stellt sich erst beim nächsten
+        // Layout ein, die Einleitung bricht aber sofort an der neuen Breite um.
+        void OrdneKopf()
+        {
+            if (Breite <= 0) return;
+            Size ra = rechtsKopf.PreferredSize;
+            rechtsKopf.Location = new Point(Math.Max(0, Breite - ra.Width), UI.S(4));
+            int ew = Math.Max(UI.S(240), Breite - ra.Width - UI.S(UI.Abstand5));
+            int ty = titel.PreferredSize.Height + UI.S(UI.Abstand1);
+            int eh = TextRenderer.MeasureText(einleitung.Text, einleitung.Font, new Size(ew, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height + UI.S(2);
+            einleitung.SetBounds(0, ty, ew, eh);
+            int h = Math.Max(ty + eh + UI.S(2), UI.S(4) + ra.Height);
+            if (Kopf.Width != Breite || Kopf.Height != h) Kopf.Size = new Size(Breite, h);
+        }
+
+        void OrdneSpalten()
+        {
+            if (Breite <= 0) return;
+            int gap = UI.S(UI.Abstand4);
+            int[] sb = SpaltenBreiten(Breite, gap);
+            Links.Location = new Point(0, 0);
+            Rechts.Location = Zweispaltig ? new Point(sb[0] + gap, 0) : new Point(0, Links.Height);
+            Size s = new Size(Breite, Zweispaltig ? Math.Max(Links.Height, Rechts.Height) : Links.Height + Rechts.Height);
+            if (Spalten.Size != s) Spalten.Size = s;
+        }
+
+        public void Ordne(int w)
+        {
+            Breite = w; Zweispaltig = ToolSpalten(w) >= 2;
+            int[] sb = SpaltenBreiten(w, UI.S(UI.Abstand4));
+            Spalten.SuspendLayout();
+            foreach (ZeilenKarte k in KartenLinks) k.Breite(sb[0]);
+            foreach (ZeilenKarte k in KartenRechts) k.Breite(sb[1]);
+            Spalten.ResumeLayout(true);
+            foreach (Control c in Voll) { if (c is Label) c.MaximumSize = new Size(w - c.Margin.Horizontal, 0); else if (!(c is FeldAuswahl)) c.Width = w - c.Margin.Horizontal; }
+            OrdneKopf(); OrdneSpalten();
+        }
+    }
+
+    // Ordnet die Modulseiten nach der Seitenbreite neu (Größe des Fensters, Wechsel der Seite)
+    List<ModulSeite> modulSeiten = new List<ModulSeite>();
+    void OrdneModulSeiten() { int w = SeitenBreite(); foreach (ModulSeite m in modulSeiten) m.Ordne(w); }
+
+    ModulSeite NeueModulSeite(FlowLayoutPanel f)
+    {
+        ModulSeite m = new ModulSeite(f);
+        // auch bei geänderter Innenfläche: Erscheint die senkrechte Bildlaufleiste, wird die Seite schmaler, ohne dass
+        // sich die Größe des Bereichs ändert
+        if (modulSeiten.Count == 0 && content != null) { content.Resize += delegate { OrdneModulSeiten(); }; content.ClientSizeChanged += delegate { if (curPage == 1 || curPage == 2) OrdneModulSeiten(); }; }
+        modulSeiten.Add(m);
+        return m;
+    }
+
+    // Zeile mit Symbol, Titel, Beschreibung und Schalter, verbunden mit einem Kontrollkästchen als Wert (wie auf der Seite
+    // Wartung): Vorlagen, Zeitschätzung und Start lesen weiter das Kästchen. nutzer wird nur aufgerufen, wenn der Schalter
+    // selbst umgelegt wurde, nicht bei einer Änderung über das Kästchen (Vorlage, Profil).
+    SettingRow SchalterZeile(CheckBox wert, string titel, string detail, string symbol, string hinweis, Action nutzer)
+    {
+        SettingRow row = new SettingRow(titel, detail);
+        row.Icon = symbol; row.Checked = wert.Checked;
+        row.Toggle.CheckedChanged += delegate
+        {
+            if (wert.Checked == row.Toggle.Checked) return;
+            if (nutzer != null) nutzer();
+            wert.Checked = row.Toggle.Checked;
+        };
+        wert.CheckedChanged += delegate { if (row.Toggle.Checked != wert.Checked) row.Toggle.Checked = wert.Checked; };
+        Tip(row, hinweis); Tip(row.Toggle, hinweis);
+        return row;
+    }
+
+    static Badge DauerEtikett(int minuten) { Badge b = new Badge(MinText(minuten), "skip"); b.Tag = "dauer"; return b; }
+
+    static LinkLabel KartenVerweis(string text)
+    {
+        LinkLabel l = new LinkLabel(); l.Text = text; l.AutoSize = true; l.Font = new Font("Segoe UI", UI.SchriftHinweis);
+        l.LinkColor = UI.Accent; l.ActiveLinkColor = UI.AccentHover; l.LinkBehavior = LinkBehavior.HoverUnderline; l.BackColor = Color.Transparent; l.Margin = new Padding(UI.S(10), 0, 0, 0);
+        return l;
+    }
+}
 // Startseite mit Steckbrief und Schnellprüfungen (Teilklasse DiagGui)
 public partial class DiagGui
 {
@@ -9239,7 +9455,8 @@ public partial class DiagGui
         pnlButtons.Margin = new Padding(0);
 
         Button btnOpenRep = new PrimaryButton();
-        btnOpenRep.Text = "Bericht öffnen";
+        // ab v4.08 kurz "Bericht": mit dem neuen Knopf "Ergebnis" passte die Zeile sonst nicht mehr neben die Befunde
+        btnOpenRep.Text = "Bericht";
         btnOpenRep.FlatStyle = FlatStyle.Flat;
         btnOpenRep.FlatAppearance.BorderSize = 0;
         btnOpenRep.BackColor = UI.Accent;
@@ -9247,8 +9464,8 @@ public partial class DiagGui
         btnOpenRep.FlatAppearance.MouseOverBackColor = UI.AccentHover;
         btnOpenRep.FlatAppearance.MouseDownBackColor = UI.AccentActive;
         btnOpenRep.Font = new Font("Segoe UI Semibold", 8.5f);
-        btnOpenRep.Padding = new Padding(UI.S(8), UI.S(3), UI.S(8), UI.S(3));
-        btnOpenRep.Margin = new Padding(0, UI.S(2), UI.S(6), 0);
+        btnOpenRep.Padding = new Padding(UI.S(5), UI.S(3), UI.S(5), UI.S(3));
+        btnOpenRep.Margin = new Padding(0, UI.S(2), UI.S(4), 0);
         btnOpenRep.AutoSize = true;
         btnOpenRep.Cursor = Cursors.Hand;
         btnOpenRep.UseVisualStyleBackColor = false;
@@ -9257,6 +9474,28 @@ public partial class DiagGui
         DbEntry targetRun = lastRun;
         btnOpenRep.Click += delegate { if (targetRun != null) OpenEntry(targetRun); };
         pnlButtons.Controls.Add(btnOpenRep);
+
+        // ab v4.08: führt zur Ergebnisseite mit diesem Lauf (Urteil, Vergleich zur Referenz, Hauptwerte)
+        Button btnErgebnis = new Button();
+        btnErgebnis.Text = "Ergebnis";
+        btnErgebnis.FlatStyle = FlatStyle.Flat;
+        btnErgebnis.FlatAppearance.BorderColor = UI.Accent;
+        btnErgebnis.FlatAppearance.BorderSize = 1;
+        btnErgebnis.BackColor = UI.AccentSoft;
+        btnErgebnis.ForeColor = UI.Accent;
+        btnErgebnis.FlatAppearance.MouseOverBackColor = UI.Accent;
+        btnErgebnis.FlatAppearance.MouseDownBackColor = UI.AccentActive;
+        btnErgebnis.Font = new Font("Segoe UI Semibold", 8.5f);
+        btnErgebnis.Padding = new Padding(UI.S(5), UI.S(3), UI.S(5), UI.S(3));
+        btnErgebnis.Margin = new Padding(0, UI.S(2), UI.S(4), 0);
+        btnErgebnis.AutoSize = true;
+        btnErgebnis.Cursor = Cursors.Hand;
+        btnErgebnis.UseVisualStyleBackColor = false;
+        btnErgebnis.MouseEnter += delegate { btnErgebnis.ForeColor = UI.OnAccent; };
+        btnErgebnis.MouseLeave += delegate { btnErgebnis.ForeColor = UI.Accent; };
+        Tip(btnErgebnis, "Öffnet die Ergebnisseite mit dem letzten Lauf dieses PCs: Urteil, Vergleich zur Referenz und Hauptwerte je Komponente.");
+        btnErgebnis.Click += delegate { ZeigeLetztesErgebnis(); };
+        pnlButtons.Controls.Add(btnErgebnis);
 
         Button btnDash = new Button();
         btnDash.Text = "Dashboard";
@@ -9268,8 +9507,8 @@ public partial class DiagGui
         btnDash.FlatAppearance.MouseOverBackColor = UI.Accent;
         btnDash.FlatAppearance.MouseDownBackColor = UI.AccentActive;
         btnDash.Font = new Font("Segoe UI Semibold", 8.5f);
-        btnDash.Padding = new Padding(UI.S(8), UI.S(3), UI.S(8), UI.S(3));
-        btnDash.Margin = new Padding(0, UI.S(2), UI.S(6), 0);
+        btnDash.Padding = new Padding(UI.S(5), UI.S(3), UI.S(5), UI.S(3));
+        btnDash.Margin = new Padding(0, UI.S(2), UI.S(4), 0);
         btnDash.AutoSize = true;
         btnDash.Cursor = Cursors.Hand;
         btnDash.UseVisualStyleBackColor = false;
@@ -9288,7 +9527,7 @@ public partial class DiagGui
         btnVerlauf.FlatAppearance.MouseOverBackColor = UI.Accent;
         btnVerlauf.FlatAppearance.MouseDownBackColor = UI.AccentActive;
         btnVerlauf.Font = new Font("Segoe UI Semibold", 8.5f);
-        btnVerlauf.Padding = new Padding(UI.S(8), UI.S(3), UI.S(8), UI.S(3));
+        btnVerlauf.Padding = new Padding(UI.S(5), UI.S(3), UI.S(5), UI.S(3));
         btnVerlauf.Margin = new Padding(0, UI.S(2), 0, 0);
         btnVerlauf.AutoSize = true;
         btnVerlauf.Cursor = Cursors.Hand;
@@ -10333,74 +10572,111 @@ e.Result = items;
 // Seite Diagnose (Teilklasse DiagGui)
 public partial class DiagGui
 {
+    // ab v4.08: Kurztitel und Beschreibung je Prüfung für die Zeilen der Karte Prüfungen (Reihenfolge wie diagKeys). Der
+    // volle Text (diagText) und die Erklärung (diagTips) stehen im Hinweis beim Überfahren.
+    static readonly string[] diagKurz = new string[] {
+        "Ereignisse und Abstürze", "Windows-Updates", "Systemintegrität", "Virenscan", "SMART-Langtest", "Netzwerk", "Arbeitsspeicher", "Energie und DxDiag" };
+    static readonly string[] diagDetail = new string[] {
+        "Ereignisprotokolle, Bluescreens, Absturzabbilder, Zuverlässigkeit",
+        "Sucht nach ausstehenden Updates, lädt nichts herunter",
+        "Dateisystem-Onlinescan, DISM ScanHealth, sfc /verifyonly (nur prüfen)",
+        "Microsoft Defender Schnellscan",
+        "Erweiterter Selbsttest aller Laufwerke; SSD meist unter 15 Min., Festplatten Stunden",
+        "Ping, DNS, HTTPS, Download",
+        "Mustertest unter Windows",
+        "Energieeffizienzanalyse (60 s) und DxDiag-Bericht" };
+    static readonly string[] diagIcons = new string[] { UI.IcoChg, UI.IcoRefresh, UI.IcoDokument, UI.IcoShield, UI.IcoDisk, UI.IcoNetz, UI.IcoRam, UI.IcoBlitz };
+    // Minuten je Prüfung und ob sie bei paralleler Ausführung nebenher läuft (Parallel im Vertrag des Moduls Diagnose)
+    static readonly int[] diagDauer = new int[] { 1, 2, 3, 1, 2, 1, 2, 2 };
+    public static readonly bool[] diagNebenher = new bool[] { false, true, false, true, true, false, false, true };
+
+    internal ModulSeite diagSeite;
+    internal FeldAuswahl segUmfang;
+    internal SettingRow[] diagRows;
+    Badge[] diagNebenEtikett;
+    LinkLabel lnkDiagAll, lnkDiagNone;
+
+    // ab v4.08: Seite im Muster von Wartung und Tools. Oben der Umfang als Auswahl mit drei Feldern, links die Karte
+    // Prüfungen (immer sichtbar, je Prüfung eine Zeile mit Schalter), rechts Ausführung, Zusätze und Zeiträume. Die
+    // Kontrollkästchen und die drei Optionsfelder bleiben als Werte bestehen (Vorlagen, Zeitschätzung, Start).
     Control BuildDiagPage()
     {
-        FlowLayoutPanel f = Page("Diagnose", "Liest Hardware, Treiber, Sicherheit und Ereignisprotokolle aus, führt die gewählten Prüfungen durch und bewertet alles in einem Bericht. Die Prüfungen verändern nichts am System; gekennzeichnete Optionen nehmen Änderungen vor.", 1);
+        FlowLayoutPanel f = Page("Diagnose", "Liest Hardware, Treiber, Sicherheit und Ereignisprotokolle aus und führt die gewählten Prüfungen durch. Prüfungen verändern nichts; gekennzeichnete Zusätze nehmen Änderungen vor.", 1);
+        diagSeite = NeueModulSeite(f);
         if (File.Exists(Path.Combine(cpDir, "laufend.json")))
         {
             Label warn = Lbl("  Der letzte Lauf wurde nicht beendet (Absturz?). Die Absturzanalyse läuft beim nächsten Start automatisch zuerst.  ", 9.75f, true, UI.Crit);
             warn.BackColor = UI.CritBg; warn.Padding = new Padding(UI.S(6)); warn.Margin = new Padding(0, 0, 0, UI.S(8));
             f.Controls.Add(warn);
         }
-        // ab v3.64 drei Profile als Segmentschalter; Funktionstest und Nur Absturzanalyse entfallen in der Oberfläche
-        // (die Absturzanalyse läuft nach einem unterbrochenen Lauf ohnehin automatisch zuerst)
-        f.Controls.Add(Section("Umfang"));
+        // Umfang: drei Profile. Die Optionsfelder tragen den Wert (Reihenfolge der Vorlagen: Voll, Schnell, Benutzerdefiniert),
+        // sichtbar ist die Auswahl mit Anzahl und Dauer je Feld. Funktionstest und Nur Absturzanalyse gibt es seit v3.64
+        // nicht mehr in der Oberfläche (die Absturzanalyse läuft nach einem unterbrochenen Lauf automatisch zuerst).
         rbVoll = new RadioButton(); rbSchnell = new RadioButton(); rbCustom = new RadioButton();
-        FlowLayoutPanel seg = new FlowLayoutPanel(); seg.AutoSize = true; seg.WrapContents = false; seg.BackColor = UI.Panel; seg.Margin = new Padding(UI.S(4), 0, 0, UI.S(4));
-        RadioButton[] rbs = new RadioButton[] { rbVoll, rbSchnell, rbCustom };
-        string[] rt = new string[] { "Vollständig", "Schnell", "Benutzerdefiniert" };
-        for (int i = 0; i < rbs.Length; i++) {
-            rbs[i].Text = rt[i]; rbs[i].AutoSize = false; rbs[i].Size = new Size(UI.S(160), UI.S(34)); rbs[i].Margin = new Padding(0, 0, UI.S(6), 0);
-            rbs[i].Cursor = Cursors.Hand; StyleSegment(rbs[i]);
-            rbs[i].CheckedChanged += delegate { ApplyDiagProfile(); };
-            seg.Controls.Add(rbs[i]);
+        Panel werte = new Panel(); werte.Visible = false; werte.Size = new Size(1, 1); werte.Margin = new Padding(0);
+        RadioButton[] rbs = new RadioButton[] { rbSchnell, rbVoll, rbCustom };
+        segUmfang = new FeldAuswahl(new string[] { "Schnell", "Vollständig", "Eigene Auswahl" }, new string[] { "", "", "Prüfungen einzeln wählen" });
+        segUmfang.Selected = 1;
+        for (int i = 0; i < rbs.Length; i++)
+        {
+            int idx = i;
+            rbs[i].AutoSize = false; rbs[i].Size = new Size(1, 1);
+            rbs[i].CheckedChanged += delegate { if (rbs[idx].Checked && segUmfang.Selected != idx) segUmfang.Selected = idx; ApplyDiagProfile(); };
+            werte.Controls.Add(rbs[i]);
         }
-        f.Controls.Add(seg);
-        lblDiagProfil = Hint("", 4); f.Controls.Add(lblDiagProfil);
+        segUmfang.SelectedChanged += delegate { if (!rbs[segUmfang.Selected].Checked) rbs[segUmfang.Selected].Checked = true; };
+        f.Controls.Add(segUmfang); f.Controls.Add(werte);
+
+        ZeilenKarte kp = diagSeite.Karte("Prüfungen", true);
+        lnkDiagAll = KartenVerweis("Alle an"); lnkDiagNone = KartenVerweis("Alle aus");
+        kp.KopfRechts.Controls.Add(lnkDiagAll); kp.KopfRechts.Controls.Add(lnkDiagNone);
+        lnkDiagAll.LinkClicked += delegate { rbCustom.Checked = true; foreach (CheckBox c in diagChk) c.Checked = true; };
+        lnkDiagNone.LinkClicked += delegate { rbCustom.Checked = true; foreach (CheckBox c in diagChk) c.Checked = false; };
+
+        diagChk = new CheckBox[diagKeys.Length]; diagRows = new SettingRow[diagKeys.Length]; diagNebenEtikett = new Badge[diagKeys.Length];
+        for (int i = 0; i < diagKeys.Length; i++)
+        {
+            diagChk[i] = Chk(diagText[i], true);
+            string t; diagTips.TryGetValue(diagKeys[i], out t);
+            // Wer einen Schalter umlegt, wählt damit die eigene Auswahl (wie bisher beim Klick auf ein Kästchen)
+            diagRows[i] = SchalterZeile(diagChk[i], diagKurz[i], diagDetail[i], diagIcons[i], diagText[i] + (String.IsNullOrEmpty(t) ? "" : "\r\n" + t), delegate { if (!rbCustom.Checked) rbCustom.Checked = true; });
+            if (diagNebenher[i]) { diagNebenEtikett[i] = new Badge("läuft nebenher", "skip"); diagNebenEtikett[i].Tag = "nebenher"; BadgeTip(diagNebenEtikett[i]); diagRows[i].AddBadge(diagNebenEtikett[i]); }
+            Badge bd = DauerEtikett(diagDauer[i]); BadgeTip(bd); diagRows[i].AddBadge(bd);
+            diagChk[i].CheckedChanged += delegate { UpdateSummary(); };
+            kp.Zeile(diagRows[i]);
+        }
+        Label hc = Lbl("Die CPU-Stabilität prüft das Modul Lasttest (Prozessor, ab 2 Min.): eigener Lastprozess, Rechenfehler, Takt- und Temperaturverlauf und Drosselnachweis.", 8.5f, false, UI.Muted); hc.Margin = new Padding(0, UI.S(4), 0, UI.S(2));
+        kp.Frei(hc);
+
+        ZeilenKarte ka = diagSeite.Karte("Ausführung", false);
         chkFast = Chk("Lesende Prüfungen parallel ausführen", true);
         chkFast.CheckedChanged += delegate { UpdateSummary(); };
-        Control fastBox = Opt2(chkFast, "Updatesuche, Defender-Schnellscan, Energieanalyse und SMART-Langtest laufen nebenher. Messungen bleiben exklusiv, damit die Werte vergleichbar sind.");
-        fastBox.Margin = new Padding(0, UI.S(UI.Abstand2), 0, 0); f.Controls.Add(fastBox);
+        ka.Zeile(SchalterZeile(chkFast, "Parallel ausführen", "Lesende Prüfungen laufen nebenher, Messungen bleiben exklusiv", UI.IcoBlitz,
+            "Lesende Prüfungen ohne Messcharakter (Updatesuche, Defender, Energieanalyse, Start des SMART-Langtests) laufen nebenher. Messungen wie RAM-Test, Netzwerk, Benchmark und Lasttest warten immer, bis alles andere fertig ist.", null));
 
-        diagToggle = new GroupHeader("Prüfungen"); diagToggle.Margin = new Padding(0, UI.S(UI.Abstand3), 0, 0);
-        Tip(diagToggle, "Klicken zeigt oder verbirgt die einzelnen Diagnoseprüfungen. Wer eine Prüfung ändert, wechselt zum Profil Benutzerdefiniert.");
-        f.Controls.Add(diagToggle);
-
-        diagBody = new FlowLayoutPanel(); diagBody.FlowDirection = FlowDirection.TopDown;
-        diagBody.WrapContents = false; diagBody.AutoSize = true; diagBody.BackColor = UI.Panel;
-        diagBody.Margin = new Padding(UI.S(UI.Abstand4), UI.S(UI.Abstand1), 0, UI.S(UI.Abstand1)); diagBody.Visible = false;
-
-        diagChk = new CheckBox[diagKeys.Length];
-        for (int i = 0; i < diagKeys.Length; i++) {
-            int chkIdx = i;
-            diagChk[i] = Chk(diagText[i], true);
-            diagChk[i].Click += delegate {
-                if (!rbCustom.Checked) {
-                    rbCustom.Checked = true;
-                    diagChk[chkIdx].Checked = !diagChk[chkIdx].Checked;
-                }
-            };
-            diagChk[i].CheckedChanged += delegate { UpdateSummary(); };
-            diagBody.Controls.Add(diagChk[i]);
-        }
-        diagBody.Controls.Add(Hint("Die CPU-Stabilität prüft das Modul Lasttest (Prozessor, ab 2 Min.): eigener Lastprozess, Rechenfehler, Takt- und Temperaturverlauf und Drosselnachweis.", 4));
-        f.Controls.Add(diagBody);
-        diagToggle.Toggled += delegate { diagBody.Visible = diagToggle.Expanded; };
-
-        f.Controls.Add(Section("Optionen"));
+        ZeilenKarte kz = diagSeite.Karte("Zusätze", false);
         chkInstall = Chk("smartmontools bei Bedarf installieren oder aus dem Datenordner verwenden", true);
         chkMem = Chk("Windows-Speicherdiagnose beim nächsten Neustart einplanen", false);
-        f.Controls.Add(OptionCard("Zusatzwerkzeuge und Speicherdiagnose", UI.IcoTools, new Control[] {
-            Opt2(chkInstall, "Liegt smartctl im Tools-Ordner, wird es von dort verwendet, sonst per winget geholt und nach dem Lauf entfernt.", RiskBadge("Eingriff")),
-            Opt2(chkMem, "Prüft den gesamten Arbeitsspeicher außerhalb von Windows; das Ergebnis liest der nächste Lauf.", RestartBadge("immer")) }));
+        SettingRow rInst = SchalterZeile(chkInstall, "smartmontools holen", "Aus dem Tools-Ordner, sonst per winget; nach dem Lauf entfernt", UI.IcoWartung,
+            "smartctl liefert SMART-Werte und den Langtest. Liegt es im Tools-Ordner des Datenordners, wird es von dort verwendet, sonst per winget geholt und nach dem Lauf entfernt (oder auf Wunsch behalten). Risikostufe Eingriff.", null);
+        Badge bi = RiskBadge("Eingriff"); BadgeTip(bi); rInst.AddBadge(bi);
+        SettingRow rMem = SchalterZeile(chkMem, "Speicherdiagnose", "Windows-Speicherdiagnose beim nächsten Neustart einplanen", UI.IcoRam,
+            "Plant die Windows-Speicherdiagnose für den nächsten Neustart ein. Sie prüft den gesamten Arbeitsspeicher außerhalb von Windows; das Ergebnis liest der nächste Lauf aus den Ereignissen.", null);
+        Badge bn = RestartBadge("immer"); BadgeTip(bn); rMem.AddBadge(bn);
+        kz.Zeile(rInst); kz.Zeile(rMem);
 
-        FlowLayoutPanel r = Row(); r.Controls.Add(RowLabel("Ereignisse der letzten", 170));
-        cmbDays = Combo(110, new string[] { "3 Tage", "7 Tage", "14 Tage", "30 Tage", "60 Tage" }, 2); r.Controls.Add(cmbDays);
-        FlowLayoutPanel rs = Row(); rs.Controls.Add(RowLabel("SMART-Langtest", 170));
+        ZeilenKarte kt = diagSeite.Karte("Zeiträume", false);
+        cmbDays = Combo(170, new string[] { "3 Tage", "7 Tage", "14 Tage", "30 Tage", "60 Tage" }, 2);
         string[] sm = new string[smartMinutes.Length]; for (int i = 0; i < sm.Length; i++) sm[i] = "höchstens " + smartMinutes[i] + " Min. warten";
-        cmbSmartMax = Combo(220, sm, 3); cmbSmartMax.SelectedIndexChanged += delegate { UpdateSummary(); }; rs.Controls.Add(cmbSmartMax);
-        f.Controls.Add(OptionCard("Prüfzeiträume", UI.IcoDiag, new Control[] { r, rs, Hint("Danach entsteht der Bericht ohne Ergebnis des Langtests; der Test läuft im Laufwerk weiter.", 180) }));
+        cmbSmartMax = Combo(220, sm, 3); cmbSmartMax.SelectedIndexChanged += delegate { UpdateSummary(); };
+        FeldReihe fz = new FeldReihe(); fz.Feld("Ereignisse der letzten", cmbDays); fz.Feld("SMART-Langtest", cmbSmartMax);
+        kt.Zeile(fz);
+        Label hz = Lbl("Nach der Wartezeit entsteht der Bericht ohne Ergebnis des Langtests; der Test läuft im Laufwerk weiter.", 8.5f, false, UI.Muted); hz.Margin = new Padding(0, UI.S(2), 0, UI.S(2));
+        kt.Frei(hz);
+
+        f.Controls.Add(diagSeite.Spalten);
         rbVoll.Checked = true;
+        diagSeite.Ordne(SeitenBreite());
         return f;
     }
 
@@ -10419,8 +10695,7 @@ public partial class DiagGui
     public static int DiagMinutes(bool[] sel)
     {
         int t = 0;
-        int[] add = new int[] { 1, 2, 3, 1, 2, 1, 2, 2 };
-        for (int i = 0; sel != null && i < sel.Length && i < add.Length; i++) if (sel[i]) t += add[i];
+        for (int i = 0; sel != null && i < sel.Length && i < diagDauer.Length; i++) if (sel[i]) t += diagDauer[i];
         return t;
     }
 
@@ -10436,40 +10711,40 @@ public partial class DiagGui
 
     void UpdateDiagSummary()
     {
-        if (diagToggle == null || diagChk == null) return;
+        if (diagSeite == null || diagChk == null || segUmfang == null) return;
         int sel = 0;
         bool[] cur = new bool[diagChk.Length];
         for (int i = 0; i < diagChk.Length; i++) { cur[i] = diagChk[i] != null && diagChk[i].Checked; if (cur[i]) sel++; }
-        string pName = rbVoll != null && rbVoll.Checked ? "Vollständig" : rbSchnell != null && rbSchnell.Checked ? "Schnell" : "Benutzerdefiniert";
-        diagToggle.CountText = sel + " von " + diagChk.Length + " gewählt, Profil " + pName;
-        if (lblDiagProfil != null)
-        {
-            string smart = cur.Length > 4 && cur[4] ? ", dazu das Warten auf den SMART-Langtest (höchstens " + SmartMax() + " Min.)" : "";
-            string par = chkFast != null && chkFast.Checked ? " mit paralleler Ausführung" : "";
-            string t = rbVoll != null && rbVoll.Checked ? "Alle " + diagChk.Length + " Prüfungen, ca. " + DiagEstimate(cur) + " Min." + par + smart
-                : rbSchnell != null && rbSchnell.Checked ? "Inventar, Ereignisse, Updatesuche, Netzwerk und kurzer RAM-Test (25 % des freien RAM), ca. " + DiagEstimate(cur) + " Min." + par
-                : "Prüfungen unten frei wählen, derzeit " + sel + " gewählt, ca. " + DiagEstimate(cur) + " Min." + par + smart;
-            SetText(lblDiagProfil, t);
-        }
+        bool par = chkFast != null && chkFast.Checked;
+        string smart = cur.Length > 4 && cur[4] ? " + Langtest bis " + MinText(SmartMax()) : "";
+        SetText(diagSeite.Anzahl, sel + " von " + diagChk.Length + " Prüfungen");
+        SetText(diagSeite.Dauer, sel > 0 ? "ca. " + MinText(DiagEstimate(cur)) + smart : "nur Inventar, ca. 1 Min.");
+        segUmfang.SetUnterzeile(0, DiagProfilText(diagSchnell));
+        segUmfang.SetUnterzeile(1, DiagProfilText(diagVoll));
+        // "läuft nebenher" nur, solange parallel ausgeführt wird
+        for (int i = 0; diagNebenEtikett != null && i < diagNebenEtikett.Length; i++) if (diagNebenEtikett[i] != null && diagNebenEtikett[i].Visible != par) diagNebenEtikett[i].Visible = par;
+    }
+
+    // Unterzeile eines Profils in der Auswahl des Umfangs: "4 Prüfungen · ca. 4 Min."
+    string DiagProfilText(bool[] pick)
+    {
+        int n = 0; foreach (bool b in pick) if (b) n++;
+        return n + " Prüfungen  ·  ca. " + MinText(DiagEstimateFor(pick));
+    }
+
+    // Schätzung für ein Profil (nicht für die aktuelle Auswahl): Abzug der nebenher laufenden Prüfungen aus dem Profil selbst
+    int DiagEstimateFor(bool[] pick)
+    {
+        int t = DiagMinutes(pick);
+        if (chkFast != null && chkFast.Checked && chkFast.Enabled) { int par = (pick[1] ? 2 : 0) + (pick[3] ? 1 : 0) + (pick[7] ? 2 : 0); t -= Math.Min(par, Math.Max(0, t - 1)); }
+        return t;
     }
 
     void ApplyDiagProfile()
     {
-        if (diagChk == null) return;
-        bool custom = rbCustom.Checked;
-        if (custom && diagBody != null)
-        {
-            diagBody.Visible = true;
-            if (diagToggle != null) diagToggle.Expanded = true;
-        }
+        if (diagChk == null || rbCustom == null) return;
         bool[] pick = rbVoll.Checked ? diagVoll : rbSchnell.Checked ? diagSchnell : null;
-        for (int i = 0; i < diagChk.Length; i++)
-        {
-            if (pick != null) diagChk[i].Checked = pick[i];
-            diagChk[i].AutoCheck = custom;
-            diagChk[i].ForeColor = custom ? UI.Text : (UI.IsDark ? Color.FromArgb(195, 200, 210) : Color.FromArgb(80, 85, 95));
-        }
-        foreach (RadioButton r in new RadioButton[] { rbVoll, rbSchnell, rbCustom }) if (r != null) StyleSegment(r);
+        if (pick != null) for (int i = 0; i < diagChk.Length; i++) diagChk[i].Checked = pick[i];
         UpdateDiagSummary();
         UpdateSummary();
     }
@@ -10481,26 +10756,95 @@ public partial class DiagGui
     static readonly string[] benchDetail = new string[] {
         "Einzel- und Mehrkern, AES-256, SHA-256, Kompression",
         "Lesen, Schreiben, Kopieren, Latenz",
-        "Rendertest je Grafikeinheit (Bilder/s, 1-%-Low, Punktzahl), Speicherdurchsatz, Desktop-Komposition, PCIe",
-        "sequentiell und 4K-Zufallszugriff, Auswahl unten" };
+        "Rendertest je Grafikeinheit, Speicherdurchsatz, Desktop-Komposition, PCIe",
+        "Lesen und Schreiben am Stück, 4K-Zufallszugriff" };
+    static readonly string[] benchIcons = new string[] { UI.IcoCpu, UI.IcoRam, UI.IcoGpu, UI.IcoDisk };
+
+    // ab v4.08: Seite im Muster von Wartung und Tools. Links die Karte Messungen mit je einer Zeile (Symbol, Titel,
+    // Beschreibung, Dauer, Schalter); die Einstellungen einer Messung stehen unter ihrer Zeile und nur, wenn sie
+    // eingeschaltet ist. Rechts Referenz und letztes Ergebnis. Die Kontrollkästchen benchChk bleiben als Werte bestehen
+    // (Vorlagen, Zeitschätzung, Start), angezeigt werden Schalter.
+    internal ModulSeite benchSeite;
+    internal SettingRow[] benchRows;
+    Badge[] benchDauer;
+    internal UnterBereich subGpu, subDisk;
+    internal List<LaufwerkZeile> diskZeilen = new List<LaufwerkZeile>();
+    // Sichtbarkeit der Bereiche unter Grafik und Laufwerken als eigener Zustand (für Tests ohne angezeigtes Fenster)
+    internal bool subGpuOffen, subDiskOffen;
+    LinkLabel lnkBenchAll, lnkBenchNone, lnkRefDb, lnkLetztes, lnkBandErg;
+    // Band "Zurück zum Ergebnis": erscheint, wenn die Seite über "Referenz ändern" der Ergebnisseite geöffnet wurde
+    internal Panel bandErg;
+    Label lblBandErg;
+    ZeilenKarte karteLetztes;
+    Label lblLetztScore, lblLetztDatum;
+    FlowLayoutPanel pnlLetztWerte;
 
     Control BuildBenchPage()
     {
-        FlowLayoutPanel f = Page("Benchmark", "Misst die Leistung der gewählten Komponenten und vergleicht sie mit der Referenz, mit früheren Läufen auf diesem PC und mit bereits geprüften Systemen.", 2);
-        f.Controls.Add(Section("Messungen"));
-        benchChk = new CheckBox[benchKeys.Length];
+        FlowLayoutPanel f = Page("Benchmark", "Misst die Leistung der gewählten Komponenten und vergleicht sie mit der Referenz und mit früheren Läufen.", 2);
+        benchSeite = NeueModulSeite(f);
+        bandErg = new Panel(); bandErg.BackColor = UI.AccentSoft; bandErg.Height = UI.S(34); bandErg.Margin = new Padding(0, 0, 0, UI.S(UI.Abstand3)); bandErg.Visible = false;
+        lnkBandErg = new LinkLabel(); lnkBandErg.Text = "\u2190  Zurück zum Ergebnis"; lnkBandErg.AutoSize = true; lnkBandErg.Font = new Font("Segoe UI Semibold", UI.SchriftText);
+        lnkBandErg.LinkColor = UI.Accent; lnkBandErg.ActiveLinkColor = UI.AccentHover; lnkBandErg.LinkBehavior = LinkBehavior.HoverUnderline; lnkBandErg.BackColor = Color.Transparent; lnkBandErg.Location = new Point(UI.S(12), UI.S(8));
+        lnkBandErg.LinkClicked += delegate { ZeigeLetztesErgebnis(); };
+        Tip(lnkBandErg, "Kehrt zur Ergebnisseite zurück. Die dort gezeigten Prozentwerte gehören zur Referenz des Laufs; eine andere Referenz gilt ab dem nächsten Lauf.");
+        lblBandErg = Lbl("", UI.SchriftText, false, UI.Text); lblBandErg.Location = new Point(UI.S(190), UI.S(8));
+        bandErg.Controls.Add(lnkBandErg); bandErg.Controls.Add(lblBandErg);
+        lnkBandErg.SizeChanged += delegate { lblBandErg.Left = lnkBandErg.Right + UI.S(14); };
+        f.Controls.Add(bandErg); f.Controls.SetChildIndex(bandErg, 0); benchSeite.Voll.Add(bandErg);
+
+        ZeilenKarte km = benchSeite.Karte("Messungen", true);
+        lnkBenchAll = KartenVerweis("Alle an"); lnkBenchNone = KartenVerweis("Alle aus");
+        km.KopfRechts.Controls.Add(lnkBenchAll); km.KopfRechts.Controls.Add(lnkBenchNone);
+        lnkBenchAll.LinkClicked += delegate { foreach (CheckBox c in benchChk) c.Checked = true; };
+        lnkBenchNone.LinkClicked += delegate { foreach (CheckBox c in benchChk) c.Checked = false; };
+
+        benchChk = new CheckBox[benchKeys.Length]; benchRows = new SettingRow[benchKeys.Length]; benchDauer = new Badge[benchKeys.Length];
         for (int i = 0; i < benchKeys.Length; i++)
         {
             benchChk[i] = Chk(benchText[i], true);
-            benchChk[i].CheckedChanged += delegate { clbDisks.Enabled = benchChk[3].Checked; UpdateSummary(); };
-            f.Controls.Add(Opt2(benchChk[i], benchDetail[i]));
+            string t; benchTips.TryGetValue(benchKeys[i], out t);
+            benchRows[i] = SchalterZeile(benchChk[i], benchText[i], benchDetail[i], benchIcons[i], t, null);
+            benchDauer[i] = DauerEtikett(BenchMinuten(i)); BadgeTip(benchDauer[i]); benchRows[i].AddBadge(benchDauer[i]);
+            benchChk[i].CheckedChanged += delegate { UpdateSummary(); };
+            km.Zeile(benchRows[i]);
+            if (i == 2)
+            {
+                // Rendertest: Grafikeinheit, Auflösung und Anzeige nebeneinander (gleich eingestellt wie im Lasttest)
+                subGpu = new UnterBereich(); subGpuOffen = true;
+                FeldReihe fr = new FeldReihe();
+                cmbGpuSel = Combo(230, GpuChoiceTexts(), 0); cmbGpuRes = Combo(120, new string[] { "1280x720", "1920x1080" }, 0);
+                cmbGpuShow = Combo(140, new string[] { "Fenster", "Vollbild", "ohne Anzeige" }, 0);
+                fr.Feld("Grafikeinheit", cmbGpuSel); fr.Feld("Auflösung", cmbGpuRes); fr.Feld("Anzeige", cmbGpuShow);
+                subGpu.Inhalt.Controls.Add(fr);
+                Label hg = Lbl("Ergebnis je Grafikeinheit: Ø Bilder/s, 1-%-Low und Punktzahl. Esc im Fenster beendet den Test.", 8.5f, false, UI.Muted); hg.Margin = new Padding(0, UI.S(2), 0, 0);
+                subGpu.Inhalt.Controls.Add(hg);
+                km.Zeile(subGpu);
+            }
+            else if (i == 3)
+            {
+                subDisk = new UnterBereich(); subDiskOffen = true;
+                foreach (string d in disks)
+                {
+                    string[] x = d.Split('|');
+                    if (x.Length < 7) continue;
+                    LaufwerkZeile z = new LaufwerkZeile(x[1], x[2], DiskFrei(x), x[6] != "1" && x[5].Length > 0);
+                    Tip(z, DiskLine(x));
+                    z.CheckedChanged += delegate { UpdateSummary(); };
+                    diskZeilen.Add(z); diskNums.Add(x[0]);
+                    subDisk.Inhalt.Controls.Add(z);
+                }
+                Label hd = Lbl("Testdatei 1 GB je Laufwerk auf dem Volume mit dem meisten freien Platz, wird danach gelöscht. USB-Datenträger sind zunächst abgewählt.", 8.5f, false, UI.Muted); hd.Margin = new Padding(0, UI.S(2), 0, 0);
+                subDisk.Inhalt.Controls.Add(hd);
+                km.Zeile(subDisk);
+            }
         }
-        // ab v4.03 direkt unter den Messungen: Die Referenz bestimmt alle Prozentwerte der Ergebnisseite und stand vorher
-        // ganz unten außerhalb des Sichtbereichs
-        f.Controls.Add(Section("Referenz"));
-        FlowLayoutPanel r2 = Row(); r2.Controls.Add(RowLabel("Referenz (100 %)", 170));
-        cmbRef = Combo(360, new string[0], 0); r2.Controls.Add(cmbRef);
-        btnUpdateMed = UI.Secondary("Median aktualisieren");
+
+        // Referenz: bestimmt alle Prozentwerte der Ergebnisseite
+        ZeilenKarte kr = benchSeite.Karte("Referenz (100 %)", false);
+        cmbRef = Combo(300, new string[0], 0); cmbRef.Margin = new Padding(0, 0, 0, UI.S(6)); kr.Zeile(cmbRef);
+        lblRefState = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblRefState.Margin = new Padding(0, 0, 0, UI.S(8)); kr.Frei(lblRefState);
+        btnUpdateMed = UI.Secondary("Median aktualisieren"); btnUpdateMed.Margin = new Padding(0, 0, 0, UI.S(8));
         btnUpdateMed.Click += delegate {
             if (running) return;
             // ab v4.06: Ergebnis aus @@RESULT und den Zeilen des Arbeitsprozesses. Bis v4.05 suchte die Oberfläche eine eigene
@@ -10511,40 +10855,113 @@ public partial class DiagGui
             MessageBox.Show(this, MedianErgebnisText(res, lines), "Median-Referenz", MessageBoxButtons.OK, res.Length > 0 && !res.StartsWith("Keine") ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
             FillRefLists(); UpdateRefState();
         };
-        r2.Controls.Add(btnUpdateMed);
-        f.Controls.Add(r2);
-        lblRefState = Hint("", 180); f.Controls.Add(lblRefState);
+        kr.Frei(btnUpdateMed);
         cmbRef.SelectedIndexChanged += delegate { UpdateRefState(); };
         // ab v4.04 ohne Haken "Dieses System als Referenz festlegen": Das geht in der Datenbank über Aktionen, wo der Lauf
         // mit seinen Werten sichtbar ist (Skriptparameter -ReferenzSpeichern bleibt für Aufrufe ohne Oberfläche)
-        f.Controls.Add(Hint("Einen bestimmten Lauf als Referenz festlegen: Seite Datenbank, Lauf markieren, Aktionen \u203A Als Referenz festlegen.", 180));
+        lnkRefDb = KartenVerweis("Eigene Referenz in der Datenbank festlegen"); lnkRefDb.Margin = new Padding(0, 0, 0, UI.S(2));
+        lnkRefDb.LinkClicked += delegate { if (!running) ShowPage(9); };
+        Tip(lnkRefDb, "Öffnet die Seite Datenbank. Dort einen Lauf markieren, dann Aktionen › Als Referenz festlegen: Dieser Lauf ist danach die eigene Referenz (Referenz.json).");
+        kr.Frei(lnkRefDb);
 
-        f.Controls.Add(Section("Laufwerke"));
-        clbDisks = new CheckedListBox(); clbDisks.CheckOnClick = true; clbDisks.Width = UI.S(UI.Gruppenbreite); clbDisks.BorderStyle = BorderStyle.FixedSingle; clbDisks.IntegralHeight = false; clbDisks.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(4)); clbDisks.BackColor = UI.Panel; clbDisks.ForeColor = UI.Text;
-        foreach (string d in disks)
-        {
-            string[] x = d.Split('|');
-            if (x.Length < 7) continue;
-            clbDisks.Items.Add(DiskLine(x), x[6] != "1" && x[5].Length > 0);
-            diskNums.Add(x[0]);
-        }
-        // Höhe nach Anzahl der Einträge (vorher mindestens 48 px, ein Laufwerk stand in einem fast leeren Feld)
-        clbDisks.Height = Math.Max(1, Math.Min(8, clbDisks.Items.Count)) * UI.S(21) + UI.S(6);
-        clbDisks.ItemCheck += delegate { BeginInvoke(new System.Windows.Forms.MethodInvoker(UpdateSummary)); };
-        f.Controls.Add(clbDisks);
-        f.Controls.Add(Hint("Je Laufwerk wird mit einer Testdatei auf dessen Volume mit dem meisten freien Platz gemessen (1 GB, im Kurzlauf 256 MB, danach gelöscht). USB-Datenträger sind zunächst abgewählt.", 4));
-        f.Controls.Add(Section("Rendertest (Grafik)"));
-        FlowLayoutPanel rg0 = Row(); rg0.Controls.Add(RowLabel("Grafikeinheit", 170));
-        cmbGpuSel = Combo(420, GpuChoiceTexts(), 0); rg0.Controls.Add(cmbGpuSel); f.Controls.Add(rg0);
-        FlowLayoutPanel rg = Row(); rg.Controls.Add(RowLabel("Auflösung", 170));
-        cmbGpuRes = Combo(140, new string[] { "1280x720", "1920x1080" }, 0); rg.Controls.Add(cmbGpuRes);
-        rg.Controls.Add(RowLabel("Anzeige", 70)); cmbGpuShow = Combo(170, new string[] { "Fenster", "Vollbild", "ohne Anzeige" }, 0); rg.Controls.Add(cmbGpuShow);
-        f.Controls.Add(rg);
-        f.Controls.Add(Hint("Ergebnis: Ø Bilder/s, 1-%-Low und Punktzahl je Grafikeinheit. Esc im Fenster beendet den Test.", 4));
+        // Letztes Ergebnis dieses PCs aus der Datenbank (nur, wenn es einen Lauf gibt)
+        karteLetztes = benchSeite.Karte("Letztes Ergebnis auf diesem PC", false);
+        lblLetztDatum = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblLetztDatum.Margin = new Padding(0, UI.S(2), 0, 0);
+        karteLetztes.KopfRechts.Controls.Add(lblLetztDatum);
+        lblLetztScore = Lbl("", 17f, true, UI.Accent); lblLetztScore.Tag = "accent"; lblLetztScore.Margin = new Padding(0, 0, 0, UI.S(4)); karteLetztes.Frei(lblLetztScore);
+        pnlLetztWerte = new FlowLayoutPanel(); pnlLetztWerte.FlowDirection = FlowDirection.TopDown; pnlLetztWerte.WrapContents = false; pnlLetztWerte.AutoSize = true; pnlLetztWerte.BackColor = UI.Panel; pnlLetztWerte.Margin = new Padding(0);
+        karteLetztes.Frei(pnlLetztWerte);
+        lnkLetztes = KartenVerweis("Ergebnis ansehen"); lnkLetztes.Margin = new Padding(0, UI.S(6), 0, UI.S(2));
+        lnkLetztes.LinkClicked += delegate { ZeigeLetztesErgebnis(); };
+        Tip(lnkLetztes, "Öffnet die Ergebnisseite mit dem letzten Lauf dieses PCs aus der Datenbank.");
+        karteLetztes.Frei(lnkLetztes);
 
+        f.Controls.Add(benchSeite.Spalten);
         clbCompare = new CheckedListBox(); clbCompare.BackColor = UI.Panel; clbCompare.ForeColor = UI.Text;
         FillRefLists();
+        FuelleLetztesErgebnis();
+        UpdateBenchSummary();
+        benchSeite.Ordne(SeitenBreite());
         return f;
+    }
+
+    // Geschätzte Minuten einer Messung (Index wie benchKeys); Laufwerke: eine Minute je gewähltem Datenträger
+    int BenchMinuten(int i) { return i == 0 ? 2 : i == 1 ? 1 : i == 2 ? 2 : Math.Max(1, DiskGewaehlt()); }
+
+    int DiskGewaehlt() { int n = 0; foreach (LaufwerkZeile z in diskZeilen) if (z.Checked) n++; return n; }
+
+    // Kopf der Seite, Zeile Laufwerke und die Bereiche unter Grafik und Laufwerken nach der Auswahl
+    void UpdateBenchSummary()
+    {
+        if (benchSeite == null || benchChk == null || benchRows == null) return;
+        int n = 0; foreach (CheckBox c in benchChk) if (c.Checked) n++;
+        SetText(benchSeite.Anzahl, n + " von " + benchChk.Length + " Messungen");
+        SetText(benchSeite.Dauer, n > 0 ? "ca. " + MinText(ModuleMinutes(1)) : "keine Messung gewählt");
+        bool gpu = benchChk[2].Checked, disk = benchChk[3].Checked;
+        if (subGpu != null && subGpuOffen != gpu) { subGpuOffen = gpu; subGpu.Visible = gpu; }
+        bool dz = disk && diskZeilen.Count > 0;
+        if (subDisk != null && subDiskOffen != dz) { subDiskOffen = dz; subDisk.Visible = dz; }
+        benchRows[3].Description = benchDetail[3] + (diskZeilen.Count > 0 ? "  ·  " + DiskGewaehlt() + " von " + diskZeilen.Count + " gewählt" : "  ·  kein Datenträger gefunden");
+        if (benchDauer != null && benchDauer[3] != null) SetText(benchDauer[3], MinText(BenchMinuten(3)));
+    }
+
+    // Karte "Letztes Ergebnis auf diesem PC": Punktzahl, Datum und Prozent je Gruppe, soweit gespeichert
+    void FuelleLetztesErgebnis()
+    {
+        if (karteLetztes == null) return;
+        DbEntry e = GetCurrentPcLastRun();
+        bool da = e != null && (e.OverallScore > 0 || e.GruppenPct.Count > 0);
+        karteLetztes.Karte.Visible = da;
+        if (!da) return;
+        System.Globalization.CultureInfo de = System.Globalization.CultureInfo.GetCultureInfo("de-DE");
+        SetText(lblLetztDatum, DatumKurz(e.Datum));
+        SetText(lblLetztScore, e.OverallScore > 0 ? ((int)e.OverallScore).ToString("N0", de) + " Punkte" : "ohne Punktzahl");
+        pnlLetztWerte.Controls.Clear();
+        for (int g = 0; g < resGruppen.Length; g++)
+        {
+            double pct; if (!e.GruppenPct.TryGetValue(resGruppen[g], out pct)) continue;
+            FlowLayoutPanel r = new FlowLayoutPanel(); r.AutoSize = true; r.WrapContents = false; r.BackColor = UI.Panel; r.Margin = new Padding(0, 0, 0, UI.S(4));
+            Label ln = Lbl(resNamen[g], UI.SchriftHinweis, false, UI.Text); ln.AutoSize = false; ln.Size = new Size(UI.S(112), UI.S(18)); ln.Margin = new Padding(0);
+            PercentBar pb = new PercentBar(); pb.Percent = pct; pb.Size = new Size(UI.S(110), UI.S(8)); pb.Margin = new Padding(0, UI.S(6), UI.S(8), 0);
+            Tip(pb, "Strich = Referenz (100 %)" + (e.RefName.Length > 0 ? ": " + e.RefName : "") + ".");
+            Label lv = Lbl(pct.ToString("0") + " %", UI.SchriftHinweis, true, UI.Text); lv.Margin = new Padding(0);
+            r.Controls.Add(ln); r.Controls.Add(pb); r.Controls.Add(lv);
+            pnlLetztWerte.Controls.Add(r);
+        }
+        if (pnlLetztWerte.Controls.Count == 0 && e.HasBench)
+        {
+            Label l = Lbl("Prozentwerte je Gruppe sind bei diesem Lauf nicht gespeichert (Lauf vor Version 4.08).", UI.SchriftHinweis, false, UI.Muted); l.Margin = new Padding(0);
+            l.MaximumSize = new Size(karteLetztes.Innenbreite, 0);
+            pnlLetztWerte.Controls.Add(l);
+        }
+        karteLetztes.Breite(karteLetztes.Karte.Width);
+    }
+
+    // "2026-11-10 14:20" -> "10.11.2026 14:20"; unbekannte Formen bleiben
+    public static string DatumKurz(string datum)
+    {
+        string d = (datum ?? "").Trim(); DateTime x;
+        foreach (string fmt in new string[] { "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm", "yyyy-MM-dd" })
+            if (DateTime.TryParseExact(d, fmt, CultureInfo.InvariantCulture, DateTimeStyles.None, out x)) return x.ToString(fmt.Length > 10 ? "dd.MM.yyyy HH:mm" : "dd.MM.yyyy", CultureInfo.InvariantCulture);
+        return d;
+    }
+
+    // Freier Platz des Volumes, auf dem gemessen wird ("C: 300 GB frei"); ohne Laufwerksbuchstabe steht das da
+    static string DiskFrei(string[] x)
+    {
+        if (x[5].Length == 0) return "kein Laufwerksbuchstabe";
+        string best = ""; long bestFree = -1; string erster = "";
+        foreach (string l in x[5].Split(','))
+        {
+            string t = l.Trim(); if (t.Length == 0) continue;
+            if (erster.Length == 0) erster = t;
+            long free = -1;
+            // USB-Datenträger nicht abfragen (ein schlafendes Laufwerk verzögerte sonst den Start)
+            if (x.Length < 7 || x[6] != "1") try { DriveInfo di = new DriveInfo(t.Substring(0, 1)); if (di.IsReady) free = di.AvailableFreeSpace; } catch { }
+            if (free > bestFree) { bestFree = free; best = t; }
+        }
+        if (bestFree >= 0) return best + " " + GbText(bestFree) + " frei";
+        return erster + (x[4].Length > 0 ? "  ·  " + x[4] : "");
     }
 
     // Laufwerkszeile: Nummer, Name, Bus, Medium, Größe und je Laufwerksbuchstabe der freie Platz; das Ziel der Messung
@@ -10606,7 +11023,7 @@ public partial class DiagGui
         {
             string st = SavedRefText();
             warn = st.Length == 0;
-            t = warn ? "Keine Referenz festgelegt: Im Datenordner liegt weder eine eigene Referenz (Referenz.json) noch ein Median. Prozentwerte beziehen sich dann auf das eingebaute Referenzprofil." : st;
+            t = warn ? "Keine Referenz festgelegt: Im Datenordner liegt weder eine eigene Referenz noch ein Median. Prozentwerte beziehen sich auf das eingebaute Referenzprofil." : st;
         }
         else if (i >= 1 && i <= 3)
         {
@@ -10745,12 +11162,12 @@ public partial class DiagGui
     string SavedRefText()
     {
         string[] r = RefDatei("Referenz.json");
-        if (r != null && r[2] != "Median") return "Eigene Referenz: " + r[0] + (r[1].Length > 0 ? " vom " + r[1] : "") + " (Referenz.json, festgelegt in der Datenbank).";
+        if (r != null && r[2] != "Median") return "Eigene Referenz: " + r[0] + (r[1].Length > 0 ? " vom " + r[1] : "") + " (Referenz.json).";
         string dev = HwIsLaptop ? "Referenz_Notebook.json" : "Referenz_Desktop.json", alt = HwIsLaptop ? "Referenz_Desktop.json" : "Referenz_Notebook.json";
         foreach (string f in new string[] { dev, alt, "PC-Diagnose-Referenz.json" })
         {
             string[] m = RefDatei(f);
-            if (m != null) return "Keine eigene Referenz festgelegt, es gilt " + m[0] + (m[1].Length > 0 ? " vom " + m[1] : "") + " (" + f + "). Eigene Referenz: Datenbank, Lauf markieren, Aktionen \u203A Als Referenz festlegen.";
+            if (m != null) return "Keine eigene Referenz festgelegt, es gilt " + m[0] + (m[1].Length > 0 ? " vom " + m[1] : "") + " (" + f + ").";
         }
         return "";
     }
@@ -14830,10 +15247,12 @@ public partial class DiagGui
             destFree.Clear();
 
             DriveInfo[] drvs = DriveInfo.GetDrives();
+            // Systemlaufwerk einmal ermitteln; ohne Systemordner (Selbsttest unter Mono) bleibt es leer statt den Aufbau abzubrechen
+            string sysRoot = ""; try { sysRoot = Path.GetPathRoot(Environment.SystemDirectory); } catch { }
             foreach (DriveInfo d in drvs)
             {
                 if (!d.IsReady) continue;
-                if (d.DriveType == DriveType.Removable || (d.DriveType == DriveType.Fixed && d.Name != Path.GetPathRoot(Environment.SystemDirectory)))
+                if (d.DriveType == DriveType.Removable || (d.DriveType == DriveType.Fixed && d.Name != sysRoot))
                 {
                     long freeGb = d.AvailableFreeSpace / 1073741824L;
                     string fs = d.DriveFormat;
@@ -15608,7 +16027,7 @@ public partial class DiagGui
     }
 
     // Geschätzte Minuten je Modul (Index 0..4 für die 5 Module), ohne Wartezeit auf den SMART-Langtest
-    int ModuleMinutes(int mod)
+    internal int ModuleMinutes(int mod)
     {
         int t = 0;
         if (mod == 0)
@@ -15623,7 +16042,7 @@ public partial class DiagGui
             if (benchChk[0].Checked) t += kurz ? 1 : 2;
             if (benchChk[1].Checked) t += 1;
             if (benchChk[2].Checked) t += 2;
-            if (benchChk[3].Checked) t += clbDisks.CheckedItems.Count;
+            if (benchChk[3].Checked) t += DiskGewaehlt();
         }
         else if (mod == 2)
         {
@@ -15670,6 +16089,7 @@ public partial class DiagGui
     void UpdateSummary()
     {
         UpdateDiagSummary();
+        UpdateBenchSummary();
         UpdateLoadTotal();
         if (lblSel == null || btnStart == null || diagChk == null || benchChk == null || repChk == null || chkLCpu == null || chkOptRestore == null) return;
         List<string> m = SelectedModules();
@@ -15734,7 +16154,7 @@ public partial class DiagGui
             if (benchChk[3].Checked)
             {
                 List<string> dn = new List<string>();
-                for (int i = 0; i < clbDisks.Items.Count && i < diskNums.Count; i++) if (clbDisks.GetItemChecked(i)) dn.Add(diskNums[i]);
+                for (int i = 0; i < diskZeilen.Count && i < diskNums.Count; i++) if (diskZeilen[i].Checked) dn.Add(diskNums[i]);
                 if (dn.Count == 0) { MessageBox.Show(this, "Für den Laufwerks-Benchmark ist kein Laufwerk ausgewählt.", "Leos Minibench", MessageBoxButtons.OK, MessageBoxIcon.Information); ShowPage(2); return; }
                 a.Append(" -BenchLaufwerke ").Append(String.Join(",", dn.ToArray()));
             }
@@ -16297,7 +16717,6 @@ public partial class DiagGui
         btnNew.Click += delegate {
             ReloadDb();
             runView.Visible = false;
-            if (resultDashboard != null) resultDashboard.Visible = false;
             contentHost.Visible = true;
             if (foot != null) foot.Visible = true;
         };
@@ -16514,7 +16933,11 @@ public partial class DiagGui
         for (int i = 0; i < nav.Count; i++) { nav[i].Running = false; nav[i].Invalidate(); }
         contentHost.Visible = false;
         if (foot != null) foot.Visible = false;
-        if (resultDashboard != null) resultDashboard.Visible = false;
+        // ab v4.08: Das bisherige Ergebnis gilt bis zum nächsten Lauf. Eintrag und Band verschwinden; zeigte die Seite
+        // gerade das Ergebnis, steht nach einem Lauf ohne Ergebnis wieder die Startseite da.
+        erg = null; ergBewegung = false; SetzeErgebnisNav();
+        if (curPage == ergebnisPage) ShowPage(0);
+        if (bandErgGezeigt) VerbergeErgebnisBand();
         runView.Visible = true;
         btnCancel.Visible = true; btnCancel.Enabled = true;
         btnSkipStep.Visible = true; btnSkipStep.Enabled = false;
@@ -16817,15 +17240,24 @@ public partial class DiagGui
 // Ergebnisseite nach einem Lauf (Teilklasse DiagGui)
 public partial class DiagGui
 {
-    // ------------------------------------------------------------ Ergebnisseite nach einem Lauf (ab v3.9, neu in v4.01)
+    // ------------------------------------------------------------ Ergebnisseite (ab v3.9, neu in v4.01, Seite ab v4.08)
     // Oben das Urteil mit den wichtigsten Befunden und der Vergleich mit der Referenz, darunter je Komponente ein
-    // Hauptwert mit Einordnung. Gezeigt wird nur, was dieser Lauf gemessen oder gemeldet hat; Details stehen im Bericht.
-    Label lblResVerdict, lblResCounts, lblResScore, lblResScoreSub, lblResRef;
+    // Hauptwert mit Einordnung. Gezeigt wird nur, was der Lauf gemessen, gemeldet oder gespeichert hat; Details stehen
+    // im Bericht.
+    // ab v4.08 ist das Ergebnis eine Seite wie jede andere: Eintrag "Ergebnis" in der Seitenleiste unter Start, die
+    // Fußleiste bleibt, Wechsel weg und zurück ohne Neuaufbau. Nach einem Programmstart zeigt sie den letzten Lauf
+    // dieses PCs aus der Datenbank. Lage und Größe aller Teile setzt OrdneErgebnis selbst (keine verschachtelten
+    // Elemente mit AutoSize mehr: Daher kam die unten leere Kopfkarte unter Windows).
+    internal Label lblResVerdict;
+    Label lblResCounts, lblResScore, lblResScoreSub, lblResRef;
     LinkLabel lnkResRef;
-    FlowLayoutPanel pnlResFind, pnlResCmp, pnlResTiles;
-    TableLayoutPanel tblResMid;
-    CardPanel cardResFind, cardResCmp;
-    LinkLabel lnkResAll;
+    internal LinkLabel lnkResAll;
+    internal CardPanel cardResHero;
+    internal UmbruchPanel pnlDashPills;
+    internal ZeilenKarte kResFind, kResCmp;
+    internal Panel pnlResTiles;
+    Panel pnlResAct;
+    Button btnDashAgain;
     // ab v4.07: Balken und Ringe, die beim Einblenden der Seite auf ihren Wert laufen, und die Punktzahl als Zahl
     List<PercentBar> resBalken = new List<PercentBar>();
     List<RingAnzeige> resRinge = new List<RingAnzeige>();
@@ -16834,124 +17266,171 @@ public partial class DiagGui
     static readonly string[] resGruppen = new string[] { "CPU", "GPU", "RAM", "Laufwerke" };
     static readonly string[] resNamen = new string[] { "Prozessor", "Grafik", "Arbeitsspeicher", "Laufwerke" };
 
+    // Was die Ergebnisseite zeigt: Werte des eben beendeten Laufs (VomLauf) oder eines Datenbankeintrags
+    internal class ErgebnisDaten
+    {
+        public DbEntry Eintrag;
+        public bool VomLauf;
+        public int NK = -1, NW = -1, NI = -1;                                // -1: Zähler nicht gespeichert
+        public List<string[]> Befunde = new List<string[]>();                // Stufe, Bereich, Text (kritisch und Warnung)
+        public Dictionary<string, double> Pct = new Dictionary<string, double>();
+        public bool HatVergleich;                                            // Prozentwerte je Gruppe liegen vor
+        public string RefName = "", Html = "", Ordner = "", Ki = "", Meta = "", Datum = "";
+        public int Score;
+    }
+    internal ErgebnisDaten erg;
+    internal int ergebnisPage = -1, ergebnisAufbauten;
+    internal NavItem navErgebnis;
+    // Zustand von Eintrag und Band für Tests: Visible eines Elements ist falsch, solange das Fenster nicht angezeigt wird
+    internal bool ergebnisNavSichtbar, bandErgGezeigt;
+    bool ergVeraltet, ergBewegung;
+
     Control BuildResultDashboard()
     {
-        Panel p = new Panel();
-        p.Dock = DockStyle.Fill; p.AutoScroll = true; p.BackColor = UI.Bg;
-        p.Padding = new Padding(UI.S(UI.Seitenrand), UI.S(UI.Seitenrand), UI.S(UI.Seitenrand), UI.S(20));
+        Panel p = new Panel(); p.BackColor = UI.Panel; p.Size = new Size(UI.S(UI.Gruppenbreite), UI.S(400));
 
-        TableLayoutPanel main = new TableLayoutPanel();
-        main.Dock = DockStyle.Top; main.AutoSize = true; main.ColumnCount = 1; main.BackColor = UI.Bg;
-        main.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-
-        lblDashTitle = Lbl("Ergebnis", UI.SchriftTitel, true, UI.Text); lblDashTitle.Margin = new Padding(0, 0, 0, UI.S(2));
-        main.Controls.Add(lblDashTitle);
-        lblDashMeta = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblDashMeta.Margin = new Padding(0, 0, 0, UI.S(12));
-        main.Controls.Add(lblDashMeta);
+        lblDashTitle = Lbl("Ergebnis", UI.SchriftTitel, true, UI.Text); lblDashTitle.Location = new Point(0, 0);
+        lblDashMeta = Lbl("", UI.SchriftText, false, UI.Muted); lblDashMeta.AutoSize = false; lblDashMeta.AutoEllipsis = true;
+        p.Controls.Add(lblDashTitle); p.Controls.Add(lblDashMeta);
 
         // 1. Urteil links, Punktzahl rechts, darunter die Hardware
-        CardPanel hero = new CardPanel(); hero.Dock = DockStyle.Top; hero.AutoSize = true; hero.Padding = new Padding(UI.S(20), UI.S(16), UI.S(20), UI.S(16)); hero.Margin = new Padding(0, 0, 0, UI.S(12));
-        TableLayoutPanel ht = new TableLayoutPanel(); ht.Dock = DockStyle.Top; ht.AutoSize = true; ht.ColumnCount = 2; ht.RowCount = 2; ht.BackColor = UI.Panel;
-        ht.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); ht.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        FlowLayoutPanel hl = new FlowLayoutPanel(); hl.FlowDirection = FlowDirection.TopDown; hl.WrapContents = false; hl.AutoSize = true; hl.BackColor = UI.Panel; hl.Margin = new Padding(0);
-        lblResVerdict = Lbl("", 15f, true, UI.Text); lblResVerdict.Margin = new Padding(0, 0, 0, UI.S(4)); hl.Controls.Add(lblResVerdict);
-        lblResCounts = Lbl("", UI.SchriftText, false, UI.Muted); lblResCounts.Margin = new Padding(0); hl.Controls.Add(lblResCounts);
-        ht.Controls.Add(hl, 0, 0);
-        FlowLayoutPanel hr = new FlowLayoutPanel(); hr.FlowDirection = FlowDirection.TopDown; hr.WrapContents = false; hr.AutoSize = true; hr.BackColor = UI.Panel; hr.Margin = new Padding(UI.S(16), 0, 0, 0); hr.Anchor = AnchorStyles.Right | AnchorStyles.Top;
-        lblResScore = Lbl("", 22f, true, UI.Accent); lblResScore.Tag = "accent"; lblResScore.Margin = new Padding(0); lblResScore.Anchor = AnchorStyles.Right; hr.Controls.Add(lblResScore);
-        lblResScoreSub = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblResScoreSub.Margin = new Padding(0); lblResScoreSub.Anchor = AnchorStyles.Right; hr.Controls.Add(lblResScoreSub);
-        ht.Controls.Add(hr, 1, 0);
-        pnlDashPills = new FlowLayoutPanel(); pnlDashPills.AutoSize = true; pnlDashPills.WrapContents = true; pnlDashPills.BackColor = UI.Panel; pnlDashPills.Margin = new Padding(0, UI.S(12), 0, 0);
-        ht.Controls.Add(pnlDashPills, 0, 1); ht.SetColumnSpan(pnlDashPills, 2);
-        // Pillen umbrechen innerhalb der Karte (vorher wurde die vierte Pille unten abgeschnitten)
-        hero.Resize += delegate { pnlDashPills.MaximumSize = new Size(Math.Max(UI.S(200), hero.ClientSize.Width - hero.Padding.Horizontal), 0); };
-        hero.Controls.Add(ht);
-        main.Controls.Add(hero);
+        cardResHero = new CardPanel(); cardResHero.AutoSize = false; cardResHero.Padding = new Padding(0);
+        lblResVerdict = Lbl("", 15f, true, UI.Text); lblResCounts = Lbl("", UI.SchriftText, false, UI.Muted);
+        lblResScore = Lbl("", 22f, true, UI.Accent); lblResScore.Tag = "accent"; lblResScore.AutoSize = false; lblResScore.TextAlign = ContentAlignment.MiddleRight;
+        lblResScoreSub = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblResScoreSub.AutoSize = false; lblResScoreSub.TextAlign = ContentAlignment.MiddleRight;
+        pnlDashPills = new UmbruchPanel();
+        cardResHero.Controls.Add(lblResVerdict); cardResHero.Controls.Add(lblResCounts); cardResHero.Controls.Add(lblResScore); cardResHero.Controls.Add(lblResScoreSub); cardResHero.Controls.Add(pnlDashPills);
+        p.Controls.Add(cardResHero);
 
         // 2. Wichtigste Befunde und Vergleich mit der Referenz nebeneinander
-        tblResMid = new TableLayoutPanel(); tblResMid.Dock = DockStyle.Top; tblResMid.AutoSize = true; tblResMid.ColumnCount = 2; tblResMid.RowCount = 1; tblResMid.BackColor = UI.Bg; tblResMid.Margin = new Padding(0, 0, 0, UI.S(12));
-        tblResMid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55)); tblResMid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
-        cardResFind = ResCard("Was zu tun ist", out pnlResFind); cardResFind.Margin = new Padding(0, 0, UI.S(6), 0);
-        lnkResAll = new LinkLabel(); lnkResAll.Text = "Alle Befunde im Bericht"; lnkResAll.AutoSize = true; lnkResAll.LinkColor = UI.Accent; lnkResAll.ActiveLinkColor = UI.AccentHover; lnkResAll.LinkBehavior = LinkBehavior.HoverUnderline; lnkResAll.Margin = new Padding(0, UI.S(8), 0, 0);
-        lnkResAll.LinkClicked += delegate { if (File.Exists(htmlPath)) OpenShell(htmlPath); };
+        kResFind = new ZeilenKarte("Was zu tun ist"); kResFind.Karte.Margin = new Padding(0);
+        lnkResAll = KartenVerweis("Alle Befunde im Bericht"); lnkResAll.Margin = new Padding(0, UI.S(6), 0, 0);
+        lnkResAll.LinkClicked += delegate { if (erg != null && File.Exists(erg.Html)) OpenShell(erg.Html); };
         Tip(lnkResAll, "Öffnet den Bericht mit allen Befunden, Messwerten und Erklärungen.");
-        cardResCmp = ResCard("Leistung im Vergleich", out pnlResCmp); cardResCmp.Margin = new Padding(UI.S(6), 0, 0, 0);
-        lblResRef = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblResRef.Margin = new Padding(0, 0, 0, UI.S(2));
-        // ab v4.03: Weg zur Wahl der Referenz direkt von der Ergebnisseite (Seite Benchmark, Abschnitt Referenz)
-        lnkResRef = new LinkLabel(); lnkResRef.Text = "Referenz ändern"; lnkResRef.AutoSize = true; lnkResRef.LinkColor = UI.Accent; lnkResRef.ActiveLinkColor = UI.AccentHover; lnkResRef.LinkBehavior = LinkBehavior.HoverUnderline; lnkResRef.Margin = new Padding(0, 0, 0, UI.S(10));
-        lnkResRef.LinkClicked += delegate {
-            btnDashBack.PerformClick();
-            ShowPage(2);
-            if (cmbRef != null) { cmbRef.Focus(); Control sc = cmbRef.Parent; while (sc != null && !(sc is ScrollableControl && ((ScrollableControl)sc).AutoScroll)) sc = sc.Parent; if (sc != null) ((ScrollableControl)sc).ScrollControlIntoView(cmbRef); }
-        };
-        Tip(lnkResRef, "Öffnet die Seite Benchmark bei der Wahl der Referenz. Eine andere Referenz gilt ab dem nächsten Lauf; im Dashboard lassen sich vorhandene Läufe gegen jede Referenz vergleichen.");
-        tblResMid.Controls.Add(cardResFind, 0, 0); tblResMid.Controls.Add(cardResCmp, 1, 0);
-        main.Controls.Add(tblResMid);
+        kResCmp = new ZeilenKarte("Leistung im Vergleich"); kResCmp.Karte.Margin = new Padding(0);
+        lblResRef = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblResRef.Margin = new Padding(0, 0, 0, UI.S(8));
+        // ab v4.03: Weg zur Wahl der Referenz direkt von der Ergebnisseite; ab v4.08 mit dem Band "Zurück zum Ergebnis"
+        lnkResRef = KartenVerweis("Referenz ändern"); lnkResRef.Margin = new Padding(0);
+        lnkResRef.LinkClicked += delegate { ZeigeReferenzwahl(); };
+        Tip(lnkResRef, "Öffnet die Seite Benchmark bei der Wahl der Referenz; von dort führt ein Band zurück zum Ergebnis. Eine andere Referenz gilt ab dem nächsten Lauf; im Dashboard lassen sich vorhandene Läufe gegen jede Referenz vergleichen.");
+        kResCmp.KopfRechts.Controls.Add(lnkResRef);
+        p.Controls.Add(kResFind.Karte); p.Controls.Add(kResCmp.Karte);
 
         // 3. Komponenten: je ein Hauptwert mit Einordnung
-        pnlResTiles = new FlowLayoutPanel(); pnlResTiles.AutoSize = true; pnlResTiles.WrapContents = true; pnlResTiles.BackColor = UI.Bg; pnlResTiles.Margin = new Padding(0, 0, 0, UI.S(12));
-        main.Controls.Add(pnlResTiles);
+        pnlResTiles = new Panel(); pnlResTiles.BackColor = UI.Panel; p.Controls.Add(pnlResTiles);
 
-        // 4. Knöpfe: links zurück, rechts der Bericht als Hauptaktion
-        TableLayoutPanel act = new TableLayoutPanel(); act.Dock = DockStyle.Top; act.AutoSize = true; act.ColumnCount = 2; act.BackColor = UI.Bg; act.Margin = new Padding(0, UI.S(4), 0, UI.S(12));
-        act.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); act.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        btnDashBack = UI.Secondary("Zurück"); btnDashBack.Margin = new Padding(0);
-        btnDashBack.Click += delegate {
-            resultDashboard.Visible = false; runView.Visible = false; contentHost.Visible = true; foot.Visible = true;
-            for (int i = 0; i < nav.Count; i++) nav[i].Running = false;
-        };
-        Tip(btnDashBack, "Kehrt zur Auswahl des Ablaufs zurück.");
-        act.Controls.Add(btnDashBack, 0, 0);
-        FlowLayoutPanel ar = new FlowLayoutPanel(); ar.AutoSize = true; ar.WrapContents = false; ar.FlowDirection = FlowDirection.RightToLeft; ar.BackColor = UI.Bg; ar.Margin = new Padding(0);
-        btnDashOpenHtml = UI.Primary("Bericht öffnen"); btnDashOpenHtml.Margin = new Padding(0);
-        btnDashOpenHtml.Click += delegate { OpenShell(htmlPath); };
+        // 4. Knöpfe: links erneut messen, rechts der Bericht als Hauptaktion
+        pnlResAct = new Panel(); pnlResAct.BackColor = UI.Panel;
+        btnDashAgain = UI.Secondary("Erneut messen");
+        btnDashAgain.Click += delegate { ErneutMessen(); };
+        Tip(btnDashAgain, "Startet den gewählten Ablauf noch einmal, mit derselben Übersicht vor dem Start wie der Startknopf. Ist links kein Modul angehakt, werden die messenden Module dieses Laufs angehakt (Diagnose, Benchmark, Lasttest).");
+        btnDashOpenHtml = UI.Primary("Bericht öffnen");
+        btnDashOpenHtml.Click += delegate { if (erg != null && File.Exists(erg.Html)) OpenShell(erg.Html); };
         Tip(btnDashOpenHtml, "Öffnet den vollständigen Bericht im Browser.");
-        btnDashVerlauf = UI.Secondary("Verlauf"); btnDashVerlauf.Margin = new Padding(0, 0, UI.S(8), 0);
-        btnDashVerlauf.Click += delegate { OpenDeviceHistory(); };
+        btnDashVerlauf = UI.Secondary("Verlauf");
+        btnDashVerlauf.Click += delegate { if (erg != null && erg.Eintrag != null) OpenDeviceHistory(erg.Eintrag); else OpenDeviceHistory(); };
         Tip(btnDashVerlauf, "Vergleicht diesen Lauf im Dashboard mit früheren Läufen desselben Geräts.");
-        btnDashFolder = UI.Secondary("Berichtsordner"); btnDashFolder.Margin = new Padding(0, 0, UI.S(8), 0);
-        btnDashFolder.Click += delegate { OpenShell(outDir); };
+        btnDashFolder = UI.Secondary("Berichtsordner");
+        btnDashFolder.Click += delegate { if (erg != null && Directory.Exists(erg.Ordner)) OpenShell(erg.Ordner); };
         Tip(btnDashFolder, "Öffnet den Berichtsordner im Explorer.");
-        btnDashKi = UI.Secondary("KI-Datei"); btnDashKi.Margin = new Padding(0, 0, UI.S(8), 0);
-        btnDashKi.Click += delegate { OpenSelect(kiPath); };
+        btnDashKi = UI.Secondary("KI-Datei");
+        btnDashKi.Click += delegate { if (erg != null && File.Exists(erg.Ki)) OpenSelect(erg.Ki); };
         Tip(btnDashKi, "Zeigt die Datei für die KI-Auswertung im Explorer.");
-        ar.Controls.Add(btnDashOpenHtml); ar.Controls.Add(btnDashVerlauf); ar.Controls.Add(btnDashFolder); ar.Controls.Add(btnDashKi);
-        act.Controls.Add(ar, 1, 0);
-        main.Controls.Add(act);
+        foreach (Button b in new Button[] { btnDashAgain, btnDashKi, btnDashFolder, btnDashVerlauf, btnDashOpenHtml }) { b.Margin = new Padding(0); pnlResAct.Controls.Add(b); }
+        p.Controls.Add(pnlResAct);
 
-        p.Controls.Add(main);
-        p.Resize += delegate { LayoutResTiles(); };
-        main.SizeChanged += delegate { LayoutResTiles(); };
+        if (content != null)
+        {
+            content.Resize += delegate { if (curPage == ergebnisPage) OrdneErgebnis(); };
+            content.ClientSizeChanged += delegate { if (curPage == ergebnisPage) OrdneErgebnis(); };
+        }
         return p;
     }
 
-    CardPanel ResCard(string title, out FlowLayoutPanel body)
-    {
-        CardPanel c = new CardPanel(); c.Dock = DockStyle.Fill; c.AutoSize = true; c.Padding = new Padding(UI.S(18), UI.S(14), UI.S(18), UI.S(14));
-        FlowLayoutPanel f = new FlowLayoutPanel(); f.Dock = DockStyle.Top; f.AutoSize = true; f.FlowDirection = FlowDirection.TopDown; f.WrapContents = false; f.BackColor = UI.Panel;
-        Label lt = Lbl(title, UI.SchriftAbschnitt, true, UI.Text); lt.Margin = new Padding(0, 0, 0, UI.S(10)); f.Controls.Add(lt);
-        c.Controls.Add(f); body = f;
-        return c;
-    }
+    // Lage und Größe aller Teile der Ergebnisseite für die Seitenbreite. Alle Höhen sind gemessen oder fest, nichts hängt
+    // von AutoSize verschachtelter Elemente ab.
+    // Gewollte Sichtbarkeit von Karte und Knöpfen: Visible eines Elements ist falsch, solange seine Seite nicht angezeigt
+    // wird, die Seite wird aber auch im Hintergrund geordnet (nach einem Lauf, vor dem ersten Öffnen).
+    Dictionary<Control, bool> ergSoll = new Dictionary<Control, bool>();
+    void ErgZeige(Control c, bool v) { ergSoll[c] = v; c.Visible = v; }
+    bool ErgSoll(Control c) { bool v; return !ergSoll.TryGetValue(c, out v) || v; }
 
-    // Kacheln gleich breit: vier nebeneinander, bei schmalem Fenster zwei
-    void LayoutResTiles()
+    bool ordnetErgebnis;
+    void OrdneErgebnis()
     {
-        if (pnlResTiles == null || resultDashboard == null) return;
-        Control mainT = pnlResTiles.Parent;
-        int avail = (mainT != null ? mainT.ClientSize.Width : resultDashboard.ClientSize.Width - resultDashboard.Padding.Horizontal) - UI.S(6);
-        int n = pnlResTiles.Controls.Count; if (n == 0 || avail < UI.S(200)) return;
-        int perRow = avail >= UI.S(900) ? Math.Min(4, n) : Math.Min(2, n);
-        int w = (avail - (perRow - 1) * UI.S(12)) / perRow;
-        for (int i = 0; i < n; i++)
+        if (resultDashboard == null || ordnetErgebnis) return;
+        ordnetErgebnis = true;
+        try
         {
-            Control c = pnlResTiles.Controls[i];
-            c.Width = w;
-            c.Margin = new Padding(0, 0, (i % perRow) == perRow - 1 ? 0 : UI.S(12), UI.S(12));
+            int w = SeitenBreite(), y = 0, gap = UI.S(UI.Abstand3);
+            y = lblDashTitle.PreferredSize.Height + UI.S(2);
+            int mh = TextRenderer.MeasureText("Äg", lblDashMeta.Font).Height + UI.S(2);
+            lblDashMeta.SetBounds(0, y, w, mh);
+            y += mh + UI.S(10);
+
+            // Kopfkarte
+            int px = UI.S(20), py = UI.S(16);
+            Size vs = lblResVerdict.PreferredSize, cs = lblResCounts.PreferredSize;
+            lblResVerdict.Location = new Point(px, py);
+            lblResCounts.Location = new Point(px, py + vs.Height + UI.S(2));
+            int links = py + vs.Height + UI.S(2) + cs.Height, rechts = py;
+            if (lblResScoreSub.Text.Length > 0)
+            {
+                string ziel = resScore > 0 ? resScore.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("de-DE")) : lblResScore.Text;
+                Size ss = TextRenderer.MeasureText(ziel, lblResScore.Font), us = TextRenderer.MeasureText(lblResScoreSub.Text, lblResScoreSub.Font);
+                int sw = Math.Max(ss.Width, us.Width) + UI.S(4);
+                lblResScore.SetBounds(w - px - sw, py - UI.S(4), sw, ss.Height);
+                lblResScoreSub.SetBounds(w - px - sw, py - UI.S(4) + ss.Height, sw, us.Height);
+                rechts = py - UI.S(4) + ss.Height + us.Height;
+            }
+            lblResScore.Visible = lblResScoreSub.Visible = lblResScoreSub.Text.Length > 0;
+            int top = Math.Max(links, rechts);
+            pnlDashPills.Location = new Point(px, top + gap);
+            pnlDashPills.Width = Math.Max(UI.S(200), w - 2 * px); pnlDashPills.Ordne();
+            int hh = (pnlDashPills.Controls.Count > 0 ? pnlDashPills.Bottom - UI.S(6) : top) + py;
+            cardResHero.SetBounds(0, y, w, hh);
+            y += hh + gap;
+
+            // Befunde und Vergleich, gleich hoch
+            bool cmp = ErgSoll(kResCmp.Karte);
+            int wl = cmp ? (w - gap) * 55 / 100 : w, wr = w - gap - wl;
+            kResFind.MinHoehe = 0; kResCmp.MinHoehe = 0;
+            kResFind.Breite(wl); if (cmp) kResCmp.Breite(wr);
+            // Balken im schmalen Fenster kürzer, damit Prozentzahl und Einordnung daneben in die Karte passen
+            int bw = Math.Max(UI.S(50), Math.Min(UI.S(120), kResCmp.Innenbreite - UI.S(120) - UI.S(10) - UI.S(155)));
+            foreach (PercentBar pb in resBalken) if (!pb.IsDisposed && pb.Width != bw) pb.Width = bw;
+            int kh = Math.Max(kResFind.InhaltHoehe, cmp ? kResCmp.InhaltHoehe : 0);
+            kResFind.MinHoehe = kh; kResCmp.MinHoehe = kh;
+            kResFind.Karte.Location = new Point(0, y); kResCmp.Karte.Location = new Point(wl + gap, y);
+            y += kh + gap;
+
+            // Kacheln gleich breit: vier nebeneinander, bei schmalem Fenster zwei
+            int n = pnlResTiles.Controls.Count;
+            pnlResTiles.Visible = n > 0;
+            if (n > 0)
+            {
+                int perRow = w >= UI.S(900) ? Math.Min(4, n) : Math.Min(2, n);
+                int tw = (w - (perRow - 1) * gap) / perRow, th = UI.S(150), zeilen = (n + perRow - 1) / perRow;
+                for (int i = 0; i < n; i++) pnlResTiles.Controls[i].SetBounds((i % perRow) * (tw + gap), (i / perRow) * (th + gap), tw, th);
+                pnlResTiles.SetBounds(0, y, w, zeilen * th + (zeilen - 1) * gap);
+                y += pnlResTiles.Height + gap;
+            }
+
+            // Knöpfe
+            int ah = 0; foreach (Control b in pnlResAct.Controls) ah = Math.Max(ah, b.PreferredSize.Height);
+            btnDashAgain.Size = btnDashAgain.PreferredSize; btnDashAgain.Location = new Point(0, (ah - btnDashAgain.Height) / 2);
+            int rx = w;
+            foreach (Button b in new Button[] { btnDashOpenHtml, btnDashVerlauf, btnDashFolder, btnDashKi })
+            {
+                if (!ErgSoll(b)) continue;
+                b.Size = b.PreferredSize; rx -= b.Width; b.Location = new Point(rx, (ah - b.Height) / 2); rx -= UI.S(8);
+            }
+            pnlResAct.SetBounds(0, y + UI.S(4), w, ah);
+            y += ah + UI.S(4) + UI.S(8);
+            Size s = new Size(w, y);
+            if (resultDashboard.Size != s) resultDashboard.Size = s;
         }
-        pnlResTiles.MaximumSize = new Size(avail + UI.S(4), 0);
-        int findW = (cardResCmp != null && cardResCmp.Visible ? avail * 55 / 100 : avail) - UI.S(150);
-        foreach (Control c in pnlResFind.Controls) if (c is FlowLayoutPanel) foreach (Control k in c.Controls) if (k is Label && !(k is LinkLabel)) k.MaximumSize = new Size(Math.Max(UI.S(200), findW), 0);
+        finally { ordnetErgebnis = false; }
     }
 
     // Einordnung gegenüber der Referenz, nicht gegenüber einem Durchschnitt: Die Referenz ist ein bestimmter PC
@@ -16963,15 +17442,20 @@ public partial class DiagGui
     }
     static string RatingLevel(double pct) { return pct >= 90 ? "ok" : pct >= 45 ? "info" : "skip"; }
 
-    // Name der Referenz für "100 % = ..." (gespeicherte Referenz mit Namen, sonst die Auswahl im Benchmark)
+    // Name der Referenz für "100 % = ...": der mit dem Lauf gespeicherte Name, sonst die geltende Auswahl im Benchmark
+    // (bei "Gespeicherte Referenz" der Name der Referenzdatei; bis v4.07 stand dort nur der Text der Auswahl)
     string RefLabelText()
     {
+        if (erg != null && erg.RefName.Length > 0) return erg.RefName;
         if (cmbRef == null || cmbRef.SelectedIndex <= 0)
         {
-            string s = SavedRefText();
-            if (s.StartsWith("Gespeicherte Referenz: ")) return "Referenz-PC " + s.Substring(23);
+            string[] r = RefDatei("Referenz.json");
+            if (r != null && r[2] != "Median" && r[0].Length > 0) return r[0];
+            string dev = HwIsLaptop ? "Referenz_Notebook.json" : "Referenz_Desktop.json", alt = HwIsLaptop ? "Referenz_Desktop.json" : "Referenz_Notebook.json";
+            foreach (string f in new string[] { dev, alt, "PC-Diagnose-Referenz.json" }) { string[] m = RefDatei(f); if (m != null && m[0].Length > 0) return m[0]; }
+            return "eingebautes Referenzprofil";
         }
-        return cmbRef != null && cmbRef.Text.Length > 0 ? cmbRef.Text : "Referenz";
+        return cmbRef.Text.Length > 0 ? cmbRef.Text : "Referenz";
     }
 
     // "Samsung SSD 980 1TB (931,5 GB, NVMe, Healthy); ..." -> eine kurze Pille je Laufwerk
@@ -17041,20 +17525,170 @@ public partial class DiagGui
         return a.Equals(b, StringComparison.OrdinalIgnoreCase) || a.EndsWith("\\" + b, StringComparison.OrdinalIgnoreCase);
     }
 
-    // Zeigt die Ergebnisseite und lässt Punktzahl, Balken und Ringe einmal auf ihren Wert laufen (ab v4.07).
-    // Die Werte selbst stehen schon fest; ohne Bewegung (Einstellungen, Remotesitzung) erscheint sofort der Endstand.
+    // "[WARNUNG] RAM: XMP inaktiv ..." -> Stufe, Bereich, Text (Form der Befundliste im Datenbankeintrag)
+    public static string[] BefundTeile(string zeile)
+    {
+        System.Text.RegularExpressions.Match m = System.Text.RegularExpressions.Regex.Match(zeile ?? "", @"^\s*\[([^\]]+)\]\s*([^:]*):\s*(.*)$", System.Text.RegularExpressions.RegexOptions.Singleline);
+        if (!m.Success) return new string[] { "", "", (zeile ?? "").Trim() };
+        return new string[] { m.Groups[1].Value.Trim().ToUpperInvariant(), m.Groups[2].Value.Trim(), m.Groups[3].Value.Trim() };
+    }
+
+    // Kritische Befunde zuerst, dann Warnungen, jeweils in der Reihenfolge des Laufs (Hinweise stehen nur im Bericht)
+    public static List<string[]> WichtigeBefunde(List<string[]> alle)
+    {
+        List<string[]> r = new List<string[]>();
+        foreach (string stufe in new string[] { "KRITISCH", "WARNUNG" })
+            foreach (string[] b in alle) if (b != null && b.Length >= 3 && b[0] == stufe) r.Add(b);
+        return r;
+    }
+
+    // Ordner eines Datenbankeintrags auf diesem Datenträger (wie OpenEntry): relativ zum Datenordner, sonst der
+    // gleichnamige Ordner unter Berichte; leer, wenn es ihn nicht gibt
+    string EintragOrdner(DbEntry e)
+    {
+        if (e == null || e.Ordner.Length == 0) return "";
+        try
+        {
+            string dir = System.IO.Path.IsPathRooted(e.Ordner) ? e.Ordner : System.IO.Path.Combine(dataDir, e.Ordner);
+            if (!Directory.Exists(dir)) { string alt = System.IO.Path.Combine(System.IO.Path.Combine(dataDir, "Berichte"), System.IO.Path.GetFileName(e.Ordner.TrimEnd('\\', '/'))); if (Directory.Exists(alt)) dir = alt; }
+            return Directory.Exists(dir) ? dir : "";
+        }
+        catch { return ""; }
+    }
+
+    // Ergebnis aus einem Datenbankeintrag: nur, was dort gespeichert ist. Prozentwerte je Gruppe und der Name der
+    // Referenz stehen ab v4.08 im Feld Vergleich; bei älteren Läufen bleibt HatVergleich falsch.
+    internal ErgebnisDaten ErgebnisAusEintrag(DbEntry e)
+    {
+        ErgebnisDaten d = new ErgebnisDaten();
+        d.Eintrag = e; d.NK = e.NK; d.NW = e.NW; d.NI = e.NI; d.Score = (int)e.OverallScore; d.Datum = e.Datum;
+        List<string[]> alle = new List<string[]>();
+        foreach (string z in e.BefundListe) alle.Add(BefundTeile(z));
+        d.Befunde = WichtigeBefunde(alle);
+        foreach (KeyValuePair<string, double> kv in e.GruppenPct) d.Pct[kv.Key] = kv.Value;
+        d.HatVergleich = e.GruppenPct.Count > 0; d.RefName = e.RefName;
+        d.Ordner = EintragOrdner(e);
+        if (d.Ordner.Length > 0)
+        {
+            string html = System.IO.Path.Combine(d.Ordner, "Diagnosebericht.html"); if (File.Exists(html)) d.Html = html;
+            try { foreach (string k in Directory.GetFiles(d.Ordner, "KI-Analyse_*.txt")) if (k.IndexOf("Kurz", StringComparison.OrdinalIgnoreCase) < 0) { d.Ki = k; break; } } catch { }
+        }
+        d.Meta = String.Format("{0}  ·  Lauf vom {1}{2}", e.DisplayName, DatumKurz(e.Datum), e.Module.Length > 0 ? "  ·  " + e.Module : "");
+        return d;
+    }
+
+    // Ergebnis des eben beendeten Laufs: Zähler, Befunde und Prozentwerte aus der Laufansicht, Hardware und Messwerte aus
+    // dem Datenbankeintrag dieses Laufs (falls geschrieben)
+    ErgebnisDaten ErgebnisAusLauf(DbEntry e)
+    {
+        ErgebnisDaten d = new ErgebnisDaten();
+        d.Eintrag = e; d.VomLauf = true; d.NK = nK; d.NW = nW; d.NI = nI; d.Score = e != null ? (int)e.OverallScore : 0;
+        d.Datum = e != null ? e.Datum : DateTime.Now.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+        List<string[]> alle = new List<string[]>();
+        if (lvFind != null)
+            foreach (ListViewItem it in lvFind.Items)
+                alle.Add(new string[] { it.SubItems[0].Text.ToUpperInvariant(), it.SubItems.Count > 1 ? it.SubItems[1].Text : "", it.SubItems.Count > 2 ? it.SubItems[2].Text : "" });
+        d.Befunde = WichtigeBefunde(alle);
+        foreach (string g in resGruppen) { double p = GroupRefPct(g); if (!double.IsNaN(p)) d.Pct[g] = p; }
+        d.HatVergleich = d.Pct.Count > 0;
+        d.RefName = e != null ? e.RefName : "";
+        d.Html = htmlPath; d.Ordner = outDir; d.Ki = kiPath;
+        d.Meta = String.Format("{0}  ·  Lauf vom {1}{2}{3}",
+            e != null ? e.DisplayName : Environment.MachineName, DatumKurz(d.Datum),
+            runStarted != DateTime.MinValue ? String.Format("  ·  Dauer {0:mm\\:ss} Min.", DateTime.Now - runStarted) : "",
+            e != null && e.Module.Length > 0 ? "  ·  " + e.Module : "");
+        return d;
+    }
+
+    // Eintrag in der Seitenleiste: sichtbar, sobald es ein Ergebnis gibt, mit der Punktzahl als Pille
+    void SetzeErgebnisNav()
+    {
+        if (navErgebnis == null) return;
+        bool da = erg != null;
+        string h = da && erg.Score > 0 ? erg.Score.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("de-DE")) : "";
+        if (navErgebnis.Hint != h) { navErgebnis.Hint = h; navErgebnis.Invalidate(); }
+        ergebnisNavSichtbar = da;
+        navErgebnis.Visible = da;
+        if (da) Tip(navErgebnis, "Ergebnis: " + (erg.VomLauf ? "der Lauf von eben" : "der letzte Lauf dieses PCs aus der Datenbank") + " (" + DatumKurz(erg.Datum) + ") mit Urteil, Vergleich zur Referenz und den Hauptwerten je Komponente.");
+    }
+
+    // Letzter Lauf dieses PCs aus der Datenbank als Ergebnis (nach dem Programmstart, nach Änderungen an der Datenbank
+    // und nach einem Lauf ohne Ergebnisseite). Ein Ergebnis des eben beendeten Laufs bleibt stehen.
+    internal void LadeErgebnisAusDatenbank()
+    {
+        if (running || (erg != null && erg.VomLauf)) return;
+        DbEntry e = GetCurrentPcLastRun();
+        erg = e != null ? ErgebnisAusEintrag(e) : null;
+        ergVeraltet = erg != null; ergBewegung = false;
+        SetzeErgebnisNav();
+        if (curPage == ergebnisPage && ergebnisPage >= 0)
+        {
+            if (erg == null) ShowPage(0);
+            else { FuelleErgebnis(); OrdneErgebnis(); }
+        }
+    }
+
+    // Öffnet die Ergebnisseite mit dem letzten Lauf (Karte "Letzter Lauf" der Startseite, Kasten auf der Seite Benchmark)
+    internal void ZeigeLetztesErgebnis()
+    {
+        if (running) return;
+        if (erg == null) LadeErgebnisAusDatenbank();
+        if (erg != null && ergebnisPage >= 0) ShowPage(ergebnisPage);
+    }
+
+    // "Referenz ändern": Seite Benchmark bei der Wahl der Referenz, darüber das Band "Zurück zum Ergebnis". Das Band
+    // verschwindet beim nächsten Seitenwechsel und beim Start eines Laufs.
+    internal void ZeigeReferenzwahl()
+    {
+        if (running) return;
+        ShowPage(2);
+        if (bandErg != null && erg != null)
+        {
+            SetText(lblBandErg, String.Format("Lauf vom {0}{1}  ·  eine andere Referenz gilt ab dem nächsten Lauf", DatumKurz(erg.Datum),
+                erg.Score > 0 ? "  ·  " + erg.Score.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("de-DE")) + " Punkte" : ""));
+            bandErg.Visible = true; bandErgGezeigt = true;
+            OrdneModulSeiten();
+        }
+        if (cmbRef != null) { cmbRef.Focus(); content.ScrollControlIntoView(cmbRef); }
+    }
+
+    void VerbergeErgebnisBand()
+    {
+        bandErgGezeigt = false;
+        if (bandErg != null) bandErg.Visible = false;
+        OrdneModulSeiten();
+    }
+
+    // "Erneut messen": derselbe Weg wie der Startknopf. Ist kein Modul angehakt (Ergebnis aus der Datenbank nach dem
+    // Programmstart), werden die messenden Module des gezeigten Laufs angehakt; Wartung und Optimierung nie von selbst.
+    void ErneutMessen()
+    {
+        if (running) return;
+        if (SelectedModules().Count == 0)
+        {
+            string m = erg != null && erg.Eintrag != null ? erg.Eintrag.Module : "";
+            bool etwas = false;
+            string[] namen = new string[] { "Diagnose", "Benchmark", "Lasttest" };
+            for (int i = 0; i < namen.Length; i++) if (m.IndexOf(namen[i], StringComparison.OrdinalIgnoreCase) >= 0) { nav[i + 1].Checked = true; etwas = true; }
+            if (!etwas) nav[2].Checked = true;
+        }
+        StartRun();
+    }
+
+    // Zeigt die Ergebnisseite nach einem Lauf. Punktzahl, Balken und Ringe laufen dabei einmal auf ihren Wert (ab v4.07),
+    // bei jeder späteren Rückkehr steht sofort der Endstand (ab v4.08).
     void ZeigeErgebnis()
     {
-        if (resultDashboard == null) return;
-        resultDashboard.Visible = true;
+        if (resultDashboard == null || ergebnisPage < 0) return;
+        ShowPage(ergebnisPage);
+        contentHost.Visible = true; if (foot != null) foot.Visible = true;
+    }
+
+    // Die Werte selbst stehen schon fest; ohne Bewegung (Einstellungen, Remotesitzung) erscheint sofort der Endstand.
+    void StarteErgebnisBewegung()
+    {
         System.Globalization.CultureInfo de = System.Globalization.CultureInfo.GetCultureInfo("de-DE");
         int ziel = resScore;
-        // Breite der Punktzahl vorab auf den Endwert festlegen, damit sich beim Hochzählen nichts verschiebt
-        if (lblResScore != null)
-        {
-            lblResScore.MinimumSize = Size.Empty;
-            if (ziel > 0) { lblResScore.Text = ziel.ToString("N0", de); lblResScore.MinimumSize = new Size(lblResScore.PreferredWidth, 0); lblResScore.TextAlign = ContentAlignment.MiddleRight; }
-        }
         Bewegung.Starte(resultDashboard, Bewegung.DauerErgebnis, delegate(double t) {
             if (ziel > 0 && lblResScore != null) lblResScore.Text = ((int)Math.Round(ziel * t)).ToString("N0", de);
             foreach (PercentBar pb in resBalken) if (!pb.IsDisposed) pb.Anteil = t;
@@ -17062,32 +17696,55 @@ public partial class DiagGui
         });
     }
 
+    // Beim Wechsel auf die Seite (aus ShowPage): Inhalt nur aufbauen, wenn sich das Ergebnis geändert hat
+    void ErgebnisSeiteGezeigt()
+    {
+        if (erg == null) return;
+        if (ergVeraltet) FuelleErgebnis();
+        OrdneErgebnis();
+        if (ergBewegung) { ergBewegung = false; StarteErgebnisBewegung(); }
+    }
+
+    // Nach einem Lauf: Ergebnis aus dem Lauf übernehmen und die Seite aufbauen; die Bewegung startet beim Anzeigen
     void PopulateResultDashboard()
     {
         ReloadDb();
         DbEntry e = null;
         if (!String.IsNullOrEmpty(outDir))
             foreach (DbEntry dbe in db) { if (ErgebnisOrdnerPasst(outDir, dbe.Ordner)) { e = dbe; break; } }
+        erg = ErgebnisAusLauf(e);
+        FuelleErgebnis();
+        ergBewegung = true;
+        SetzeErgebnisNav();
+        FuelleLetztesErgebnis();
+    }
+
+    void FuelleErgebnis()
+    {
+        if (erg == null || resultDashboard == null) return;
+        ergVeraltet = false; ergebnisAufbauten++;
+        ErgebnisDaten d = erg; DbEntry e = d.Eintrag;
         System.Globalization.CultureInfo de = System.Globalization.CultureInfo.GetCultureInfo("de-DE");
+        resultDashboard.SuspendLayout();
+        lblDashMeta.Text = d.Meta;
 
-        lblDashMeta.Text = String.Format("{0}  ·  {1}{2}",
-            e != null ? e.DisplayName : Environment.MachineName,
-            e != null ? "Lauf vom " + e.Datum : DateTime.Now.ToString("dd.MM.yyyy HH:mm"),
-            runStarted != DateTime.MinValue ? String.Format("  ·  Dauer {0:mm\\:ss} Min.", DateTime.Now - runStarted) : "");
+        // Urteil aus den Befunden des Laufs
+        if (d.NK < 0) { lblResVerdict.Text = "Befunde nicht gespeichert"; lblResVerdict.ForeColor = UI.Muted; lblResCounts.Text = "Dieser Eintrag trägt keine Befunde (Import oder älterer Lauf)."; }
+        else
+        {
+            if (d.NK > 0) { lblResVerdict.Text = d.NK == 1 ? "1 kritischer Befund" : d.NK + " kritische Befunde"; lblResVerdict.ForeColor = UI.Crit; }
+            else if (d.NW > 0) { lblResVerdict.Text = d.NW == 1 ? "1 Warnung" : d.NW + " Warnungen"; lblResVerdict.ForeColor = UI.Warn; }
+            else { lblResVerdict.Text = "Keine Auffälligkeiten"; lblResVerdict.ForeColor = UI.Ok; }
+            lblResCounts.Text = String.Format("{0} kritisch  ·  {1} Warnungen  ·  {2} Hinweise", d.NK, d.NW, d.NI);
+        }
 
-        // Urteil aus den Befunden dieses Laufs
-        if (nK > 0) { lblResVerdict.Text = nK == 1 ? "1 kritischer Befund" : nK + " kritische Befunde"; lblResVerdict.ForeColor = UI.Crit; }
-        else if (nW > 0) { lblResVerdict.Text = nW == 1 ? "1 Warnung" : nW + " Warnungen"; lblResVerdict.ForeColor = UI.Warn; }
-        else { lblResVerdict.Text = "Keine Auffälligkeiten"; lblResVerdict.ForeColor = UI.Ok; }
-        lblResCounts.Text = String.Format("{0} kritisch  ·  {1} Warnungen  ·  {2} Hinweise", nK, nW, nI);
-
-        int score = e != null ? (int)e.OverallScore : 0;
-        resScore = score; resBalken.Clear(); resRinge.Clear();
-        lblResScore.Text = score > 0 ? score.ToString("N0", de) : "";
-        lblResScoreSub.Text = score > 0 ? "Punkte gesamt" : "";
+        resScore = d.Score; resBalken.Clear(); resRinge.Clear();
+        lblResScore.Text = d.Score > 0 ? d.Score.ToString("N0", de) : "";
+        lblResScoreSub.Text = d.Score > 0 ? "Punkte gesamt" : "";
         lblResScore.ForeColor = UI.Accent;
 
-        pnlDashPills.Controls.Clear();
+        pnlDashPills.SuspendLayout();
+        while (pnlDashPills.Controls.Count > 0) { Control c = pnlDashPills.Controls[0]; pnlDashPills.Controls.RemoveAt(0); c.Dispose(); }
         if (e != null)
         {
             if (!String.IsNullOrEmpty(e.CpuDisplay)) pnlDashPills.Controls.Add(new PillLabel(e.CpuDisplay));
@@ -17095,96 +17752,113 @@ public partial class DiagGui
             if (!String.IsNullOrEmpty(e.Ram)) pnlDashPills.Controls.Add(new PillLabel(e.Ram));
             foreach (string dp in DiskPills(e.Disk)) { PillLabel pl = new PillLabel(dp); Tip(pl, e.Disk); pnlDashPills.Controls.Add(pl); }
         }
+        pnlDashPills.ResumeLayout(false);
 
-        // Wichtigste Befunde: kritische zuerst, dann Warnungen, höchstens fünf
-        while (pnlResFind.Controls.Count > 1) pnlResFind.Controls.RemoveAt(1);
+        // Wichtigste Befunde: kritische zuerst, dann Warnungen, höchstens fünf; der Verweis auf den Bericht steht immer
+        // als letztes Element darunter (bis v4.07 konnte er über dem Text landen)
+        FlowLayoutPanel pf = kResFind.Inhalt;
+        kResFind.Leere(lnkResAll);
+        pf.SuspendLayout();
         int shown = 0;
-        if (lvFind != null)
-            foreach (ListViewItem it in lvFind.Items)
-            {
-                string lev = it.SubItems[0].Text;
-                if (lev != "KRITISCH" && lev != "WARNUNG") continue;
-                if (shown >= 5) break;
-                FlowLayoutPanel r = new FlowLayoutPanel(); r.AutoSize = true; r.WrapContents = false; r.BackColor = UI.Panel; r.Margin = new Padding(0, 0, 0, UI.S(8));
-                Badge b = new Badge(lev == "KRITISCH" ? "Kritisch" : "Warnung", lev == "KRITISCH" ? "crit" : "warn"); b.Margin = new Padding(0, UI.S(1), UI.S(10), 0); b.Width = Math.Max(b.Width, UI.S(72));
-                Label lt = Lbl(it.SubItems.Count > 2 ? it.SubItems[2].Text : "", UI.SchriftHinweis, false, UI.Text); lt.Margin = new Padding(0, UI.S(2), 0, 0);
-                Tip(lt, (it.SubItems.Count > 1 ? it.SubItems[1].Text + ": " : "") + (it.SubItems.Count > 2 ? it.SubItems[2].Text : ""));
-                r.Controls.Add(b); r.Controls.Add(lt); pnlResFind.Controls.Add(r);
-                shown++;
-            }
-        if (shown == 0)
+        foreach (string[] b in d.Befunde)
         {
-            Label ok = Lbl(nI > 0 ? "Keine kritischen Befunde und keine Warnungen. " + (nI == 1 ? "1 Hinweis" : nI + " Hinweise") + " stehen im Bericht." : "Keine kritischen Befunde, keine Warnungen und keine Hinweise.", UI.SchriftText, false, UI.Text);
-            ok.MaximumSize = new Size(UI.S(440), 0); pnlResFind.Controls.Add(ok);
+            if (shown >= 5) break;
+            Panel r = new Panel(); r.BackColor = UI.Panel; r.Margin = new Padding(0, 0, 0, UI.S(6));
+            Badge bd = new Badge(b[0] == "KRITISCH" ? "Kritisch" : "Warnung", b[0] == "KRITISCH" ? "crit" : "warn"); bd.Width = Math.Max(bd.Width, UI.S(72)); bd.Location = new Point(0, UI.S(1));
+            Label lt = Lbl(b[2], UI.SchriftHinweis, false, UI.Text); lt.AutoSize = false; lt.Location = new Point(bd.Width + UI.S(10), UI.S(1));
+            Tip(lt, (b[1].Length > 0 ? b[1] + ": " : "") + b[2]);
+            r.Controls.Add(bd); r.Controls.Add(lt);
+            // Text bricht an der Breite der Karte um, die Zeile wird so hoch wie der Text
+            r.Resize += delegate {
+                int tw = Math.Max(UI.S(120), r.Width - lt.Left);
+                int th = Math.Max(bd.Height, TextRenderer.MeasureText(lt.Text, lt.Font, new Size(tw, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height + UI.S(2));
+                lt.Size = new Size(tw, th);
+                if (r.Height != th + UI.S(2)) r.Height = th + UI.S(2);
+            };
+            r.Height = bd.Height + UI.S(2);
+            kResFind.Zeile(r);
+            shown++;
         }
-        else if (nK + nW > shown)
-        {
-            Label more = Lbl(String.Format("und {0} weitere", nK + nW - shown), UI.SchriftHinweis, false, UI.Muted); more.Margin = new Padding(0, 0, 0, UI.S(2)); pnlResFind.Controls.Add(more);
-        }
-        lnkResAll.Visible = File.Exists(htmlPath);
-        pnlResFind.Controls.Add(lnkResAll);
+        string hinweis = "";
+        if (d.NK < 0) hinweis = "Die Befunde dieses Laufs sind nicht gespeichert.";
+        else if (shown == 0 && d.NK + d.NW > 0) hinweis = "Die Befunde dieses Laufs stehen im Bericht.";
+        else if (shown == 0) hinweis = d.NI > 0 ? "Keine kritischen Befunde und keine Warnungen. " + (d.NI == 1 ? "1 Hinweis steht" : d.NI + " Hinweise stehen") + " im Bericht." : "Keine kritischen Befunde, keine Warnungen und keine Hinweise.";
+        else if (d.NK + d.NW > shown) hinweis = String.Format("und {0} weitere", d.NK + d.NW - shown);
+        if (hinweis.Length > 0) { Label l = Lbl(hinweis, shown == 0 ? UI.SchriftText : UI.SchriftHinweis, false, shown == 0 ? UI.Text : UI.Muted); l.Margin = new Padding(0, 0, 0, UI.S(2)); kResFind.Frei(l); }
+        lnkResAll.Visible = File.Exists(d.Html);
+        pf.Controls.Add(lnkResAll); pf.Controls.SetChildIndex(lnkResAll, pf.Controls.Count - 1);
+        pf.ResumeLayout(true);
 
         // Vergleich mit der Referenz je Komponente (nur mit Benchmark in diesem Lauf)
-        while (pnlResCmp.Controls.Count > 1) pnlResCmp.Controls.RemoveAt(1);
-        // Verweise der Seite folgen Farbschema und Akzent auch nach einem Wechsel (sie behielten bisher die Farbe vom Aufbau)
+        FlowLayoutPanel pc = kResCmp.Inhalt;
+        kResCmp.Leere(lblResRef);
+        pc.SuspendLayout();
+        // Verweise der Seite folgen Farbschema und Akzent auch nach einem Wechsel
         foreach (LinkLabel ll in new LinkLabel[] { lnkResRef, lnkResAll }) if (ll != null) { ll.LinkColor = UI.Accent; ll.ActiveLinkColor = UI.AccentHover; }
-        lblResRef.Text = "100 % = " + RefLabelText();
-        lblResRef.MaximumSize = new Size(UI.S(400), 0);
-        pnlResCmp.Controls.Add(lblResRef);
-        pnlResCmp.Controls.Add(lnkResRef);
-        int cmpRows = 0;
-        for (int g = 0; g < resGruppen.Length; g++)
+        bool bench = e != null && e.HasBench;
+        if (d.HatVergleich)
         {
-            double pct = GroupRefPct(resGruppen[g]);
-            TableLayoutPanel r = new TableLayoutPanel(); r.AutoSize = true; r.ColumnCount = 3; r.BackColor = UI.Panel; r.Margin = new Padding(0, 0, 0, UI.S(8));
-            r.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(120))); r.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(130))); r.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            Label ln = Lbl(resNamen[g], UI.SchriftText, false, UI.Text); ln.Margin = new Padding(0, UI.S(2), 0, 0);
-            r.Controls.Add(ln, 0, 0);
-            if (double.IsNaN(pct))
+            lblResRef.Text = "100 % = " + RefLabelText(); lblResRef.ForeColor = UI.Muted;
+            kResCmp.Frei(lblResRef);
+            for (int g = 0; g < resGruppen.Length; g++)
             {
-                // Gruppe in diesem Lauf nicht gemessen (abgewählt oder übersprungen): Zeile bleibt, damit das Fehlen auffällt
-                Label lx = Lbl("nicht gemessen", UI.SchriftText, false, UI.Muted); lx.Margin = new Padding(0, UI.S(2), 0, 0);
-                r.Controls.Add(lx, 1, 0); r.SetColumnSpan(lx, 2);
-                pnlResCmp.Controls.Add(r);
-                continue;
+                double pct; bool hat = d.Pct.TryGetValue(resGruppen[g], out pct);
+                FlowLayoutPanel r = new FlowLayoutPanel(); r.AutoSize = true; r.WrapContents = false; r.BackColor = UI.Panel; r.Margin = new Padding(0, 0, 0, UI.S(6));
+                Label ln = Lbl(resNamen[g], UI.SchriftText, false, UI.Text); ln.AutoSize = false; ln.Size = new Size(UI.S(120), UI.S(20)); ln.Margin = new Padding(0);
+                r.Controls.Add(ln);
+                if (!hat)
+                {
+                    // Gruppe in diesem Lauf nicht gemessen (abgewählt oder übersprungen): Zeile bleibt, damit das Fehlen auffällt
+                    Label lx = Lbl("nicht gemessen", UI.SchriftText, false, UI.Muted); lx.Margin = new Padding(0);
+                    r.Controls.Add(lx); kResCmp.Frei(r);
+                    continue;
+                }
+                PercentBar pb = new PercentBar(); pb.Percent = pct; pb.Size = new Size(UI.S(120), UI.S(10)); pb.Margin = new Padding(0, UI.S(6), UI.S(10), 0);
+                Tip(pb, "Strich = Referenz (100 %). Langsamer als die Referenz heißt nicht defekt, nur langsamer als dieser PC.");
+                Label lv = Lbl(pct.ToString("0") + " %  " + RatingWord(pct), UI.SchriftText, true, UI.Text); lv.Margin = new Padding(0);
+                resBalken.Add(pb);
+                r.Controls.Add(pb); r.Controls.Add(lv);
+                kResCmp.Frei(r);
             }
-            PercentBar pb = new PercentBar(); pb.Percent = pct; pb.Size = new Size(UI.S(120), UI.S(10)); pb.Margin = new Padding(0, UI.S(7), UI.S(10), 0);
-            Tip(pb, "Strich = Referenz (100 %). Langsamer als die Referenz heißt nicht defekt, nur langsamer als dieser PC.");
-            Label lv = Lbl(pct.ToString("0") + " %  " + RatingWord(pct), UI.SchriftText, true, UI.Text); lv.Margin = new Padding(0, UI.S(2), 0, 0);
-            resBalken.Add(pb);
-            r.Controls.Add(pb, 1, 0); r.Controls.Add(lv, 2, 0);
-            pnlResCmp.Controls.Add(r); cmpRows++;
         }
-        bool hasCmp = cmpRows > 0;
-        cardResCmp.Visible = hasCmp;
-        tblResMid.ColumnStyles[0].Width = hasCmp ? 55 : 100; tblResMid.ColumnStyles[1].Width = hasCmp ? 45 : 0;
-        cardResFind.Margin = new Padding(0, 0, hasCmp ? UI.S(6) : 0, 0);
+        else if (bench)
+        {
+            // Lauf vor v4.08 oder ohne Referenz: nichts nachrechnen, sondern sagen, was fehlt (Vorgabe 11)
+            Label l = Lbl("Der Vergleich mit der Referenz ist bei diesem Lauf nicht gespeichert (Lauf vor Version 4.08 oder ohne Referenz). Die Prozentwerte stehen im Bericht; der nächste Lauf speichert sie mit.", UI.SchriftText, false, UI.Muted); l.Margin = new Padding(0, 0, 0, UI.S(4));
+            kResCmp.Frei(l);
+        }
+        pc.ResumeLayout(true);
+        ErgZeige(kResCmp.Karte, d.HatVergleich || bench);
 
         // Komponenten: nur mit Messwerten
-        pnlResTiles.Controls.Clear();
+        while (pnlResTiles.Controls.Count > 0) { Control c = pnlResTiles.Controls[0]; pnlResTiles.Controls.RemoveAt(0); c.Dispose(); }
         if (e != null)
         {
             double mt = e.Get("CPU|MT"), st = e.Get("CPU|ST");
-            if (mt > 0) pnlResTiles.Controls.Add(ResTile("Prozessor", UI.IcoCpu, mt.ToString("N0", de), "Punkte, alle Kerne", st > 0 ? "Ein Kern: " + st.ToString("N0", de) + " Punkte" : "", GroupRefPct("CPU")));
+            if (mt > 0) pnlResTiles.Controls.Add(ResTile("Prozessor", UI.IcoCpu, mt.ToString("N0", de), "Punkte, alle Kerne", st > 0 ? "Ein Kern: " + st.ToString("N0", de) + " Punkte" : "", ErgPct("CPU")));
             double rend = e.Get("GPU|REND"), rend1 = e.Get("GPU|REND1"), vmb = e.Get("GPU|VMB");
-            if (rend > 0) pnlResTiles.Controls.Add(ResTile("Grafik", UI.IcoGpu, rend.ToString("N1", de) + " FPS", "Bilder je Sekunde im Rendertest", rend1 > 0 ? "1 % der langsamsten Bilder: " + rend1.ToString("N1", de) + " FPS" : "", GroupRefPct("GPU")));
-            else if (vmb > 0) pnlResTiles.Controls.Add(ResTile("Grafik", UI.IcoGpu, vmb.ToString("N1", de) + " GB/s", "Speicherdurchsatz", "", GroupRefPct("GPU")));
+            if (rend > 0) pnlResTiles.Controls.Add(ResTile("Grafik", UI.IcoGpu, rend.ToString("N1", de) + " FPS", "Bilder je Sekunde im Rendertest", rend1 > 0 ? "1 % der langsamsten Bilder: " + rend1.ToString("N1", de) + " FPS" : "", ErgPct("GPU")));
+            else if (vmb > 0) pnlResTiles.Controls.Add(ResTile("Grafik", UI.IcoGpu, vmb.ToString("N1", de) + " GB/s", "Speicherdurchsatz", "", ErgPct("GPU")));
             double rL = e.Get("RAM|Lesen"), rLat = e.Get("RAM|Latenz");
-            if (rL > 0) pnlResTiles.Controls.Add(ResTile("Arbeitsspeicher", UI.IcoRam, rL.ToString("N1", de) + " GB/s", "Lesen", rLat > 0 ? "Latenz: " + rLat.ToString("N0", de) + " ns" : "", GroupRefPct("RAM")));
+            if (rL > 0) pnlResTiles.Controls.Add(ResTile("Arbeitsspeicher", UI.IcoRam, rL.ToString("N1", de) + " GB/s", "Lesen", rLat > 0 ? "Latenz: " + rLat.ToString("N0", de) + " ns" : "", ErgPct("RAM")));
             double sr = 0, r1 = 0;
             foreach (KeyValuePair<string, double> kv in e.Werte)
             {
                 if (kv.Key.StartsWith("DISK|") && kv.Key.EndsWith("|SR") && kv.Value > sr) sr = kv.Value;
                 if (kv.Key.StartsWith("DISK|") && kv.Key.EndsWith("|R1") && kv.Value > r1) r1 = kv.Value;
             }
-            if (sr > 0) pnlResTiles.Controls.Add(ResTile("Laufwerk", UI.IcoDisk, sr.ToString("N0", de) + " MB/s", "Lesen am Stück, schnellstes Laufwerk", r1 > 0 ? "4K-Zufallszugriff: " + r1.ToString("N0", de) + " IOPS" : "", GroupRefPct("Laufwerke")));
+            if (sr > 0) pnlResTiles.Controls.Add(ResTile("Laufwerk", UI.IcoDisk, sr.ToString("N0", de) + " MB/s", "Lesen am Stück, schnellstes Laufwerk", r1 > 0 ? "4K-Zufallszugriff: " + r1.ToString("N0", de) + " IOPS" : "", ErgPct("Laufwerke")));
         }
-        pnlResTiles.Visible = pnlResTiles.Controls.Count > 0;
-        btnDashVerlauf.Visible = e != null;
-        btnDashKi.Visible = File.Exists(kiPath);
-        btnDashOpenHtml.Enabled = File.Exists(htmlPath);
-        LayoutResTiles();
+        ErgZeige(btnDashVerlauf, e != null);
+        ErgZeige(btnDashKi, File.Exists(d.Ki));
+        ErgZeige(btnDashFolder, Directory.Exists(d.Ordner));
+        btnDashOpenHtml.Enabled = File.Exists(d.Html);
+        resultDashboard.ResumeLayout(false);
+        OrdneErgebnis();
     }
+
+    // Prozent der Referenz für eine Gruppe des gezeigten Ergebnisses, sonst NaN
+    double ErgPct(string g) { double p; return erg != null && erg.Pct.TryGetValue(g, out p) ? p : double.NaN; }
 }
 // Dezente Bewegung der Oberfläche (ab v4.07): gemeinsamer Zeitgeber, Ringanzeige, Überblendung beim Seitenwechsel
 // und die Farbpunkte der Akzentfarbe.
@@ -17725,6 +18399,10 @@ public static class UI
     public const string IcoSearch = "\uE721";
     public const string IcoLock = "\uE72E";
     public const string IcoSun = "\uE706";
+    // ab v4.08: Ergebnis (Seitenleiste), Energie und parallele Ausführung, Systemintegrität
+    public const string IcoErgebnis = "\uE9D2";
+    public const string IcoBlitz = "\uE945";
+    public const string IcoDokument = "\uE8A5";
 
     // Symbol nach Namen (Katalog und Vertrag nennen Felder wie "IcoShield"); unbekannt oder leer: ersatz
     public static string IconByName(string name, string ersatz)
@@ -19182,8 +19860,12 @@ public class SettingRow : Control
     }
 
     public string Title { get { return title; } set { title = value ?? ""; AccessibleName = title; Invalidate(); } }
-    public string Description { get { return desc; } set { desc = value ?? ""; RecalcHeight(); Invalidate(); } }
+    public string Description { get { return desc; } set { if (desc == (value ?? "")) return; desc = value ?? ""; RecalcHeight(); Invalidate(); } }
     public ToggleSwitch Toggle { get { return toggle; } }
+    // ab v4.08: Symbol links vor dem Titel (Seiten Benchmark und Diagnose); leer = Zeile ohne Symbol wie bisher
+    string icon = "";
+    public string Icon { get { return icon; } set { icon = value ?? ""; RecalcHeight(); Invalidate(); } }
+    int TextLinks { get { return icon.Length > 0 ? UI.S(44) : UI.S(12); } }
     public bool Checked
     {
         get { return toggle != null && toggle.Checked; }
@@ -19215,6 +19897,7 @@ public class SettingRow : Control
     {
         if (b == null) return 0;
         string t = (b.Text ?? "").ToLowerInvariant();
+        if (t.EndsWith(" min.") || t.Contains(" std.")) return 5;   // ab v4.08: Dauer direkt neben dem Schalter
         if (t.Contains("neustart")) return 4;
         if (t == "eingriff" || t == "zerstrend" || t == "zerstoerend" || t == "ndern" || t == "aendern" || t == "lesen") return 3;
         if (t == "empfohlen" || t == "standard") return 2;
@@ -19235,7 +19918,7 @@ public class SettingRow : Control
         try
         {
             if (Width <= 0) return;
-            int curX = UI.S(12);
+            int curX = TextLinks;
             int rightBound = Width - UI.S(16);
             if (toggle != null) rightBound = Math.Min(rightBound, toggle.Left > 0 ? toggle.Left : (Width - UI.S(54)));
             for (int i = 0; i < badges.Count; i++)
@@ -19349,7 +20032,10 @@ public class SettingRow : Control
             using (Pen pen = new Pen(border, 1f)) g.DrawPath(pen, p);
         }
 
-        int curX = UI.S(12);
+        int curX = TextLinks;
+        if (icon.Length > 0)
+            using (Font fi = UI.SymbolFont(13f))
+                TextRenderer.DrawText(g, icon, fi, new Rectangle(UI.S(10), 0, UI.S(28), Height), UI.Accent, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoClipping);
         int rightBound = Width - UI.S(16);
         if (toggle != null) rightBound = Math.Min(rightBound, toggle.Left);
         for (int i = 0; i < badges.Count; i++)
@@ -19389,6 +20075,262 @@ public class SettingRow : Control
     }
 }
 
+
+// ab v4.08: kompakte Zeile für einen Datenträger (Seite Benchmark): Haken, Name, Etikett für die Anbindung und rechts der
+// freie Platz. Ersetzt das Listenfeld mit Kontrollkästchen, das als einziges Element der Seite einen hellen Rahmen trug.
+public class LaufwerkZeile : Control
+{
+    string name = "", bus = "", rechts = "";
+    bool isChecked, hover;
+    public event EventHandler CheckedChanged;
+
+    public LaufwerkZeile(string name, string bus, string rechts, bool on)
+    {
+        this.name = name ?? ""; this.bus = bus ?? ""; this.rechts = rechts ?? ""; isChecked = on;
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
+        TabStop = true; Cursor = Cursors.Hand; BackColor = UI.Panel;
+        AccessibleRole = AccessibleRole.CheckButton; AccessibleName = this.name;
+        Size = new Size(UI.S(400), UI.S(30)); Margin = new Padding(0, 0, 0, UI.S(4));
+    }
+    public string Laufwerk { get { return name; } }
+    public string Anbindung { get { return bus; } }
+    public string Rechts { get { return rechts; } set { rechts = value ?? ""; Invalidate(); } }
+    public bool Checked
+    {
+        get { return isChecked; }
+        set { if (isChecked == value) return; isChecked = value; Invalidate(); if (CheckedChanged != null) CheckedChanged(this, EventArgs.Empty); }
+    }
+    protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
+    protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
+    protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
+    protected override void OnMouseClick(MouseEventArgs e) { if (e.Button == MouseButtons.Left) { Focus(); Checked = !Checked; } base.OnMouseClick(e); }
+    protected override void OnKeyDown(KeyEventArgs e) { if (e.KeyCode == Keys.Space) { Checked = !Checked; e.Handled = true; } base.OnKeyDown(e); }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias; g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+        using (SolidBrush ob = new SolidBrush(UI.Panel)) g.FillRectangle(ob, ClientRectangle);
+        Color bg = hover ? (UI.IsDark ? Color.FromArgb(42, 44, 48) : Color.FromArgb(246, 248, 252)) : (UI.IsDark ? Color.FromArgb(30, 31, 33) : Color.FromArgb(250, 251, 252));
+        using (GraphicsPath p = UI.Round(new RectangleF(0.5f, 0.5f, Width - 2, Height - 2), UI.SF(6)))
+        {
+            using (SolidBrush b = new SolidBrush(bg)) g.FillPath(b, p);
+            using (Pen pen = new Pen(UI.Line, 1f)) g.DrawPath(pen, p);
+        }
+        int bs = UI.S(16);
+        Rectangle bx = new Rectangle(UI.S(10), (Height - bs) / 2, bs, bs);
+        using (GraphicsPath bp = UI.Round(bx, UI.SF(4)))
+        {
+            using (SolidBrush bb = new SolidBrush(isChecked ? UI.Accent : UI.Panel)) g.FillPath(bb, bp);
+            using (Pen bpen = new Pen(isChecked ? UI.Accent : (UI.IsDark ? Color.FromArgb(90, 95, 105) : Color.FromArgb(160, 170, 185)), UI.SF(1.5f))) g.DrawPath(bpen, bp);
+        }
+        if (isChecked) using (Pen ck = new Pen(UI.OnAccent, UI.SF(2f))) { ck.StartCap = LineCap.Round; ck.EndCap = LineCap.Round; g.DrawLines(ck, new PointF[] { new PointF(bx.X + bs * 0.24f, bx.Y + bs * 0.52f), new PointF(bx.X + bs * 0.44f, bx.Y + bs * 0.72f), new PointF(bx.X + bs * 0.78f, bx.Y + bs * 0.30f) }); }
+        int x = bx.Right + UI.S(9), right = Width - UI.S(10);
+        using (Font fr = new Font("Segoe UI", 8.75f))
+        {
+            if (rechts.Length > 0)
+            {
+                Size rs = TextRenderer.MeasureText(g, rechts, fr, new Size(int.MaxValue, Height), TextFormatFlags.NoPadding);
+                int rw = Math.Min(rs.Width, Math.Max(0, Width / 2));
+                TextRenderer.DrawText(g, rechts, fr, new Rectangle(right - rw, 0, rw, Height), UI.Muted, TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                right -= rw + UI.S(10);
+            }
+            using (Font fn = new Font("Segoe UI Semibold", 9f))
+            using (Font fb = new Font("Segoe UI Semibold", 8f))
+            {
+                Size bsz = bus.Length > 0 ? TextRenderer.MeasureText(g, bus, fb, new Size(int.MaxValue, Height), TextFormatFlags.NoPadding) : Size.Empty;
+                int bw = bus.Length > 0 ? bsz.Width + UI.S(14) : 0;
+                Size ns = TextRenderer.MeasureText(g, name, fn, new Size(int.MaxValue, Height), TextFormatFlags.NoPadding);
+                int nw = Math.Min(ns.Width, Math.Max(UI.S(40), right - x - bw - UI.S(8)));
+                TextRenderer.DrawText(g, name, fn, new Rectangle(x, 0, nw, Height), UI.Text, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                if (bus.Length > 0)
+                {
+                    Color fg, bbg; UI.BadgeColors("skip", out fg, out bbg);
+                    RectangleF br = new RectangleF(x + nw + UI.S(8), (Height - UI.S(18)) / 2f, bw, UI.S(18));
+                    using (GraphicsPath p = UI.Round(br, br.Height / 2f)) using (SolidBrush b = new SolidBrush(bbg)) g.FillPath(b, p);
+                    TextRenderer.DrawText(g, bus, fb, Rectangle.Round(br), fg, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                }
+            }
+        }
+        if (Focused) using (Pen fp = new Pen(UI.Accent, 1f)) { fp.DashStyle = DashStyle.Dot; g.DrawRectangle(fp, 2, 2, Width - 5, Height - 5); }
+    }
+}
+
+// ab v4.08: Auswahl aus wenigen Feldern mit Titel und Unterzeile (Umfang der Diagnose). Das gewählte Feld trägt die
+// Akzentfläche; Pfeiltasten wechseln, wenn das Element den Fokus hat.
+public class FeldAuswahl : Control
+{
+    string[] titel, unter;
+    int sel, hoverIdx = -1;
+    public event EventHandler SelectedChanged;
+
+    public FeldAuswahl(string[] titel, string[] unter)
+    {
+        this.titel = titel ?? new string[0]; this.unter = unter ?? new string[0];
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
+        TabStop = true; Cursor = Cursors.Hand; BackColor = UI.Panel;
+        AccessibleRole = AccessibleRole.Grouping;
+        Size = new Size(UI.S(190) * Math.Max(1, this.titel.Length), UI.S(50)); Margin = new Padding(0, 0, 0, UI.S(UI.Abstand3));
+    }
+    public int Count { get { return titel.Length; } }
+    public int Selected
+    {
+        get { return sel; }
+        set { if (value < 0 || value >= titel.Length || sel == value) return; sel = value; Invalidate(); if (SelectedChanged != null) SelectedChanged(this, EventArgs.Empty); }
+    }
+    public void SetUnterzeile(int i, string text) { if (i >= 0 && i < unter.Length && unter[i] != (text ?? "")) { unter[i] = text ?? ""; Invalidate(); } }
+    public string Unterzeile(int i) { return i >= 0 && i < unter.Length ? unter[i] : ""; }
+    // Feld an einer Stelle (für Klick und Hinweise); -1 außerhalb
+    public int FeldBei(int x) { if (titel.Length == 0 || x < 0 || x >= Width) return -1; return Math.Min(titel.Length - 1, x * titel.Length / Math.Max(1, Width)); }
+    protected override void OnMouseMove(MouseEventArgs e) { int h = FeldBei(e.X); if (h != hoverIdx) { hoverIdx = h; Invalidate(); } base.OnMouseMove(e); }
+    protected override void OnMouseLeave(EventArgs e) { hoverIdx = -1; Invalidate(); base.OnMouseLeave(e); }
+    protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
+    protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
+    protected override void OnMouseClick(MouseEventArgs e) { if (e.Button == MouseButtons.Left) { Focus(); int i = FeldBei(e.X); if (i >= 0) Selected = i; } base.OnMouseClick(e); }
+    protected override bool IsInputKey(Keys keyData) { return keyData == Keys.Left || keyData == Keys.Right || base.IsInputKey(keyData); }
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        if (e.KeyCode == Keys.Left) { Selected = Math.Max(0, sel - 1); e.Handled = true; }
+        else if (e.KeyCode == Keys.Right) { Selected = Math.Min(titel.Length - 1, sel + 1); e.Handled = true; }
+        base.OnKeyDown(e);
+    }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias; g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+        using (SolidBrush ob = new SolidBrush(UI.Panel)) g.FillRectangle(ob, ClientRectangle);
+        int n = titel.Length; if (n == 0) return;
+        RectangleF all = new RectangleF(0.5f, 0.5f, Width - 2, Height - 2);
+        using (GraphicsPath p = UI.Round(all, UI.SF(6)))
+        {
+            Region alt = g.Clip;
+            g.SetClip(p, CombineMode.Intersect);
+            for (int i = 0; i < n; i++)
+            {
+                int x0 = i * Width / n, x1 = (i + 1) * Width / n;
+                Color bg = i == sel ? UI.Accent : i == hoverIdx ? (UI.IsDark ? Color.FromArgb(45, 48, 52) : Color.FromArgb(243, 244, 246)) : UI.Panel;
+                using (SolidBrush b = new SolidBrush(bg)) g.FillRectangle(b, x0, 0, x1 - x0, Height);
+                if (i > 0 && i != sel && i - 1 != sel) using (Pen pl = new Pen(UI.Line)) g.DrawLine(pl, x0, 0, x0, Height);
+            }
+            g.Clip = alt;
+            using (Pen pen = new Pen(UI.Line, 1f)) g.DrawPath(pen, p);
+        }
+        using (Font ft = new Font("Segoe UI Semibold", UI.SchriftText))
+        using (Font fu = new Font("Segoe UI", 8.5f))
+            for (int i = 0; i < n; i++)
+            {
+                int x0 = i * Width / n, x1 = (i + 1) * Width / n;
+                bool on = i == sel;
+                string u = i < unter.Length ? unter[i] : "";
+                int th = ft.Height, uh = u.Length > 0 ? fu.Height : 0, y = (Height - th - uh) / 2;
+                TextRenderer.DrawText(g, titel[i], ft, new Rectangle(x0 + UI.S(4), y, x1 - x0 - UI.S(8), th), on ? UI.OnAccent : UI.Text, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
+                // Unterzeile auf der Akzentfläche in derselben Schriftfarbe wie der Titel (Kontrast wie bei Primärknöpfen)
+                if (u.Length > 0) TextRenderer.DrawText(g, u, fu, new Rectangle(x0 + UI.S(4), y + th, x1 - x0 - UI.S(8), uh), on ? UI.OnAccent : UI.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
+            }
+        if (Focused) using (Pen fp = new Pen(UI.Accent, 1f)) { fp.DashStyle = DashStyle.Dot; g.DrawRectangle(fp, 2, 2, Width - 5, Height - 5); }
+    }
+}
+
+// ab v4.08: Bereich mit den Einstellungen einer Messung oder Prüfung, eingerückt unter ihrer Zeile mit einem Strich links.
+// Der Inhalt steht untereinander und bekommt die Breite des Bereichs; die Höhe folgt dem Inhalt.
+public class UnterBereich : Panel
+{
+    public readonly FlowLayoutPanel Inhalt = new FlowLayoutPanel();
+    public UnterBereich()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        BackColor = UI.Panel; Margin = new Padding(UI.S(30), 0, 0, UI.S(8));
+        Inhalt.FlowDirection = FlowDirection.TopDown; Inhalt.WrapContents = false; Inhalt.AutoSize = true; Inhalt.AutoSizeMode = AutoSizeMode.GrowAndShrink; Inhalt.BackColor = UI.Panel;
+        Inhalt.Location = new Point(UI.S(14), UI.S(4)); Inhalt.Margin = new Padding(0);
+        Inhalt.SizeChanged += delegate { Passe(); };
+        Controls.Add(Inhalt);
+        Height = UI.S(20);
+    }
+    public int InhaltBreite { get { return Math.Max(UI.S(120), Width - UI.S(14)); } }
+    void Passe() { int h = Inhalt.Height + UI.S(8); if (Height != h) Height = h; }
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+        int w = InhaltBreite;
+        foreach (Control c in Inhalt.Controls)
+        {
+            if (c is Label) c.MaximumSize = new Size(w - c.Margin.Horizontal, 0);
+            else if (c.Width != w - c.Margin.Horizontal) c.Width = w - c.Margin.Horizontal;
+        }
+        Passe();
+    }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        using (SolidBrush b = new SolidBrush(UI.Panel)) e.Graphics.FillRectangle(b, ClientRectangle);
+        using (SolidBrush l = new SolidBrush(UI.Line)) e.Graphics.FillRectangle(l, 0, 0, UI.S(2), Height);
+    }
+}
+
+// ab v4.08: Felder mit Beschriftung über dem Element (Auswahllisten), nebeneinander mit Umbruch nach Breite. Die Höhe
+// setzt das Element selbst (FlowLayoutPanel mit AutoSize behält bei Umbruch die Höhe des ersten Aufbaus).
+public class FeldReihe : Panel
+{
+    List<Control[]> felder = new List<Control[]>();
+    public FeldReihe() { BackColor = UI.Panel; Margin = new Padding(0, 0, 0, UI.S(4)); Height = UI.S(48); }
+    public void Feld(string beschriftung, Control c)
+    {
+        Label l = new Label(); l.Text = beschriftung; l.AutoSize = true; l.ForeColor = UI.Muted; l.BackColor = Color.Transparent; l.UseMnemonic = false;
+        l.Font = new Font("Segoe UI", 8.5f); l.Margin = new Padding(0);
+        c.Margin = new Padding(0);
+        Controls.Add(l); Controls.Add(c); felder.Add(new Control[] { l, c });
+        Ordne();
+    }
+    // Zeilen, die die Felder bei dieser Breite brauchen (für Tests)
+    public int Zeilen { get; private set; }
+    protected override void OnResize(EventArgs e) { base.OnResize(e); Ordne(); }
+    void Ordne()
+    {
+        int x = 0, y = 0, zeileH = 0, gap = UI.S(14), lh = UI.S(18), zeilen = felder.Count > 0 ? 1 : 0;
+        foreach (Control[] f in felder)
+        {
+            int w = Math.Max(f[1].Width, f[0].PreferredSize.Width);
+            if (x > 0 && x + w > Width) { x = 0; y += zeileH + UI.S(8); zeileH = 0; zeilen++; }
+            f[0].Location = new Point(x, y); f[1].Location = new Point(x, y + lh);
+            zeileH = Math.Max(zeileH, lh + f[1].Height);
+            x += w + gap;
+        }
+        Zeilen = zeilen;
+        int h = y + zeileH + UI.S(2);
+        if (Height != h) Height = h;
+    }
+}
+
+// ab v4.08: Elemente nebeneinander mit Umbruch nach Breite (Hardware-Pillen der Ergebnisseite). Die Höhe setzt das
+// Element selbst: Ein FlowLayoutPanel mit AutoSize behielt die Höhe des ersten, schmalen Aufbaus, die Kopfkarte der
+// Ergebnisseite blieb dadurch unter Windows unten rund 130 px leer.
+public class UmbruchPanel : Panel
+{
+    bool ordnet;
+    public UmbruchPanel() { BackColor = UI.Panel; Height = 0; }
+    public int Zeilen { get; private set; }
+    protected override void OnResize(EventArgs e) { base.OnResize(e); Ordne(); }
+    protected override void OnControlAdded(ControlEventArgs e) { base.OnControlAdded(e); Ordne(); }
+    protected override void OnControlRemoved(ControlEventArgs e) { base.OnControlRemoved(e); Ordne(); }
+    public void Ordne()
+    {
+        if (ordnet) return;
+        ordnet = true;
+        try
+        {
+            int x = 0, y = 0, zh = 0, zeilen = 0;
+            // alle Kindelemente zählen: Visible eines Kindes ist falsch, solange die Seite selbst nicht angezeigt wird
+            foreach (Control c in Controls)
+            {
+                int cw = c.Width + c.Margin.Horizontal;
+                if (zeilen == 0) zeilen = 1;
+                if (x > 0 && x + cw > Width) { x = 0; y += zh; zh = 0; zeilen++; }
+                c.Location = new Point(x + c.Margin.Left, y + c.Margin.Top);
+                x += cw; zh = Math.Max(zh, c.Height + c.Margin.Vertical);
+            }
+            Zeilen = zeilen;
+            if (Height != y + zh) Height = y + zh;
+        }
+        finally { ordnet = false; }
+    }
+}
 
 // Moderne Fluent-Kartenansicht (Wintoys-Look)
 public class FluentCard : Control
@@ -19748,6 +20690,8 @@ class NavItem : Control
     public string Title, Desc, Icon;
     // ab v3.64: kurzer Zusatz rechts im Eintrag, etwa die geschätzte Dauer eines angehakten Moduls
     public string Hint = "";
+    // ab v4.08: Zusatz als Pille in Akzentschrift (Punktzahl am Eintrag Ergebnis)
+    public bool HintPille = false;
     public bool HasCheck = true;
     public event EventHandler Picked;
     public event EventHandler CheckedChanged;
@@ -19850,7 +20794,19 @@ class NavItem : Control
                 using (Font fh = new Font("Segoe UI", 8.5f))
                 {
                     Size hs = TextRenderer.MeasureText(g, Hint, fh);
-                    if (right - hs.Width > x + tsz.Width + UI.S(6))
+                    if (HintPille)
+                    {
+                        int pw = hs.Width + UI.S(12), ph = UI.S(20);
+                        if (right - pw > x + tsz.Width + UI.S(6))
+                        {
+                            RectangleF pr = new RectangleF(right - pw, (Height - ph) / 2f, pw, ph);
+                            Color pbg = sel ? UI.Panel : (UI.IsDark ? Color.FromArgb(44, 47, 51) : Color.FromArgb(235, 238, 242));
+                            using (GraphicsPath pp = UI.Round(pr, ph / 2f)) using (SolidBrush pb = new SolidBrush(pbg)) g.FillPath(pb, pp);
+                            TextRenderer.DrawText(g, Hint, fh, Rectangle.Round(pr), UI.IsDark ? UI.Accent : UI.AccentDark, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                            right -= pw + UI.S(6);
+                        }
+                    }
+                    else if (right - hs.Width > x + tsz.Width + UI.S(6))
                     {
                         TextRenderer.DrawText(g, Hint, fh, new Rectangle(right - hs.Width, 0, hs.Width, Height), UI.Muted, TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
                         right -= hs.Width + UI.S(6);
@@ -20155,6 +21111,13 @@ public class DbEntry
     public bool IsReference = false;
     public int Kerne = 0, Threads = 0;
     public Dictionary<string, double> Werte = new Dictionary<string, double>();
+    // ab v4.08: Vergleich mit der Referenz, wie ihn der Lauf berechnet hat (Prozent je Gruppe, Name der Referenz), und die
+    // Befunde des Laufs als Text. Fehlen die Felder (Läufe vor 4.08, Importe), bleiben die Sammlungen leer.
+    public Dictionary<string, double> GruppenPct = new Dictionary<string, double>();
+    public string RefName = "";
+    public bool HatVergleich = false;
+    public List<string> BefundListe = new List<string>();
+    public int NK = -1, NW = -1, NI = -1;
     public bool HasBench { get { return Werte.Count > 0; } }
     public double Get(string k) { double v; return Werte.TryGetValue(k, out v) ? v : 0; }
     public string DisplayName { get { return !String.IsNullOrEmpty(Name) ? Name : Computer; } }
@@ -20246,7 +21209,23 @@ public class DbEntry
                 object b; if (d.TryGetValue("Befunde", out b))
                 {
                     Dictionary<string, object> bd = b as Dictionary<string, object>;
-                    if (bd != null) e.Befunde = String.Format("{0} / {1} / {2}", S(bd, "Kritisch"), S(bd, "Warnungen"), S(bd, "Hinweise"));
+                    if (bd != null)
+                    {
+                        e.Befunde = String.Format("{0} / {1} / {2}", S(bd, "Kritisch"), S(bd, "Warnungen"), S(bd, "Hinweise"));
+                        int zk, zw, zi;
+                        if (int.TryParse(S(bd, "Kritisch"), out zk) && int.TryParse(S(bd, "Warnungen"), out zw) && int.TryParse(S(bd, "Hinweise"), out zi)) { e.NK = zk; e.NW = zw; e.NI = zi; }
+                        object lo; if (bd.TryGetValue("Liste", out lo) && lo is System.Collections.IEnumerable && !(lo is string)) foreach (object x in (System.Collections.IEnumerable)lo) if (x != null) e.BefundListe.Add(Convert.ToString(x));
+                    }
+                }
+                object vObj; if (d.TryGetValue("Vergleich", out vObj))
+                {
+                    Dictionary<string, object> vd = vObj as Dictionary<string, object>;
+                    if (vd != null)
+                    {
+                        e.HatVergleich = true; e.RefName = S(vd, "Referenz");
+                        object go; Dictionary<string, object> gg = vd.TryGetValue("Gruppen", out go) ? go as Dictionary<string, object> : null;
+                        if (gg != null) foreach (KeyValuePair<string, object> kv in gg) { try { double pv = Convert.ToDouble(kv.Value, CultureInfo.InvariantCulture); if (pv > 0) e.GruppenPct[kv.Key] = pv; } catch { } }
+                    }
                 }
                 object gObj; if (d.TryGetValue("Geraet", out gObj))
                 {
@@ -21273,6 +22252,16 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.08", "12.11.2026", "Ergebnis als Seite, Benchmark und Diagnose im Stil der übrigen Seiten",
+            "\u2022 Ergebnis: neuer Eintrag \u201EErgebnis\u201C in der Seitenleiste direkt unter Start, mit der Punktzahl als Pille. Er erscheint, sobald es ein Ergebnis gibt, und bleibt bis zum nächsten Lauf. Die Ergebnisseite ist jetzt eine Seite wie jede andere: Die Fußleiste bleibt, der Wechsel weg und zurück baut nichts neu auf, und Punktzahl, Balken und Ringe laufen nur beim ersten Anzeigen nach einem Lauf auf ihren Wert.\r\n" +
+            "\u2022 Ergebnis nach dem Programmstart: \u201EErgebnis\u201C zeigt den letzten Lauf dieses PCs aus der Datenbank. Der Knopf \u201EErgebnis\u201C in der Karte \u201ELetzter Lauf\u201C der Startseite und der neue Kasten \u201ELetztes Ergebnis auf diesem PC\u201C der Seite Benchmark führen dorthin.\r\n" +
+            "\u2022 \u201EReferenz ändern\u201C öffnet die Seite Benchmark bei der Referenz und zeigt dort das Band \u201EZurück zum Ergebnis\u201C mit Datum und Punktzahl des Laufs. Bis v4.07 führte von dort kein Weg zurück. Statt \u201EZurück\u201C gibt es \u201EErneut messen\u201C (derselbe Weg wie der Startknopf).\r\n" +
+            "\u2022 Datenbank: Der Lauf speichert den Vergleich mit der Referenz (Name der Referenz, Prozent für Prozessor, Grafik, Arbeitsspeicher, Laufwerke) als optionales Feld; das Format bleibt PC-Diagnose-DB/2. Läufe vor 4.08 zeigen auf der Ergebnisseite Punktzahl, Kacheln und Befunde, beim Vergleich aber \u201Enicht gespeichert\u201C mit Verweis auf den Bericht. Nachgerechnet wird nichts.\r\n" +
+            "\u2022 Seite Benchmark neu aufgebaut: links die Karte \u201EMessungen\u201C mit je einer Zeile (Symbol, Beschreibung, Dauer, Schalter) und \u201EAlle an \u00B7 Alle aus\u201C. Die Einstellungen stehen unter ihrer Messung und nur, wenn sie eingeschaltet ist: unter Grafik der Rendertest, unter Laufwerke die Datenträger als kompakte Zeilen mit Anbindung und freiem Platz. Rechts die Referenz und das letzte Ergebnis. Das Listenfeld mit hellem Rahmen entfällt, die Seite nutzt die ganze Breite.\r\n" +
+            "\u2022 Seite Diagnose neu aufgebaut: Umfang als Auswahl mit drei Feldern (Schnell, Vollständig, Eigene Auswahl, je mit Anzahl und Dauer), die Prüfungen immer sichtbar als Zeilen mit Schalter, Kurztitel und Dauer; \u201Eläuft nebenher\u201C kennzeichnet, was bei paralleler Ausführung nebenher läuft. Rechts Ausführung, Zusätze und Zeiträume. Ein umgelegter Schalter wechselt wie bisher zur eigenen Auswahl.\r\n" +
+            "\u2022 Beide Seiten ordnen sich unter 900 px Seitenbreite in einer Spalte. Vorlagen, Zeitschätzung und Startparameter sind unverändert; gespeicherte Vorlagen laden wie bisher.\r\n" +
+            "\u2022 Startfenster: zeigt die Version des Skripts, das tatsächlich läuft. Liegt neben LMB.exe ein Skript einer anderen Version, steht das im Startfenster und in Start.log (bei 4.07 lief so unbemerkt noch 4.06).\r\n" +
+            "\u2022 Behoben: Die Kopfkarte der Ergebnisseite blieb unter Windows unten rund 130 px leer, die Seite brauchte dadurch eine Bildlaufleiste und der Titel war abgeschnitten. \u201EAlle Befunde im Bericht\u201C stand über dem Text statt darunter. Während das Ergebnis zu sehen war, blieb das zuletzt gewählte Modul markiert. \u201E100 % =\u201C nannte bei der gespeicherten Referenz nur \u201EGespeicherte Referenz\u201C statt ihres Namens."),
         new Eintrag("4.07", "10.11.2026", "Eine Datei je Seite, kürzerer Start, Akzentfarbe und dezente Bewegung",
             "\u2022 Akzentfarbe: In den Einstellungen wählbar (Blau, Türkis, Violett, Pink, Orange oder die Akzentfarbe aus Windows). Sie gilt sofort für Schalter, Knöpfe, Markierungen und Verweise, in beiden Farbschemata mit geprüftem Kontrast. Etiketten mit Bedeutung (Ändern, Warnung, Kritisch) behalten ihre Farbe.\r\n" +
             "\u2022 Ergebnisseite: Die Punktzahl zählt hoch, die Balken im Vergleich füllen sich, jede Komponente trägt einen Ring mit ihrem Anteil an der Referenz (voller Ring = 100 %). Alles dauert 0,7 s und zeigt nur gemessene Werte.\r\n" +
@@ -22576,6 +23565,22 @@ function Get-Bewertungswort($Pct) { Get-BenchRatingWord $Pct }
 function Send-BenchGroup([string]$Gruppe) {
     $g = Get-BenchGroup $Gruppe
     if ($g.Anzahl) { Send-GuiEvent 'BGRP' $Gruppe $g.Name $g.Status $g.Kopf $g.Referenz }
+}
+
+# Vergleich mit der Referenz für den Datenbankeintrag (ab v4.08): Name der Referenz und Prozent je Gruppe, genau die
+# Zahlen aus Bericht und Laufansicht. Die Ergebnisseite zeigt damit auch einen Lauf aus der Datenbank, ohne selbst zu
+# rechnen. $null ohne Referenz oder ohne verglichene Gruppe; das Feld fehlt dann im Eintrag.
+function Get-DbVergleich {
+    if (-not (Test-HasReference)) { return $null }
+    $g = [ordered]@{}
+    foreach ($k in 'CPU', 'GPU', 'RAM', 'Laufwerke') {
+        $x = Get-BenchGroup $k
+        if ($null -ne $x.RefPct -and [double]$x.RefPct -gt 0) { $g[$k] = [int]$x.RefPct }
+    }
+    if (-not $g.Count) { return $null }
+    $name = [string]$script:Ref.Name
+    if (-not $name) { $name = [string]$script:Ref.Quelle }
+    return [ordered]@{ Referenz = $name; Stand = [string]$script:Ref.Datum; Gruppen = $g }
 }
 
 # Messwerte dieses Laufs als Referenzwerte (Laufwerke als Mittelwert je Klasse)
@@ -33131,6 +34136,9 @@ function Save-DbEntry {
         Akku      = @($script:BatteryInfo | ForEach-Object { [ordered]@{ Name = $_.Name; DesignmWh = $_.DesignmWh; VollmWh = $_.VollmWh; VerschleissProzent = $_.VerschleissProzent; Zyklen = $_.Zyklen
             LaufzeitVollMin = $(if ($_.LaufzeitVoll) { [math]::Round($_.LaufzeitVoll.TotalMinutes) } else { $null }); Quelle = $_.Quelle } })
     }
+    # ab v4.08: optionales Feld Vergleich (Name der Referenz, Prozent je Gruppe) für die Ergebnisseite. Das Format bleibt
+    # PC-Diagnose-DB/2: Ältere Versionen ignorieren das Feld, Einträge ohne das Feld zeigen "nicht gespeichert".
+    if (Get-Command 'Get-DbVergleich' -ErrorAction SilentlyContinue) { $vgl = Get-DbVergleich; if ($vgl) { $o['Vergleich'] = $vgl } }
     $file = Join-Path $script:DbDir ('{0}_{1}.json' -f (Get-SafeName $env:COMPUTERNAME), (Get-Date -Format 'yyyyMMdd_HHmmss'))
     try { [IO.File]::WriteAllText($file, ($o | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false))); return $file } catch { return '' }
 }

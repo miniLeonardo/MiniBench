@@ -18,7 +18,6 @@ public partial class DiagGui
         if (lvDb != null && lvDb.IsHandleCreated) try { SetWindowTheme(lvDb.Handle, subApp, null); } catch { }
         if (lvSens != null && lvSens.IsHandleCreated) try { SetWindowTheme(lvSens.Handle, subApp, null); } catch { }
         if (lvChg != null && lvChg.IsHandleCreated) try { SetWindowTheme(lvChg.Handle, subApp, null); } catch { }
-        if (clbDisks != null && clbDisks.IsHandleCreated) try { SetWindowTheme(clbDisks.Handle, subApp, null); } catch { }
         if (clbCompare != null && clbCompare.IsHandleCreated) try { SetWindowTheme(clbCompare.Handle, subApp, null); } catch { }
         if (txtLog != null && txtLog.IsHandleCreated) try { SetWindowTheme(txtLog.Handle, subApp, null); } catch { }
         ApplyNativeThemeRecursive(this, subApp);
@@ -126,6 +125,10 @@ public partial class DiagGui
             // ab v3.64: Warnfelder und gedämpfte Beschriftungen tragen eigene Farben
             foreach (Label w in new Label[] { lblAkku, lblRestoreWarn }) if (w != null) { w.ForeColor = UI.Warn; w.BackColor = UI.WarnBg; }
             foreach (Panel b in modBanners) if (b != null) { b.BackColor = UI.InfoBg; foreach (Control k in b.Controls) { if (k is LinkLabel) ((LinkLabel)k).LinkColor = UI.Accent; else k.ForeColor = UI.Text; } }
+            if (bandErg != null) { bandErg.BackColor = UI.AccentSoft; if (lblBandErg != null) lblBandErg.ForeColor = UI.Text; }
+            // ab v4.08: Zeile zur Referenz und die aufgebaute Ergebnisseite tragen eigene Farben (Warnung, Urteil): neu setzen
+            UpdateRefState(); FuelleLetztesErgebnis();
+            if (erg != null && ergebnisAufbauten > 0 && !ergVeraltet) FuelleErgebnis();
             UpdateLoadEnabled(); ThemeLog();
             if (barAll != null && !done) barAll.Fill = UI.Accent;
             if (barSub != null) barSub.Fill = UI.AccentActive;
@@ -159,7 +162,7 @@ public partial class DiagGui
             c.BackColor = UI.Bg;
             c.Invalidate();
         }
-        else if (c is FluentCard || c is ToolRow || c is StartTaskCard || c is SettingRow || c is CategoryPickerItem)
+        else if (c is FluentCard || c is ToolRow || c is StartTaskCard || c is SettingRow || c is CategoryPickerItem || c is LaufwerkZeile || c is FeldAuswahl)
         {
             c.BackColor = UI.Panel;
             c.Invalidate();

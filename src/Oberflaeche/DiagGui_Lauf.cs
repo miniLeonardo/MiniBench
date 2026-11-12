@@ -85,7 +85,6 @@ public partial class DiagGui
         btnNew.Click += delegate {
             ReloadDb();
             runView.Visible = false;
-            if (resultDashboard != null) resultDashboard.Visible = false;
             contentHost.Visible = true;
             if (foot != null) foot.Visible = true;
         };
@@ -302,7 +301,11 @@ public partial class DiagGui
         for (int i = 0; i < nav.Count; i++) { nav[i].Running = false; nav[i].Invalidate(); }
         contentHost.Visible = false;
         if (foot != null) foot.Visible = false;
-        if (resultDashboard != null) resultDashboard.Visible = false;
+        // ab v4.08: Das bisherige Ergebnis gilt bis zum nächsten Lauf. Eintrag und Band verschwinden; zeigte die Seite
+        // gerade das Ergebnis, steht nach einem Lauf ohne Ergebnis wieder die Startseite da.
+        erg = null; ergBewegung = false; SetzeErgebnisNav();
+        if (curPage == ergebnisPage) ShowPage(0);
+        if (bandErgGezeigt) VerbergeErgebnisBand();
         runView.Visible = true;
         btnCancel.Visible = true; btnCancel.Enabled = true;
         btnSkipStep.Visible = true; btnSkipStep.Enabled = false;

@@ -8,6 +8,13 @@ public class DbEntry
     public bool IsReference = false;
     public int Kerne = 0, Threads = 0;
     public Dictionary<string, double> Werte = new Dictionary<string, double>();
+    // ab v4.08: Vergleich mit der Referenz, wie ihn der Lauf berechnet hat (Prozent je Gruppe, Name der Referenz), und die
+    // Befunde des Laufs als Text. Fehlen die Felder (Läufe vor 4.08, Importe), bleiben die Sammlungen leer.
+    public Dictionary<string, double> GruppenPct = new Dictionary<string, double>();
+    public string RefName = "";
+    public bool HatVergleich = false;
+    public List<string> BefundListe = new List<string>();
+    public int NK = -1, NW = -1, NI = -1;
     public bool HasBench { get { return Werte.Count > 0; } }
     public double Get(string k) { double v; return Werte.TryGetValue(k, out v) ? v : 0; }
     public string DisplayName { get { return !String.IsNullOrEmpty(Name) ? Name : Computer; } }
@@ -99,7 +106,23 @@ public class DbEntry
                 object b; if (d.TryGetValue("Befunde", out b))
                 {
                     Dictionary<string, object> bd = b as Dictionary<string, object>;
-                    if (bd != null) e.Befunde = String.Format("{0} / {1} / {2}", S(bd, "Kritisch"), S(bd, "Warnungen"), S(bd, "Hinweise"));
+                    if (bd != null)
+                    {
+                        e.Befunde = String.Format("{0} / {1} / {2}", S(bd, "Kritisch"), S(bd, "Warnungen"), S(bd, "Hinweise"));
+                        int zk, zw, zi;
+                        if (int.TryParse(S(bd, "Kritisch"), out zk) && int.TryParse(S(bd, "Warnungen"), out zw) && int.TryParse(S(bd, "Hinweise"), out zi)) { e.NK = zk; e.NW = zw; e.NI = zi; }
+                        object lo; if (bd.TryGetValue("Liste", out lo) && lo is System.Collections.IEnumerable && !(lo is string)) foreach (object x in (System.Collections.IEnumerable)lo) if (x != null) e.BefundListe.Add(Convert.ToString(x));
+                    }
+                }
+                object vObj; if (d.TryGetValue("Vergleich", out vObj))
+                {
+                    Dictionary<string, object> vd = vObj as Dictionary<string, object>;
+                    if (vd != null)
+                    {
+                        e.HatVergleich = true; e.RefName = S(vd, "Referenz");
+                        object go; Dictionary<string, object> gg = vd.TryGetValue("Gruppen", out go) ? go as Dictionary<string, object> : null;
+                        if (gg != null) foreach (KeyValuePair<string, object> kv in gg) { try { double pv = Convert.ToDouble(kv.Value, CultureInfo.InvariantCulture); if (pv > 0) e.GruppenPct[kv.Key] = pv; } catch { } }
+                    }
                 }
                 object gObj; if (d.TryGetValue("Geraet", out gObj))
                 {

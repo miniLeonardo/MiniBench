@@ -1,0 +1,172 @@
+﻿LEOS MINIBENCH 4.08: ÄNDERUNGEN
+===============================
+
+Auftrag vom 12.11.2026: Die Ergebnisseite soll erreichbar bleiben, die Seiten Benchmark und Diagnose sollen aussehen wie
+Wartung, Optimierung und Tools, dazu die Befunde aus zwei Windows-Aufnahmen von 4.07. Leonardo hat die Fotos der neuen
+Seiten bestätigt, den Vorschlag zur Ergebnisseite angenommen und für die Prozentwerte den Weg "Speichern" gewählt.
+Messabläufe, Berichte, Ereigniskanal und Startparameter sind unverändert; der Datenbankeintrag bekommt ein optionales Feld.
+
+
+1. ERGEBNIS ALS SEITE
+  Vorher                      Die Ergebnisseite war ein eigener Bereich neben den Seiten. "Referenz ändern", "Zurück" und
+                              der Info-Knopf verließen sie, danach führte kein Weg zurück. Die Fußleiste verschwand, in der
+                              Seitenleiste blieb das zuletzt gewählte Modul markiert.
+  Eintrag "Ergebnis"          Steht in der Seitenleiste direkt unter Start, mit Symbol und der Punktzahl als Pille. Er
+                              erscheint, sobald es ein Ergebnis gibt, und verschwindet mit dem Start des nächsten Laufs.
+  Seite wie jede andere       Die Ergebnisseite liegt jetzt bei den übrigen Seiten (hinter Versionen, die Stellen 0 bis 11
+                              bleiben). Die Fußleiste bleibt sichtbar, der Wechsel weg und zurück baut nichts neu auf.
+  Bewegung                    Punktzahl, Balken und Ringe laufen nur beim ersten Anzeigen nach einem Lauf auf ihren Wert,
+                              bei jeder Rückkehr steht sofort der Endstand.
+  Referenz ändern             Öffnet die Seite Benchmark bei der Referenz. Oben steht das Band "Zurück zum Ergebnis" mit
+                              Datum und Punktzahl des Laufs und dem Hinweis, dass eine andere Referenz ab dem nächsten Lauf
+                              gilt. Das Band verschwindet beim nächsten Seitenwechsel und beim Start eines Laufs.
+  Erneut messen               Ersetzt "Zurück": derselbe Weg wie der Startknopf, mit derselben Übersicht vor dem Start.
+                              Ist kein Modul angehakt (Ergebnis aus der Datenbank), werden die messenden Module des
+                              gezeigten Laufs angehakt (Diagnose, Benchmark, Lasttest), Wartung und Optimierung nie.
+  Nach dem Programmstart      "Ergebnis" zeigt den letzten Lauf dieses PCs aus der Datenbank. Aufgebaut wird die Seite erst
+                              beim Öffnen. Der Knopf "Ergebnis" in der Karte "Letzter Lauf" der Startseite und "Ergebnis
+                              ansehen" im Kasten "Letztes Ergebnis auf diesem PC" der Seite Benchmark führen dorthin.
+                              "Bericht öffnen" heißt in der Karte kurz "Bericht", damit die Zeile passt.
+  Was gespeichert war         Zähler und Text aller Befunde stehen seit langem im Datenbankeintrag (Befunde.Liste). Es
+                              fehlten die Prozentwerte je Gruppe und der Name der Referenz.
+  Neues Feld Vergleich        Der Lauf schreibt Vergleich = { Referenz, Stand, Gruppen = { CPU, GPU, RAM, Laufwerke } } mit
+                              genau den Zahlen der Gruppenzeilen des Laufs (Get-DbVergleich). Das Feld fehlt ohne Referenz
+                              oder ohne verglichene Gruppe. Das Format bleibt PC-Diagnose-DB/2; ältere Versionen
+                              ignorieren das Feld.
+  Läufe vor 4.08              Punktzahl, Hardware, Kacheln und Befunde erscheinen. In "Leistung im Vergleich" steht, dass
+                              der Vergleich bei diesem Lauf nicht gespeichert ist, mit Verweis auf den Bericht; die Kacheln
+                              tragen dann keinen Ring. Nachgerechnet wird nichts (Vorgabe 11). Einträge ohne Befunde
+                              (Importe) zeigen "Befunde nicht gespeichert".
+  Nicht umgesetzt             Das Auswahlfeld für frühere Läufe dieses Geräts (zweite Stufe) bleibt offen.
+
+
+2. SEITE BENCHMARK
+  Seitenkopf                  Titel und Einleitung in einer Zeile, rechts "4 von 4 Messungen" und die Dauer.
+  Karte Messungen             Links, rund 60 % der Breite: je Messung eine Zeile mit Symbol, Titel, Beschreibung, Dauer als
+                              Etikett und Schalter, dazu "Alle an" und "Alle aus". Reihenfolge wie bisher.
+  Einstellungen               Stehen unter ihrer Messung und nur, wenn sie eingeschaltet ist: unter Grafik der Rendertest
+                              (Grafikeinheit, Auflösung, Anzeige nebeneinander), unter Laufwerke die Datenträger als
+                              kompakte Zeilen (Haken, Name, Etikett für die Anbindung, freier Platz des Volumes, auf dem
+                              gemessen wird) und der Hinweis zur Testdatei. Die Zeile Laufwerke nennt "5 von 6 gewählt".
+  Dauer der Laufwerke         Das Etikett zeigt die Schätzung, mit der auch Seitenkopf und Fußleiste rechnen (eine Minute
+                              je gewähltem Datenträger), nicht fest 2 Min. wie im Entwurf.
+  Karte Referenz              Rechts: Auswahl, eine Zeile zur geltenden Referenz, "Median aktualisieren" und der Verweis
+                              "Eigene Referenz in der Datenbank festlegen" (öffnet die Seite Datenbank).
+  Letztes Ergebnis            Darunter Punktzahl, Datum und Prozent je Gruppe des letzten Laufs dieses PCs, soweit
+                              gespeichert, und "Ergebnis ansehen". Ohne Lauf fehlt der Kasten.
+  Erhalten                    benchChk bleibt als Wert hinter den Schaltern (wie repChk auf der Seite Wartung): Vorlagen
+                              (Bench.CPU bis Bench.Disk, Bench.Referenz, Gpu.*), Zeitschätzung und Startparameter lesen
+                              unverändert. Abgleich der Rendertest-Auswahl mit dem Lasttest, UpdateRefState, FillRefLists
+                              und "Median aktualisieren" sind dieselben. Das Listenfeld clbDisks ist ersetzt; seine drei
+                              Leser (Zeitschätzung, Start, Farbschema) sind umgestellt.
+
+
+3. SEITE DIAGNOSE
+  Umfang                      Auswahl mit drei Feldern: Schnell, Vollständig, Eigene Auswahl, die ersten beiden mit Anzahl
+                              der Prüfungen und Dauer (mit paralleler Ausführung entsprechend kürzer).
+  Karte Prüfungen             Links, immer sichtbar: acht Zeilen mit Symbol, Kurztitel, Beschreibung, Dauer und Schalter.
+                              "läuft nebenher" steht an Updatesuche, Defender, SMART-Langtest und Energieanalyse, solange
+                              parallel ausgeführt wird (Parallel im Vertrag des Moduls; ein Test hält beides gleich).
+                              Der volle bisherige Text und die Erklärung stehen im Hinweis beim Überfahren.
+  Eigene Auswahl              Ein umgelegter Schalter wechselt zur eigenen Auswahl, die übrigen Prüfungen bleiben, wie
+                              bisher beim Klick auf ein Kästchen. "Alle an" und "Alle aus" wechseln ebenfalls dorthin.
+  Rechts                      Ausführung (Parallel ausführen), Zusätze (smartmontools holen mit Etikett Eingriff,
+                              Speicherdiagnose mit Etikett Neustart), Zeiträume (Ereignisse der letzten n Tage, Wartezeit
+                              des SMART-Langtests).
+  Erhalten                    diagChk, chkFast, chkInstall, chkMem und die drei Optionsfelder bleiben als Werte, diagKeys,
+                              Parameter des Arbeitsprozesses und die Schlüssel der Vorlagen unverändert. Neu sind die Felder
+                              diagKurz, diagDetail, diagIcons, diagDauer und diagNebenher neben diagText.
+
+
+4. GEMEINSAMER BAUSTEIN
+  DiagGui_Modulseite.cs       ModulSeite (Kopf mit Anzahl und Dauer, zwei Spalten 60 zu 40, unter 900 px Seitenbreite eine
+                              Spalte wie ToolSpalten), ZeilenKarte (Karte mit Titel, Verweisen rechts und Inhalt in
+                              Innenbreite) und SchalterZeile (Zeile mit Schalter, verbunden mit einem Kontrollkästchen).
+                              Die Ergebnisseite nutzt ZeilenKarte für ihre beiden mittleren Karten.
+  Steuerelemente              SettingRow mit Symbol links, LaufwerkZeile, FeldAuswahl, UnterBereich, FeldReihe,
+                              UmbruchPanel, NavItem mit Pille.
+  Geprüft und verworfen       CategoryBlock der Seite Wartung baut Kontrollkästchen in einer aufklappbaren Tabelle und
+                              passt nicht; SettingRow reicht mit dem Symbol.
+  Seite Lasttest              Nur angesehen, nicht umgebaut (Vorschlag siehe Projektstand, Offene Befunde).
+
+
+5. STARTFENSTER
+  Vorher                      LMB.exe lädt bevorzugt die LeosMinibench.ps1 neben sich und zeigte dabei immer die eigene
+                              Version. Lag dort noch das Skript der Vorversion, lief unbemerkt die alte (bei 4.07 so
+                              geschehen: exe 4.07, Skript 4.06).
+  Jetzt                       Das Startprogramm liest die Zeile $ScriptVersion aus den ersten 600 Zeilen des Skripts.
+                              Weicht sie ab, zeigt das Startfenster die Version des Skripts und darunter in Gelb "LMB.exe
+                              ist Version 4.08, daneben liegt Skript 4.07."; Start.log nennt beide Versionen.
+
+
+6. TESTS
+  Selbsttest der Oberfläche   Neun neue Fälle (63 statt 54): Modulseite.Rahmen, Laufwerkszeile, Umfang.Auswahl,
+                              Umbruch.Hoehe, Ergebnis.Befundzeile, Benchmark.Seite, Diagnose.Seite, Ergebnis.Seitenleiste,
+                              Ergebnis.Datenbank. Die letzten vier bauen erstmals die ganze Oberfläche auf (ohne sie
+                              anzuzeigen) und prüfen Verhalten: Schalter und Werte in beide Richtungen, Vorlagen mit den
+                              bisherigen Schlüsseln, Eintrag der Seitenleiste ohne und mit Ergebnis, Rückkehr ohne
+                              Neuaufbau, Band, Ergebnis aus Einträgen mit und ohne die neuen Felder.
+  Pester                      Messung: Get-DbVergleich (Zahlen wie die Gruppenzeilen, fehlt ohne Referenz). Datenbank:
+                              Save-DbEntry schreibt das Feld, ohne Referenz fehlt es, Einträge mit und ohne Feld stehen
+                              nebeneinander. Modulvertrag: diagNebenher = Parallel im Vertrag, je Prüfung ein Kurztitel.
+                              Aufbau: Version des Skripts im Startfenster. Oberflaeche: gemeinsamer Rahmen, Ergebnis als
+                              Seite, Oberfläche rechnet Prozentwerte nicht nach.
+
+
+GEFUNDEN UND BEHOBEN
+  Kopfkarte der Ergebnisseite Unter Windows blieb sie unten rund 130 px leer, die Seite brauchte eine Bildlaufleiste und der
+                              Titel war abgeschnitten. Ursache: Die Pillen standen in einem FlowLayoutPanel mit AutoSize
+                              und Umbruch. Es behielt die Höhe des ersten, schmalen Aufbaus (Fallstrick 3). Die Pillen
+                              stehen jetzt in einem Element, das seine Höhe selbst setzt; die ganze Seite ordnet
+                              OrdneErgebnis mit gemessenen Höhen.
+  Alle Befunde im Bericht     Der Verweis stand unter Windows über dem Text. Er wird jetzt bei jedem Aufbau ausdrücklich
+                              als letztes Element gesetzt; der Selbsttest prüft die Reihenfolge.
+  Markiertes Modul            Während das Ergebnis zu sehen war, blieb das zuletzt gewählte Modul markiert.
+  100 % =                     Bei "Gespeicherte Referenz" nannte die Ergebnisseite nur diesen Text statt des Namens der
+                              Referenz: RefLabelText suchte nach einem Satzanfang, den es seit 4.06 nicht mehr gab.
+  Zeile zur Referenz          Die Warnfarbe der Zeile unter der Auswahl blieb nach einem Wechsel des Farbschemas stehen.
+  Startprogramm               Ein zweiter Start von LMB.exe hielt Statusdatei und entpacktes Skript einer laufenden
+                              Instanz für Reste und löschte sie: Geprüft wurde der Prozessname LeosMinibench, die exe heißt
+                              seit 3.73 LMB. Betraf nur Starts ohne Skript neben der exe.
+  Seite Umzug                 Path.GetPathRoot(Environment.SystemDirectory) brach den Aufbau der Oberfläche ab, wenn es
+                              keinen Systemordner gibt (Selbsttest unter Mono). Jetzt abgesichert.
+  Eigene Durchsicht           Die neuen Seiten ordneten sich zuerst nach Visible ihrer Teile. Visible ist falsch, solange
+                              die Seite selbst nicht angezeigt wird; nach einem Lauf wäre die Ergebnisseite ohne Pillen und
+                              ohne Vergleichskarte geordnet worden. Jetzt eigene Zustände. Befunde wurden mit einer
+                              instabilen Sortierung geordnet; jetzt kritisch zuerst in der Reihenfolge des Laufs.
+
+
+GRENZEN
+  Nicht unter Windows geprüft Alles ist in der Linux-Sandbox unter Mono entstanden und dort in Hell und Dunkel bei 100 %
+                              fotografiert, auch im schmalen Fenster und nach einem Wechsel des Farbschemas zur Laufzeit.
+                              Unter Windows offen: beide neuen Seiten bei 125 und 150 %, die Kopfkarte der Ergebnisseite,
+                              der Hinweis im Startfenster, der freie Platz in den Laufwerkszeilen (unter Mono nicht
+                              abfragbar) und die Symbole (in der Sandbox Ersatzzeichen).
+  Startzeit                   Start.log im Projektordner enthält genau einen Start mit 4.07 (7,9 s, erster Start mit
+                              Übersetzung, Hardwareabfrage 566 ms, Seiten zusammen 745 ms, davon Versionen 150 ms und
+                              Lasttest 113 ms). "Datenpflege: unverändert" ist damit noch nicht belegt; dazu braucht es
+                              einen zweiten Start. Die Ergebnisseite kommt beim Aufbau der Seiten hinzu.
+  Sandbox                     933 bestanden, 51 fehlgeschlagen, 70 übersprungen (4.07: 924, 52, 61). Die 51 brauchen Windows und
+                              sind dieselben wie auf 4.07: Bericht 34, Datenbank 3, Diagnose 3, Lauf 4, Modulvertrag 3,
+                              Sensoren 4. Der 52. von 4.07 (Datenbank, Desktop-Median als Standard) besteht in der Sandbox
+                              jetzt nur, weil eine Attrappe des neuen Tests im Nachbau von Pester über ihren Test hinaus
+                              gilt (Fallstrick 12); unter Windows ändert das nichts. Übersprungen sind in der Sandbox die
+                              Fälle des Selbsttests (dort ohne Anzeige); er läuft getrennt unter Mono mit Xvfb: 63 Fälle
+                              bestanden (4.07: 54).
+  Selbsttest unter Windows    Vier neue Fälle bauen die ganze Oberfläche auf. Unter Mono laufen sie; unter Windows im
+                              Testprozess von Testen.cmd sind sie noch nicht gelaufen. Scheitert dort der Aufbau, zeigt
+                              der Fall die Meldung der Ausnahme.
+  Laufansicht                 Nach einem Lauf zeigt das Programm die Ergebnisseite; die Laufansicht mit Tests, Leistung
+                              und Protokoll ist danach wie bisher nicht mehr erreichbar.
+  Erneut messen               Startet, was links angehakt ist. Wer nach dem Lauf die Auswahl ändert, misst die neue Auswahl.
+
+
+UMSTIEG
+  Nichts zu tun. Vorlagen laden wie bisher. Der erste Lauf mit 4.08 speichert den Vergleich mit; bis dahin zeigt
+  "Ergebnis" für den letzten Lauf "nicht gespeichert" bei den Prozentwerten.
+
+
+QUELLEN
+  AutoSizeMode (GrowOnly, GrowAndShrink): https://learn.microsoft.com/dotnet/api/system.windows.forms.autosizemode
+  Control.Visible (Wert hängt von den übergeordneten Elementen ab): https://learn.microsoft.com/dotnet/api/system.windows.forms.control.visible
+  FlowLayoutPanel: https://learn.microsoft.com/dotnet/desktop/winforms/controls/flowlayoutpanel-control-overview

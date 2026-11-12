@@ -391,10 +391,12 @@ public partial class DiagGui
             destFree.Clear();
 
             DriveInfo[] drvs = DriveInfo.GetDrives();
+            // Systemlaufwerk einmal ermitteln; ohne Systemordner (Selbsttest unter Mono) bleibt es leer statt den Aufbau abzubrechen
+            string sysRoot = ""; try { sysRoot = Path.GetPathRoot(Environment.SystemDirectory); } catch { }
             foreach (DriveInfo d in drvs)
             {
                 if (!d.IsReady) continue;
-                if (d.DriveType == DriveType.Removable || (d.DriveType == DriveType.Fixed && d.Name != Path.GetPathRoot(Environment.SystemDirectory)))
+                if (d.DriveType == DriveType.Removable || (d.DriveType == DriveType.Fixed && d.Name != sysRoot))
                 {
                     long freeGb = d.AvailableFreeSpace / 1073741824L;
                     string fs = d.DriveFormat;

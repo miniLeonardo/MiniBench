@@ -595,7 +595,8 @@ public partial class DiagGui
         pnlButtons.Margin = new Padding(0);
 
         Button btnOpenRep = new PrimaryButton();
-        btnOpenRep.Text = "Bericht öffnen";
+        // ab v4.08 kurz "Bericht": mit dem neuen Knopf "Ergebnis" passte die Zeile sonst nicht mehr neben die Befunde
+        btnOpenRep.Text = "Bericht";
         btnOpenRep.FlatStyle = FlatStyle.Flat;
         btnOpenRep.FlatAppearance.BorderSize = 0;
         btnOpenRep.BackColor = UI.Accent;
@@ -603,8 +604,8 @@ public partial class DiagGui
         btnOpenRep.FlatAppearance.MouseOverBackColor = UI.AccentHover;
         btnOpenRep.FlatAppearance.MouseDownBackColor = UI.AccentActive;
         btnOpenRep.Font = new Font("Segoe UI Semibold", 8.5f);
-        btnOpenRep.Padding = new Padding(UI.S(8), UI.S(3), UI.S(8), UI.S(3));
-        btnOpenRep.Margin = new Padding(0, UI.S(2), UI.S(6), 0);
+        btnOpenRep.Padding = new Padding(UI.S(5), UI.S(3), UI.S(5), UI.S(3));
+        btnOpenRep.Margin = new Padding(0, UI.S(2), UI.S(4), 0);
         btnOpenRep.AutoSize = true;
         btnOpenRep.Cursor = Cursors.Hand;
         btnOpenRep.UseVisualStyleBackColor = false;
@@ -613,6 +614,28 @@ public partial class DiagGui
         DbEntry targetRun = lastRun;
         btnOpenRep.Click += delegate { if (targetRun != null) OpenEntry(targetRun); };
         pnlButtons.Controls.Add(btnOpenRep);
+
+        // ab v4.08: führt zur Ergebnisseite mit diesem Lauf (Urteil, Vergleich zur Referenz, Hauptwerte)
+        Button btnErgebnis = new Button();
+        btnErgebnis.Text = "Ergebnis";
+        btnErgebnis.FlatStyle = FlatStyle.Flat;
+        btnErgebnis.FlatAppearance.BorderColor = UI.Accent;
+        btnErgebnis.FlatAppearance.BorderSize = 1;
+        btnErgebnis.BackColor = UI.AccentSoft;
+        btnErgebnis.ForeColor = UI.Accent;
+        btnErgebnis.FlatAppearance.MouseOverBackColor = UI.Accent;
+        btnErgebnis.FlatAppearance.MouseDownBackColor = UI.AccentActive;
+        btnErgebnis.Font = new Font("Segoe UI Semibold", 8.5f);
+        btnErgebnis.Padding = new Padding(UI.S(5), UI.S(3), UI.S(5), UI.S(3));
+        btnErgebnis.Margin = new Padding(0, UI.S(2), UI.S(4), 0);
+        btnErgebnis.AutoSize = true;
+        btnErgebnis.Cursor = Cursors.Hand;
+        btnErgebnis.UseVisualStyleBackColor = false;
+        btnErgebnis.MouseEnter += delegate { btnErgebnis.ForeColor = UI.OnAccent; };
+        btnErgebnis.MouseLeave += delegate { btnErgebnis.ForeColor = UI.Accent; };
+        Tip(btnErgebnis, "Öffnet die Ergebnisseite mit dem letzten Lauf dieses PCs: Urteil, Vergleich zur Referenz und Hauptwerte je Komponente.");
+        btnErgebnis.Click += delegate { ZeigeLetztesErgebnis(); };
+        pnlButtons.Controls.Add(btnErgebnis);
 
         Button btnDash = new Button();
         btnDash.Text = "Dashboard";
@@ -624,8 +647,8 @@ public partial class DiagGui
         btnDash.FlatAppearance.MouseOverBackColor = UI.Accent;
         btnDash.FlatAppearance.MouseDownBackColor = UI.AccentActive;
         btnDash.Font = new Font("Segoe UI Semibold", 8.5f);
-        btnDash.Padding = new Padding(UI.S(8), UI.S(3), UI.S(8), UI.S(3));
-        btnDash.Margin = new Padding(0, UI.S(2), UI.S(6), 0);
+        btnDash.Padding = new Padding(UI.S(5), UI.S(3), UI.S(5), UI.S(3));
+        btnDash.Margin = new Padding(0, UI.S(2), UI.S(4), 0);
         btnDash.AutoSize = true;
         btnDash.Cursor = Cursors.Hand;
         btnDash.UseVisualStyleBackColor = false;
@@ -644,7 +667,7 @@ public partial class DiagGui
         btnVerlauf.FlatAppearance.MouseOverBackColor = UI.Accent;
         btnVerlauf.FlatAppearance.MouseDownBackColor = UI.AccentActive;
         btnVerlauf.Font = new Font("Segoe UI Semibold", 8.5f);
-        btnVerlauf.Padding = new Padding(UI.S(8), UI.S(3), UI.S(8), UI.S(3));
+        btnVerlauf.Padding = new Padding(UI.S(5), UI.S(3), UI.S(5), UI.S(3));
         btnVerlauf.Margin = new Padding(0, UI.S(2), 0, 0);
         btnVerlauf.AutoSize = true;
         btnVerlauf.Cursor = Cursors.Hand;

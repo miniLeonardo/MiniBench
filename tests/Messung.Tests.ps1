@@ -627,6 +627,34 @@ Describe 'Gewichtung im Gesamtbild' {
         Set-ModuleVar 'BenchDisks' @([pscustomobject]@{ RefPct = 400; Status = 'OK' })
         MinibenchTest\Get-BenchOverall | Should -Be 159   # (100^4 x 400^2)^(1/6); ungewichtet wären es 200
     }
+    It 'Vergleich für den Datenbankeintrag: Name der Referenz und Prozent je verglichener Gruppe (ab v4.08)' {
+        Set-ModuleVar 'Ref' @{ Name = 'Median Desktop-PCs (7 Systeme)'; Datum = '2026-11-10'; Quelle = 'Referenz_Desktop.json'; Werte = @{ 'CPU|X' = 100.0 } }
+        Set-ModuleVar 'BenchResults' @(
+            [pscustomobject]@{ Gruppe = 'CPU'; Key = 'CPU|X'; RefKey = 'CPU|X'; RefPct = 103; Status = 'OK' }
+            [pscustomobject]@{ Gruppe = 'GPU'; Key = 'GPU|REND'; RefKey = 'GPU|REND'; RefPct = 237; Status = 'OK' }
+            [pscustomobject]@{ Gruppe = 'RAM'; Key = 'RAM|X'; RefKey = 'RAM|X'; RefPct = $null; Status = 'OK' })
+        Set-ModuleVar 'BenchDisks' @()
+        $v = MinibenchTest\Get-DbVergleich
+        $v.Referenz | Should -Be 'Median Desktop-PCs (7 Systeme)'
+        $v.Stand | Should -Be '2026-11-10'
+        $v.Gruppen['CPU'] | Should -Be 103
+        $v.Gruppen['GPU'] | Should -Be 237
+        $v.Gruppen.Contains('RAM') | Should -BeFalse -Because 'ohne Referenzwert nicht verglichen'
+        $v.Gruppen.Contains('Laufwerke') | Should -BeFalse -Because 'nicht gemessen'
+        # dieselben Zahlen wie die Gruppenzeilen des Laufs
+        $v.Gruppen['GPU'] | Should -Be (MinibenchTest\Get-BenchGroup 'GPU').RefPct
+    }
+    It 'Vergleich für den Datenbankeintrag fehlt ohne Referenz und ohne verglichene Gruppe' {
+        Set-ModuleVar 'Ref' @{ Name = ''; Datum = ''; Quelle = ''; Werte = @{} }
+        Set-ModuleVar 'BenchResults' @([pscustomobject]@{ Gruppe = 'CPU'; Key = 'CPU|X'; RefKey = 'CPU|X'; RefPct = 103; Status = 'OK' })
+        MinibenchTest\Get-DbVergleich | Should -BeNullOrEmpty
+        Set-ModuleVar 'Ref' @{ Name = 'R'; Datum = ''; Quelle = 'Q'; Werte = @{ 'CPU|X' = 100.0 } }
+        Set-ModuleVar 'BenchResults' @()
+        MinibenchTest\Get-DbVergleich | Should -BeNullOrEmpty
+        Set-ModuleVar 'Ref' @{ Name = ''; Datum = ''; Quelle = 'Eingebettet (Desktop)'; Werte = @{ 'CPU|X' = 100.0 } }
+        Set-ModuleVar 'BenchResults' @([pscustomobject]@{ Gruppe = 'CPU'; Key = 'CPU|X'; RefKey = 'CPU|X'; RefPct = 90; Status = 'OK' })
+        (MinibenchTest\Get-DbVergleich).Referenz | Should -Be 'Eingebettet (Desktop)' -Because 'ohne Namen steht die Quelle'
+    }
     It 'Gruppen ohne Referenzwert fallen aus dem Gesamtbild' {
         Set-ModuleVar 'BenchResults' @([pscustomobject]@{ Gruppe = 'CPU'; Key = 'CPU|X'; RefKey = 'CPU|X'; RefPct = 120; Status = 'OK' })
         MinibenchTest\Get-BenchOverall | Should -Be 120

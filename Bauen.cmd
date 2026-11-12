@@ -21,6 +21,7 @@ $ohneTests = ([string]$A1).Trim().ToLowerInvariant() -eq 'ohnetests'
 
 $launcher = @'
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -39,7 +40,7 @@ using System.Windows.Forms;
 // bis die Oberfläche gezeichnet ist (benanntes Ereignis LEOSMINIBENCH_BEREIT) oder PowerShell endet.
 class Splash : Form
 {
-    Label status;
+    Label status, lblVersion, lblHinweis;
     ProgressBar bar;
     public Splash(string version)
     {
@@ -53,9 +54,19 @@ class Splash : Form
         catch { try { pb.Image = Icon.ToBitmap(); } catch { } }
         Label t = new Label(); t.Text = "Leos Minibench"; t.Font = new Font("Segoe UI Semibold", 17f); t.AutoSize = true; t.Location = new Point(108, 26); t.ForeColor = Color.White;
         Label v = new Label(); v.Text = "Version " + version; v.AutoSize = true; v.Location = new Point(111, 64); v.ForeColor = Color.FromArgb(160, 174, 192);
+        lblVersion = v;
+        // ab v4.08: Hinweis, wenn neben der exe ein Skript einer anderen Version liegt (dann läuft dieses, nicht das eingebettete)
+        lblHinweis = new Label(); lblHinweis.Text = ""; lblHinweis.AutoSize = false; lblHinweis.Size = new Size(306, 18); lblHinweis.Location = new Point(111, 84); lblHinweis.ForeColor = Color.FromArgb(252, 211, 77); lblHinweis.Visible = false;
         status = new Label(); status.Text = "wird gestartet ..."; status.AutoSize = false; status.Size = new Size(392, 20); status.Location = new Point(24, 112); status.ForeColor = Color.FromArgb(203, 213, 225);
         bar = new ProgressBar(); bar.Location = new Point(24, 136); bar.Size = new Size(392, 10); bar.Style = ProgressBarStyle.Continuous; bar.Maximum = 100;
-        Controls.Add(pb); Controls.Add(t); Controls.Add(v); Controls.Add(status); Controls.Add(bar);
+        Controls.Add(pb); Controls.Add(t); Controls.Add(v); Controls.Add(lblHinweis); Controls.Add(status); Controls.Add(bar);
+    }
+    // Zeigt die Version des Skripts, das tatsächlich läuft, und nennt die Abweichung von der exe
+    public void SetVersion(string laeuft, string hinweis)
+    {
+        lblVersion.Text = "Version " + laeuft;
+        lblHinweis.Text = hinweis ?? ""; lblHinweis.Visible = lblHinweis.Text.Length > 0;
+        Refresh();
     }
     public void SetStatus(string text, int percent)
     {
@@ -92,6 +103,27 @@ static class Program
         return b.ToString();
     }
 
+    // Version eines Gesamtskripts aus seiner Zeile $ScriptVersion = '4.08' (steht in den ersten Zeilen); leer, wenn sie fehlt
+    static string SkriptVersion(string[] zeilen)
+    {
+        if (zeilen == null) return "";
+        foreach (string z in zeilen)
+        {
+            string t = z.TrimStart('\uFEFF', ' ', '\t');
+            if (!t.StartsWith("$ScriptVersion")) continue;
+            int a = t.IndexOf('\''), e = a >= 0 ? t.IndexOf('\'', a + 1) : -1;
+            return e > a ? t.Substring(a + 1, e - a - 1).Trim() : "";
+        }
+        return "";
+    }
+
+    // Hinweis für das Startfenster, wenn das Skript neben der exe eine andere Version hat als die exe; sonst leer
+    static string VersionsHinweis(string exeVersion, string skriptVersion)
+    {
+        if (String.IsNullOrEmpty(skriptVersion) || skriptVersion == exeVersion) return "";
+        return "LMB.exe ist Version " + exeVersion + ", daneben liegt Skript " + skriptVersion + ".";
+    }
+
     // Startphase in die Statusdatei (Zeitstempel|Quelle|Text), Quelle L = exe
     static void Phase(DateTime t, string text)
     {
@@ -103,7 +135,7 @@ static class Program
     {
         int pid; string n = Path.GetFileNameWithoutExtension(file);
         if (!n.StartsWith(prefix) || !int.TryParse(n.Substring(prefix.Length), out pid)) return true;
-        try { using (Process op = Process.GetProcessById(pid)) { return !op.HasExited && op.ProcessName.StartsWith("LeosMinibench", StringComparison.OrdinalIgnoreCase); } } catch { return false; }
+        try { using (Process op = Process.GetProcessById(pid)) { return !op.HasExited && (op.ProcessName.StartsWith("LeosMinibench", StringComparison.OrdinalIgnoreCase) || op.ProcessName.Equals("LMB", StringComparison.OrdinalIgnoreCase)); } } catch { return false; }
     }
 
     [STAThread]
@@ -146,7 +178,13 @@ static class Program
         if (File.Exists(beside))
         {
             ps1 = beside;
-            Phase(DateTime.Now, "Skript geladen (neben exe)");
+            // ab v4.08: Das Startfenster zeigt die Version des Skripts, das läuft. Bis v4.07 stand dort immer die Version
+            // der exe, auch wenn daneben noch das Skript der Vorversion lag.
+            string sv = "";
+            try { List<string> kopf = new List<string>(); using (StreamReader sr = new StreamReader(beside, Encoding.UTF8)) { string z; while (kopf.Count < 600 && (z = sr.ReadLine()) != null) kopf.Add(z); } sv = SkriptVersion(kopf.ToArray()); } catch { }
+            string vh = VersionsHinweis("@@VERSION_TEXT@@", sv);
+            if (vh.Length > 0) { sp.SetVersion(sv, vh); Application.DoEvents(); }
+            Phase(DateTime.Now, vh.Length > 0 ? "Skript geladen (neben exe, Version " + sv + ", exe @@VERSION_TEXT@@)" : "Skript geladen (neben exe)");
         }
         else
         {

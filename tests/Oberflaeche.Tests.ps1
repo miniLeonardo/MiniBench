@@ -80,6 +80,15 @@ Describe 'Selbsttest der Oberfläche' {
         @{ Fall = 'Ringanzeige' }
         @{ Fall = 'Ergebnis.Ordner' }
         @{ Fall = 'Einstellungen.Werte' }
+        @{ Fall = 'Modulseite.Rahmen' }
+        @{ Fall = 'Laufwerkszeile' }
+        @{ Fall = 'Umfang.Auswahl' }
+        @{ Fall = 'Umbruch.Hoehe' }
+        @{ Fall = 'Ergebnis.Befundzeile' }
+        @{ Fall = 'Benchmark.Seite' }
+        @{ Fall = 'Diagnose.Seite' }
+        @{ Fall = 'Ergebnis.Seitenleiste' }
+        @{ Fall = 'Ergebnis.Datenbank' }
     ) {
         Assert-GuiSelbsttest $Fall
     }
@@ -310,5 +319,36 @@ Describe 'Eine Datei je Seite, Startzeit, Akzentfarbe und Bewegung (ab v4.07)' {
         $gui | Should -Match 'Zeile\(gAll, "Animationen"'
         $gui | Should -Match '(?s)LoadAkzentPreference\(\);\s+UI\.SetTheme\(isDark\);'
         $gui | Should -Not -Match 'Color\.FromArgb\(100, 180, 246\)|Color\.FromArgb\(0, 100, 190\)' -Because 'feste Blautöne folgen sonst der Akzentfarbe nicht'
+    }
+}
+
+Describe 'Modulseiten und Ergebnis als Seite (ab v4.08)' {
+    It 'Benchmark und Diagnose nutzen den gemeinsamen Rahmen, das Listenfeld der Laufwerke ist ersetzt' {
+        $gui = Get-GuiText
+        (Get-SrcText 'Oberflaeche/DiagGui_Benchmark.cs') | Should -Match 'benchSeite = NeueModulSeite\(f\);'
+        (Get-SrcText 'Oberflaeche/DiagGui_Diagnose.cs') | Should -Match 'diagSeite = NeueModulSeite\(f\);'
+        (Get-SrcText 'Oberflaeche/DiagGui_Modulseite.cs') | Should -Match 'SettingRow SchalterZeile\(CheckBox wert'
+        $gui | Should -Not -Match 'clbDisks'
+        $gui | Should -Not -Match 'GroupHeader diagToggle'
+        # Werte für Vorlagen und Start bleiben Kontrollkästchen und Optionsfelder mit den bisherigen Namen
+        $gui | Should -Match 'benchChk\[i\] = Chk\(benchText\[i\], true\);'
+        $gui | Should -Match 'diagChk\[i\] = Chk\(diagText\[i\], true\);'
+        $gui | Should -Match 'new RadioButton\[\] \{ rbVoll, rbSchnell, rbCustom \}' -Because 'Reihenfolge der Profile in den Vorlagen'
+    }
+    It 'das Ergebnis ist eine Seite mit Eintrag in der Seitenleiste, ohne Knopf Zurück' {
+        $gui = Get-GuiText
+        $gui | Should -Not -Match 'btnDashBack'
+        $gui | Should -Match 'navErgebnis = new NavItem\("Ergebnis", "", UI\.IcoErgebnis\);'
+        $gui | Should -Match 'ergebnisPage = pages\.Count; pages\.Add\(resultDashboard\);'
+        $gui | Should -Match 'btnDashAgain = UI\.Secondary\("Erneut messen"\);'
+        $gui | Should -Match 'if \(ergBewegung\) \{ ergBewegung = false; StarteErgebnisBewegung\(\); \}' -Because 'Bewegung nur beim ersten Anzeigen'
+        $gui | Should -Match 'if \(bandErgGezeigt\) VerbergeErgebnisBand\(\);'
+        $gui | Should -Not -Match 'resultDashboard\.Visible = false' -Because 'die Seite wird wie jede andere über ShowPage gewechselt'
+    }
+    It 'der Vergleich mit der Referenz steht im Datenbankeintrag und wird von dort gelesen' {
+        (Get-SrcText 'Kern/Datenbank.ps1') | Should -Match "\`$o\['Vergleich'\] = \`$vgl"
+        (Get-SrcText 'Kern/Datenbank.ps1') | Should -Match "\`$script:DbFormat = 'PC-Diagnose-DB/2'"
+        (Get-SrcText 'Oberflaeche/DiagGui_Modelle.cs') | Should -Match 'd\.TryGetValue\("Vergleich", out vObj\)'
+        (Get-GuiText) | Should -Not -Match 'Get-RefPct|GeoMean' -Because 'die Oberfläche rechnet die Prozentwerte nicht nach'
     }
 }

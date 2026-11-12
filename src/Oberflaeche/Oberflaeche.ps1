@@ -72,6 +72,7 @@ if (-not $EventMode -and -not $ImportOrdner -and -not $Vergleich -and -not $Ruec
 #>> EINBINDEN Oberflaeche\DiagGui_Darstellung.cs
 #>> EINBINDEN Oberflaeche\DiagGui_Einstellungen.cs
 #>> EINBINDEN Oberflaeche\DiagGui_Update.cs
+#>> EINBINDEN Oberflaeche\DiagGui_Modulseite.cs
 #>> EINBINDEN Oberflaeche\DiagGui_Startseite.cs
 #>> EINBINDEN Oberflaeche\DiagGui_Diagnose.cs
 #>> EINBINDEN Oberflaeche\DiagGui_Benchmark.cs

@@ -453,6 +453,22 @@ function Send-BenchGroup([string]$Gruppe) {
     if ($g.Anzahl) { Send-GuiEvent 'BGRP' $Gruppe $g.Name $g.Status $g.Kopf $g.Referenz }
 }
 
+# Vergleich mit der Referenz für den Datenbankeintrag (ab v4.08): Name der Referenz und Prozent je Gruppe, genau die
+# Zahlen aus Bericht und Laufansicht. Die Ergebnisseite zeigt damit auch einen Lauf aus der Datenbank, ohne selbst zu
+# rechnen. $null ohne Referenz oder ohne verglichene Gruppe; das Feld fehlt dann im Eintrag.
+function Get-DbVergleich {
+    if (-not (Test-HasReference)) { return $null }
+    $g = [ordered]@{}
+    foreach ($k in 'CPU', 'GPU', 'RAM', 'Laufwerke') {
+        $x = Get-BenchGroup $k
+        if ($null -ne $x.RefPct -and [double]$x.RefPct -gt 0) { $g[$k] = [int]$x.RefPct }
+    }
+    if (-not $g.Count) { return $null }
+    $name = [string]$script:Ref.Name
+    if (-not $name) { $name = [string]$script:Ref.Quelle }
+    return [ordered]@{ Referenz = $name; Stand = [string]$script:Ref.Datum; Gruppen = $g }
+}
+
 # Messwerte dieses Laufs als Referenzwerte (Laufwerke als Mittelwert je Klasse)
 function Get-CurrentRefValues {
     $w = @{}

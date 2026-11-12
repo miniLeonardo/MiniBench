@@ -261,6 +261,10 @@ public static class UI
     public const string IcoSearch = "\uE721";
     public const string IcoLock = "\uE72E";
     public const string IcoSun = "\uE706";
+    // ab v4.08: Ergebnis (Seitenleiste), Energie und parallele Ausführung, Systemintegrität
+    public const string IcoErgebnis = "\uE9D2";
+    public const string IcoBlitz = "\uE945";
+    public const string IcoDokument = "\uE8A5";
 
     // Symbol nach Namen (Katalog und Vertrag nennen Felder wie "IcoShield"); unbekannt oder leer: ersatz
     public static string IconByName(string name, string ersatz)
@@ -1718,8 +1722,12 @@ public class SettingRow : Control
     }
 
     public string Title { get { return title; } set { title = value ?? ""; AccessibleName = title; Invalidate(); } }
-    public string Description { get { return desc; } set { desc = value ?? ""; RecalcHeight(); Invalidate(); } }
+    public string Description { get { return desc; } set { if (desc == (value ?? "")) return; desc = value ?? ""; RecalcHeight(); Invalidate(); } }
     public ToggleSwitch Toggle { get { return toggle; } }
+    // ab v4.08: Symbol links vor dem Titel (Seiten Benchmark und Diagnose); leer = Zeile ohne Symbol wie bisher
+    string icon = "";
+    public string Icon { get { return icon; } set { icon = value ?? ""; RecalcHeight(); Invalidate(); } }
+    int TextLinks { get { return icon.Length > 0 ? UI.S(44) : UI.S(12); } }
     public bool Checked
     {
         get { return toggle != null && toggle.Checked; }
@@ -1751,6 +1759,7 @@ public class SettingRow : Control
     {
         if (b == null) return 0;
         string t = (b.Text ?? "").ToLowerInvariant();
+        if (t.EndsWith(" min.") || t.Contains(" std.")) return 5;   // ab v4.08: Dauer direkt neben dem Schalter
         if (t.Contains("neustart")) return 4;
         if (t == "eingriff" || t == "zerstrend" || t == "zerstoerend" || t == "ndern" || t == "aendern" || t == "lesen") return 3;
         if (t == "empfohlen" || t == "standard") return 2;
@@ -1771,7 +1780,7 @@ public class SettingRow : Control
         try
         {
             if (Width <= 0) return;
-            int curX = UI.S(12);
+            int curX = TextLinks;
             int rightBound = Width - UI.S(16);
             if (toggle != null) rightBound = Math.Min(rightBound, toggle.Left > 0 ? toggle.Left : (Width - UI.S(54)));
             for (int i = 0; i < badges.Count; i++)
@@ -1885,7 +1894,10 @@ public class SettingRow : Control
             using (Pen pen = new Pen(border, 1f)) g.DrawPath(pen, p);
         }
 
-        int curX = UI.S(12);
+        int curX = TextLinks;
+        if (icon.Length > 0)
+            using (Font fi = UI.SymbolFont(13f))
+                TextRenderer.DrawText(g, icon, fi, new Rectangle(UI.S(10), 0, UI.S(28), Height), UI.Accent, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoClipping);
         int rightBound = Width - UI.S(16);
         if (toggle != null) rightBound = Math.Min(rightBound, toggle.Left);
         for (int i = 0; i < badges.Count; i++)
@@ -1925,6 +1937,262 @@ public class SettingRow : Control
     }
 }
 
+
+// ab v4.08: kompakte Zeile für einen Datenträger (Seite Benchmark): Haken, Name, Etikett für die Anbindung und rechts der
+// freie Platz. Ersetzt das Listenfeld mit Kontrollkästchen, das als einziges Element der Seite einen hellen Rahmen trug.
+public class LaufwerkZeile : Control
+{
+    string name = "", bus = "", rechts = "";
+    bool isChecked, hover;
+    public event EventHandler CheckedChanged;
+
+    public LaufwerkZeile(string name, string bus, string rechts, bool on)
+    {
+        this.name = name ?? ""; this.bus = bus ?? ""; this.rechts = rechts ?? ""; isChecked = on;
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
+        TabStop = true; Cursor = Cursors.Hand; BackColor = UI.Panel;
+        AccessibleRole = AccessibleRole.CheckButton; AccessibleName = this.name;
+        Size = new Size(UI.S(400), UI.S(30)); Margin = new Padding(0, 0, 0, UI.S(4));
+    }
+    public string Laufwerk { get { return name; } }
+    public string Anbindung { get { return bus; } }
+    public string Rechts { get { return rechts; } set { rechts = value ?? ""; Invalidate(); } }
+    public bool Checked
+    {
+        get { return isChecked; }
+        set { if (isChecked == value) return; isChecked = value; Invalidate(); if (CheckedChanged != null) CheckedChanged(this, EventArgs.Empty); }
+    }
+    protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
+    protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
+    protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
+    protected override void OnMouseClick(MouseEventArgs e) { if (e.Button == MouseButtons.Left) { Focus(); Checked = !Checked; } base.OnMouseClick(e); }
+    protected override void OnKeyDown(KeyEventArgs e) { if (e.KeyCode == Keys.Space) { Checked = !Checked; e.Handled = true; } base.OnKeyDown(e); }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias; g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+        using (SolidBrush ob = new SolidBrush(UI.Panel)) g.FillRectangle(ob, ClientRectangle);
+        Color bg = hover ? (UI.IsDark ? Color.FromArgb(42, 44, 48) : Color.FromArgb(246, 248, 252)) : (UI.IsDark ? Color.FromArgb(30, 31, 33) : Color.FromArgb(250, 251, 252));
+        using (GraphicsPath p = UI.Round(new RectangleF(0.5f, 0.5f, Width - 2, Height - 2), UI.SF(6)))
+        {
+            using (SolidBrush b = new SolidBrush(bg)) g.FillPath(b, p);
+            using (Pen pen = new Pen(UI.Line, 1f)) g.DrawPath(pen, p);
+        }
+        int bs = UI.S(16);
+        Rectangle bx = new Rectangle(UI.S(10), (Height - bs) / 2, bs, bs);
+        using (GraphicsPath bp = UI.Round(bx, UI.SF(4)))
+        {
+            using (SolidBrush bb = new SolidBrush(isChecked ? UI.Accent : UI.Panel)) g.FillPath(bb, bp);
+            using (Pen bpen = new Pen(isChecked ? UI.Accent : (UI.IsDark ? Color.FromArgb(90, 95, 105) : Color.FromArgb(160, 170, 185)), UI.SF(1.5f))) g.DrawPath(bpen, bp);
+        }
+        if (isChecked) using (Pen ck = new Pen(UI.OnAccent, UI.SF(2f))) { ck.StartCap = LineCap.Round; ck.EndCap = LineCap.Round; g.DrawLines(ck, new PointF[] { new PointF(bx.X + bs * 0.24f, bx.Y + bs * 0.52f), new PointF(bx.X + bs * 0.44f, bx.Y + bs * 0.72f), new PointF(bx.X + bs * 0.78f, bx.Y + bs * 0.30f) }); }
+        int x = bx.Right + UI.S(9), right = Width - UI.S(10);
+        using (Font fr = new Font("Segoe UI", 8.75f))
+        {
+            if (rechts.Length > 0)
+            {
+                Size rs = TextRenderer.MeasureText(g, rechts, fr, new Size(int.MaxValue, Height), TextFormatFlags.NoPadding);
+                int rw = Math.Min(rs.Width, Math.Max(0, Width / 2));
+                TextRenderer.DrawText(g, rechts, fr, new Rectangle(right - rw, 0, rw, Height), UI.Muted, TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                right -= rw + UI.S(10);
+            }
+            using (Font fn = new Font("Segoe UI Semibold", 9f))
+            using (Font fb = new Font("Segoe UI Semibold", 8f))
+            {
+                Size bsz = bus.Length > 0 ? TextRenderer.MeasureText(g, bus, fb, new Size(int.MaxValue, Height), TextFormatFlags.NoPadding) : Size.Empty;
+                int bw = bus.Length > 0 ? bsz.Width + UI.S(14) : 0;
+                Size ns = TextRenderer.MeasureText(g, name, fn, new Size(int.MaxValue, Height), TextFormatFlags.NoPadding);
+                int nw = Math.Min(ns.Width, Math.Max(UI.S(40), right - x - bw - UI.S(8)));
+                TextRenderer.DrawText(g, name, fn, new Rectangle(x, 0, nw, Height), UI.Text, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                if (bus.Length > 0)
+                {
+                    Color fg, bbg; UI.BadgeColors("skip", out fg, out bbg);
+                    RectangleF br = new RectangleF(x + nw + UI.S(8), (Height - UI.S(18)) / 2f, bw, UI.S(18));
+                    using (GraphicsPath p = UI.Round(br, br.Height / 2f)) using (SolidBrush b = new SolidBrush(bbg)) g.FillPath(b, p);
+                    TextRenderer.DrawText(g, bus, fb, Rectangle.Round(br), fg, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                }
+            }
+        }
+        if (Focused) using (Pen fp = new Pen(UI.Accent, 1f)) { fp.DashStyle = DashStyle.Dot; g.DrawRectangle(fp, 2, 2, Width - 5, Height - 5); }
+    }
+}
+
+// ab v4.08: Auswahl aus wenigen Feldern mit Titel und Unterzeile (Umfang der Diagnose). Das gewählte Feld trägt die
+// Akzentfläche; Pfeiltasten wechseln, wenn das Element den Fokus hat.
+public class FeldAuswahl : Control
+{
+    string[] titel, unter;
+    int sel, hoverIdx = -1;
+    public event EventHandler SelectedChanged;
+
+    public FeldAuswahl(string[] titel, string[] unter)
+    {
+        this.titel = titel ?? new string[0]; this.unter = unter ?? new string[0];
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
+        TabStop = true; Cursor = Cursors.Hand; BackColor = UI.Panel;
+        AccessibleRole = AccessibleRole.Grouping;
+        Size = new Size(UI.S(190) * Math.Max(1, this.titel.Length), UI.S(50)); Margin = new Padding(0, 0, 0, UI.S(UI.Abstand3));
+    }
+    public int Count { get { return titel.Length; } }
+    public int Selected
+    {
+        get { return sel; }
+        set { if (value < 0 || value >= titel.Length || sel == value) return; sel = value; Invalidate(); if (SelectedChanged != null) SelectedChanged(this, EventArgs.Empty); }
+    }
+    public void SetUnterzeile(int i, string text) { if (i >= 0 && i < unter.Length && unter[i] != (text ?? "")) { unter[i] = text ?? ""; Invalidate(); } }
+    public string Unterzeile(int i) { return i >= 0 && i < unter.Length ? unter[i] : ""; }
+    // Feld an einer Stelle (für Klick und Hinweise); -1 außerhalb
+    public int FeldBei(int x) { if (titel.Length == 0 || x < 0 || x >= Width) return -1; return Math.Min(titel.Length - 1, x * titel.Length / Math.Max(1, Width)); }
+    protected override void OnMouseMove(MouseEventArgs e) { int h = FeldBei(e.X); if (h != hoverIdx) { hoverIdx = h; Invalidate(); } base.OnMouseMove(e); }
+    protected override void OnMouseLeave(EventArgs e) { hoverIdx = -1; Invalidate(); base.OnMouseLeave(e); }
+    protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
+    protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
+    protected override void OnMouseClick(MouseEventArgs e) { if (e.Button == MouseButtons.Left) { Focus(); int i = FeldBei(e.X); if (i >= 0) Selected = i; } base.OnMouseClick(e); }
+    protected override bool IsInputKey(Keys keyData) { return keyData == Keys.Left || keyData == Keys.Right || base.IsInputKey(keyData); }
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        if (e.KeyCode == Keys.Left) { Selected = Math.Max(0, sel - 1); e.Handled = true; }
+        else if (e.KeyCode == Keys.Right) { Selected = Math.Min(titel.Length - 1, sel + 1); e.Handled = true; }
+        base.OnKeyDown(e);
+    }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias; g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+        using (SolidBrush ob = new SolidBrush(UI.Panel)) g.FillRectangle(ob, ClientRectangle);
+        int n = titel.Length; if (n == 0) return;
+        RectangleF all = new RectangleF(0.5f, 0.5f, Width - 2, Height - 2);
+        using (GraphicsPath p = UI.Round(all, UI.SF(6)))
+        {
+            Region alt = g.Clip;
+            g.SetClip(p, CombineMode.Intersect);
+            for (int i = 0; i < n; i++)
+            {
+                int x0 = i * Width / n, x1 = (i + 1) * Width / n;
+                Color bg = i == sel ? UI.Accent : i == hoverIdx ? (UI.IsDark ? Color.FromArgb(45, 48, 52) : Color.FromArgb(243, 244, 246)) : UI.Panel;
+                using (SolidBrush b = new SolidBrush(bg)) g.FillRectangle(b, x0, 0, x1 - x0, Height);
+                if (i > 0 && i != sel && i - 1 != sel) using (Pen pl = new Pen(UI.Line)) g.DrawLine(pl, x0, 0, x0, Height);
+            }
+            g.Clip = alt;
+            using (Pen pen = new Pen(UI.Line, 1f)) g.DrawPath(pen, p);
+        }
+        using (Font ft = new Font("Segoe UI Semibold", UI.SchriftText))
+        using (Font fu = new Font("Segoe UI", 8.5f))
+            for (int i = 0; i < n; i++)
+            {
+                int x0 = i * Width / n, x1 = (i + 1) * Width / n;
+                bool on = i == sel;
+                string u = i < unter.Length ? unter[i] : "";
+                int th = ft.Height, uh = u.Length > 0 ? fu.Height : 0, y = (Height - th - uh) / 2;
+                TextRenderer.DrawText(g, titel[i], ft, new Rectangle(x0 + UI.S(4), y, x1 - x0 - UI.S(8), th), on ? UI.OnAccent : UI.Text, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
+                // Unterzeile auf der Akzentfläche in derselben Schriftfarbe wie der Titel (Kontrast wie bei Primärknöpfen)
+                if (u.Length > 0) TextRenderer.DrawText(g, u, fu, new Rectangle(x0 + UI.S(4), y + th, x1 - x0 - UI.S(8), uh), on ? UI.OnAccent : UI.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
+            }
+        if (Focused) using (Pen fp = new Pen(UI.Accent, 1f)) { fp.DashStyle = DashStyle.Dot; g.DrawRectangle(fp, 2, 2, Width - 5, Height - 5); }
+    }
+}
+
+// ab v4.08: Bereich mit den Einstellungen einer Messung oder Prüfung, eingerückt unter ihrer Zeile mit einem Strich links.
+// Der Inhalt steht untereinander und bekommt die Breite des Bereichs; die Höhe folgt dem Inhalt.
+public class UnterBereich : Panel
+{
+    public readonly FlowLayoutPanel Inhalt = new FlowLayoutPanel();
+    public UnterBereich()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        BackColor = UI.Panel; Margin = new Padding(UI.S(30), 0, 0, UI.S(8));
+        Inhalt.FlowDirection = FlowDirection.TopDown; Inhalt.WrapContents = false; Inhalt.AutoSize = true; Inhalt.AutoSizeMode = AutoSizeMode.GrowAndShrink; Inhalt.BackColor = UI.Panel;
+        Inhalt.Location = new Point(UI.S(14), UI.S(4)); Inhalt.Margin = new Padding(0);
+        Inhalt.SizeChanged += delegate { Passe(); };
+        Controls.Add(Inhalt);
+        Height = UI.S(20);
+    }
+    public int InhaltBreite { get { return Math.Max(UI.S(120), Width - UI.S(14)); } }
+    void Passe() { int h = Inhalt.Height + UI.S(8); if (Height != h) Height = h; }
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+        int w = InhaltBreite;
+        foreach (Control c in Inhalt.Controls)
+        {
+            if (c is Label) c.MaximumSize = new Size(w - c.Margin.Horizontal, 0);
+            else if (c.Width != w - c.Margin.Horizontal) c.Width = w - c.Margin.Horizontal;
+        }
+        Passe();
+    }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        using (SolidBrush b = new SolidBrush(UI.Panel)) e.Graphics.FillRectangle(b, ClientRectangle);
+        using (SolidBrush l = new SolidBrush(UI.Line)) e.Graphics.FillRectangle(l, 0, 0, UI.S(2), Height);
+    }
+}
+
+// ab v4.08: Felder mit Beschriftung über dem Element (Auswahllisten), nebeneinander mit Umbruch nach Breite. Die Höhe
+// setzt das Element selbst (FlowLayoutPanel mit AutoSize behält bei Umbruch die Höhe des ersten Aufbaus).
+public class FeldReihe : Panel
+{
+    List<Control[]> felder = new List<Control[]>();
+    public FeldReihe() { BackColor = UI.Panel; Margin = new Padding(0, 0, 0, UI.S(4)); Height = UI.S(48); }
+    public void Feld(string beschriftung, Control c)
+    {
+        Label l = new Label(); l.Text = beschriftung; l.AutoSize = true; l.ForeColor = UI.Muted; l.BackColor = Color.Transparent; l.UseMnemonic = false;
+        l.Font = new Font("Segoe UI", 8.5f); l.Margin = new Padding(0);
+        c.Margin = new Padding(0);
+        Controls.Add(l); Controls.Add(c); felder.Add(new Control[] { l, c });
+        Ordne();
+    }
+    // Zeilen, die die Felder bei dieser Breite brauchen (für Tests)
+    public int Zeilen { get; private set; }
+    protected override void OnResize(EventArgs e) { base.OnResize(e); Ordne(); }
+    void Ordne()
+    {
+        int x = 0, y = 0, zeileH = 0, gap = UI.S(14), lh = UI.S(18), zeilen = felder.Count > 0 ? 1 : 0;
+        foreach (Control[] f in felder)
+        {
+            int w = Math.Max(f[1].Width, f[0].PreferredSize.Width);
+            if (x > 0 && x + w > Width) { x = 0; y += zeileH + UI.S(8); zeileH = 0; zeilen++; }
+            f[0].Location = new Point(x, y); f[1].Location = new Point(x, y + lh);
+            zeileH = Math.Max(zeileH, lh + f[1].Height);
+            x += w + gap;
+        }
+        Zeilen = zeilen;
+        int h = y + zeileH + UI.S(2);
+        if (Height != h) Height = h;
+    }
+}
+
+// ab v4.08: Elemente nebeneinander mit Umbruch nach Breite (Hardware-Pillen der Ergebnisseite). Die Höhe setzt das
+// Element selbst: Ein FlowLayoutPanel mit AutoSize behielt die Höhe des ersten, schmalen Aufbaus, die Kopfkarte der
+// Ergebnisseite blieb dadurch unter Windows unten rund 130 px leer.
+public class UmbruchPanel : Panel
+{
+    bool ordnet;
+    public UmbruchPanel() { BackColor = UI.Panel; Height = 0; }
+    public int Zeilen { get; private set; }
+    protected override void OnResize(EventArgs e) { base.OnResize(e); Ordne(); }
+    protected override void OnControlAdded(ControlEventArgs e) { base.OnControlAdded(e); Ordne(); }
+    protected override void OnControlRemoved(ControlEventArgs e) { base.OnControlRemoved(e); Ordne(); }
+    public void Ordne()
+    {
+        if (ordnet) return;
+        ordnet = true;
+        try
+        {
+            int x = 0, y = 0, zh = 0, zeilen = 0;
+            // alle Kindelemente zählen: Visible eines Kindes ist falsch, solange die Seite selbst nicht angezeigt wird
+            foreach (Control c in Controls)
+            {
+                int cw = c.Width + c.Margin.Horizontal;
+                if (zeilen == 0) zeilen = 1;
+                if (x > 0 && x + cw > Width) { x = 0; y += zh; zh = 0; zeilen++; }
+                c.Location = new Point(x + c.Margin.Left, y + c.Margin.Top);
+                x += cw; zh = Math.Max(zh, c.Height + c.Margin.Vertical);
+            }
+            Zeilen = zeilen;
+            if (Height != y + zh) Height = y + zh;
+        }
+        finally { ordnet = false; }
+    }
+}
 
 // Moderne Fluent-Kartenansicht (Wintoys-Look)
 public class FluentCard : Control
@@ -2284,6 +2552,8 @@ class NavItem : Control
     public string Title, Desc, Icon;
     // ab v3.64: kurzer Zusatz rechts im Eintrag, etwa die geschätzte Dauer eines angehakten Moduls
     public string Hint = "";
+    // ab v4.08: Zusatz als Pille in Akzentschrift (Punktzahl am Eintrag Ergebnis)
+    public bool HintPille = false;
     public bool HasCheck = true;
     public event EventHandler Picked;
     public event EventHandler CheckedChanged;
@@ -2386,7 +2656,19 @@ class NavItem : Control
                 using (Font fh = new Font("Segoe UI", 8.5f))
                 {
                     Size hs = TextRenderer.MeasureText(g, Hint, fh);
-                    if (right - hs.Width > x + tsz.Width + UI.S(6))
+                    if (HintPille)
+                    {
+                        int pw = hs.Width + UI.S(12), ph = UI.S(20);
+                        if (right - pw > x + tsz.Width + UI.S(6))
+                        {
+                            RectangleF pr = new RectangleF(right - pw, (Height - ph) / 2f, pw, ph);
+                            Color pbg = sel ? UI.Panel : (UI.IsDark ? Color.FromArgb(44, 47, 51) : Color.FromArgb(235, 238, 242));
+                            using (GraphicsPath pp = UI.Round(pr, ph / 2f)) using (SolidBrush pb = new SolidBrush(pbg)) g.FillPath(pb, pp);
+                            TextRenderer.DrawText(g, Hint, fh, Rectangle.Round(pr), UI.IsDark ? UI.Accent : UI.AccentDark, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+                            right -= pw + UI.S(6);
+                        }
+                    }
+                    else if (right - hs.Width > x + tsz.Width + UI.S(6))
                     {
                         TextRenderer.DrawText(g, Hint, fh, new Rectangle(right - hs.Width, 0, hs.Width, Height), UI.Muted, TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
                         right -= hs.Width + UI.S(6);

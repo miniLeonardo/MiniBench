@@ -293,6 +293,39 @@ Describe 'Schreiben im Format 2' {
         $j.Befunde.Warnungen | Should -Be 1
         @(MinibenchTest\Get-DbEntries).Count | Should -Be 4
     }
+    It 'schreibt den Vergleich mit der Referenz als optionales Feld, ohne Referenz fehlt es (ab v4.08)' {
+        $d = New-Db
+        Set-Device 'G-44444444444444444444'
+        # Kerne und Threads aus dem Text und WMI als Attrappe, damit der Eintrag auf jedem System gleich entsteht
+        Mock -ModuleName MinibenchTest Get-CimInstance { }
+        & (Get-Module MinibenchTest) {
+            $script:Facts['Prozessor'] = 'AMD Ryzen 5 7600X (6 Kerne, 12 Threads)'
+            $script:BenchGroupNames = @{ CPU = 'Prozessor'; RAM = 'Arbeitsspeicher'; GPU = 'Grafik'; Laufwerke = 'Laufwerke' }; $script:BenchHead = @{}
+            $script:Ref = @{ Name = 'Median Desktop-PCs (7 Systeme)'; Datum = '2026-11-10'; Quelle = 'Referenz_Desktop.json'; Werte = @{ 'CPU|MT' = 30000.0 }; Herkunft = @{} }
+            $script:BenchResults = @(
+                [pscustomobject]@{ Gruppe = 'CPU'; Key = 'CPU|MT'; RefKey = 'CPU|MT'; Wert = 32433.0; RefPct = 108; Status = 'OK' }
+                [pscustomobject]@{ Gruppe = 'RAM'; Key = 'RAM|Lesen'; RefKey = 'RAM|Lesen'; Wert = 61.2; RefPct = 174; Status = 'OK' })
+        }
+        try {
+            $f = & (Get-Module MinibenchTest) { Save-DbEntry -Sorted @([pscustomobject]@{ Stufe = 'WARNUNG'; Bereich = 'RAM'; Befund = 'XMP inaktiv' }) -NK 0 -NW 1 -NI 0 }
+            $f | Should -Exist
+            $j = Get-Content $f -Raw -Encoding UTF8 | ConvertFrom-Json
+            $j.Format | Should -Be 'PC-Diagnose-DB/2' -Because 'das Feld ist optional, das Format bleibt'
+            $j.Vergleich.Referenz | Should -Be 'Median Desktop-PCs (7 Systeme)'
+            $j.Vergleich.Gruppen.CPU | Should -Be 108
+            $j.Vergleich.Gruppen.RAM | Should -Be 174
+            $j.Vergleich.Gruppen.PSObject.Properties.Name | Should -Not -Contain 'GPU'
+            $j.Befunde.Liste | Should -Contain '[WARNUNG] RAM: XMP inaktiv'
+            # ohne Referenz: kein Feld, der Eintrag bleibt lesbar wie ein Lauf vor 4.08
+            Start-Sleep -Milliseconds 1100
+            $f2 = & (Get-Module MinibenchTest) { $script:Ref = @{ Name = ''; Datum = ''; Quelle = ''; Werte = @{}; Herkunft = @{} }; Save-DbEntry -Sorted @() -NK 0 -NW 0 -NI 0 }
+            $j2 = Get-Content $f2 -Raw -Encoding UTF8 | ConvertFrom-Json
+            $j2.PSObject.Properties.Name | Should -Not -Contain 'Vergleich'
+            @(MinibenchTest\Get-DbEntries).Count | Should -Be 5 -Because 'Einträge mit und ohne das neue Feld stehen nebeneinander'
+        } finally {
+            & (Get-Module MinibenchTest) { $script:Facts['Prozessor'] = 'AMD Ryzen 5 7600X'; $script:BenchResults = @(); $script:Ref = $null }
+        }
+    }
     It 'schreibt nichts mit -KeineDatenbank' {
         $null = New-Db
         & (Get-Module MinibenchTest) { $script:KeineDatenbank = $true; try { Save-DbEntry -Sorted @() -NK 0 -NW 0 -NI 0 } finally { $script:KeineDatenbank = $false } } | Should -BeNullOrEmpty
