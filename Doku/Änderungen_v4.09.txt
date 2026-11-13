@@ -1,0 +1,142 @@
+﻿LEOS MINIBENCH 4.09: ÄNDERUNGEN
+===============================
+
+Auftrag vom 13.11.2026: Lasttest und System-Umzug waren die letzten Seiten im alten Aufbau und sollen aussehen wie die
+übrigen. Die Schalter waren auf allen Seiten leicht abgeschnitten (Bildschirmfoto von 4.08 unter Windows). Dazu ein
+Fehler aus Start.log des Projektordners: Die Datenpflege lief trotz unveränderter Daten bei jedem Start.
+Messabläufe, Berichte, Ereigniskanal, Startparameter, Datenbankformat und der Umfang der Sicherung sind unverändert.
+
+
+1. SCHALTER
+  Vorher                      Das Element war genau so groß wie die Pille (38 x 20). Die geglättete Kontur lag damit auf
+                              der Kante des Elements, der Fokusrahmen (2 px um die Pille) außerhalb. Rechts und unten
+                              fehlte eine Reihe Bildpunkte, auf jeder Seite mit Schaltern.
+  Jetzt                       Das Element ist ringsum 3 px größer (44 x 26), die Pille bleibt 38 x 20 und steht in der
+                              Mitte. Kontur und Fokusrahmen liegen ganz im Element.
+  Lage                        Zeilen (SettingRow) und Karten (FluentCard) setzen das Element um den Rand weiter nach
+                              rechts: Die Pille endet wie bisher 16 px vor dem rechten Rand, Etiketten stehen wie bisher
+                              10 px links von ihr.
+  Kleiner gesetzt             Setzt jemand das Element von außen kleiner, schrumpft die Pille mit, statt an der Kante
+                              abgeschnitten zu werden.
+  Gesperrt                    Ein deaktivierter Schalter zeigt seinen Stand gedämpft (gebraucht während der Sicherung auf
+                              der Seite System-Umzug).
+
+
+2. SEITE LASTTEST
+  Vorher                      Tabelle mit Kontrollkästchen: Komponente, Dauer, Einstellungen, darunter die Gesamtdauer als
+                              Zeile und ein eigener Abschnitt Abbruchschwelle, alles in fester Breite links.
+  Seitenkopf                  Titel und Einleitung, rechts "3 von 4 Komponenten" und "Gesamtdauer 2 Min.".
+  Karte Komponenten           Links, rund 60 % der Breite: je Komponente eine Zeile mit Symbol, Titel, Beschreibung, der
+                              gewählten Dauer als Etikett und Schalter, dazu "Alle an" und "Alle aus".
+  Einstellungen               Stehen unter ihrer Komponente und nur, wenn sie eingeschaltet ist, nebeneinander mit
+                              Beschriftung darüber: Dauer bei jeder, dazu Anteil am freien RAM (Arbeitsspeicher),
+                              Grafikeinheit, Auflösung und Anzeige (Grafik), Laufwerk (Datenträger). Bei schmaler Karte
+                              brechen die Felder um.
+  Karte Abbruchschwelle       Rechts: CPU- und GPU-Temperatur nebeneinander und der Hinweis zur Wirkung.
+  Karte Sensoren              Neu, rechts: nennt, woher CPU-Temperatur, CPU-Takt, CPU-Leistung und Mainboard-Lüfter des
+                              Laufs kommen. Drei Fälle: PawnIO wird vorübergehend installiert und wieder entfernt, PawnIO
+                              ist installiert und bleibt, oder der Treiber wird nicht verwendet. Das Etikett "PawnIO
+                              vorübergehend" steht jetzt im Kopf dieser Karte; ein Verweis öffnet Sensoren live.
+  Akkubetrieb                 Die Warnung steht als Band über den Karten in ganzer Breite.
+  Erhalten                    chkLCpu bis chkLDisk bleiben als Werte hinter den Schaltern, die Auswahllisten sind
+                              dieselben: Vorlagen (Last.CPU bis Last.AbbruchGpu), Zeitschätzung, Startparameter und der
+                              Abgleich des Rendertests mit der Seite Benchmark lesen unverändert.
+  Entfallen                   SetPartEnabled und die Tabelle: Was zu einer abgewählten Komponente gehört, wird nicht mehr
+                              ausgegraut, sondern steht nicht da.
+
+
+3. SEITE SYSTEM-UMZUG
+  Vorher                      Drei Abschnitte untereinander in fester Breite mit Kontrollkästchen; Profile und
+                              Zusatzordner als eingerückte Kästchen, Fortschritt und Protokoll am Seitenende.
+  Seitenkopf                  Rechts "8 von 10 Bereichen" und die Gesamtgröße, sobald sie gemessen ist.
+  Benutzer-Bibliotheken       Links: sechs Zeilen mit Symbol, Titel und Schalter, dazu "Alle an" und "Alle aus". Nach dem
+                              Schnell-Scan steht in jeder Zeile der Ordner (auch ein umgeleiteter) und rechts die
+                              gemessene Größe als Etikett. Vor dem Scan fragt die Seite keinen Ordner ab.
+  System und Programme        Desktop-Layout, Software-Inventar, Profile und Konfigurationen, WLAN-Profile als Zeilen mit
+                              Schalter. Unter Profile stehen nach dem Scan die erkannten Gruppen als Auswahlzeilen
+                              (Webbrowser, E-Mail-Programme, Entwicklung und Editoren, Werkzeuge und Fernzugriff, Windows
+                              Terminal) mit den gefundenen Programmen rechts. Unter WLAN-Profile steht "WLAN-Passwörter im
+                              Klartext mitsichern"; Einschalten fragt wie bisher nach.
+  Zusatzordner                Eigene Karte: nach dem Scan je Ordner im Stamm von C: eine Auswahlzeile mit Größe.
+  Zielmedium                  Rechts: Auswahl in Kartenbreite, "Durchsuchen", die Warnung bei FAT32.
+  Sicherung                   Rechts: Gesamtgröße, freier Platz auf dem Ziel, "Sicherung starten" und "Schnell-Scan",
+                              darunter während und nach der Sicherung Schritt, Fortschrittsbalken (im Stil der
+                              Laufansicht), aktuelle Datei und Protokoll.
+  Während der Sicherung       Auswahl und Ziel sind gesperrt; Schalter und Haken zeigen ihren Stand gedämpft.
+  Erhalten                    Umfang (Lib_Desktop bis Wlan_Klartext), Aufruf des Arbeitsprozesses, Auswertung seiner
+                              Zeilen, Abfragen vor dem Start und nach dem Ende sind dieselben. Die Knöpfe heißen kürzer
+                              "Sicherung starten" und "Schnell-Scan", damit sie nebeneinander in die Karte passen.
+
+
+4. GEMEINSAMER RAHMEN
+  DiagGui_Modulseite.cs       Trägt jetzt vier Seiten: Diagnose, Benchmark, Lasttest, System-Umzug (IstModulSeite).
+  Seitenkopf                  Anzahl und Dauer stehen ohne eigenes Feld im Kopf und werden bei jedem neuen Text aus dem
+                              gemessenen Text rechtsbündig gesetzt.
+  Steuerelemente              UnterBereich.Ordne (Inhalt nach einem Neuaufbau auf Breite bringen), LaufwerkZeile und
+                              SettingRow mit gedämpfter Darstellung, wenn gesperrt; acht neue Symbole für die Zeilen der
+                              Seite System-Umzug.
+
+
+5. DATENPFLEGE BEIM START
+  Befund                      Start.log des Projektordners: Die Starts mit 4.08 am 13.11. melden jedes Mal "Datenpflege:
+                              nichts zu archivieren", nie "unverändert". Der gespeicherte Stand endete auf "Laufzeit:0".
+  Ursache                     Die Datenpflege entfernt den leeren Ordner Laufzeit\<PC>. Der Start legt ihn wieder an. Der
+                              Stand (4.07) zählte jeden Ordner in Laufzeit: gespeichert 0, beim nächsten Start 1.
+  Jetzt                       Gezählt werden nur Ordner mit Inhalt. Ein Ordner mit einer Datei (laufender Lauf, Rest der
+                              Live-Ansicht) ändert den Stand weiter.
+  Wirkung                     Der zweite Start ohne neue Daten überspringt die Datenpflege (auf dem Stick 0,8 bis 1,5 s).
+                              Nach dem Umstieg läuft sie einmal, weil die Programmversion zum Stand gehört.
+
+
+6. TESTS
+  Selbsttest der Oberfläche   68 Fälle (4.08: 63). Neu: ToggleSwitch.Rand, Lasttest.Seite, Lasttest.Sensoren, Umzug.Seite,
+                              Umzug.Platz, Modulseite.Kopf. Lasttest.Deaktivierung entfällt mit SetPartEnabled.
+  Pester                      Datenbank: Der Stand ändert sich nicht durch einen leeren Laufzeitordner, wohl aber durch
+                              einen mit Inhalt; nach der Datenpflege gilt der nächste Start als erledigt.
+
+
+GEFUNDEN UND BEHOBEN
+  Freier Platz, Netzlaufwerk  Für das Netzlaufwerk trug die Seite System-Umzug fest 100 GB freien Platz ein und meldete
+                              "100,0 GB (Ausreichend)". Jetzt: "Netzlaufwerk: Der freie Platz wird nicht geprüft" (der
+                              Start greift nie auf das NAS zu).
+  Ohne Zielmedium             Stand "Freier Speicher auf Ziel: 0,0 GB (Ausreichend)" in Grün. Jetzt "Kein Zielmedium
+                              gewählt". Ein gewählter Ordner ohne lesbares Laufwerk (Freigabe) nennt keine 0 GB mehr.
+  Gesamtgröße vor dem Scan    Stand "0,0 GB", obwohl noch nichts gemessen war. Jetzt "nach dem Schnell-Scan"; danach
+                              "rund", weil Layout, Software-Inventar und Profile geschätzt sind. "Ausreichend" steht nur
+                              mit gemessenem Umfang; "nicht ausreichend" schon vorher, wenn es für die geschätzten
+                              Bereiche nicht reicht.
+  exFAT                       Die Warnung "mit FAT32 formatiert" erschien auch bei exFAT (gesucht wurde "FAT").
+  Start ohne Auswahl          Hatte der Scan Zusatzordner gefunden, ließ sich die Sicherung starten, auch wenn nichts
+                              gewählt war: Geprüft wurde die Zahl der gefundenen statt der gewählten Ordner.
+  Seitenkopf                  Wurde der Text zu Anzahl oder Dauer kürzer, blieb rechts eine Lücke (Seiten Benchmark und
+                              Diagnose seit 4.08): Die Lage richtete sich nach der Größe eines Felds, die sich erst beim
+                              nächsten Layout einstellt (Fallstrick 8, 9).
+  Farben nach Farbwechsel     Die Hinweise der Seite System-Umzug behielten nach einem Wechsel des Farbschemas die Farben
+                              des alten; die Seite rechnet jetzt neu.
+  Eigene Durchsicht           Die Zeitschätzung des Moduls Lasttest ist die Gesamtdauer plus eine Minute Vorbereitung;
+                              der Seitenkopf nennt die Gesamtdauer, die Seitenleiste die Schätzung (wie bisher).
+
+
+GRENZEN
+  Nicht unter Windows geprüft Alles ist in der Linux-Sandbox unter Mono entstanden und dort in Hell und Dunkel bei 100 %
+                              fotografiert, auch im schmalen Fenster. Unter Windows offen: beide Seiten bei 125 und 150 %,
+                              die acht neuen Symbole (in der Sandbox Ersatzzeichen; die Zeichen stammen aus Segoe MDL2
+                              Assets), der Schnell-Scan mit echten Ordnern, eine Sicherung mit der neuen Seite.
+  Schnell-Scan                Misst wie bisher im Vordergrund; bei großen Bibliotheken reagiert das Fenster so lange nicht.
+  Geschätzte Größen           Layout 10 MB, Software-Inventar 20 MB und die Profile sind weiter feste Schätzwerte.
+  Sandbox                     935 bestanden, 51 fehlgeschlagen, 75 übersprungen (4.08: 933, 51, 70). Die 51 brauchen Windows
+                              und sind Zeile für Zeile dieselben wie auf 4.08: Bericht 34, Datenbank 3, Diagnose 3, Lauf 4,
+                              Modulvertrag 3, Sensoren 4. Übersprungen sind in der Sandbox die Fälle des Selbsttests (dort
+                              ohne Anzeige); er läuft getrennt unter Mono mit Xvfb: 68 Fälle bestanden.
+  Datenpflege                 Der Befund stammt aus Start.log und der Standdatei; behoben und mit Tests belegt, unter
+                              Windows zeigt es der zweite Start mit 4.09 ("Datenpflege: unverändert" in Start.log).
+
+
+UMSTIEG
+  Nichts zu tun. Vorlagen laden wie bisher.
+
+
+QUELLEN
+  Control.Size, ClientRectangle und Zeichnen an der Kante: https://learn.microsoft.com/dotnet/api/system.windows.forms.control.clientrectangle
+  Segoe MDL2 Assets, Liste der Zeichen: https://learn.microsoft.com/windows/apps/design/style/segoe-ui-symbol-font
+  DirectoryInfo.GetFileSystemInfos: https://learn.microsoft.com/dotnet/api/system.io.directoryinfo.getfilesysteminfos

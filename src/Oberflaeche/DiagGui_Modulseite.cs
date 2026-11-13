@@ -1,4 +1,4 @@
-﻿// Gemeinsamer Rahmen der Modulseiten Benchmark und Diagnose (ab v4.08, Teilklasse DiagGui)
+﻿// Gemeinsamer Rahmen der Seiten Diagnose, Benchmark, Lasttest und System-Umzug (ab v4.08, Teilklasse DiagGui)
 public partial class DiagGui
 {
     // Karte mit Titel, optionalen Verweisen rechts im Kopf und Inhalt untereinander. Zeilen, Unterbereiche und Auswahllisten
@@ -81,7 +81,6 @@ public partial class DiagGui
         // Elemente über die ganze Seitenbreite (Bänder, Auswahl des Umfangs)
         public readonly List<Control> Voll = new List<Control>();
         Label titel, einleitung;
-        FlowLayoutPanel rechtsKopf = new FlowLayoutPanel();
         public int Breite { get; private set; }
         public bool Zweispaltig { get; private set; }
 
@@ -94,12 +93,13 @@ public partial class DiagGui
             titel.Location = new Point(0, 0); einleitung.Margin = new Padding(0);
             // feste Größe statt AutoSize: Höhe und Umbruch der Einleitung setzt OrdneKopf aus dem gemessenen Text
             einleitung.MaximumSize = Size.Empty; einleitung.AutoSize = false;
-            Anzahl = Lbl("", 10.5f, true, UI.Text); Anzahl.Margin = new Padding(0); Anzahl.Anchor = AnchorStyles.Right;
-            Dauer = Lbl("", UI.SchriftText, false, UI.Muted); Dauer.Margin = new Padding(0, UI.S(1), 0, 0); Dauer.Anchor = AnchorStyles.Right;
-            rechtsKopf.FlowDirection = FlowDirection.TopDown; rechtsKopf.WrapContents = false; rechtsKopf.AutoSize = true; rechtsKopf.AutoSizeMode = AutoSizeMode.GrowAndShrink; rechtsKopf.BackColor = UI.Panel; rechtsKopf.Margin = new Padding(0);
-            rechtsKopf.Controls.Add(Anzahl); rechtsKopf.Controls.Add(Dauer);
-            Kopf.Controls.Add(titel); Kopf.Controls.Add(einleitung); Kopf.Controls.Add(rechtsKopf);
-            rechtsKopf.SizeChanged += delegate { OrdneKopf(); };
+            // ab v4.09 stehen Anzahl und Dauer ohne eigenes Feld direkt im Kopf und werden bei jedem neuen Text aus dem
+            // gemessenen Text rechtsbündig gesetzt. Vorher richtete sich die Lage nach der Größe eines Felds, die sich erst
+            // beim nächsten Layout einstellt: Wurde der Text kürzer, blieb rechts eine Lücke.
+            Anzahl = Lbl("", 10.5f, true, UI.Text); Anzahl.Margin = new Padding(0);
+            Dauer = Lbl("", UI.SchriftText, false, UI.Muted); Dauer.Margin = new Padding(0);
+            Kopf.Controls.Add(titel); Kopf.Controls.Add(einleitung); Kopf.Controls.Add(Anzahl); Kopf.Controls.Add(Dauer);
+            Anzahl.TextChanged += delegate { OrdneKopf(); }; Dauer.TextChanged += delegate { OrdneKopf(); };
             f.Controls.Add(Kopf); f.Controls.SetChildIndex(Kopf, 0);
 
             Spalten.BackColor = UI.Panel; Spalten.Margin = new Padding(0);
@@ -132,8 +132,10 @@ public partial class DiagGui
         void OrdneKopf()
         {
             if (Breite <= 0) return;
-            Size ra = rechtsKopf.PreferredSize;
-            rechtsKopf.Location = new Point(Math.Max(0, Breite - ra.Width), UI.S(4));
+            Size sa = Anzahl.GetPreferredSize(Size.Empty), sd = Dauer.GetPreferredSize(Size.Empty);
+            Size ra = new Size(Math.Max(sa.Width, sd.Width), sa.Height + UI.S(1) + sd.Height);
+            Anzahl.Location = new Point(Math.Max(0, Breite - sa.Width), UI.S(4));
+            Dauer.Location = new Point(Math.Max(0, Breite - sd.Width), UI.S(4) + sa.Height + UI.S(1));
             int ew = Math.Max(UI.S(240), Breite - ra.Width - UI.S(UI.Abstand5));
             int ty = titel.PreferredSize.Height + UI.S(UI.Abstand1);
             int eh = TextRenderer.MeasureText(einleitung.Text, einleitung.Font, new Size(ew, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height + UI.S(2);
@@ -170,12 +172,15 @@ public partial class DiagGui
     List<ModulSeite> modulSeiten = new List<ModulSeite>();
     void OrdneModulSeiten() { int w = SeitenBreite(); foreach (ModulSeite m in modulSeiten) m.Ordne(w); }
 
+    // Seiten mit diesem Rahmen: Diagnose, Benchmark, Lasttest und System-Umzug (Nummern wie in der Seitenleiste)
+    static bool IstModulSeite(int i) { return i == 1 || i == 2 || i == 3 || i == 8; }
+
     ModulSeite NeueModulSeite(FlowLayoutPanel f)
     {
         ModulSeite m = new ModulSeite(f);
         // auch bei geänderter Innenfläche: Erscheint die senkrechte Bildlaufleiste, wird die Seite schmaler, ohne dass
         // sich die Größe des Bereichs ändert
-        if (modulSeiten.Count == 0 && content != null) { content.Resize += delegate { OrdneModulSeiten(); }; content.ClientSizeChanged += delegate { if (curPage == 1 || curPage == 2) OrdneModulSeiten(); }; }
+        if (modulSeiten.Count == 0 && content != null) { content.Resize += delegate { OrdneModulSeiten(); }; content.ClientSizeChanged += delegate { if (IstModulSeite(curPage)) OrdneModulSeiten(); }; }
         modulSeiten.Add(m);
         return m;
     }

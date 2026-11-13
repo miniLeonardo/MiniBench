@@ -303,7 +303,10 @@ function Get-DatenpflegeStand([string]$DataDir = $script:DataDir) {
         @{ Name = 'Datenbank'; Pfad = (Join-Path $DataDir 'Datenbank'); Muster = '*.json'; Art = 'Dateien' },
         @{ Name = 'Berichte'; Pfad = (Join-Path $DataDir 'Berichte'); Muster = '*'; Art = 'Ordner' },
         @{ Name = 'Vergleiche'; Pfad = (Join-Path (Join-Path $DataDir 'Berichte') 'Vergleiche'); Muster = '*.html'; Art = 'Dateien' },
-        @{ Name = 'Laufzeit'; Pfad = (Join-Path $DataDir 'Laufzeit'); Muster = '*'; Art = 'Ordner'; NurAnzahl = $true },
+        # ab v4.09 zählen nur Ordner mit Inhalt: Die Datenpflege entfernt den leeren Ordner je PC, der Start legt ihn
+        # wieder an. Mit jedem Ordner gezählt (v4.07, v4.08) wich der Stand deshalb bei jedem Start vom gespeicherten ab
+        # (Laufzeit:1 statt Laufzeit:0) und die Datenpflege lief trotz unveränderter Daten jedes Mal.
+        @{ Name = 'Laufzeit'; Pfad = (Join-Path $DataDir 'Laufzeit'); Muster = '*'; Art = 'OrdnerMitInhalt'; NurAnzahl = $true },
         @{ Name = 'LaufzeitDateien'; Pfad = (Join-Path $DataDir 'Laufzeit'); Muster = '*'; Art = 'Dateien'; NurAnzahl = $true },
         @{ Name = 'Laufend'; Pfad = (Join-Path $DataDir 'Laufzeit'); Muster = 'laufend.json'; Art = 'Tief' },
         @{ Name = 'Smart'; Pfad = (Join-Path (Join-Path (Join-Path $DataDir 'Tools') 'smartmontools') 'bin'); Muster = '*'; Art = 'Dateien' },
@@ -316,6 +319,7 @@ function Get-DatenpflegeStand([string]$DataDir = $script:DataDir) {
                 $di = New-Object IO.DirectoryInfo($o.Pfad)
                 $liste = $(switch ($o.Art) {
                         'Ordner' { $di.GetDirectories($o.Muster) }
+                        'OrdnerMitInhalt' { $di.GetDirectories($o.Muster) | Where-Object { @($_.GetFileSystemInfos()).Count -gt 0 } }
                         'Tief' { $di.GetFiles($o.Muster, [IO.SearchOption]::AllDirectories) }
                         default { $di.GetFiles($o.Muster) }
                     })

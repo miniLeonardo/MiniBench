@@ -6,7 +6,7 @@
 
 **Portable Diagnose-, Benchmark-, Stresstest-, Reparatur- und Optimierungs-Suite für Windows 10 & 11.**
 
-[![Version](https://img.shields.io/badge/Version-4.08-0284c7.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-4.09-0284c7.svg)](CHANGELOG.md)
 [![Changelog](https://img.shields.io/badge/Changelog-MD-6366f1.svg)](CHANGELOG.md)
 [![Lizenz](https://img.shields.io/badge/Lizenz-MIT-blue.svg)](LICENSE)
 [![Plattform](https://img.shields.io/badge/Windows-10%20%7C%2011%20(x64)-0078d4.svg)]()
@@ -22,12 +22,12 @@
 <br/>
 
 <a href="https://github.com/miniLeonardo/MiniBench/releases">
-  <img src="https://img.shields.io/badge/%E2%AC%87%EF%B8%8F%20Download-LMB.exe%20(v4.08)-2563eb?style=for-the-badge&logo=windows&logoColor=white" alt="Download LMB.exe" />
+  <img src="https://img.shields.io/badge/%E2%AC%87%EF%B8%8F%20Download-LMB.exe%20(v4.09)-2563eb?style=for-the-badge&logo=windows&logoColor=white" alt="Download LMB.exe" />
 </a>
 
 <br/><br/>
 
-<img src="Doku/Screenshots/Startseite_Neu.png" alt="Leos Minibench 4.08 Oberfläche" width="850" />
+<img src="Doku/Screenshots/Startseite_Neu.png" alt="Leos Minibench 4.09 Oberfläche" width="850" />
 
 <br/><br/>
 
@@ -55,6 +55,7 @@ Alternativ kann die Suite ohne Binärdatei direkt per PowerShell über `LMB.cmd`
 
 ## 🆕 Neu in 4.0x
 
+* **4.09:** Seiten Lasttest und System-Umzug mit Karten, Schaltern und ganzer Breite wie die übrigen Seiten, Schalter nicht mehr abgeschnitten, Datenpflege läuft beim Start nur noch bei geänderten Daten, System-Umzug nennt freien Platz und Größe nur, wenn sie bekannt sind.
 * **4.08:** Ergebnis als eigene Seite in der Seitenleiste (bleibt erreichbar, zeigt nach dem Start den letzten Lauf aus der Datenbank), Seiten Benchmark und Diagnose mit Karten, Schaltern und ganzer Breite, Startfenster zeigt die Version des geladenen Skripts.
 * **4.07:** Akzentfarbe in den Einstellungen, Ergebnisseite mit Ringanzeige und dezenter Bewegung, kurze Überblendung beim Seitenwechsel, kürzerer Start (schnellere Hardwareabfrage, Datenpflege nur bei Bedarf), ein Fehler der Ergebnisseite behoben.
 * **4.06:** Update-Prüfung findet neue Versionen zuverlässig (kein 24-Stunden-Cache für „Jetzt suchen“, Ausweg bei gesperrter GitHub-API), „Median aktualisieren“ meldet das echte Ergebnis und überschreibt die eigene Referenz nicht mehr.

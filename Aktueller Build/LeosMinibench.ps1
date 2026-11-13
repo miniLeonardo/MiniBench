@@ -247,7 +247,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
 }
 #endregion
 
-$ScriptVersion = '4.08'
+$ScriptVersion = '4.09'
 $AppName       = 'Leos Minibench'
 # Eingebettete Referenzprofile für Leos Minibench (v3.0)
 $script:EmbeddedReferences = @{
@@ -2059,7 +2059,10 @@ function Get-DatenpflegeStand([string]$DataDir = $script:DataDir) {
         @{ Name = 'Datenbank'; Pfad = (Join-Path $DataDir 'Datenbank'); Muster = '*.json'; Art = 'Dateien' },
         @{ Name = 'Berichte'; Pfad = (Join-Path $DataDir 'Berichte'); Muster = '*'; Art = 'Ordner' },
         @{ Name = 'Vergleiche'; Pfad = (Join-Path (Join-Path $DataDir 'Berichte') 'Vergleiche'); Muster = '*.html'; Art = 'Dateien' },
-        @{ Name = 'Laufzeit'; Pfad = (Join-Path $DataDir 'Laufzeit'); Muster = '*'; Art = 'Ordner'; NurAnzahl = $true },
+        # ab v4.09 zählen nur Ordner mit Inhalt: Die Datenpflege entfernt den leeren Ordner je PC, der Start legt ihn
+        # wieder an. Mit jedem Ordner gezählt (v4.07, v4.08) wich der Stand deshalb bei jedem Start vom gespeicherten ab
+        # (Laufzeit:1 statt Laufzeit:0) und die Datenpflege lief trotz unveränderter Daten jedes Mal.
+        @{ Name = 'Laufzeit'; Pfad = (Join-Path $DataDir 'Laufzeit'); Muster = '*'; Art = 'OrdnerMitInhalt'; NurAnzahl = $true },
         @{ Name = 'LaufzeitDateien'; Pfad = (Join-Path $DataDir 'Laufzeit'); Muster = '*'; Art = 'Dateien'; NurAnzahl = $true },
         @{ Name = 'Laufend'; Pfad = (Join-Path $DataDir 'Laufzeit'); Muster = 'laufend.json'; Art = 'Tief' },
         @{ Name = 'Smart'; Pfad = (Join-Path (Join-Path (Join-Path $DataDir 'Tools') 'smartmontools') 'bin'); Muster = '*'; Art = 'Dateien' },
@@ -2072,6 +2075,7 @@ function Get-DatenpflegeStand([string]$DataDir = $script:DataDir) {
                 $di = New-Object IO.DirectoryInfo($o.Pfad)
                 $liste = $(switch ($o.Art) {
                         'Ordner' { $di.GetDirectories($o.Muster) }
+                        'OrdnerMitInhalt' { $di.GetDirectories($o.Muster) | Where-Object { @($_.GetFileSystemInfos()).Count -gt 0 } }
                         'Tief' { $di.GetFiles($o.Muster, [IO.SearchOption]::AllDirectories) }
                         default { $di.GetFiles($o.Muster) }
                     })
@@ -7076,11 +7080,11 @@ public partial class DiagGui : Form
         Tip(cmbRef, "System oder Medianwert, gegen den die Messungen in Prozent angegeben werden (100 % = Referenz). Gespeicherte Referenz: die eigene Referenz (Referenz.json, festgelegt in der Datenbank), sonst der gespeicherte Median der Geräteklasse; Median: aus allen passenden Läufen der Datenbank.");
         Tip(btnUpdateMed, "Berechnet die Median-Referenzen für alle Systeme, Notebooks und Desktops aus der Datenbank neu und speichert sie als Referenz_Median.json, Referenz_Notebook.json und Referenz_Desktop.json. Die eigene Referenz (Referenz.json) bleibt unverändert.");
         // Lasttest
-        Tip(chkLCpu, "Alle logischen Prozessoren rechnen mit Ergebnisprüfung; Rechenfehler deuten auf Instabilität (Übertaktung, Spannung, Kühlung, Netzteil). Läuft in einem eigenen Prozess ohne Unterbrechungen. Mit Sensoren gibt es Takt- und Temperaturverlauf und den Drosselnachweis. Ersetzt ab v2.7 den CPU-Stabilitätstest der Diagnose.");
-        Tip(chkLRam, "Mustertest über einen Teil des freien Arbeitsspeichers mit Bitfehlerprüfung. Neben der CPU-Last läuft er mit niedriger Priorität auf einem Viertel der Threads.");
+        Tip(chkLCpu, lastTips[0]);
+        Tip(chkLRam, lastTips[1]);
         Tip(cmbLRamPct, "Anteil des freien Arbeitsspeichers, den der RAM-Test belegt. Mehr findet mehr Fehler, lässt Windows aber weniger Luft.");
-        Tip(chkLGpu, "Eigener Rendertest mit Direct3D 11 als Dauerlast auf den gewählten Grafikeinheiten gleichzeitig: Bilder/s-Verlauf, Bildprüfung alle 30 Sekunden und Erkennung von Treiber-Resets.");
-        Tip(chkLDisk, "Schreibt eine Testdatei (bis 4 GB), liest sie zurück und prüft jeden Block. Meldet Datenfehler, Ein-/Ausgabefehler und Controllerereignisse. Die Datei wird danach gelöscht.");
+        Tip(chkLGpu, lastTips[2]);
+        Tip(chkLDisk, lastTips[3]);
         Tip(cmbLDiskDrive, "Laufwerk für den Datenträgertest; es braucht mindestens 2 GB freien Platz.");
         foreach (ComboBox c in new ComboBox[] { cmbLCpu, cmbLRam, cmbLGpu, cmbLDisk }) Tip(c, "Dauer dieser Komponente. Alle gewählten Komponenten starten gleichzeitig, jede endet nach ihrer eigenen Dauer.");
         Tip(cmbLGpuSel, "Welche Grafikeinheiten der Rendertest belastet (gleich eingestellt wie im Benchmark).");
@@ -7088,6 +7092,9 @@ public partial class DiagGui : Form
         Tip(cmbLGpuShow, "Fenster, Vollbild oder ohne Anzeige für den Rendertest (gleich eingestellt wie im Benchmark).");
         Tip(cmbLAbortCpu, "Liegt die CPU-Temperatur über dieser Schwelle, endet der Test mit einem Befund. Automatisch: TjMax der CPU nach rund einer Minute (viele Notebooks laufen planmäßig an TjMax), sonst 100 °C. Feste Werte greifen nach rund 10 Sekunden.");
         Tip(cmbLAbortGpu, "Liegt die GPU-Temperatur rund 10 Sekunden über dieser Schwelle, endet der Test mit einem Befund.");
+        Tip(lnkLastAll, "Schaltet alle vier Komponenten ein.");
+        Tip(lnkLastNone, "Schaltet alle Komponenten aus.");
+        Tip(lnkLastSens, "Öffnet die Seite Sensoren live. Dort steht, ob der Treiber PawnIO für Messungen verwendet wird.");
         // Reparatur
         for (int i = 0; repChk != null && i < repChk.Length && i < repKeys.Length; i++)
         {
@@ -7166,7 +7173,7 @@ public partial class DiagGui : Form
         if (i == 3) UpdateLoadExtras();
         // ab v4.05: installierte Softwarepakete beim ersten Öffnen der Seite Tools im Hintergrund erkennen
         if (i == 6) { if (!paketGeprueft) StartSoftwareStateCheck(); if (toolsLayout != null) toolsLayout(); }
-        if (i == 1 || i == 2) OrdneModulSeiten();
+        if (IstModulSeite(i)) OrdneModulSeiten();
         ApplyNativeControlThemes();
         if (vorher != null) Ueberblendung.Starte(content, vorher);
     }
@@ -7500,6 +7507,7 @@ public partial class DiagGui
             UpdateRefState(); FuelleLetztesErgebnis();
             if (erg != null && ergebnisAufbauten > 0 && !ergVeraltet) FuelleErgebnis();
             UpdateLoadEnabled(); ThemeLog();
+            if (umzugRechne != null) umzugRechne();
             if (barAll != null && !done) barAll.Fill = UI.Accent;
             if (barSub != null) barSub.Fill = UI.AccentActive;
         }
@@ -8649,7 +8657,7 @@ public partial class DiagGui
         }
     }
 }
-// Gemeinsamer Rahmen der Modulseiten Benchmark und Diagnose (ab v4.08, Teilklasse DiagGui)
+// Gemeinsamer Rahmen der Seiten Diagnose, Benchmark, Lasttest und System-Umzug (ab v4.08, Teilklasse DiagGui)
 public partial class DiagGui
 {
     // Karte mit Titel, optionalen Verweisen rechts im Kopf und Inhalt untereinander. Zeilen, Unterbereiche und Auswahllisten
@@ -8732,7 +8740,6 @@ public partial class DiagGui
         // Elemente über die ganze Seitenbreite (Bänder, Auswahl des Umfangs)
         public readonly List<Control> Voll = new List<Control>();
         Label titel, einleitung;
-        FlowLayoutPanel rechtsKopf = new FlowLayoutPanel();
         public int Breite { get; private set; }
         public bool Zweispaltig { get; private set; }
 
@@ -8745,12 +8752,13 @@ public partial class DiagGui
             titel.Location = new Point(0, 0); einleitung.Margin = new Padding(0);
             // feste Größe statt AutoSize: Höhe und Umbruch der Einleitung setzt OrdneKopf aus dem gemessenen Text
             einleitung.MaximumSize = Size.Empty; einleitung.AutoSize = false;
-            Anzahl = Lbl("", 10.5f, true, UI.Text); Anzahl.Margin = new Padding(0); Anzahl.Anchor = AnchorStyles.Right;
-            Dauer = Lbl("", UI.SchriftText, false, UI.Muted); Dauer.Margin = new Padding(0, UI.S(1), 0, 0); Dauer.Anchor = AnchorStyles.Right;
-            rechtsKopf.FlowDirection = FlowDirection.TopDown; rechtsKopf.WrapContents = false; rechtsKopf.AutoSize = true; rechtsKopf.AutoSizeMode = AutoSizeMode.GrowAndShrink; rechtsKopf.BackColor = UI.Panel; rechtsKopf.Margin = new Padding(0);
-            rechtsKopf.Controls.Add(Anzahl); rechtsKopf.Controls.Add(Dauer);
-            Kopf.Controls.Add(titel); Kopf.Controls.Add(einleitung); Kopf.Controls.Add(rechtsKopf);
-            rechtsKopf.SizeChanged += delegate { OrdneKopf(); };
+            // ab v4.09 stehen Anzahl und Dauer ohne eigenes Feld direkt im Kopf und werden bei jedem neuen Text aus dem
+            // gemessenen Text rechtsbündig gesetzt. Vorher richtete sich die Lage nach der Größe eines Felds, die sich erst
+            // beim nächsten Layout einstellt: Wurde der Text kürzer, blieb rechts eine Lücke.
+            Anzahl = Lbl("", 10.5f, true, UI.Text); Anzahl.Margin = new Padding(0);
+            Dauer = Lbl("", UI.SchriftText, false, UI.Muted); Dauer.Margin = new Padding(0);
+            Kopf.Controls.Add(titel); Kopf.Controls.Add(einleitung); Kopf.Controls.Add(Anzahl); Kopf.Controls.Add(Dauer);
+            Anzahl.TextChanged += delegate { OrdneKopf(); }; Dauer.TextChanged += delegate { OrdneKopf(); };
             f.Controls.Add(Kopf); f.Controls.SetChildIndex(Kopf, 0);
 
             Spalten.BackColor = UI.Panel; Spalten.Margin = new Padding(0);
@@ -8783,8 +8791,10 @@ public partial class DiagGui
         void OrdneKopf()
         {
             if (Breite <= 0) return;
-            Size ra = rechtsKopf.PreferredSize;
-            rechtsKopf.Location = new Point(Math.Max(0, Breite - ra.Width), UI.S(4));
+            Size sa = Anzahl.GetPreferredSize(Size.Empty), sd = Dauer.GetPreferredSize(Size.Empty);
+            Size ra = new Size(Math.Max(sa.Width, sd.Width), sa.Height + UI.S(1) + sd.Height);
+            Anzahl.Location = new Point(Math.Max(0, Breite - sa.Width), UI.S(4));
+            Dauer.Location = new Point(Math.Max(0, Breite - sd.Width), UI.S(4) + sa.Height + UI.S(1));
             int ew = Math.Max(UI.S(240), Breite - ra.Width - UI.S(UI.Abstand5));
             int ty = titel.PreferredSize.Height + UI.S(UI.Abstand1);
             int eh = TextRenderer.MeasureText(einleitung.Text, einleitung.Font, new Size(ew, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height + UI.S(2);
@@ -8821,12 +8831,15 @@ public partial class DiagGui
     List<ModulSeite> modulSeiten = new List<ModulSeite>();
     void OrdneModulSeiten() { int w = SeitenBreite(); foreach (ModulSeite m in modulSeiten) m.Ordne(w); }
 
+    // Seiten mit diesem Rahmen: Diagnose, Benchmark, Lasttest und System-Umzug (Nummern wie in der Seitenleiste)
+    static bool IstModulSeite(int i) { return i == 1 || i == 2 || i == 3 || i == 8; }
+
     ModulSeite NeueModulSeite(FlowLayoutPanel f)
     {
         ModulSeite m = new ModulSeite(f);
         // auch bei geänderter Innenfläche: Erscheint die senkrechte Bildlaufleiste, wird die Seite schmaler, ohne dass
         // sich die Größe des Bereichs ändert
-        if (modulSeiten.Count == 0 && content != null) { content.Resize += delegate { OrdneModulSeiten(); }; content.ClientSizeChanged += delegate { if (curPage == 1 || curPage == 2) OrdneModulSeiten(); }; }
+        if (modulSeiten.Count == 0 && content != null) { content.Resize += delegate { OrdneModulSeiten(); }; content.ClientSizeChanged += delegate { if (IstModulSeite(curPage)) OrdneModulSeiten(); }; }
         modulSeiten.Add(m);
         return m;
     }
@@ -11175,41 +11188,58 @@ public partial class DiagGui
 // Seite Lasttest (Teilklasse DiagGui)
 public partial class DiagGui
 {
-    // ab v3.64 Lasttest als Tabelle: Komponente, Dauer, Einstellungen; Hinweise stehen bei ihrem Feld statt am Seitenende
-    Dictionary<CheckBox, List<Control>> loadParts = new Dictionary<CheckBox, List<Control>>();
-    Label lblLoadTotal, lblAkku;
+    // ab v4.09: Seite im Muster von Benchmark und Diagnose (bis v4.08 eine Tabelle mit Kontrollkästchen). Links die Karte
+    // Komponenten mit je einer Zeile (Symbol, Titel, Beschreibung, Dauer, Schalter); Dauer und Einstellungen einer
+    // Komponente stehen unter ihrer Zeile und nur, wenn sie eingeschaltet ist. Rechts Abbruchschwelle und Sensoren. Die
+    // Kontrollkästchen chkLCpu bis chkLDisk bleiben als Werte bestehen (Vorlagen, Zeitschätzung, Start).
+    static readonly string[] lastTitel = new string[] { "Prozessor", "Arbeitsspeicher", "Grafik", "Datenträger" };
+    static readonly string[] lastDetail = new string[] {
+        "Alle Threads mit Ergebnisprüfung",
+        "Mustertest mit Bitfehlerprüfung",
+        "Rendertest mit Direct3D 11, Bildprüfung alle 30 s, Erkennung von Treiber-Resets",
+        "Schreiben, Lesen und Prüfen jedes Blocks; Testdatei bis 4 GB, wird danach gelöscht" };
+    static readonly string[] lastIcons = new string[] { UI.IcoCpu, UI.IcoRam, UI.IcoGpu, UI.IcoDisk };
+    static readonly string[] lastTips = new string[] {
+        "Alle logischen Prozessoren rechnen mit Ergebnisprüfung; Rechenfehler deuten auf Instabilität (Übertaktung, Spannung, Kühlung, Netzteil). Läuft in einem eigenen Prozess ohne Unterbrechungen. Mit Sensoren gibt es Takt- und Temperaturverlauf und den Drosselnachweis. Ersetzt ab v2.7 den CPU-Stabilitätstest der Diagnose.",
+        "Mustertest über einen Teil des freien Arbeitsspeichers mit Bitfehlerprüfung. Neben der CPU-Last läuft er mit niedriger Priorität auf einem Viertel der Threads.",
+        "Eigener Rendertest mit Direct3D 11 als Dauerlast auf den gewählten Grafikeinheiten gleichzeitig: Bilder/s-Verlauf, Bildprüfung alle 30 Sekunden und Erkennung von Treiber-Resets.",
+        "Schreibt eine Testdatei (bis 4 GB), liest sie zurück und prüft jeden Block. Meldet Datenfehler, Ein-/Ausgabefehler und Controllerereignisse. Die Datei wird danach gelöscht." };
+
+    internal ModulSeite lastSeite;
+    internal SettingRow[] lastRows;
+    internal UnterBereich[] lastSub;
+    // Sichtbarkeit der Bereiche unter den Zeilen als eigener Zustand (für Tests ohne angezeigtes Fenster)
+    internal bool[] lastSubOffen = new bool[] { true, true, true, true };
+    Badge[] lastDauer;
+    LinkLabel lnkLastAll, lnkLastNone, lnkLastSens;
+    Label lblAkku, lblLastSens;
     Badge badgePawn;
 
-    static Label CellLabel(string text, int width)
-    {
-        Label l = RowLabel(text, width); l.Font = new Font("Segoe UI", UI.SchriftText); return l;
-    }
+    CheckBox[] LastChk() { return new CheckBox[] { chkLCpu, chkLRam, chkLGpu, chkLDisk }; }
+    ComboBox[] LastDauerWahl() { return new ComboBox[] { cmbLCpu, cmbLRam, cmbLGpu, cmbLDisk }; }
 
     Control BuildLoadPage()
     {
         FlowLayoutPanel f = Page("Lasttest", "Belastet die gewählten Komponenten gleichzeitig, jede mit eigener Dauer, und zeichnet Temperatur, Takt, Leistung und Lüfter auf. Gemeldet werden Rechen-, Bit- und Datenfehler, WHEA-Fehler und Drosselung. Während des Tests lässt er sich jederzeit beenden.", 3);
+        lastSeite = NeueModulSeite(f);
         string[] mins = new string[] { "2 Min.", "5 Min.", "10 Min.", "15 Min.", "30 Min.", "60 Min.", "120 Min.", "240 Min." };
-        lblAkku = Lbl("  Akkubetrieb: Für den Lasttest das Netzteil anschließen, sonst begrenzt die Energieverwaltung Takt und Leistung.  ", UI.SchriftText, true, UI.Warn);
-        lblAkku.BackColor = UI.WarnBg; lblAkku.Padding = new Padding(UI.S(6)); lblAkku.Margin = new Padding(0, UI.S(4), 0, UI.S(4)); lblAkku.Visible = false; f.Controls.Add(lblAkku);
-        f.Controls.Add(Section("Komponenten und Dauer"));
-        TableLayoutPanel t = LoadTable();
-        t.Controls.Add(CellLabel("Komponente", 230), 0, 0); t.Controls.Add(CellLabel("Dauer", 120), 1, 0); t.Controls.Add(CellLabel("Einstellungen", 150), 2, 0);
-        foreach (Control c in t.Controls) { c.ForeColor = UI.Muted; c.Font = new Font("Segoe UI Semibold", UI.SchriftHinweis); }
+        lblAkku = Lbl("Akkubetrieb: Für den Lasttest das Netzteil anschließen, sonst begrenzt die Energieverwaltung Takt und Leistung.", UI.SchriftText, true, UI.Warn);
+        lblAkku.BackColor = UI.WarnBg; lblAkku.Padding = new Padding(UI.S(10), UI.S(6), UI.S(10), UI.S(6)); lblAkku.Margin = new Padding(0, 0, 0, UI.S(UI.Abstand3)); lblAkku.Visible = false;
+        f.Controls.Add(lblAkku); lastSeite.Voll.Add(lblAkku);
 
-        chkLCpu = Chk("Prozessor", true); cmbLCpu = Combo(110, mins, 0);
-        AddLoadRow(t, 1, chkLCpu, "alle Threads mit Ergebnisprüfung", cmbLCpu, null);
+        ZeilenKarte kk = lastSeite.Karte("Komponenten", true);
+        lnkLastAll = KartenVerweis("Alle an"); lnkLastNone = KartenVerweis("Alle aus");
+        kk.KopfRechts.Controls.Add(lnkLastAll); kk.KopfRechts.Controls.Add(lnkLastNone);
+        lnkLastAll.LinkClicked += delegate { foreach (CheckBox c in LastChk()) c.Checked = true; };
+        lnkLastNone.LinkClicked += delegate { foreach (CheckBox c in LastChk()) c.Checked = false; };
 
-        chkLRam = Chk("Arbeitsspeicher", true); cmbLRam = Combo(110, mins, 0);
-        cmbLRamPct = Combo(90, new string[] { "25 %", "40 %", "60 %", "75 %" }, 1);
-        Label lPct = CellLabel("Anteil am freien RAM", 150);
-        AddLoadRow(t, 2, chkLRam, "Mustertest mit Bitfehlerprüfung", cmbLRam, new Control[] { SettingRow(lPct, cmbLRamPct) });
-
-        chkLGpu = Chk("Grafik", true); cmbLGpu = Combo(110, mins, 0);
-        cmbLGpuSel = Combo(260, GpuChoiceTexts(), 0);
-        cmbLGpuRes = Combo(120, new string[] { "1280x720", "1920x1080" }, 0);
-        cmbLGpuShow = Combo(140, new string[] { "Fenster", "Vollbild", "ohne Anzeige" }, 0);
-        Label lSel = CellLabel("Grafikeinheit", 100), lRes = CellLabel("Auflösung", 100), lShow = CellLabel("Anzeige", 100);
-        AddLoadRow(t, 3, chkLGpu, "Rendertest mit Direct3D 11, Bildprüfung alle 30 s, Erkennung von Treiber-Resets", cmbLGpu, new Control[] { SettingRow(lSel, cmbLGpuSel), SettingRow(lRes, cmbLGpuRes), SettingRow(lShow, cmbLGpuShow) });
+        chkLCpu = Chk("Prozessor", true); cmbLCpu = Combo(100, mins, 0);
+        chkLRam = Chk("Arbeitsspeicher", true); cmbLRam = Combo(100, mins, 0);
+        cmbLRamPct = Combo(100, new string[] { "25 %", "40 %", "60 %", "75 %" }, 1);
+        chkLGpu = Chk("Grafik", true); cmbLGpu = Combo(100, mins, 0);
+        cmbLGpuSel = Combo(210, GpuChoiceTexts(), 0);
+        cmbLGpuRes = Combo(105, new string[] { "1280x720", "1920x1080" }, 0);
+        cmbLGpuShow = Combo(125, new string[] { "Fenster", "Vollbild", "ohne Anzeige" }, 0);
         // Einstellungen des Rendertests auf beiden Seiten gleich halten: Benchmark -> Lasttest und Lasttest -> Benchmark
         // (ab 3.53 über CopySelection; vorher setzte sync2 die Grafikeinheit des Lasttests auf den Wert des Benchmarks zurück)
         EventHandler sync1 = delegate { if (syncGpu || cmbGpuRes == null) return; syncGpu = true; try { CopySelection(GpuCombosBench(), GpuCombosLast()); } finally { syncGpu = false; } };
@@ -11218,7 +11248,7 @@ public partial class DiagGui
         if (cmbGpuSel != null) cmbGpuSel.SelectedIndexChanged += sync1;
         cmbLGpuRes.SelectedIndexChanged += sync2; cmbLGpuShow.SelectedIndexChanged += sync2; cmbLGpuSel.SelectedIndexChanged += sync2;
 
-        chkLDisk = Chk("Datenträger", false); cmbLDisk = Combo(110, mins, 0);
+        chkLDisk = Chk("Datenträger", false); cmbLDisk = Combo(100, mins, 0);
         List<string> letters = new List<string>();
         foreach (string d in disks)
         {
@@ -11228,91 +11258,105 @@ public partial class DiagGui
         if (letters.Count == 0) letters.Add("C:");
         letters.Sort();
         cmbLDiskDrive = Combo(260, letters.ToArray(), 0);
-        Label lDrv = CellLabel("Laufwerk", 100);
-        AddLoadRow(t, 4, chkLDisk, "Schreiben, Lesen und Prüfen jedes Blocks; Testdatei bis 4 GB, wird danach gelöscht", cmbLDisk, new Control[] { SettingRow(lDrv, cmbLDiskDrive) });
-        f.Controls.Add(Card(t));
-        lblLoadTotal = Lbl("", UI.SchriftText, true, UI.Text); lblLoadTotal.Margin = new Padding(UI.S(4), UI.S(UI.Abstand2), 0, 0); f.Controls.Add(lblLoadTotal);
 
-        foreach (CheckBox c in new CheckBox[] { chkLCpu, chkLRam, chkLGpu, chkLDisk }) c.CheckedChanged += delegate { UpdateLoadEnabled(); UpdateSummary(); };
-        foreach (ComboBox c in new ComboBox[] { cmbLCpu, cmbLRam, cmbLGpu, cmbLDisk }) c.SelectedIndexChanged += delegate { UpdateSummary(); };
+        CheckBox[] chk = LastChk(); ComboBox[] dauer = LastDauerWahl();
+        lastRows = new SettingRow[chk.Length]; lastSub = new UnterBereich[chk.Length]; lastDauer = new Badge[chk.Length];
+        for (int i = 0; i < chk.Length; i++)
+        {
+            lastRows[i] = SchalterZeile(chk[i], lastTitel[i], lastDetail[i], lastIcons[i], lastTips[i], null);
+            lastDauer[i] = DauerEtikett(Minutes(dauer[i])); Tip(lastDauer[i], "Gewählte Dauer dieser Komponente.");
+            lastRows[i].AddBadge(lastDauer[i]);
+            kk.Zeile(lastRows[i]);
+            // Dauer und Einstellungen der Komponente nebeneinander, bei schmaler Karte mit Umbruch
+            lastSub[i] = new UnterBereich();
+            FeldReihe fr = new FeldReihe();
+            fr.Feld("Dauer", dauer[i]);
+            if (i == 1) fr.Feld("Anteil am freien RAM", cmbLRamPct);
+            else if (i == 2) { fr.Feld("Grafikeinheit", cmbLGpuSel); fr.Feld("Auflösung", cmbLGpuRes); fr.Feld("Anzeige", cmbLGpuShow); }
+            else if (i == 3) fr.Feld("Laufwerk", cmbLDiskDrive);
+            lastSub[i].Inhalt.Controls.Add(fr);
+            kk.Zeile(lastSub[i]);
+            chk[i].CheckedChanged += delegate { UpdateLoadEnabled(); UpdateSummary(); };
+            dauer[i].SelectedIndexChanged += delegate { UpdateSummary(); };
+        }
+        Label hk = Lbl("Alle gewählten Komponenten starten gleichzeitig, jede endet nach ihrer eigenen Dauer. Die Gesamtdauer ist die längste gewählte Dauer.", 8.5f, false, UI.Muted); hk.Margin = new Padding(0, UI.S(4), 0, UI.S(2));
+        kk.Frei(hk);
 
-        f.Controls.Add(Section("Abbruchschwelle"));
-        TableLayoutPanel ta = LoadTable();
+        ZeilenKarte ka = lastSeite.Karte("Abbruchschwelle", false);
         cmbLAbortCpu = Combo(140, new string[] { "Automatisch", "85 °C", "90 °C", "95 °C", "100 °C", "aus" }, 0);
         cmbLAbortGpu = Combo(140, new string[] { "85 °C", "90 °C", "95 °C", "aus" }, 1);
-        badgePawn = new Badge("PawnIO vorübergehend", "info");
+        FeldReihe fa = new FeldReihe(); fa.Feld("CPU-Temperatur", cmbLAbortCpu); fa.Feld("GPU-Temperatur", cmbLAbortGpu);
+        ka.Zeile(fa);
+        Label ha = Lbl("Liegt die Temperatur rund 10 Sekunden auf oder über der Schwelle, endet der Test mit einem Befund. Automatisch: TjMax der CPU, sonst 100 °C.", 8.5f, false, UI.Muted); ha.Margin = new Padding(0, UI.S(2), 0, UI.S(2));
+        ka.Frei(ha);
+
+        // Sensoren: woher die CPU-Werte des Laufs kommen (Treiber PawnIO, Einstellung auf der Seite Sensoren live)
+        ZeilenKarte ks = lastSeite.Karte("Sensoren", false);
+        badgePawn = new Badge("PawnIO vorübergehend", "info"); badgePawn.Margin = new Padding(UI.S(6), UI.S(2), 0, 0);
         Tip(badgePawn, "Echte CPU-Temperaturen liefert LibreHardwareMonitor mit dem Treiber PawnIO. Er wird für den Lauf vorübergehend installiert und danach wieder entfernt (einstellbar auf der Seite Sensoren live).");
-        ta.Controls.Add(CellLabel("CPU-Temperatur", 230), 0, 0); ta.Controls.Add(cmbLAbortCpu, 1, 0); ta.Controls.Add(badgePawn, 2, 0);
-        ta.Controls.Add(CellLabel("GPU-Temperatur", 230), 0, 1); ta.Controls.Add(cmbLAbortGpu, 1, 1);
-        f.Controls.Add(Card(ta));
-        f.Controls.Add(Hint("Liegt die Temperatur rund 10 Sekunden auf oder über der Schwelle, endet der Test mit einem Befund. Automatisch: TjMax der CPU, sonst 100 °C.", 4));
+        ks.KopfRechts.Controls.Add(badgePawn);
+        lblLastSens = Lbl("", UI.SchriftHinweis, false, UI.Muted); lblLastSens.Margin = new Padding(0, 0, 0, UI.S(6));
+        ks.Frei(lblLastSens);
+        lnkLastSens = KartenVerweis("Sensoren live öffnen"); lnkLastSens.Margin = new Padding(0, 0, 0, UI.S(2));
+        lnkLastSens.LinkClicked += delegate { if (!running) ShowPage(7); };
+        ks.Frei(lnkLastSens);
+
+        f.Controls.Add(lastSeite.Spalten);
         UpdateLoadEnabled();
+        UpdateLoadExtras();
+        lastSeite.Ordne(SeitenBreite());
         return f;
     }
 
-    static TableLayoutPanel LoadTable()
-    {
-        TableLayoutPanel t = new TableLayoutPanel(); t.AutoSize = true; t.AutoSizeMode = AutoSizeMode.GrowAndShrink; t.ColumnCount = 3; t.BackColor = UI.Panel;
-        t.Margin = new Padding(0, 0, 0, 0);
-        t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(240))); t.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UI.S(130))); t.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        return t;
-    }
-
-    static Control SettingRow(Label l, Control c)
-    {
-        FlowLayoutPanel r = new FlowLayoutPanel(); r.AutoSize = true; r.WrapContents = false; r.BackColor = UI.Panel; r.Margin = new Padding(0, 0, 0, UI.S(2));
-        r.Controls.Add(l); r.Controls.Add(c); return r;
-    }
-
-    void AddLoadRow(TableLayoutPanel t, int row, CheckBox chk, string detail, ComboBox dur, Control[] settings)
-    {
-        Control comp = Opt2(chk, detail);
-        Label d = comp.Controls.Count > 1 ? comp.Controls[1] as Label : null;
-        if (d != null) d.MaximumSize = new Size(UI.S(216), 0);
-        comp.Margin = new Padding(0, UI.S(4), UI.S(4), UI.S(6));
-        dur.Margin = new Padding(0, UI.S(6), 0, 0);
-        t.Controls.Add(comp, 0, row); t.Controls.Add(dur, 1, row);
-        List<Control> parts = new List<Control>(); parts.Add(dur);
-        if (settings != null && settings.Length > 0)
-        {
-            FlowLayoutPanel s = new FlowLayoutPanel(); s.FlowDirection = FlowDirection.TopDown; s.WrapContents = false; s.AutoSize = true; s.BackColor = UI.Panel; s.Margin = new Padding(0, UI.S(4), 0, UI.S(4));
-            foreach (Control c in settings) { s.Controls.Add(c); foreach (Control k in c.Controls) parts.Add(k); }
-            t.Controls.Add(s, 2, row);
-        }
-        loadParts[chk] = parts;
-    }
-
-    // Elemente einer abgewählten Komponente einheitlich deaktivieren: Auswahllisten aus, Beschriftungen gedämpft
-    public static void SetPartEnabled(IEnumerable<Control> parts, bool on)
-    {
-        if (parts == null) return;
-        foreach (Control c in parts)
-        {
-            if (c is Label) c.ForeColor = on ? UI.Text : DisabledText();
-            else c.Enabled = on;
-        }
-    }
-
+    // Bereiche unter den Zeilen: nur bei eingeschalteter Komponente sichtbar
     void UpdateLoadEnabled()
     {
-        foreach (KeyValuePair<CheckBox, List<Control>> kv in loadParts) SetPartEnabled(kv.Value, kv.Key.Checked);
+        if (lastSub != null && chkLCpu != null)
+        {
+            CheckBox[] chk = LastChk();
+            for (int i = 0; i < chk.Length && i < lastSub.Length; i++)
+                if (lastSub[i] != null && lastSubOffen[i] != chk[i].Checked) { lastSubOffen[i] = chk[i].Checked; lastSub[i].Visible = chk[i].Checked; }
+        }
         UpdateLoadTotal();
     }
 
+    // Kopf der Seite (Anzahl, Gesamtdauer) und Dauer an jeder Zeile
     void UpdateLoadTotal()
     {
-        if (lblLoadTotal == null || chkLCpu == null) return;
-        int m = LoadTotalMinutes(new bool[] { chkLCpu.Checked, chkLRam.Checked, chkLGpu.Checked, chkLDisk.Checked },
-            new int[] { Minutes(cmbLCpu), Minutes(cmbLRam), Minutes(cmbLGpu), Minutes(cmbLDisk) });
-        SetText(lblLoadTotal, m == 0 ? "Keine Komponente gewählt" : "Gesamtdauer: " + MinText(m) + " (alle gewählten Komponenten laufen gleichzeitig)");
-        lblLoadTotal.ForeColor = m == 0 ? UI.Warn : UI.Text;
+        if (lastSeite == null || chkLCpu == null) return;
+        CheckBox[] chk = LastChk(); ComboBox[] dauer = LastDauerWahl();
+        bool[] on = new bool[chk.Length]; int[] min = new int[chk.Length]; int n = 0;
+        for (int i = 0; i < chk.Length; i++)
+        {
+            on[i] = chk[i].Checked; min[i] = Minutes(dauer[i]); if (on[i]) n++;
+            if (lastDauer != null && lastDauer[i] != null) SetText(lastDauer[i], MinText(min[i]));
+        }
+        int m = LoadTotalMinutes(on, min);
+        SetText(lastSeite.Anzahl, n + " von " + chk.Length + " Komponenten");
+        SetText(lastSeite.Dauer, m == 0 ? "keine Komponente gewählt" : "Gesamtdauer " + MinText(m));
     }
 
     // Hinweise der Seite Lasttest, die sich nach Gerät und Einstellung richten (Akkubetrieb, PawnIO)
     void UpdateLoadExtras()
     {
         try { if (lblAkku != null) lblAkku.Visible = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Offline; } catch { }
-        try { if (badgePawn != null) badgePawn.Text = (cmbDriver == null || cmbDriver.SelectedIndex == 0) && PawnIoVersion().Length == 0 ? "PawnIO vorübergehend" : ""; } catch { }
+        try
+        {
+            bool treiber = cmbDriver == null || cmbDriver.SelectedIndex == 0;
+            string pawn = PawnIoVersion();
+            if (badgePawn != null) badgePawn.Text = treiber && pawn.Length == 0 ? "PawnIO vorübergehend" : "";
+            if (lblLastSens != null) SetText(lblLastSens, LastSensorText(treiber, pawn));
+        }
+        catch { }
+    }
+
+    // Text der Karte Sensoren: woher CPU-Temperatur, Takt, Leistung und Lüfter des Laufs kommen
+    public static string LastSensorText(bool treiber, string pawnVersion)
+    {
+        string werte = "CPU-Temperatur, CPU-Takt, CPU-Leistung und Mainboard-Lüfter";
+        if (!treiber) return "Der Treiber PawnIO wird nicht verwendet. " + werte + " liefert LibreHardwareMonitor dem Lauf damit nicht.";
+        if (String.IsNullOrEmpty(pawnVersion)) return werte + " liefert LibreHardwareMonitor mit dem Treiber PawnIO. Er wird für den Lauf vorübergehend installiert und danach wieder entfernt.";
+        return werte + " liefert LibreHardwareMonitor mit dem Treiber PawnIO. PawnIO " + pawnVersion + " ist installiert und bleibt unverändert.";
     }
 
     // Laufwerksname kurz: Busangaben und Größenangabe im Namen entfallen ("NVMe PC SN820 NVMe WD 4096GB" -> "PC SN820 WD")
@@ -14945,280 +14989,208 @@ public partial class DiagGui
         return Directory.Exists(def) ? def : "";
     }
 
+    // ab v4.09: Seite im Muster von Benchmark und Diagnose (bis v4.08 Abschnitte mit Kontrollkästchen). Links der Umfang
+    // in drei Karten (Benutzer-Bibliotheken, System und Programme, Zusatzordner), rechts Zielmedium und Sicherung mit
+    // Fortschritt. Die Kontrollkästchen bleiben als Werte bestehen, angezeigt werden Zeilen mit Schaltern (SchalterZeile);
+    // Profile und Zusatzordner, die erst der Schnell-Scan findet, stehen als Auswahlzeilen unter ihrer Zeile bzw. in
+    // ihrer Karte.
+    internal ModulSeite umzugSeite;
+    internal SettingRow[] umzugLibRows;
+    internal SettingRow[] umzugSysRows;
+    internal UnterBereich subUmzugProfile, subUmzugWlan;
+    // Sichtbarkeit der Bereiche unter Profile und WLAN als eigener Zustand (für Tests ohne angezeigtes Fenster)
+    internal bool subUmzugProfileOffen, subUmzugWlanOffen = true;
+    internal ZeilenKarte karteUmzugZusatz;
+    internal Label lblUmzugGroesse, lblUmzugPlatz;
+    // Größe und freien Platz neu rechnen und die Farben der Hinweise setzen (auch nach einem Wechsel des Farbschemas)
+    internal Action umzugRechne;
+
+    // Zeile zum freien Platz auf dem Ziel. Ohne Zielmedium und bei Zielen ohne lesbaren freien Platz (Netzlaufwerk) steht
+    // das da; "ausreichend" gibt es nur mit gemessenem freiem Platz und gemessenem Umfang.
+    // stufe: 0 gedämpft, 1 gut, 2 kritisch, 3 Warnung
+    public static string UmzugPlatzText(string zielPfad, string dateisystem, long frei, long bedarf, bool gemessen, out int stufe)
+    {
+        stufe = 0;
+        if (String.IsNullOrEmpty(zielPfad)) { stufe = 3; return "Kein Zielmedium gewählt"; }
+        if (String.Equals(dateisystem, "Netzwerk", StringComparison.OrdinalIgnoreCase)) return "Netzlaufwerk: Der freie Platz wird nicht geprüft";
+        if (frei <= 0) return "Freier Platz auf dem Ziel nicht lesbar";
+        string f = "Frei auf dem Ziel: " + (frei / 1073741824.0).ToString("N1") + " GB";
+        if (bedarf > frei) { stufe = 2; return f + ", nicht ausreichend"; }
+        if (!gemessen) return f;
+        stufe = 1; return f + ", ausreichend";
+    }
+
     Control BuildUmzugPage()
     {
         FlowLayoutPanel f = Page("System-Umzug & Neuinstallation", "Sichert pers\u00F6nliche Dateien, Desktop-Layout und Programme vor einer Neuinstallation und stellt sie mit 1 Klick wieder her.", -1);
+        umzugSeite = NeueModulSeite(f);
 
-        // 1. Ziel-Auswahl
-        f.Controls.Add(Section("Zielmedium f\u00FCr die Datensicherung"));
+        // 1. Umfang, links: Benutzer-Bibliotheken (Größe je Ordner nach dem Schnell-Scan)
+        ZeilenKarte kLib = umzugSeite.Karte("Benutzer-Bibliotheken", true);
+        LinkLabel lnkLibsAll = KartenVerweis("Alle an"), lnkLibsNone = KartenVerweis("Alle aus");
+        Tip(lnkLibsAll, "Alle Benutzer-Bibliotheken einschalten.");
+        Tip(lnkLibsNone, "Alle Benutzer-Bibliotheken ausschalten.");
+        kLib.KopfRechts.Controls.Add(lnkLibsAll); kLib.KopfRechts.Controls.Add(lnkLibsNone);
 
-        TableLayoutPanel targetTable = new TableLayoutPanel();
-        targetTable.AutoSize = true;
-        targetTable.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        targetTable.ColumnCount = 2;
-        targetTable.RowCount = 2;
-        targetTable.BackColor = UI.Panel;
-        targetTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-        targetTable.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        string[] libTitel = new string[] { "Desktop", "Dokumente", "Downloads", "Bilder", "Musik", "Videos" };
+        string[] libScope = new string[] { "Lib_Desktop", "Lib_Dokumente", "Lib_Downloads", "Lib_Bilder", "Lib_Musik", "Lib_Videos" };
+        string[] libDetail = new string[] {
+            "Dateien und Ordner auf dem Desktop", "Pers\u00F6nliche Dokumente", "Oft gro\u00DF, deshalb zun\u00E4chst aus",
+            "Fotos und Bildschirmfotos", "Musiksammlung", "Videosammlung" };
+        string[] libIcons = new string[] { UI.IcoBildschirm, UI.IcoDokument, UI.IcoHerunterladen, UI.IcoBild, UI.IcoMusik, UI.IcoVideo };
+        string[] libTips = new string[] {
+            "Sichert den Desktop-Ordner des aktuellen Benutzers.",
+            "Sichert den Dokumente-Ordner des aktuellen Benutzers.",
+            "Sichert den Downloads-Ordner (standardm\u00E4\u00DFig deaktiviert wegen oft hohem Datenvolumen).",
+            "Sichert den Bilder-Ordner des aktuellen Benutzers.",
+            "Sichert den Musik-Ordner des aktuellen Benutzers.",
+            "Sichert den Videos-Ordner des aktuellen Benutzers." };
+        CheckBox[] libChk = new CheckBox[libTitel.Length]; Badge[] libGroesse = new Badge[libTitel.Length]; long[] libSize = new long[libTitel.Length];
+        umzugLibRows = new SettingRow[libTitel.Length];
+        for (int i = 0; i < libTitel.Length; i++)
+        {
+            libChk[i] = Chk(libTitel[i], i != 2);
+            umzugLibRows[i] = SchalterZeile(libChk[i], libTitel[i], libDetail[i], libIcons[i], libTips[i], null);
+            libGroesse[i] = new Badge("", "skip"); Tip(libGroesse[i], "Gr\u00F6\u00DFe des Ordners, gemessen beim Schnell-Scan.");
+            umzugLibRows[i].AddBadge(libGroesse[i]);
+            kLib.Zeile(umzugLibRows[i]);
+        }
 
+        // System und Programme; Profile und das Klartext-Kennwort der WLAN-Profile stehen unter ihrer Zeile
+        ZeilenKarte kSys = umzugSeite.Karte("System und Programme", true);
+        CheckBox chkLayout = Chk("Desktop-Layout", true), chkSoftware = Chk("Software-Inventar", true), chkProfiles = Chk("Profile und Konfigurationen", false), chkWlan = Chk("WLAN-Profile", true);
+        SettingRow rLayout = SchalterZeile(chkLayout, "Desktop-Layout", "Hintergrundbild und Positionen der Symbole", UI.IcoAnpassen,
+            "Sichert das aktive Desktop-Wallpaper sowie die Icon-Koordinaten.", null);
+        SettingRow rSoft = SchalterZeile(chkSoftware, "Software-Inventar", "Winget-Paketliste und Bericht \u00FCber Programme, die von Hand zu installieren sind", UI.IcoApp,
+            "Erstellt einen Winget-Paketexport und einen Bericht \u00FCber manuell zu installierende Programme.", null);
+        SettingRow rProf = SchalterZeile(chkProfiles, "Profile und Konfigurationen", "Browser, E-Mail, Editoren und Werkzeuge", UI.IcoKontakt,
+            "Sichert Konfigurationsdateien, Sitzungen und Profile erkannter Anwendungen.", null);
+        subUmzugProfile = new UnterBereich(); subUmzugProfile.Visible = false;
+        Label lblScanHint = Lbl("Der Schnell-Scan ermittelt installierte Browser, E-Mail-Programme, Editoren und Werkzeuge. Danach lassen sich die Profile hier einzeln w\u00E4hlen.", 8.5f, false, UI.Muted);
+        lblScanHint.Margin = new Padding(0, 0, 0, UI.S(2));
+        subUmzugProfile.Inhalt.Controls.Add(lblScanHint);
+        SettingRow rWlan = SchalterZeile(chkWlan, "WLAN-Profile", "Gespeicherte Netzwerke zur automatischen Wiederherstellung", UI.IcoWlan,
+            "Sichert gespeicherte WLAN-Netzwerke zur automatischen Wiederherstellung.", null);
+        subUmzugWlan = new UnterBereich();
+        LaufwerkZeile zWlanClear = new LaufwerkZeile("WLAN-Passw\u00F6rter im Klartext mitsichern", "", "unverschl\u00FCsselt auf dem Zielmedium", false);
+        Tip(zWlanClear, "Achtung: Sichert Netzwerkschl\u00FCssel unverschl\u00FCsselt in XML-Dateien auf dem Zielmedium.");
+        subUmzugWlan.Inhalt.Controls.Add(zWlanClear);
+        kSys.Zeile(rLayout); kSys.Zeile(rSoft); kSys.Zeile(rProf); kSys.Zeile(subUmzugProfile); kSys.Zeile(rWlan); kSys.Zeile(subUmzugWlan);
+        umzugSysRows = new SettingRow[] { rLayout, rSoft, rProf, rWlan };
+
+        // Einschalten fragt nach (der Schlüssel liegt danach lesbar auf dem Zielmedium); bei Nein bleibt die Zeile aus
+        zWlanClear.CheckedChanged += delegate {
+            if (!zWlanClear.Checked) return;
+            DialogResult dr = MessageBox.Show(this,
+                "Sicherheits-Warnung:\r\n\r\n" +
+                "Wenn Sie diese Option aktivieren, werden alle gespeicherten WLAN-Passw\u00F6rter unverschl\u00FCsselt im Klartext in den exportierten XML-Dateien auf dem Zielmedium gespeichert.\r\n\r\n" +
+                "Jeder mit Zugriff auf das Zielmedium kann diese Passw\u00F6rter einsehen.\r\n\r\n" +
+                "M\u00F6chten Sie WLAN-Passw\u00F6rter wirklich im Klartext sichern?",
+                "WLAN-Passw\u00F6rter im Klartext sichern",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning);
+            if (dr != DialogResult.Yes) zWlanClear.Checked = false;
+        };
+
+        // Zusatzordner im Stamm von C: (findet der Schnell-Scan)
+        karteUmzugZusatz = umzugSeite.Karte("Zusatzordner auf Laufwerk C:", true);
+        Label lblZusatz = Lbl("Der Schnell-Scan sucht weitere Ordner im Stamm von Laufwerk C: und bietet sie hier zur Wahl an.", 8.5f, false, UI.Muted);
+        lblZusatz.Margin = new Padding(0, 0, 0, UI.S(2));
+        karteUmzugZusatz.Frei(lblZusatz);
+
+        // 2. Zielmedium, rechts
+        ZeilenKarte kZiel = umzugSeite.Karte("Zielmedium", false);
         DarkComboBox cmbDest = new DarkComboBox();
-        cmbDest.Dock = DockStyle.Fill;
-        cmbDest.Margin = new Padding(0, UI.S(2), UI.S(8), UI.S(2));
+        cmbDest.Margin = new Padding(0, 0, 0, UI.S(8));
         Tip(cmbDest, "W\u00E4hlen Sie das Ziellaufwerk oder die Netzwerkfreigabe f\u00FCr die Sicherung aus.");
+        kZiel.Zeile(cmbDest);
 
-        Button btnBrowse = UI.Secondary("Durchsuchen ...");
-        btnBrowse.Margin = new Padding(0, UI.S(2), 0, UI.S(2));
+        Button btnBrowse = UI.Secondary("Durchsuchen \u2026");
+        btnBrowse.Margin = new Padding(0, 0, 0, UI.S(8));
         Tip(btnBrowse, "Einen beliebigen Ordner auf einem lokalen Datentr\u00E4ger oder im Netzwerk ausw\u00E4hlen.");
-
-        targetTable.Controls.Add(cmbDest, 0, 0);
-        targetTable.Controls.Add(btnBrowse, 1, 0);
+        kZiel.Frei(btnBrowse);
 
         Label lblFatWarn = Lbl("Achtung: Das Zielmedium ist mit FAT32 formatiert. Einzeldateien ab 4 GB k\u00F6nnen nicht gespeichert werden (NTFS oder exFAT empfohlen).", 8.5f, false, UI.Warn);
-        lblFatWarn.AutoSize = true;
         lblFatWarn.Visible = false;
-        lblFatWarn.Margin = new Padding(0, UI.S(6), 0, 0);
-        lblFatWarn.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 32), 0);
+        lblFatWarn.Margin = new Padding(0, 0, 0, UI.S(6));
         Tip(lblFatWarn, "FAT32 unterst\u00FCtzt technisch keine Dateien \u00FCber 4 GB. F\u00FCr gro\u00DFe Sicherungen wird exFAT oder NTFS empfohlen.");
-        targetTable.Controls.Add(lblFatWarn, 0, 1);
-        targetTable.SetColumnSpan(lblFatWarn, 2);
+        kZiel.Frei(lblFatWarn);
+        Label hZiel = Lbl("Wechsellaufwerk (USB-Stick, externe SSD) oder konfigurierten NAS-Pfad als Sicherungsziel w\u00E4hlen.", 8.5f, false, UI.Muted);
+        hZiel.Margin = new Padding(0, 0, 0, UI.S(2));
+        kZiel.Frei(hZiel);
 
-        f.Controls.Add(Card(targetTable));
-        f.Controls.Add(Hint("Wechsellaufwerk (USB-Stick, externe SSD) oder konfigurierten NAS-Pfad als Sicherungsziel w\u00E4hlen.", 4));
+        // 3. Sicherung: Größe, freier Platz, Start, Schnell-Scan, Fortschritt und Protokoll
+        ZeilenKarte kSich = umzugSeite.Karte("Sicherung", false);
+        Label lblSummary = Lbl("Gesamtgr\u00F6\u00DFe: nach dem Schnell-Scan", 10.5f, true, UI.Text);
+        lblSummary.Margin = new Padding(0, 0, 0, UI.S(2));
+        Tip(lblSummary, "Umfang der gew\u00E4hlten Bereiche: Bibliotheken und Zusatzordner gemessen beim Schnell-Scan, Layout, Software-Inventar und Profile gesch\u00E4tzt.");
+        kSich.Frei(lblSummary); lblUmzugGroesse = lblSummary;
+        Label lblPlatz = Lbl("", UI.SchriftText, false, UI.Muted);
+        lblPlatz.Margin = new Padding(0, 0, 0, UI.S(10));
+        Tip(lblPlatz, "Vergleich zwischen dem Umfang der Sicherung und dem freien Speicher auf dem Zielmedium.");
+        kSich.Frei(lblPlatz); lblUmzugPlatz = lblPlatz;
 
-        // 2. Umfangs-Auswahl (mit manuellem Schnell-Scan per Knopfdruck)
-        f.Controls.Add(Section("Sicherungsumfang"));
-
-        FlowLayoutPanel scopePanel = new FlowLayoutPanel();
-        scopePanel.FlowDirection = FlowDirection.TopDown;
-        scopePanel.WrapContents = false;
-        scopePanel.AutoSize = true;
-        scopePanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        scopePanel.BackColor = UI.Panel;
-
-        // Zeile für manuellen Schnell-Scan
-        FlowLayoutPanel scanRow = Row();
-        scanRow.Margin = new Padding(0, 0, 0, UI.S(8));
-
-        Button btnStartScan = UI.Secondary("Schnell-Scan durchf\u00FChren");
-        Tip(btnStartScan, "Pr\u00FCft diesen PC auf vorhandene Bibliotheken, Desktop-Layout und installierte Anwendungsprofile.");
-
-        Label lblScanInfo = Lbl("Ermittelt vorab, welche Bibliotheken, Profile und Programme auf diesem PC vorhanden sind.", 8.5f, false, UI.Muted);
-        lblScanInfo.Margin = new Padding(UI.S(10), UI.S(4), 0, 0);
-        lblScanInfo.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 220), 0);
-        Tip(lblScanInfo, "Status des Vorab-Scans der installierten Anwendungen und Verzeichnisse.");
-
-        scanRow.Controls.Add(btnStartScan);
-        scanRow.Controls.Add(lblScanInfo);
-        scopePanel.Controls.Add(scanRow);
-
-        // Granulare Bibliotheken
-        FlowLayoutPanel libHeaderRow = Row();
-        libHeaderRow.Margin = new Padding(0, 0, 0, UI.S(2));
-        Label lblLibsHead = Lbl("Benutzer-Bibliotheken:", 9.5f, true, UI.Text);
-        lblLibsHead.Margin = new Padding(0, UI.S(2), UI.S(8), UI.S(2));
-        Tip(lblLibsHead, "Pers\u00F6nliche Standardbibliotheken des Benutzers ausw\u00E4hlen.");
-
-        LinkLabel lnkLibsAll = new LinkLabel();
-        lnkLibsAll.Text = "Alle an";
-        lnkLibsAll.AutoSize = true;
-        lnkLibsAll.Font = new Font("Segoe UI", 8.5f);
-        lnkLibsAll.LinkColor = UI.Accent;
-        lnkLibsAll.ActiveLinkColor = UI.Accent;
-        lnkLibsAll.Margin = new Padding(0, UI.S(4), 0, UI.S(2));
-        Tip(lnkLibsAll, "Alle Benutzer-Bibliotheken markieren.");
-
-        Label lblLibsSlash = Lbl("/", 8.5f, false, UI.Muted);
-        lblLibsSlash.Margin = new Padding(UI.S(2), UI.S(4), UI.S(2), UI.S(2));
-
-        LinkLabel lnkLibsNone = new LinkLabel();
-        lnkLibsNone.Text = "Alle aus";
-        lnkLibsNone.AutoSize = true;
-        lnkLibsNone.Font = new Font("Segoe UI", 8.5f);
-        lnkLibsNone.LinkColor = UI.Accent;
-        lnkLibsNone.ActiveLinkColor = UI.Accent;
-        lnkLibsNone.Margin = new Padding(0, UI.S(4), 0, UI.S(2));
-        Tip(lnkLibsNone, "Alle Benutzer-Bibliotheken abw\u00E4hlen.");
-
-        libHeaderRow.Controls.Add(lblLibsHead);
-        libHeaderRow.Controls.Add(lnkLibsAll);
-        libHeaderRow.Controls.Add(lblLibsSlash);
-        libHeaderRow.Controls.Add(lnkLibsNone);
-        scopePanel.Controls.Add(libHeaderRow);
-
-        FlowLayoutPanel libSubFlow = new FlowLayoutPanel();
-        libSubFlow.FlowDirection = FlowDirection.TopDown;
-        libSubFlow.WrapContents = false;
-        libSubFlow.AutoSize = true;
-        libSubFlow.Margin = new Padding(UI.S(16), 0, 0, UI.S(4));
-        libSubFlow.BackColor = UI.Panel;
-
-        CheckBox chkLibDesktop = Chk("Desktop", true);
-        Tip(chkLibDesktop, "Sichert den Desktop-Ordner des aktuellen Benutzers.");
-        libSubFlow.Controls.Add(chkLibDesktop);
-
-        CheckBox chkLibDocs = Chk("Dokumente", true);
-        Tip(chkLibDocs, "Sichert den Dokumente-Ordner des aktuellen Benutzers.");
-        libSubFlow.Controls.Add(chkLibDocs);
-
-        CheckBox chkLibDownloads = Chk("Downloads", false);
-        Tip(chkLibDownloads, "Sichert den Downloads-Ordner (standardm\u00E4\u00DFig deaktiviert wegen oft hohem Datenvolumen).");
-        libSubFlow.Controls.Add(chkLibDownloads);
-
-        CheckBox chkLibPictures = Chk("Bilder", true);
-        Tip(chkLibPictures, "Sichert den Bilder-Ordner des aktuellen Benutzers.");
-        libSubFlow.Controls.Add(chkLibPictures);
-
-        CheckBox chkLibMusic = Chk("Musik", true);
-        Tip(chkLibMusic, "Sichert den Musik-Ordner des aktuellen Benutzers.");
-        libSubFlow.Controls.Add(chkLibMusic);
-
-        CheckBox chkLibVideos = Chk("Videos", true);
-        Tip(chkLibVideos, "Sichert den Videos-Ordner des aktuellen Benutzers.");
-        libSubFlow.Controls.Add(chkLibVideos);
-
-        scopePanel.Controls.Add(libSubFlow);
-
-        CheckBox chkLayout = Chk("Desktop-Layout (Icon-Positionen & Hintergrundbild)", true);
-        Tip(chkLayout, "Sichert das aktive Desktop-Wallpaper sowie die Icon-Koordinaten.");
-        scopePanel.Controls.Add(chkLayout);
-
-        CheckBox chkSoftware = Chk("Software-Inventar (Winget-Paketliste & Programm-Report)", true);
-        Tip(chkSoftware, "Erstellt einen Winget-Paketexport und einen Bericht \u00FCber manuell zu installierende Programme.");
-        scopePanel.Controls.Add(chkSoftware);
-
-        CheckBox chkProfiles = Chk("Profile & Konfigurationen (Configs)", false);
-        Tip(chkProfiles, "Sichert Konfigurationsdateien, Sitzungen und Profile erkannter Anwendungen.");
-        scopePanel.Controls.Add(chkProfiles);
-
-        FlowLayoutPanel profSubFlow = new FlowLayoutPanel();
-        profSubFlow.FlowDirection = FlowDirection.TopDown;
-        profSubFlow.WrapContents = false;
-        profSubFlow.AutoSize = true;
-        profSubFlow.Margin = new Padding(UI.S(24), 0, 0, UI.S(4));
-        profSubFlow.BackColor = UI.Panel;
-
-        Label lblScanHint = Lbl("Klicke oben auf 'Schnell-Scan durchf\u00FChren', um installierte Browser, Mail-Clients, Editoren und Tools zu ermitteln.", 8.5f, false, UI.Muted);
-        lblScanHint.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(4));
-        lblScanHint.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 60), 0);
-        Tip(lblScanHint, "Hinweis zur Erkennung vorhandener Anwendungsprofile auf diesem Computer.");
-        profSubFlow.Controls.Add(lblScanHint);
-
-        scopePanel.Controls.Add(profSubFlow);
-        CheckBox chkWlan = Chk("WLAN-Profile (gespeicherte Netzwerke)", true);
-        Tip(chkWlan, "Sichert gespeicherte WLAN-Netzwerke zur automatischen Wiederherstellung.");
-        scopePanel.Controls.Add(chkWlan);
-
-        FlowLayoutPanel wlanSubFlow = new FlowLayoutPanel();
-        wlanSubFlow.FlowDirection = FlowDirection.TopDown;
-        wlanSubFlow.WrapContents = false;
-        wlanSubFlow.AutoSize = true;
-        wlanSubFlow.Margin = new Padding(UI.S(24), 0, 0, UI.S(4));
-        wlanSubFlow.BackColor = UI.Panel;
-
-        CheckBox chkWlanClear = Chk("WLAN-Passw\u00F6rter im Klartext mitsichern", false);
-        Tip(chkWlanClear, "Achtung: Sichert Netzwerkschl\u00FCssel unverschl\u00FCsselt in XML-Dateien auf dem Zielmedium.");
-        wlanSubFlow.Controls.Add(chkWlanClear);
-        scopePanel.Controls.Add(wlanSubFlow);
-
-        chkWlan.CheckedChanged += delegate {
-            chkWlanClear.Enabled = chkWlan.Checked;
-            if (!chkWlan.Checked) chkWlanClear.Checked = false;
-        };
-
-        chkWlanClear.Click += delegate {
-            if (chkWlanClear.Checked)
-            {
-                DialogResult dr = MessageBox.Show(this,
-                    "Sicherheits-Warnung:\r\n\r\n" +
-                    "Wenn Sie diese Option aktivieren, werden alle gespeicherten WLAN-Passw\u00F6rter unverschl\u00FCsselt im Klartext in den exportierten XML-Dateien auf dem Zielmedium gespeichert.\r\n\r\n" +
-                    "Jeder mit Zugriff auf das Zielmedium kann diese Passw\u00F6rter einsehen.\r\n\r\n" +
-                    "M\u00F6chten Sie WLAN-Passw\u00F6rter wirklich im Klartext sichern?",
-                    "WLAN-Passw\u00F6rter im Klartext sichern",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Warning);
-                if (dr != DialogResult.Yes)
-                {
-                    chkWlanClear.Checked = false;
-                }
-            }
-        };
-
-        FlowLayoutPanel customPanel = new FlowLayoutPanel();
-        customPanel.FlowDirection = FlowDirection.TopDown;
-        customPanel.WrapContents = false;
-        customPanel.AutoSize = true;
-        customPanel.Margin = new Padding(0, UI.S(6), 0, 0);
-        customPanel.BackColor = UI.Panel;
-        scopePanel.Controls.Add(customPanel);
-
-        f.Controls.Add(Card(scopePanel));
-        f.Controls.Add(Hint("Alle gew\u00E4hlten Daten und Profile werden in ein autarkes 1-Klick-Wiederherstellungspaket gespiegelt.", 4));
-
-        // 3. Status- & Startbereich (inkl. Live-Log)
-        f.Controls.Add(Section("Status & Sicherung"));
-
-        FlowLayoutPanel statusPanel = new FlowLayoutPanel();
-        statusPanel.FlowDirection = FlowDirection.TopDown;
-        statusPanel.WrapContents = false;
-        statusPanel.AutoSize = true;
-        statusPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        statusPanel.BackColor = UI.Panel;
-
-        Label lblSummary = Lbl("Pr\u00FCfe Speicherplatz ...", 9.5f, true, UI.Ok);
-        lblSummary.Margin = new Padding(0, 0, 0, UI.S(8));
-        lblSummary.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 32), 0);
-        Tip(lblSummary, "Vergleich zwischen gemessenem Datenvolumen und freiem Speicher auf dem Zielmedium.");
-        statusPanel.Controls.Add(lblSummary);
-
-        Button btnStartUmzug = UI.Primary("Umzug-Sicherung starten");
-        btnStartUmzug.Font = new Font("Segoe UI Semibold", 10.5f);
-        btnStartUmzug.Padding = new Padding(UI.S(16), UI.S(6), UI.S(16), UI.S(6));
-        btnStartUmzug.Margin = new Padding(0, 0, 0, UI.S(8));
+        FlowLayoutPanel knoepfe = Row();
+        knoepfe.Margin = new Padding(0, 0, 0, UI.S(8));
+        Button btnStartUmzug = UI.Primary("Sicherung starten");
+        btnStartUmzug.Font = new Font("Segoe UI Semibold", 10f);
+        btnStartUmzug.Padding = new Padding(UI.S(14), UI.S(4), UI.S(14), UI.S(4));
+        btnStartUmzug.Margin = new Padding(0, 0, UI.S(8), 0);
         Tip(btnStartUmzug, "Startet die Erstellung der System-Umzug-Sicherung und des autarken Wiederherstellungsskripts auf dem gew\u00E4hlten Zielmedium.");
-        statusPanel.Controls.Add(btnStartUmzug);
+        Button btnStartScan = UI.Secondary("Schnell-Scan");
+        btnStartScan.Margin = new Padding(0);
+        btnStartScan.Padding = new Padding(UI.S(12), UI.S(4), UI.S(12), UI.S(4));
+        Tip(btnStartScan, "Pr\u00FCft diesen PC auf vorhandene Bibliotheken, Desktop-Layout und installierte Anwendungsprofile und misst die Gr\u00F6\u00DFe der Ordner.");
+        knoepfe.Controls.Add(btnStartUmzug); knoepfe.Controls.Add(btnStartScan);
+        kSich.Frei(knoepfe);
+
+        bool gescannt = false;
+        Label lblScanInfo = Lbl("Der Schnell-Scan misst die Bibliotheken und sucht Profile, Programme und weitere Ordner auf diesem PC.", 8.5f, false, UI.Muted);
+        lblScanInfo.Margin = new Padding(0, 0, 0, UI.S(4));
+        Tip(lblScanInfo, "Status des Vorab-Scans der installierten Anwendungen und Verzeichnisse.");
+        kSich.Frei(lblScanInfo);
+        Label hSich = Lbl("Alle gew\u00E4hlten Daten und Profile werden in ein autarkes 1-Klick-Wiederherstellungspaket gespiegelt.", 8.5f, false, UI.Muted);
+        hSich.Margin = new Padding(0, 0, 0, UI.S(2));
+        kSich.Frei(hSich);
 
         Label lblUmzugProg = Lbl("Bereit zum Start.", 9f, true, UI.Accent);
+        lblUmzugProg.Tag = "accent";
         lblUmzugProg.Visible = false;
-        lblUmzugProg.Margin = new Padding(0, 0, 0, UI.S(4));
-        lblUmzugProg.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 32), 0);
+        lblUmzugProg.Margin = new Padding(0, UI.S(8), 0, UI.S(4));
         Tip(lblUmzugProg, "Zeigt den aktuellen Schritt des Sicherungslaufs an.");
-        statusPanel.Controls.Add(lblUmzugProg);
+        kSich.Frei(lblUmzugProg);
 
-        ProgressBar pbUmzug = new ProgressBar();
-        pbUmzug.Width = UI.S(UI.Gruppenbreite - 32);
-        pbUmzug.Height = UI.S(18);
-        pbUmzug.Minimum = 0;
-        pbUmzug.Maximum = 100;
-        pbUmzug.Value = 0;
+        FlatBar pbUmzug = new FlatBar();
+        pbUmzug.Height = UI.S(8);
+        pbUmzug.Fill = UI.Accent;
         pbUmzug.Visible = false;
         pbUmzug.Margin = new Padding(0, 0, 0, UI.S(4));
         Tip(pbUmzug, "Fortschrittsbalken der laufenden Sicherung.");
-        statusPanel.Controls.Add(pbUmzug);
+        kSich.Zeile(pbUmzug);
 
         Label lblUmzugDetail = Lbl("", 8.5f, false, UI.Muted);
         lblUmzugDetail.Visible = false;
         lblUmzugDetail.Margin = new Padding(0, 0, 0, UI.S(4));
-        lblUmzugDetail.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 32), 0);
         Tip(lblUmzugDetail, "Zeigt die aktuell kopierte Datei oder das aktuelle Unterverzeichnis an.");
-        statusPanel.Controls.Add(lblUmzugDetail);
+        kSich.Frei(lblUmzugDetail);
 
         TextBox txtUmzugLog = new TextBox();
         txtUmzugLog.Multiline = true;
         txtUmzugLog.ReadOnly = true;
         txtUmzugLog.ScrollBars = ScrollBars.Vertical;
+        txtUmzugLog.BorderStyle = BorderStyle.FixedSingle;
         txtUmzugLog.BackColor = UI.IsDark ? Color.FromArgb(24, 24, 24) : Color.FromArgb(245, 245, 245);
         txtUmzugLog.ForeColor = UI.IsDark ? Color.FromArgb(220, 220, 220) : Color.FromArgb(40, 40, 40);
         txtUmzugLog.Font = new Font("Consolas", 8.25f);
-        txtUmzugLog.Width = UI.S(UI.Gruppenbreite - 32);
-        txtUmzugLog.Height = UI.S(130);
-        txtUmzugLog.Margin = new Padding(0, UI.S(4), 0, 0);
+        txtUmzugLog.Height = UI.S(150);
+        txtUmzugLog.Margin = new Padding(0, UI.S(4), 0, UI.S(2));
         txtUmzugLog.Visible = false;
         Tip(txtUmzugLog, "Laufendes Protokoll der Sicherung.");
-        statusPanel.Controls.Add(txtUmzugLog);
+        kSich.Zeile(txtUmzugLog);
 
-        f.Controls.Add(Card(statusPanel));
+        f.Controls.Add(umzugSeite.Spalten);
 
-        long sizeDesktop = 0, sizeDocs = 0, sizeDownloads = 0, sizePictures = 0, sizeMusic = 0, sizeVideos = 0;
+        // Geschätzter Umfang der Bereiche ohne eigene Messung
         long sizeLayout = 10485760L;
         long sizeSoftware = 20971520L;
         long sizeProfBrowser = 314572800L;
@@ -15228,12 +15200,13 @@ public partial class DiagGui
         long sizeProfTerm = 5242880L;
         List<long> customSizes = new List<long>();
 
-        CheckBox chkProfBrowser = null;
-        CheckBox chkProfMail = null;
-        CheckBox chkProfDev = null;
-        CheckBox chkProfTools = null;
-        CheckBox chkProfTerm = null;
-        List<CheckBox> customBoxes = new List<CheckBox>();
+        // Auswahlzeilen der Profile (legt der Schnell-Scan an) und der Zusatzordner
+        LaufwerkZeile chkProfBrowser = null;
+        LaufwerkZeile chkProfMail = null;
+        LaufwerkZeile chkProfDev = null;
+        LaufwerkZeile chkProfTools = null;
+        LaufwerkZeile chkProfTerm = null;
+        List<LaufwerkZeile> customBoxes = new List<LaufwerkZeile>();
         List<string> customPaths = new List<string>();
 
         List<string> destPaths = new List<string>();
@@ -15273,7 +15246,9 @@ public partial class DiagGui
                     cmbDest.Items.Add(nasText);
                     destPaths.Add(nasPfad);
                     destFs.Add("Netzwerk");
-                    destFree.Add(107374182400L);
+                    // ab v4.09 ohne angenommenen freien Platz: Der Start greift nie auf das NAS zu, die Seite nennt das
+                    // (bis v4.08 standen hier fest 100 GB, die Seite meldete damit immer "Ausreichend")
+                    destFree.Add(0);
                 }
             }
             catch { }
@@ -15293,80 +15268,59 @@ public partial class DiagGui
 
         Action updateCalc = delegate {
             int selIdx = cmbDest.SelectedIndex;
+            string curPath = (selIdx >= 0 && selIdx < destPaths.Count) ? destPaths[selIdx] : "";
             string curFs = (selIdx >= 0 && selIdx < destFs.Count) ? destFs[selIdx] : "";
             long curFree = (selIdx >= 0 && selIdx < destFree.Count) ? destFree[selIdx] : 0;
-            bool isFat = curFs.IndexOf("FAT", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool isFat = curFs.IndexOf("FAT", StringComparison.OrdinalIgnoreCase) >= 0 && curFs.IndexOf("exFAT", StringComparison.OrdinalIgnoreCase) < 0;
             lblFatWarn.Visible = isFat;
+            lblFatWarn.ForeColor = UI.Warn;
 
-            long totalBytes = 0;
-            if (chkLibDesktop.Checked) totalBytes += sizeDesktop;
-            if (chkLibDocs.Checked) totalBytes += sizeDocs;
-            if (chkLibDownloads.Checked) totalBytes += sizeDownloads;
-            if (chkLibPictures.Checked) totalBytes += sizePictures;
-            if (chkLibMusic.Checked) totalBytes += sizeMusic;
-            if (chkLibVideos.Checked) totalBytes += sizeVideos;
+            long totalBytes = 0; int gewaehlt = 0, bereiche = libChk.Length + 4 + customBoxes.Count;
+            for (int i = 0; i < libChk.Length; i++) if (libChk[i].Checked) { totalBytes += libSize[i]; gewaehlt++; }
 
-            if (chkLayout.Checked) totalBytes += sizeLayout;
-            if (chkSoftware.Checked) totalBytes += sizeSoftware;
+            if (chkLayout.Checked) { totalBytes += sizeLayout; gewaehlt++; }
+            if (chkSoftware.Checked) { totalBytes += sizeSoftware; gewaehlt++; }
             if (chkProfiles.Checked)
             {
+                gewaehlt++;
                 if (chkProfBrowser != null && chkProfBrowser.Checked) totalBytes += sizeProfBrowser;
                 if (chkProfMail != null && chkProfMail.Checked) totalBytes += sizeProfMail;
                 if (chkProfDev != null && chkProfDev.Checked) totalBytes += sizeProfDev;
                 if (chkProfTools != null && chkProfTools.Checked) totalBytes += sizeProfTools;
                 if (chkProfTerm != null && chkProfTerm.Checked) totalBytes += sizeProfTerm;
             }
-
+            if (chkWlan.Checked) gewaehlt++;
 
             for (int i = 0; i < customBoxes.Count; i++)
             {
                 if (customBoxes[i].Checked)
                 {
                     totalBytes += (i < customSizes.Count) ? customSizes[i] : 0;
+                    gewaehlt++;
                 }
             }
 
-            double totalGb = totalBytes / 1073741824.0;
-            double freeGb = curFree / 1073741824.0;
-            string sizeStr = (totalGb >= 0.1 || totalBytes == 0) ? totalGb.ToString("N1") + " GB" : FormatByteSize(totalBytes);
+            // Bereiche unter Profile und WLAN nur bei eingeschalteter Zeile
+            if (subUmzugProfileOffen != chkProfiles.Checked) { subUmzugProfileOffen = chkProfiles.Checked; subUmzugProfile.Visible = subUmzugProfileOffen; }
+            if (subUmzugWlanOffen != chkWlan.Checked) { subUmzugWlanOffen = chkWlan.Checked; subUmzugWlan.Visible = subUmzugWlanOffen; }
 
-            if (curFree > 0 && totalBytes > curFree)
-            {
-                lblSummary.Text = "Gesamtgr\u00F6\u00DFe: " + sizeStr + " \u00B7 Freier Speicher auf Ziel: " + freeGb.ToString("N1") + " GB (Nicht ausreichend Speicherplatz!)";
-                lblSummary.ForeColor = UI.Crit;
-            }
-            else
-            {
-                lblSummary.Text = "Gesamtgr\u00F6\u00DFe: " + sizeStr + " \u00B7 Freier Speicher auf Ziel: " + freeGb.ToString("N1") + " GB (Ausreichend)";
-                lblSummary.ForeColor = UI.Ok;
-            }
+            double totalGb = totalBytes / 1073741824.0;
+            string sizeStr = (totalGb >= 0.1 || totalBytes == 0) ? totalGb.ToString("N1") + " GB" : FormatByteSize(totalBytes);
+            SetText(umzugSeite.Anzahl, gewaehlt + " von " + bereiche + " Bereichen");
+            SetText(umzugSeite.Dauer, gescannt ? "rund " + sizeStr : "Gr\u00F6\u00DFe nach dem Schnell-Scan");
+            SetText(lblSummary, gescannt ? "Gesamtgr\u00F6\u00DFe: rund " + sizeStr : "Gesamtgr\u00F6\u00DFe: nach dem Schnell-Scan");
+            int stufe;
+            SetText(lblPlatz, UmzugPlatzText(curPath, curFs, curFree, totalBytes, gescannt, out stufe));
+            lblPlatz.ForeColor = stufe == 1 ? UI.Ok : stufe == 2 ? UI.Crit : stufe == 3 ? UI.Warn : UI.Muted;
+            lblScanInfo.ForeColor = gescannt ? UI.Ok : UI.Muted;
+            pbUmzug.Fill = UI.Accent;
         };
+        umzugRechne = updateCalc;
 
         cmbDest.SelectedIndexChanged += delegate { updateCalc(); };
-        lnkLibsAll.LinkClicked += delegate {
-            chkLibDesktop.Checked = true;
-            chkLibDocs.Checked = true;
-            chkLibDownloads.Checked = true;
-            chkLibPictures.Checked = true;
-            chkLibMusic.Checked = true;
-            chkLibVideos.Checked = true;
-            updateCalc();
-        };
-        lnkLibsNone.LinkClicked += delegate {
-            chkLibDesktop.Checked = false;
-            chkLibDocs.Checked = false;
-            chkLibDownloads.Checked = false;
-            chkLibPictures.Checked = false;
-            chkLibMusic.Checked = false;
-            chkLibVideos.Checked = false;
-            updateCalc();
-        };
-        chkLibDesktop.CheckedChanged += delegate { updateCalc(); };
-        chkLibDocs.CheckedChanged += delegate { updateCalc(); };
-        chkLibDownloads.CheckedChanged += delegate { updateCalc(); };
-        chkLibPictures.CheckedChanged += delegate { updateCalc(); };
-        chkLibMusic.CheckedChanged += delegate { updateCalc(); };
-        chkLibVideos.CheckedChanged += delegate { updateCalc(); };
+        lnkLibsAll.LinkClicked += delegate { foreach (CheckBox c in libChk) c.Checked = true; };
+        lnkLibsNone.LinkClicked += delegate { foreach (CheckBox c in libChk) c.Checked = false; };
+        foreach (CheckBox c in libChk) c.CheckedChanged += delegate { updateCalc(); };
         chkLayout.CheckedChanged += delegate { updateCalc(); };
         chkSoftware.CheckedChanged += delegate { updateCalc(); };
         chkProfiles.CheckedChanged += delegate {
@@ -15378,6 +15332,20 @@ public partial class DiagGui
             if (chkProfTerm != null) chkProfTerm.Checked = on;
             updateCalc();
         };
+        chkWlan.CheckedChanged += delegate {
+            if (!chkWlan.Checked) zWlanClear.Checked = false;
+            updateCalc();
+        };
+
+        // Auswahlzeile eines Profils im Bereich unter "Profile und Konfigurationen"
+        Func<string, List<string>, string, LaufwerkZeile> profilZeile = delegate(string titel, List<string> gefunden, string hinweis) {
+            string liste = gefunden != null ? String.Join(", ", gefunden.ToArray()) : "";
+            LaufwerkZeile z = new LaufwerkZeile(titel, "", liste, true);
+            Tip(z, hinweis + (liste.Length > 0 ? "\r\nErkannt: " + liste : ""));
+            z.CheckedChanged += delegate { updateCalc(); };
+            subUmzugProfile.Inhalt.Controls.Add(z);
+            return z;
+        };
 
         Action runScan = delegate {
             btnStartScan.Enabled = false;
@@ -15386,35 +15354,24 @@ public partial class DiagGui
             string userProf = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
 
-            string pDesktop = GetUserShellFolder("Desktop", Environment.SpecialFolder.Desktop);
-            string pDocs = GetUserShellFolder("Personal", Environment.SpecialFolder.MyDocuments);
-            string pDownloads = GetDownloadsPath();
-            string pPictures = GetUserShellFolder("My Pictures", Environment.SpecialFolder.MyPictures);
-            string pMusic = GetUserShellFolder("My Music", Environment.SpecialFolder.MyMusic);
-            string pVideos = GetUserShellFolder("My Video", Environment.SpecialFolder.MyVideos);
+            string[] libPfad = new string[] {
+                GetUserShellFolder("Desktop", Environment.SpecialFolder.Desktop),
+                GetUserShellFolder("Personal", Environment.SpecialFolder.MyDocuments),
+                GetDownloadsPath(),
+                GetUserShellFolder("My Pictures", Environment.SpecialFolder.MyPictures),
+                GetUserShellFolder("My Music", Environment.SpecialFolder.MyMusic),
+                GetUserShellFolder("My Video", Environment.SpecialFolder.MyVideos) };
 
-            // Echte Größenmessung der Bibliotheken
-            sizeDesktop = SafeDirectorySize(pDesktop);
-            sizeDocs = SafeDirectorySize(pDocs);
-            sizeDownloads = SafeDirectorySize(pDownloads);
-            sizePictures = SafeDirectorySize(pPictures);
-            sizeMusic = SafeDirectorySize(pMusic);
-            sizeVideos = SafeDirectorySize(pVideos);
-
-            chkLibDesktop.Text = "Desktop (" + FormatByteSize(sizeDesktop) + ")";
-            chkLibDocs.Text = "Dokumente (" + FormatByteSize(sizeDocs) + ")";
-            chkLibDownloads.Text = "Downloads (" + FormatByteSize(sizeDownloads) + ")";
-            chkLibPictures.Text = "Bilder (" + FormatByteSize(sizePictures) + ")";
-            chkLibMusic.Text = "Musik (" + FormatByteSize(sizeMusic) + ")";
-            chkLibVideos.Text = "Videos (" + FormatByteSize(sizeVideos) + ")";
-
+            // Echte Größenmessung der Bibliotheken: Größe als Etikett, der Ordner als Beschreibung der Zeile
             int libCount = 0;
-            if (Directory.Exists(pDesktop)) libCount++;
-            if (Directory.Exists(pDocs)) libCount++;
-            if (Directory.Exists(pDownloads)) libCount++;
-            if (Directory.Exists(pPictures)) libCount++;
-            if (Directory.Exists(pMusic)) libCount++;
-            if (Directory.Exists(pVideos)) libCount++;
+            for (int i = 0; i < libPfad.Length; i++)
+            {
+                bool da = !String.IsNullOrEmpty(libPfad[i]) && Directory.Exists(libPfad[i]);
+                libSize[i] = SafeDirectorySize(libPfad[i]);
+                SetText(libGroesse[i], da ? FormatByteSize(libSize[i]) : "");
+                umzugLibRows[i].Description = da ? libPfad[i] : "Ordner auf diesem PC nicht gefunden";
+                if (da) libCount++;
+            }
 
             bool hasWp = false;
             try { hasWp = File.Exists(Path.Combine(roamApp, "Microsoft\\Windows\\Themes\\TranscodedWallpaper")); } catch { }
@@ -15463,48 +15420,28 @@ public partial class DiagGui
 
             int totalFound = libCount + (hasWp ? 1 : 0) + (hasWg ? 1 : 0) + foundBrowsers.Count + foundMail.Count + foundDev.Count + foundTools.Count + (hasTerminal ? 1 : 0);
 
+            gescannt = true;
             lblScanInfo.Text = "\u2713 Scan abgeschlossen: " + totalFound + " Komponenten und Profile auf diesem PC erkannt.";
             lblScanInfo.ForeColor = UI.Ok;
 
-            profSubFlow.Controls.Clear();
-
-            if (foundBrowsers.Count > 0) {
-                chkProfBrowser = Chk("Webbrowser: " + String.Join(", ", foundBrowsers.ToArray()), true);
-                Tip(chkProfBrowser, "Sichert Lesezeichen, Sitzungen und Einstellungen der erkannten Webbrowser.");
-                chkProfBrowser.CheckedChanged += delegate { updateCalc(); };
-                profSubFlow.Controls.Add(chkProfBrowser);
-            }
-            if (foundMail.Count > 0) {
-                chkProfMail = Chk("E-Mail-Clients: " + String.Join(", ", foundMail.ToArray()), true);
-                Tip(chkProfMail, "Sichert Kontoeinstellungen, Adressb\u00FCcher und E-Mail-Profile von Mozilla Thunderbird.");
-                chkProfMail.CheckedChanged += delegate { updateCalc(); };
-                profSubFlow.Controls.Add(chkProfMail);
-            }
-            if (foundDev.Count > 0) {
-                chkProfDev = Chk("Entwickler & Editoren: " + String.Join(", ", foundDev.ToArray()), true);
-                Tip(chkProfDev, "Sichert Benutzereinstellungen, Tastenbelegungen und Konfigurationsdateien von Entwicklungswerkzeugen.");
-                chkProfDev.CheckedChanged += delegate { updateCalc(); };
-                profSubFlow.Controls.Add(chkProfDev);
-            }
-            if (foundTools.Count > 0) {
-                chkProfTools = Chk("Tools & Remote: " + String.Join(", ", foundTools.ToArray()), true);
-                Tip(chkProfTools, "Sichert Serverlisten, FTP-Verbindungen und Session-Profile g\u00E4ngiger Hilfswerkzeuge.");
-                chkProfTools.CheckedChanged += delegate { updateCalc(); };
-                profSubFlow.Controls.Add(chkProfTools);
-            }
-            if (hasTerminal) {
-                chkProfTerm = Chk("Windows Terminal & Konsole (settings.json)", true);
-                Tip(chkProfTerm, "Sichert benutzerdefinierte Profile und Farbschemata des Windows Terminals.");
-                chkProfTerm.CheckedChanged += delegate { updateCalc(); };
-                profSubFlow.Controls.Add(chkProfTerm);
-            }
-            if (profSubFlow.Controls.Count == 0) {
-                Label lblNoProfs = Hint("Keine spezifischen Anwendungsprofile auf diesem PC gefunden.", 0);
+            // Profile: je erkannter Gruppe eine Auswahlzeile unter "Profile und Konfigurationen"
+            subUmzugProfile.Inhalt.SuspendLayout();
+            subUmzugProfile.Inhalt.Controls.Clear();
+            chkProfBrowser = null; chkProfMail = null; chkProfDev = null; chkProfTools = null; chkProfTerm = null;
+            if (foundBrowsers.Count > 0) chkProfBrowser = profilZeile("Webbrowser", foundBrowsers, "Sichert Lesezeichen, Sitzungen und Einstellungen der erkannten Webbrowser.");
+            if (foundMail.Count > 0) chkProfMail = profilZeile("E-Mail-Programme", foundMail, "Sichert Kontoeinstellungen, Adressb\u00FCcher und E-Mail-Profile von Mozilla Thunderbird.");
+            if (foundDev.Count > 0) chkProfDev = profilZeile("Entwicklung und Editoren", foundDev, "Sichert Benutzereinstellungen, Tastenbelegungen und Konfigurationsdateien von Entwicklungswerkzeugen.");
+            if (foundTools.Count > 0) chkProfTools = profilZeile("Werkzeuge und Fernzugriff", foundTools, "Sichert Serverlisten, FTP-Verbindungen und Session-Profile g\u00E4ngiger Hilfswerkzeuge.");
+            if (hasTerminal) chkProfTerm = profilZeile("Windows Terminal", new List<string>(new string[] { "settings.json" }), "Sichert benutzerdefinierte Profile und Farbschemata des Windows Terminals.");
+            if (subUmzugProfile.Inhalt.Controls.Count == 0) {
+                Label lblNoProfs = Lbl("Keine Anwendungsprofile auf diesem PC gefunden (Browser, E-Mail, Editoren, Werkzeuge).", 8.5f, false, UI.Muted);
+                lblNoProfs.Margin = new Padding(0, 0, 0, UI.S(2));
                 Tip(lblNoProfs, "Es wurden keine Standardprofile f\u00FCr Browser, Mail oder Tools gefunden.");
-                profSubFlow.Controls.Add(lblNoProfs);
+                subUmzugProfile.Inhalt.Controls.Add(lblNoProfs);
             }
+            subUmzugProfile.Inhalt.ResumeLayout(true);
+            subUmzugProfile.Ordne();
 
-            customPanel.Controls.Clear();
             customBoxes.Clear();
             customPaths.Clear();
             customSizes.Clear();
@@ -15527,7 +15464,7 @@ public partial class DiagGui
 
                         long cSize = SafeDirectorySize(di.FullName);
                         string cSizeStr = FormatByteSize(cSize);
-                        CheckBox cb = Chk("Ordner C:\\" + di.Name + (cSize > 0 ? " (" + cSizeStr + ")" : ""), false);
+                        LaufwerkZeile cb = new LaufwerkZeile("C:\\" + di.Name, "", cSizeStr, false);
                         cb.Tag = di.FullName;
                         Tip(cb, "Sichert das Verzeichnis C:\\" + di.Name + " (" + cSizeStr + ") in den Unterordner C_Laufwerk_Zusatz.");
                         cb.CheckedChanged += delegate { updateCalc(); };
@@ -15538,17 +15475,18 @@ public partial class DiagGui
                 }
             } catch { }
 
+            karteUmzugZusatz.Leere();
             if (customBoxes.Count > 0) {
-                Label lblCHead = Lbl("Erkannte Zusatzordner auf Laufwerk C:\\ (bei Bedarf w\u00E4hlen):", 9f, true, UI.Text);
-                lblCHead.Margin = new Padding(0, UI.S(8), 0, UI.S(2));
-                Tip(lblCHead, "Zusatzordner auf C:\\.");
-                customPanel.Controls.Add(lblCHead);
-                foreach (CheckBox cb in customBoxes) customPanel.Controls.Add(cb);
+                foreach (LaufwerkZeile cb in customBoxes) karteUmzugZusatz.Zeile(cb);
+                Label lblCHead = Lbl("Bei Bedarf w\u00E4hlen. Gesichert wird in den Unterordner C_Laufwerk_Zusatz.", 8.5f, false, UI.Muted);
+                lblCHead.Margin = new Padding(0, UI.S(2), 0, UI.S(2));
+                karteUmzugZusatz.Frei(lblCHead);
             } else {
-                Label lblNoC = Hint("Keine zus\u00E4tzlichen Stammordner auf Laufwerk C:\\ gefunden.", 0);
-                Tip(lblNoC, "Keine zus\u00E4tzlichen Ordner auf C:\\ vorhanden.");
-                customPanel.Controls.Add(lblNoC);
+                Label lblNoC = Lbl("Keine zus\u00E4tzlichen Stammordner auf Laufwerk C: gefunden.", 8.5f, false, UI.Muted);
+                lblNoC.Margin = new Padding(0, 0, 0, UI.S(2));
+                karteUmzugZusatz.Frei(lblNoC);
             }
+            karteUmzugZusatz.Breite(karteUmzugZusatz.Karte.Width);
 
             btnStartScan.Enabled = true;
             updateCalc();
@@ -15575,7 +15513,8 @@ public partial class DiagGui
                         free = di.AvailableFreeSpace;
                     }
                     catch { }
-                    string itemText = p + " (" + (free / 1073741824L) + " GB frei, " + fs + ")";
+                    // Ordner ohne lesbares Laufwerk (Freigabe \\Server\Ordner): ohne erfundene Angaben
+                    string itemText = free > 0 ? p + " (" + (free / 1073741824L) + " GB frei, " + fs + ")" : p;
                     cmbDest.Items.Add(itemText);
                     destPaths.Add(p);
                     destFs.Add(fs);
@@ -15583,6 +15522,13 @@ public partial class DiagGui
                     cmbDest.SelectedIndex = cmbDest.Items.Count - 1;
                 }
             }
+        };
+
+        // Während der Sicherung: Auswahl und Ziel gesperrt, die Schalter zeigen ihren Stand gedämpft
+        Action<bool> sperre = delegate(bool an) {
+            foreach (ZeilenKarte k in new ZeilenKarte[] { kLib, kSys, karteUmzugZusatz, kZiel }) k.Inhalt.Enabled = !an;
+            btnStartUmzug.Enabled = !an;
+            btnStartScan.Enabled = !an;
         };
 
         btnStartUmzug.Click += delegate {
@@ -15595,12 +15541,7 @@ public partial class DiagGui
             string targetPath = destPaths[selIdx];
 
             List<string> scopes = new List<string>();
-            if (chkLibDesktop.Checked) scopes.Add("Lib_Desktop");
-            if (chkLibDocs.Checked) scopes.Add("Lib_Dokumente");
-            if (chkLibDownloads.Checked) scopes.Add("Lib_Downloads");
-            if (chkLibPictures.Checked) scopes.Add("Lib_Bilder");
-            if (chkLibMusic.Checked) scopes.Add("Lib_Musik");
-            if (chkLibVideos.Checked) scopes.Add("Lib_Videos");
+            for (int i = 0; i < libChk.Length; i++) if (libChk[i].Checked) scopes.Add(libScope[i]);
             if (chkLayout.Checked) scopes.Add("Layout");
             if (chkSoftware.Checked) scopes.Add("Programme");
             if (chkProfiles.Checked)
@@ -15616,19 +15557,21 @@ public partial class DiagGui
             if (chkWlan.Checked)
             {
                 scopes.Add("Wlan");
-                if (chkWlanClear.Checked) scopes.Add("Wlan_Klartext");
-            }
-
-            if (scopes.Count == 0 && customBoxes.Count == 0)
-            {
-                MessageBox.Show(this, "Bitte w\u00E4hlen Sie mindestens eine Sicherungskomponente aus.", "System-Umzug", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
+                if (zWlanClear.Checked) scopes.Add("Wlan_Klartext");
             }
 
             List<string> chosenCustom = new List<string>();
             for (int i = 0; i < customBoxes.Count; i++)
             {
                 if (customBoxes[i].Checked) chosenCustom.Add(customPaths[i]);
+            }
+
+            // ab v4.09 zählen die gewählten Zusatzordner (bis v4.08 genügte, dass der Scan welche gefunden hatte: Die
+            // Sicherung startete dann auch ganz ohne Auswahl)
+            if (scopes.Count == 0 && chosenCustom.Count == 0)
+            {
+                MessageBox.Show(this, "Bitte w\u00E4hlen Sie mindestens eine Sicherungskomponente aus.", "System-Umzug", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
             }
 
             string scopeStr = String.Join(",", scopes.ToArray());
@@ -15642,29 +15585,7 @@ public partial class DiagGui
 
             if (MessageBox.Show(this, prompt, "System-Umzug starten", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
 
-            btnStartUmzug.Enabled = false;
-            btnStartScan.Enabled = false;
-            btnBrowse.Enabled = false;
-            cmbDest.Enabled = false;
-            lnkLibsAll.Enabled = false;
-            lnkLibsNone.Enabled = false;
-            chkLibDesktop.Enabled = false;
-            chkLibDocs.Enabled = false;
-            chkLibDownloads.Enabled = false;
-            chkLibPictures.Enabled = false;
-            chkLibMusic.Enabled = false;
-            chkLibVideos.Enabled = false;
-            chkLayout.Enabled = false;
-            chkSoftware.Enabled = false;
-            chkProfiles.Enabled = false;
-            chkWlan.Enabled = false;
-            chkWlanClear.Enabled = false;
-            if (chkProfBrowser != null) chkProfBrowser.Enabled = false;
-            if (chkProfMail != null) chkProfMail.Enabled = false;
-            if (chkProfDev != null) chkProfDev.Enabled = false;
-            if (chkProfTools != null) chkProfTools.Enabled = false;
-            if (chkProfTerm != null) chkProfTerm.Enabled = false;
-            foreach (CheckBox cb in customBoxes) cb.Enabled = false;
+            sperre(true);
 
             lblUmzugProg.Text = "Sicherung wird gestartet ...";
             lblUmzugProg.Visible = true;
@@ -15783,30 +15704,8 @@ public partial class DiagGui
                 try
                 {
                     BeginInvoke(new MethodInvoker(delegate {
-                        btnStartUmzug.Enabled = true;
-                        btnStartScan.Enabled = true;
-                        btnBrowse.Enabled = true;
-                        cmbDest.Enabled = true;
-                        lnkLibsAll.Enabled = true;
-                        lnkLibsNone.Enabled = true;
-                        chkLibDesktop.Enabled = true;
-                        chkLibDocs.Enabled = true;
-                        chkLibDownloads.Enabled = true;
-                        chkLibPictures.Enabled = true;
-                        chkLibMusic.Enabled = true;
-                        chkLibVideos.Enabled = true;
-                        chkLayout.Enabled = true;
-                        chkSoftware.Enabled = true;
-                        chkProfiles.Enabled = true;
-                        chkWlan.Enabled = true;
-                        chkWlanClear.Enabled = chkWlan.Checked;
-                        if (chkProfBrowser != null) chkProfBrowser.Enabled = true;
-                        if (chkProfMail != null) chkProfMail.Enabled = true;
-                        if (chkProfDev != null) chkProfDev.Enabled = true;
-                        if (chkProfTools != null) chkProfTools.Enabled = true;
-                        if (chkProfTerm != null) chkProfTerm.Enabled = true;
+                        sperre(false);
                         lblUmzugDetail.Visible = false;
-                        foreach (CheckBox cb in customBoxes) cb.Enabled = true;
 
                         if (isSuccess)
                         {
@@ -18403,6 +18302,15 @@ public static class UI
     public const string IcoErgebnis = "\uE9D2";
     public const string IcoBlitz = "\uE945";
     public const string IcoDokument = "\uE8A5";
+    // ab v4.09: Symbole der Seite System-Umzug (Segoe MDL2 Assets / Fluent Icons)
+    public const string IcoBildschirm = "\uE770";
+    public const string IcoHerunterladen = "\uE896";
+    public const string IcoBild = "\uE8B9";
+    public const string IcoMusik = "\uE8D6";
+    public const string IcoVideo = "\uE714";
+    public const string IcoAnpassen = "\uE771";
+    public const string IcoKontakt = "\uE77B";
+    public const string IcoWlan = "\uE701";
 
     // Symbol nach Namen (Katalog und Vertrag nennen Felder wie "IcoShield"); unbekannt oder leer: ersatz
     public static string IconByName(string name, string ersatz)
@@ -19333,8 +19241,12 @@ public class DarkComboBox : ComboBox
 }
 
 // Moderner Windows 11 Toggle-Switch (Wintoys-Look, ab v3.9 mit UI.S(38) x UI.S(20))
+// ab v4.09: Das Element ist ringsum um Rand größer als die Pille. Vorher füllte die Pille das Element ganz aus: Die
+// geglättete Kontur lag auf der Kante, der Fokusrahmen außerhalb, beides wurde rechts und unten abgeschnitten.
 public class ToggleSwitch : Control
 {
+    public const int Rand = 3;
+    public const int PilleBreite = 38, PilleHoehe = 20;
     bool isChecked;
     bool hover;
     public event EventHandler CheckedChanged;
@@ -19347,7 +19259,7 @@ public class ToggleSwitch : Control
         Cursor = Cursors.Hand;
         AccessibleRole = AccessibleRole.CheckButton;
         AccessibleName = "Schalter";
-        Size = new Size(UI.S(38), UI.S(20));
+        Size = new Size(UI.S(PilleBreite) + 2 * UI.S(Rand), UI.S(PilleHoehe) + 2 * UI.S(Rand));
         BackColor = Color.Transparent;
     }
 
@@ -19376,6 +19288,18 @@ public class ToggleSwitch : Control
 
     // Umschalten durch den Nutzer (Klick, Leertaste, Klick auf die Zeile); gesperrt ohne Wirkung
     public void UserToggle() { if (!locked) Checked = !Checked; }
+
+    // Fläche der Pille im Element (für Layout und Selbsttest): liegt mit Abstand Rand innerhalb des Elements
+    public Rectangle Pille
+    {
+        get
+        {
+            int w = Math.Max(UI.S(12), Math.Min(UI.S(PilleBreite), Width - 2 * UI.S(Rand)));
+            int h = Math.Max(UI.S(8), Math.Min(UI.S(PilleHoehe), Height - 2 * UI.S(Rand)));
+            return new Rectangle((Width - w) / 2, (Height - h) / 2, w, h);
+        }
+    }
+    protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
 
     protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
     protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
@@ -19407,10 +19331,10 @@ public class ToggleSwitch : Control
         Graphics g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
-        int trackW = UI.S(38);
-        int trackH = UI.S(20);
-        int trackX = (Width - trackW) / 2;
-        int trackY = (Height - trackH) / 2;
+        // Pille in fester Größe in der Mitte; passt sie nicht ganz hinein (Element von außen kleiner gesetzt), schrumpft
+        // sie mit, damit Kontur und Fokusrahmen nie an der Kante liegen
+        Rectangle pille = Pille;
+        int trackW = pille.Width, trackH = pille.Height, trackX = pille.X, trackY = pille.Y;
         RectangleF trackRect = new RectangleF(trackX, trackY, trackW, trackH);
         float rad = trackH / 2f;
 
@@ -19422,7 +19346,9 @@ public class ToggleSwitch : Control
         {
             if (isChecked)
             {
-                Color fillColor = locked ? UI.Ok : hover ? UI.AccentHover : UI.Accent;
+                Color fillColor = locked ? UI.Ok : hover && Enabled ? UI.AccentHover : UI.Accent;
+                // deaktiviert (laufende Sicherung auf der Seite System-Umzug): Stand bleibt lesbar, Fläche gedämpft
+                if (!Enabled) fillColor = UI.Mix(fillColor, UI.Panel, 0.55);
                 using (SolidBrush b = new SolidBrush(fillColor)) g.FillPath(b, trackPath);
                 using (Pen p = new Pen(fillColor, 1f)) g.DrawPath(p, trackPath);
             }
@@ -19963,8 +19889,9 @@ public class SettingRow : Control
         int curRight = Width - UI.S(16);
         if (toggle != null)
         {
-            toggle.Location = new Point(curRight - toggle.Width, (Height - toggle.Height) / 2);
-            curRight -= toggle.Width + UI.S(10);
+            // die Pille endet wie bisher am rechten Rand der Zeile; der Rand des Elements (ab v4.09) ragt darüber hinaus
+            toggle.Location = new Point(curRight + UI.S(ToggleSwitch.Rand) - toggle.Width, (Height - toggle.Height) / 2);
+            curRight = toggle.Left + UI.S(ToggleSwitch.Rand) - UI.S(10);
         }
         List<Badge> visibleBadges = new List<Badge>();
         for (int i = 0; i < badges.Count; i++)
@@ -19995,6 +19922,7 @@ public class SettingRow : Control
     protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
     protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
     protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
+    protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
 
     protected override void OnMouseClick(MouseEventArgs e)
     {
@@ -20023,8 +19951,9 @@ public class SettingRow : Control
         g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
         RectangleF r = new RectangleF(1, 1, Width - 3, Height - 3);
-        Color bg = hover ? (UI.IsDark ? Color.FromArgb(42, 44, 48) : Color.FromArgb(246, 248, 252)) : UI.Panel;
-        Color border = hover ? (UI.IsDark ? Color.FromArgb(70, 74, 80) : Color.FromArgb(215, 219, 226)) : UI.Line;
+        bool hv = hover && Enabled;
+        Color bg = hv ? (UI.IsDark ? Color.FromArgb(42, 44, 48) : Color.FromArgb(246, 248, 252)) : UI.Panel;
+        Color border = hv ? (UI.IsDark ? Color.FromArgb(70, 74, 80) : Color.FromArgb(215, 219, 226)) : UI.Line;
 
         using (GraphicsPath p = UI.Round(r, UI.SF(6)))
         {
@@ -20035,7 +19964,7 @@ public class SettingRow : Control
         int curX = TextLinks;
         if (icon.Length > 0)
             using (Font fi = UI.SymbolFont(13f))
-                TextRenderer.DrawText(g, icon, fi, new Rectangle(UI.S(10), 0, UI.S(28), Height), UI.Accent, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoClipping);
+                TextRenderer.DrawText(g, icon, fi, new Rectangle(UI.S(10), 0, UI.S(28), Height), Enabled ? UI.Accent : UI.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoClipping);
         int rightBound = Width - UI.S(16);
         if (toggle != null) rightBound = Math.Min(rightBound, toggle.Left);
         for (int i = 0; i < badges.Count; i++)
@@ -20051,7 +19980,7 @@ public class SettingRow : Control
             Size tsz = TextRenderer.MeasureText(g, title ?? "", ft, new Size(textW, int.MaxValue), TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
             int titleH = Math.Max(tsz.Height, UI.S(18));
             int startY = string.IsNullOrEmpty(desc) ? (Height - titleH) / 2 : UI.S(7);
-            TextRenderer.DrawText(g, title ?? "", ft, new Rectangle(curX, startY, textW, titleH), UI.Text, TextFormatFlags.Left | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+            TextRenderer.DrawText(g, title ?? "", ft, new Rectangle(curX, startY, textW, titleH), Enabled ? UI.Text : UI.Muted, TextFormatFlags.Left | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
 
             if (!string.IsNullOrEmpty(desc))
             {
@@ -20106,11 +20035,12 @@ public class LaufwerkZeile : Control
     protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
     protected override void OnMouseClick(MouseEventArgs e) { if (e.Button == MouseButtons.Left) { Focus(); Checked = !Checked; } base.OnMouseClick(e); }
     protected override void OnKeyDown(KeyEventArgs e) { if (e.KeyCode == Keys.Space) { Checked = !Checked; e.Handled = true; } base.OnKeyDown(e); }
+    protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
     protected override void OnPaint(PaintEventArgs e)
     {
         Graphics g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias; g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
         using (SolidBrush ob = new SolidBrush(UI.Panel)) g.FillRectangle(ob, ClientRectangle);
-        Color bg = hover ? (UI.IsDark ? Color.FromArgb(42, 44, 48) : Color.FromArgb(246, 248, 252)) : (UI.IsDark ? Color.FromArgb(30, 31, 33) : Color.FromArgb(250, 251, 252));
+        Color bg = hover && Enabled ? (UI.IsDark ? Color.FromArgb(42, 44, 48) : Color.FromArgb(246, 248, 252)) : (UI.IsDark ? Color.FromArgb(30, 31, 33) : Color.FromArgb(250, 251, 252));
         using (GraphicsPath p = UI.Round(new RectangleF(0.5f, 0.5f, Width - 2, Height - 2), UI.SF(6)))
         {
             using (SolidBrush b = new SolidBrush(bg)) g.FillPath(b, p);
@@ -20118,10 +20048,12 @@ public class LaufwerkZeile : Control
         }
         int bs = UI.S(16);
         Rectangle bx = new Rectangle(UI.S(10), (Height - bs) / 2, bs, bs);
+        // gesperrt (laufende Sicherung auf der Seite System-Umzug): Haken bleibt lesbar, Fläche gedämpft
+        Color akz = Enabled ? UI.Accent : UI.Mix(UI.Accent, UI.Panel, 0.55);
         using (GraphicsPath bp = UI.Round(bx, UI.SF(4)))
         {
-            using (SolidBrush bb = new SolidBrush(isChecked ? UI.Accent : UI.Panel)) g.FillPath(bb, bp);
-            using (Pen bpen = new Pen(isChecked ? UI.Accent : (UI.IsDark ? Color.FromArgb(90, 95, 105) : Color.FromArgb(160, 170, 185)), UI.SF(1.5f))) g.DrawPath(bpen, bp);
+            using (SolidBrush bb = new SolidBrush(isChecked ? akz : UI.Panel)) g.FillPath(bb, bp);
+            using (Pen bpen = new Pen(isChecked ? akz : (UI.IsDark ? Color.FromArgb(90, 95, 105) : Color.FromArgb(160, 170, 185)), UI.SF(1.5f))) g.DrawPath(bpen, bp);
         }
         if (isChecked) using (Pen ck = new Pen(UI.OnAccent, UI.SF(2f))) { ck.StartCap = LineCap.Round; ck.EndCap = LineCap.Round; g.DrawLines(ck, new PointF[] { new PointF(bx.X + bs * 0.24f, bx.Y + bs * 0.52f), new PointF(bx.X + bs * 0.44f, bx.Y + bs * 0.72f), new PointF(bx.X + bs * 0.78f, bx.Y + bs * 0.30f) }); }
         int x = bx.Right + UI.S(9), right = Width - UI.S(10);
@@ -20141,7 +20073,7 @@ public class LaufwerkZeile : Control
                 int bw = bus.Length > 0 ? bsz.Width + UI.S(14) : 0;
                 Size ns = TextRenderer.MeasureText(g, name, fn, new Size(int.MaxValue, Height), TextFormatFlags.NoPadding);
                 int nw = Math.Min(ns.Width, Math.Max(UI.S(40), right - x - bw - UI.S(8)));
-                TextRenderer.DrawText(g, name, fn, new Rectangle(x, 0, nw, Height), UI.Text, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                TextRenderer.DrawText(g, name, fn, new Rectangle(x, 0, nw, Height), Enabled ? UI.Text : UI.Muted, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
                 if (bus.Length > 0)
                 {
                     Color fg, bbg; UI.BadgeColors("skip", out fg, out bbg);
@@ -20246,9 +20178,10 @@ public class UnterBereich : Panel
     }
     public int InhaltBreite { get { return Math.Max(UI.S(120), Width - UI.S(14)); } }
     void Passe() { int h = Inhalt.Height + UI.S(8); if (Height != h) Height = h; }
-    protected override void OnResize(EventArgs e)
+    protected override void OnResize(EventArgs e) { base.OnResize(e); Ordne(); }
+    // Breite an den Inhalt weitergeben; nach einem neu aufgebauten Inhalt (Schnell-Scan der Seite System-Umzug) aufrufen
+    public void Ordne()
     {
-        base.OnResize(e);
         int w = InhaltBreite;
         foreach (Control c in Inhalt.Controls)
         {
@@ -20356,7 +20289,7 @@ public class FluentCard : Control
         Margin = new Padding(0, 0, 0, UI.S(8));
 
         toggle = new ToggleSwitch();
-        toggle.Location = new Point(Width - toggle.Width - UI.S(16), (Height - toggle.Height) / 2);
+        toggle.Location = new Point(Width - toggle.Width - UI.S(16) + UI.S(ToggleSwitch.Rand), (Height - toggle.Height) / 2);
         toggle.CheckedChanged += delegate
         {
             if (CheckedChanged != null) CheckedChanged(this, EventArgs.Empty);
@@ -20440,7 +20373,7 @@ public class FluentCard : Control
         }
         if (toggle != null && toggle.Visible)
         {
-            toggle.Location = new Point(curRight - toggle.Width, (Height - toggle.Height) / 2);
+            toggle.Location = new Point(curRight + UI.S(ToggleSwitch.Rand) - toggle.Width, (Height - toggle.Height) / 2);
         }
     }
 
@@ -22252,6 +22185,14 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.09", "13.11.2026", "Lasttest und System-Umzug im Stil der übrigen Seiten, Schalter ohne Beschnitt",
+            "\u2022 Seite Lasttest neu aufgebaut: links die Karte \u201EKomponenten\u201C mit je einer Zeile (Symbol, Beschreibung, gewählte Dauer, Schalter) und \u201EAlle an \u00B7 Alle aus\u201C. Dauer und Einstellungen stehen unter ihrer Komponente und nur, wenn sie eingeschaltet ist. Rechts die Abbruchschwellen und die Karte \u201ESensoren\u201C: Sie nennt, woher CPU-Temperatur, Takt, Leistung und Lüfter des Laufs kommen (PawnIO vorübergehend, installiert oder nicht verwendet). Der Seitenkopf nennt \u201E3 von 4 Komponenten\u201C und die Gesamtdauer.\r\n" +
+            "\u2022 Seite System-Umzug neu aufgebaut: links Benutzer-Bibliotheken, System und Programme und Zusatzordner als Zeilen mit Schalter, rechts Zielmedium und Sicherung mit Fortschritt und Protokoll. Nach dem Schnell-Scan trägt jede Bibliothek ihren Ordner und ihre Größe; erkannte Profile stehen als Auswahlzeilen unter \u201EProfile und Konfigurationen\u201C, weitere Ordner von Laufwerk C: in einer eigenen Karte. Während der Sicherung ist die Auswahl gesperrt.\r\n" +
+            "\u2022 Beide Seiten nutzen den Rahmen der Seiten Benchmark und Diagnose und ordnen sich unter 900 px Seitenbreite in einer Spalte. Vorlagen, Zeitschätzung, Startparameter und der Umfang der Sicherung sind unverändert; gespeicherte Vorlagen laden wie bisher.\r\n" +
+            "\u2022 Behoben: Die Schalter waren auf allen Seiten rechts und unten leicht abgeschnitten, weil die Pille ihr Element ganz ausfüllte. Das Element ist jetzt ringsum 3 px größer, die Pille steht an derselben Stelle.\r\n" +
+            "\u2022 Behoben: Die Datenpflege lief bei jedem Start, \u201EDatenpflege: unverändert\u201C kam nie zustande (auf dem Stick 0,8 bis 1,5 s je Start). Sie entfernt den leeren Ordner Laufzeit\\<PC>, der Start legt ihn wieder an, und der gespeicherte Stand zählte ihn mit.\r\n" +
+            "\u2022 Behoben, System-Umzug: Für ein Netzlaufwerk meldete die Seite fest \u201E100,0 GB (Ausreichend)\u201C, ohne Zielmedium \u201E0,0 GB (Ausreichend)\u201C und vor dem Schnell-Scan \u201EGesamtgröße 0,0 GB\u201C; jetzt steht da, was bekannt ist. exFAT löste die Warnung für FAT32 aus. Die Sicherung ließ sich ganz ohne Auswahl starten, sobald der Scan Zusatzordner gefunden hatte.\r\n" +
+            "\u2022 Behoben: Im Kopf der Seiten Benchmark und Diagnose blieb rechts eine Lücke, wenn der Text zu Anzahl oder Dauer kürzer wurde."),
         new Eintrag("4.08", "12.11.2026", "Ergebnis als Seite, Benchmark und Diagnose im Stil der übrigen Seiten",
             "\u2022 Ergebnis: neuer Eintrag \u201EErgebnis\u201C in der Seitenleiste direkt unter Start, mit der Punktzahl als Pille. Er erscheint, sobald es ein Ergebnis gibt, und bleibt bis zum nächsten Lauf. Die Ergebnisseite ist jetzt eine Seite wie jede andere: Die Fußleiste bleibt, der Wechsel weg und zurück baut nichts neu auf, und Punktzahl, Balken und Ringe laufen nur beim ersten Anzeigen nach einem Lauf auf ihren Wert.\r\n" +
             "\u2022 Ergebnis nach dem Programmstart: \u201EErgebnis\u201C zeigt den letzten Lauf dieses PCs aus der Datenbank. Der Knopf \u201EErgebnis\u201C in der Karte \u201ELetzter Lauf\u201C der Startseite und der neue Kasten \u201ELetztes Ergebnis auf diesem PC\u201C der Seite Benchmark führen dorthin.\r\n" +

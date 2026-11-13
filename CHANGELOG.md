@@ -2,6 +2,19 @@
 
 Alle wesentlichen Änderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v4.09 (13.11.2026)
+
+### Verbessert
+* **Seite Lasttest:** Karte Komponenten mit Zeilen und Schaltern, Dauer und Einstellungen unter ihrer Komponente, rechts Abbruchschwelle und Sensoren, Seitenkopf mit Anzahl und Gesamtdauer.
+* **Seite System-Umzug:** Benutzer-Bibliotheken, System und Programme und Zusatzordner als Zeilen mit Schaltern, rechts Zielmedium und Sicherung mit Fortschritt; nach dem Schnell-Scan Ordner und Größe je Bibliothek, Profile und Zusatzordner als Auswahlzeilen.
+* **Gemeinsamer Rahmen:** Beide Seiten nutzen DiagGui_Modulseite.cs wie Benchmark und Diagnose, unter 900 px Seitenbreite eine Spalte. Vorlagen, Zeitschätzung, Startparameter und Umfang der Sicherung unverändert.
+
+### Behoben
+* **Schalter:** auf allen Seiten rechts und unten leicht abgeschnitten (die Pille füllte ihr Element ganz aus).
+* **Datenpflege:** lief bei jedem Start, weil der gespeicherte Stand den leeren Ordner Laufzeit\<PC> mitzählte, den sie selbst entfernt und der Start wieder anlegt.
+* **System-Umzug:** erfundene Angaben zum freien Platz (Netzlaufwerk fest 100 GB, ohne Ziel „Ausreichend“), Gesamtgröße 0,0 GB vor dem Schnell-Scan, FAT32-Warnung bei exFAT, Start ohne Auswahl nach einem Scan mit Zusatzordnern.
+* **Seitenkopf:** Lücke rechts neben Anzahl und Dauer, wenn der Text kürzer wurde (Benchmark, Diagnose).
+
 ## v4.08 (12.11.2026)
 
 ### Neu

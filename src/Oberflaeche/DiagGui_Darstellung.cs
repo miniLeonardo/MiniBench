@@ -130,6 +130,7 @@ public partial class DiagGui
             UpdateRefState(); FuelleLetztesErgebnis();
             if (erg != null && ergebnisAufbauten > 0 && !ergVeraltet) FuelleErgebnis();
             UpdateLoadEnabled(); ThemeLog();
+            if (umzugRechne != null) umzugRechne();
             if (barAll != null && !done) barAll.Fill = UI.Accent;
             if (barSub != null) barSub.Fill = UI.AccentActive;
         }

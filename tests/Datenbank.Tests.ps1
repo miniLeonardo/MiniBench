@@ -755,6 +755,29 @@ Describe 'Datenpflege und Archivierung' {
         [IO.File]::WriteAllText((Join-Path $root 'Laufzeit/PC1/laufend.json'), '{}')
         (MinibenchTest\Get-DatenpflegeStand -DataDir $root).Signatur | Should -Not -Be $c.Signatur
     }
+    # v4.07 und v4.08: Die Datenpflege entfernt den leeren Ordner Laufzeit\<PC>, der Start legt ihn wieder an. Der Stand
+    # zählte jeden Ordner und wich damit bei jedem Start ab; "Datenpflege: unverändert" kam nie.
+    It 'Stand ändert sich nicht durch einen leeren Laufzeitordner je PC, wohl aber durch einen mit Inhalt' {
+        $root = New-Leer
+        New-Entry (Join-Path $root 'Datenbank') 'PC1_20261003_142535' '2.7' 'Diagnose (vollständig)' @{}
+        $a = MinibenchTest\Get-DatenpflegeStand -DataDir $root
+        New-Item -ItemType Directory (Join-Path $root 'Laufzeit/PC1') -Force | Out-Null
+        (MinibenchTest\Get-DatenpflegeStand -DataDir $root).Signatur | Should -Be $a.Signatur
+        [IO.File]::WriteAllText((Join-Path $root 'Laufzeit/PC1/sensor.stop'), 'x')
+        (MinibenchTest\Get-DatenpflegeStand -DataDir $root).Signatur | Should -Not -Be $a.Signatur
+    }
+    It 'nach der Datenpflege gilt der nächste Start mit neu angelegtem leerem Laufzeitordner als erledigt' {
+        $root = New-Leer
+        $db = Join-Path $root 'Datenbank'
+        New-Entry $db 'PC1_20261003_142535' '2.7' 'Diagnose (vollständig)' @{}
+        Set-Alter (Join-Path $db 'PC1_20261003_142535.json') 3
+        New-Item -ItemType Directory (Join-Path $root 'Laufzeit/PC1') -Force | Out-Null
+        $null = MinibenchTest\Invoke-Datenpflege -DataDir $root
+        Join-Path $root 'Laufzeit/PC1' | Should -Not -Exist
+        MinibenchTest\Save-DatenpflegeStand -DataDir $root -Stand (MinibenchTest\Get-DatenpflegeStand -DataDir $root)
+        New-Item -ItemType Directory (Join-Path $root 'Laufzeit/PC1') -Force | Out-Null
+        MinibenchTest\Test-DatenpflegeErledigt -DataDir $root -Stand (MinibenchTest\Get-DatenpflegeStand -DataDir $root) -MindestAlterMin 60 | Should -BeTrue
+    }
     It 'gilt erst als erledigt, wenn der Stand gespeichert ist und kein frischer Lauf mehr geschützt war' {
         $root = New-Leer
         $db = Join-Path $root 'Datenbank'

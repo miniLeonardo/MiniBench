@@ -29,6 +29,7 @@ Describe 'Selbsttest der Oberfläche' {
         @{ Fall = 'UI.Skalierung' }
         @{ Fall = 'UI.Farbschema' }
         @{ Fall = 'ToggleSwitch' }
+        @{ Fall = 'ToggleSwitch.Rand' }
         @{ Fall = 'FluentCard' }
         @{ Fall = 'Hinweise.Umbruch' }
         @{ Fall = 'Grafikauswahl.Abgleich' }
@@ -45,7 +46,8 @@ Describe 'Selbsttest der Oberfläche' {
         @{ Fall = 'Startknopf.Beschriftung' }
         @{ Fall = 'Zeitangabe.Minuten' }
         @{ Fall = 'Lasttest.Gesamtdauer' }
-        @{ Fall = 'Lasttest.Deaktivierung' }
+        @{ Fall = 'Lasttest.Seite' }
+        @{ Fall = 'Lasttest.Sensoren' }
         @{ Fall = 'Startuebersicht' }
         @{ Fall = 'Wartung.Detailtext' }
         @{ Fall = 'Voreinstellung.Altwerte' }
@@ -89,6 +91,9 @@ Describe 'Selbsttest der Oberfläche' {
         @{ Fall = 'Diagnose.Seite' }
         @{ Fall = 'Ergebnis.Seitenleiste' }
         @{ Fall = 'Ergebnis.Datenbank' }
+        @{ Fall = 'Umzug.Seite' }
+        @{ Fall = 'Umzug.Platz' }
+        @{ Fall = 'Modulseite.Kopf' }
     ) {
         Assert-GuiSelbsttest $Fall
     }

@@ -14,6 +14,7 @@ public static class GuiSelbsttest
         Fall("UI.Skalierung", UiSkalierung);
         Fall("UI.Farbschema", UiFarbschema);
         Fall("ToggleSwitch", ToggleSchalter);
+        Fall("ToggleSwitch.Rand", ToggleRand);
         Fall("FluentCard", FluentKarte);
         Fall("Hinweise.Umbruch", HinweisUmbruch);
         Fall("Grafikauswahl.Abgleich", GrafikAbgleich);
@@ -30,7 +31,8 @@ public static class GuiSelbsttest
         Fall("Startknopf.Beschriftung", StartknopfBeschriftung);
         Fall("Zeitangabe.Minuten", Zeitangabe);
         Fall("Lasttest.Gesamtdauer", LasttestGesamtdauer);
-        Fall("Lasttest.Deaktivierung", LasttestDeaktivierung);
+        Fall("Lasttest.Seite", LasttestSeite);
+        Fall("Lasttest.Sensoren", LasttestSensoren);
         Fall("Startuebersicht", Startuebersicht);
         Fall("Wartung.Detailtext", WartungDetailtext);
         Fall("Voreinstellung.Altwerte", VoreinstellungAltwerte);
@@ -74,6 +76,9 @@ public static class GuiSelbsttest
         Fall("Diagnose.Seite", DiagnoseSeite);
         Fall("Ergebnis.Seitenleiste", ErgebnisSeitenleiste);
         Fall("Ergebnis.Datenbank", ErgebnisDatenbank);
+        Fall("Umzug.Seite", UmzugSeite);
+        Fall("Umzug.Platz", UmzugPlatz);
+        Fall("Modulseite.Kopf", ModulseiteKopf);
         foreach (string l in outLines) System.Console.WriteLine(l);
         return 0;
     }
@@ -115,6 +120,37 @@ public static class GuiSelbsttest
             Ist(!t.Checked, "Vorgabe aus");
             t.Checked = true; Ist(t.Checked && n == 1, "Einschalten meldet CheckedChanged");
             t.Checked = true; Ist(n == 1, "gleicher Wert meldet nichts");
+        }
+    }
+
+    // ab v4.09: Die Pille liegt mit Abstand im Element. Bis v4.08 füllte sie es ganz aus; Kontur und Fokusrahmen lagen
+    // auf oder außerhalb der Kante und wurden rechts und unten abgeschnitten. In der Zeile steht sie an derselben Stelle.
+    static void ToggleRand()
+    {
+        using (ToggleSwitch t = new ToggleSwitch())
+        {
+            Rectangle p = t.Pille; int r = UI.S(ToggleSwitch.Rand);
+            Ist(p.Width == UI.S(38) && p.Height == UI.S(20), "Pille 38 x 20: " + p);
+            Ist(r >= 3 && p.Left >= r && p.Top >= r && p.Right <= t.Width - r && p.Bottom <= t.Height - r, "Abstand der Pille zur Kante: " + p + " in " + t.Size);
+            Ist(p.Left - UI.S(2) >= 0 && p.Top - UI.S(2) >= 0 && p.Right + UI.S(2) <= t.Width - 1 && p.Bottom + UI.S(2) <= t.Height - 1, "Fokusrahmen liegt im Element");
+            // von außen kleiner gesetzt: Die Pille schrumpft mit, statt an der Kante abgeschnitten zu werden
+            t.Size = new Size(UI.S(30), UI.S(16));
+            p = t.Pille;
+            Ist(p.Left >= r && p.Top >= r && p.Right <= t.Width - r && p.Bottom <= t.Height - r, "kleines Element: Pille bleibt innen: " + p);
+        }
+        using (ToggleSwitch sw = new ToggleSwitch())
+        using (SettingRow row = new SettingRow("Titel", "Beschreibung der Zeile", sw))
+        {
+            row.Width = 500;
+            Ist(sw.Left + sw.Pille.Right == row.Width - UI.S(16), "Pille endet wie bisher 16 px vor dem Rand der Zeile: " + (sw.Left + sw.Pille.Right));
+            Ist(sw.Left >= 0 && sw.Right <= row.Width && sw.Top >= 0 && sw.Bottom <= row.Height, "Schalter liegt ganz in der Zeile: " + sw.Bounds + " in " + row.Size);
+            Badge b = new Badge("2 Min.", "skip"); row.AddBadge(b);
+            Ist(b.Right == sw.Left + sw.Pille.Left - UI.S(10), "Etikett 10 px links der Pille: " + b.Right);
+        }
+        using (FluentCard c = new FluentCard("Testkarte", "Beschreibung", UI.IcoDiag))
+        {
+            c.Width = 400;
+            Ist(c.Toggle.Left >= 0 && c.Toggle.Right <= c.Width && c.Toggle.Top >= 0 && c.Toggle.Bottom <= c.Height, "Schalter liegt ganz in der Karte");
         }
     }
 
@@ -390,18 +426,54 @@ public static class GuiSelbsttest
         Ist(DiagGui.LoadTotalMinutes(null, null) == 0, "ohne Listen");
     }
 
-    // Alles, was zu einer abgewählten Komponente gehört, wird einheitlich deaktiviert (bis 3.63 blieb das Label hell)
-    static void LasttestDeaktivierung()
+    // ab v4.09: Seite Lasttest im Muster der Seite Benchmark. Schalter und Kontrollkästchen (Werte für Vorlagen und
+    // Start) bleiben gleich, Dauer und Einstellungen stehen nur unter eingeschalteten Komponenten, der Kopf nennt Anzahl
+    // und Gesamtdauer, Vorlagen mit den bisherigen Schlüsseln
+    static void LasttestSeite()
     {
-        using (Label l = new Label()) using (ComboBox c = new ComboBox())
+        string d = NeuerDatenordner();
+        try
         {
-            Control[] teile = new Control[] { l, c };
-            DiagGui.SetPartEnabled(teile, false);
-            Ist(!c.Enabled && l.ForeColor == DiagGui.DisabledText(), "abgewählt: Liste aus, Beschriftung gedämpft");
-            DiagGui.SetPartEnabled(teile, true);
-            Ist(c.Enabled && l.ForeColor == UI.Text, "gewählt: Liste an, Beschriftung normal");
-            DiagGui.SetPartEnabled(null, true);
+            using (DiagGui g = NeueOberflaeche(d, new string[] { "0|Samsung SSD 980 1TB|NVMe|SSD|931,5 GB|C:|0" }))
+            {
+                Ist(g.lastRows.Length == 4 && g.lastSub.Length == 4, "vier Komponenten");
+                foreach (SettingRow r in g.lastRows) Ist(r.Icon.Length > 0 && r.Title.Length > 0 && r.Description.Length > 0, "Zeile mit Symbol, Titel, Beschreibung: " + r.Title);
+                Ist(g.lastRows[0].Checked && g.lastRows[1].Checked && g.lastRows[2].Checked && !g.lastRows[3].Checked, "Vorgabe: Datenträger aus");
+                Ist(g.lastSubOffen[0] && g.lastSubOffen[1] && g.lastSubOffen[2] && !g.lastSubOffen[3], "Einstellungen nur unter eingeschalteten Komponenten");
+                Ist(g.lastSeite.Anzahl.Text == "3 von 4 Komponenten" && g.lastSeite.Dauer.Text == "Gesamtdauer 2 Min.", "Seitenkopf: " + g.lastSeite.Anzahl.Text + ", " + g.lastSeite.Dauer.Text);
+                Ist(g.ModuleMinutes(2) == 3, "Schätzung des Moduls 3 Min. (Gesamtdauer und Vorbereitung): " + g.ModuleMinutes(2));
+                // Schalter -> Wert
+                g.lastRows[3].Toggle.UserToggle();
+                System.Collections.Generic.Dictionary<string, object> v = g.CaptureSettings();
+                Ist(System.Convert.ToBoolean(v["Last.Disk"]) && g.lastSubOffen[3] && g.lastSeite.Anzahl.Text == "4 von 4 Komponenten", "Datenträger an: Wert folgt, Einstellungen offen");
+                foreach (string k in new string[] { "Last.CPU", "Last.CPUDauer", "Last.RAM", "Last.RAMDauer", "Last.RAMAnteil", "Last.GPU", "Last.GPUDauer", "Last.Disk", "Last.DiskDauer", "Last.Laufwerk", "Last.AbbruchCpu", "Last.AbbruchGpu" })
+                    Ist(v.ContainsKey(k), "Schlüssel der Vorlagen: " + k);
+                // Wert -> Schalter und Dauer (Vorlage)
+                System.Collections.Generic.Dictionary<string, object> alt = new System.Collections.Generic.Dictionary<string, object>();
+                alt["Last.CPU"] = false; alt["Last.RAM"] = true; alt["Last.GPU"] = true; alt["Last.Disk"] = false; alt["Last.GPUDauer"] = "15 Min."; alt["Last.RAMDauer"] = "5 Min.";
+                g.ApplySettings(alt);
+                Ist(!g.lastRows[0].Checked && g.lastRows[1].Checked && g.lastRows[2].Checked && !g.lastRows[3].Checked, "Vorlage stellt die Schalter");
+                Ist(!g.lastSubOffen[0] && g.lastSubOffen[2] && !g.lastSubOffen[3], "Bereiche folgen der Vorlage");
+                Ist(g.lastSeite.Anzahl.Text == "2 von 4 Komponenten" && g.lastSeite.Dauer.Text == "Gesamtdauer 15 Min.", "längste Dauer bestimmt die Gesamtdauer: " + g.lastSeite.Dauer.Text);
+                Ist(g.ModuleMinutes(2) == 16, "Schätzung des Moduls 16 Min.: " + g.ModuleMinutes(2));
+                // alle aus
+                foreach (SettingRow r in g.lastRows) if (r.Checked) r.Toggle.UserToggle();
+                Ist(g.lastSeite.Anzahl.Text == "0 von 4 Komponenten" && g.lastSeite.Dauer.Text == "keine Komponente gewählt", "nichts gewählt: " + g.lastSeite.Dauer.Text);
+                g.ShowPage(3);
+                Ist(g.lastSeite.Breite > 0 && g.lastSeite.Spalten.Width == g.lastSeite.Breite, "Seite auf Seitenbreite geordnet");
+            }
         }
+        finally { Raeume(d); }
+    }
+
+    // Karte Sensoren der Seite Lasttest: nennt, woher die CPU-Werte kommen, je nach Einstellung und installiertem Treiber
+    static void LasttestSensoren()
+    {
+        string a = DiagGui.LastSensorText(true, ""), b = DiagGui.LastSensorText(true, "2.0.1"), c = DiagGui.LastSensorText(false, "2.0.1");
+        Ist(a.Contains("vorübergehend installiert") && a.Contains("wieder entfernt"), "ohne installierten Treiber: " + a);
+        Ist(b.Contains("PawnIO 2.0.1 ist installiert") && b.Contains("bleibt unverändert") && !b.Contains("vorübergehend"), "installierter Treiber bleibt: " + b);
+        Ist(c.Contains("wird nicht verwendet") && !c.Contains("installiert"), "Treiber abgewählt: " + c);
+        Ist(DiagGui.LastSensorText(true, null) == a, "ohne Angabe wie nicht installiert");
     }
 
     // Zusammenfassung vor dem Start nur bei Eingriffen, Neustarts oder ohne Wiederherstellungspunkt
@@ -944,7 +1016,7 @@ public static class GuiSelbsttest
         return d;
     }
     static void Raeume(string d) { try { System.IO.Directory.Delete(d, true); } catch { } }
-    static DiagGui NeueOberflaeche(string d, string[] disks) { return new DiagGui("", "", "", d, "4.08", disks ?? new string[0], new string[0], "G-test"); }
+    static DiagGui NeueOberflaeche(string d, string[] disks) { return new DiagGui("", "", "", d, "4.09", disks ?? new string[0], new string[0], "G-test"); }
 
     // Datenbankeintrag dieses PCs; mitVergleich und mitBefunden steuern die Felder, die es erst ab 4.08 bzw. bei Läufen gibt
     static void SchreibeLauf(string d, string datum, bool mitVergleich, bool mitBefunden)
@@ -1245,6 +1317,82 @@ public static class GuiSelbsttest
             l = DbEntry.Load(System.IO.Path.Combine(d, "Datenbank"));
             Ist(l.Count == 7, "Einträge im Format 1 und 2 nebeneinander: " + l.Count);
             foreach (DbEntry e in l) if (e.Computer == "TORRENT") Ist(!e.HatVergleich && e.NW >= 0 && e.BefundListe.Count > 0, "Eintrag im Format 1: Befunde gelesen, kein Vergleich");
+        }
+        finally { Raeume(d); }
+    }
+
+    // ab v4.09: Seite System-Umzug im Muster der Seite Benchmark. Zeilen mit Schaltern je Bibliothek und Bereich, der Kopf
+    // nennt die Anzahl; die Bereiche unter Profile und WLAN stehen nur bei eingeschalteter Zeile. Ohne Schnell-Scan nennt
+    // die Seite keine Größe.
+    static void UmzugSeite()
+    {
+        string d = NeuerDatenordner();
+        try
+        {
+            using (DiagGui g = NeueOberflaeche(d, null))
+            {
+                Ist(g.umzugLibRows.Length == 6 && g.umzugSysRows.Length == 4, "sechs Bibliotheken, vier Bereiche");
+                foreach (SettingRow r in g.umzugLibRows) Ist(r.Icon.Length > 0 && r.Title.Length > 0 && r.Description.Length > 0, "Zeile mit Symbol, Titel, Beschreibung: " + r.Title);
+                foreach (SettingRow r in g.umzugSysRows) Ist(r.Icon.Length > 0 && r.Title.Length > 0 && r.Description.Length > 0, "Zeile mit Symbol, Titel, Beschreibung: " + r.Title);
+                Ist(g.umzugLibRows[0].Checked && !g.umzugLibRows[2].Checked && g.umzugLibRows[5].Checked, "Downloads zunächst aus");
+                Ist(g.umzugSysRows[0].Checked && g.umzugSysRows[1].Checked && !g.umzugSysRows[2].Checked && g.umzugSysRows[3].Checked, "Profile zunächst aus");
+                Ist(g.umzugSeite.Anzahl.Text == "8 von 10 Bereichen", g.umzugSeite.Anzahl.Text);
+                Ist(g.umzugSeite.Dauer.Text == "Größe nach dem Schnell-Scan" && g.lblUmzugGroesse.Text == "Gesamtgröße: nach dem Schnell-Scan", "ohne Scan keine Größe: " + g.lblUmzugGroesse.Text);
+                Ist(g.lblUmzugPlatz.Text.Length > 0 && !g.lblUmzugPlatz.Text.Contains("usreichend"), "ohne Scan kein Urteil zum Platz: " + g.lblUmzugPlatz.Text);
+                Ist(!g.subUmzugProfileOffen && g.subUmzugWlanOffen, "Bereich unter WLAN offen, unter Profile zu");
+                g.umzugSysRows[3].Toggle.UserToggle();
+                Ist(!g.subUmzugWlanOffen && g.umzugSeite.Anzahl.Text == "7 von 10 Bereichen", "WLAN aus: Bereich zu, " + g.umzugSeite.Anzahl.Text);
+                g.umzugSysRows[2].Toggle.UserToggle(); g.umzugLibRows[2].Toggle.UserToggle();
+                Ist(g.subUmzugProfileOffen && g.umzugSeite.Anzahl.Text == "9 von 10 Bereichen", "Profile und Downloads an: " + g.umzugSeite.Anzahl.Text);
+                Ist(g.karteUmzugZusatz != null && HatText(g.karteUmzugZusatz.Karte, "Schnell-Scan"), "Karte Zusatzordner nennt den Schnell-Scan");
+                // Farbschema wechseln: Die Seite rechnet neu, ohne Fehler und mit gleichem Stand
+                g.umzugRechne();
+                Ist(g.umzugSeite.Anzahl.Text == "9 von 10 Bereichen", "nach erneutem Rechnen gleich");
+                g.ShowPage(8);
+                Ist(g.umzugSeite.Breite > 0 && g.umzugSeite.Spalten.Width == g.umzugSeite.Breite, "Seite auf Seitenbreite geordnet");
+            }
+        }
+        finally { Raeume(d); }
+    }
+
+    // Zeile zum freien Platz: "ausreichend" nur mit gemessenem Umfang und gemessenem freiem Platz. Bis v4.08 stand bei
+    // einem Netzlaufwerk fest "100,0 GB (Ausreichend)" und ohne Zielmedium "0,0 GB (Ausreichend)".
+    static void UmzugPlatz()
+    {
+        int st; long gb = 1073741824L;
+        Ist(DiagGui.UmzugPlatzText("", "", 0, 5 * gb, true, out st) == "Kein Zielmedium gewählt" && st == 3, "ohne Ziel");
+        string n = DiagGui.UmzugPlatzText("\\\\nas\\sicherung", "Netzwerk", 0, 5 * gb, true, out st);
+        Ist(n.Contains("nicht geprüft") && !n.Contains("GB") && st == 0, "Netzlaufwerk ohne erfundenen Platz: " + n);
+        string u = DiagGui.UmzugPlatzText("\\\\server\\ordner", "", 0, 5 * gb, true, out st);
+        Ist(u.Contains("nicht lesbar") && st == 0, "Freigabe ohne lesbares Laufwerk: " + u);
+        string ok = DiagGui.UmzugPlatzText("E:\\", "exFAT", 29 * gb, 5 * gb, true, out st);
+        Ist(ok == "Frei auf dem Ziel: 29,0 GB, ausreichend" && st == 1, "genug Platz: " + ok);
+        string eng = DiagGui.UmzugPlatzText("E:\\", "exFAT", 3 * gb, 5 * gb, true, out st);
+        Ist(eng == "Frei auf dem Ziel: 3,0 GB, nicht ausreichend" && st == 2, "zu wenig Platz: " + eng);
+        string vor = DiagGui.UmzugPlatzText("E:\\", "exFAT", 29 * gb, 30 * 1048576L, false, out st);
+        Ist(vor == "Frei auf dem Ziel: 29,0 GB" && st == 0, "vor dem Scan ohne Urteil: " + vor);
+        string vorEng = DiagGui.UmzugPlatzText("E:\\", "exFAT", gb / 100, 30 * 1048576L, false, out st);
+        Ist(vorEng.EndsWith("nicht ausreichend") && st == 2, "zu wenig Platz schon für die geschätzten Bereiche: " + vorEng);
+    }
+
+    // Kopf der Modulseiten: Anzahl und Dauer stehen rechtsbündig, auch wenn der Text kürzer wird (bis v4.08 blieb dann
+    // rechts eine Lücke, weil sich die Lage nach der noch nicht angepassten Größe eines Felds richtete)
+    static void ModulseiteKopf()
+    {
+        string d = NeuerDatenordner();
+        try
+        {
+            using (DiagGui g = NeueOberflaeche(d, null))
+            {
+                DiagGui.ModulSeite m = g.umzugSeite;
+                m.Ordne(1000);
+                Ist(m.Anzahl.Left + m.Anzahl.GetPreferredSize(Size.Empty).Width == 1000 && m.Dauer.Left + m.Dauer.GetPreferredSize(Size.Empty).Width == 1000, "rechtsbündig bei 1000");
+                int vorher = m.Dauer.Left;
+                m.Dauer.Text = "rund 2 GB";
+                Ist(m.Dauer.Left > vorher && m.Dauer.Left + m.Dauer.GetPreferredSize(Size.Empty).Width == 1000, "kürzerer Text rückt nach rechts: " + m.Dauer.Left);
+                Ist(m.Dauer.Top >= m.Anzahl.Top + m.Anzahl.GetPreferredSize(Size.Empty).Height, "Dauer steht unter der Anzahl");
+                Ist(m.Kopf.Height >= m.Dauer.Top + m.Dauer.GetPreferredSize(Size.Empty).Height, "Kopf so hoch wie beide Zeilen");
+            }
         }
         finally { Raeume(d); }
     }

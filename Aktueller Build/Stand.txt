@@ -1,17 +1,17 @@
 ﻿LEOS MINIBENCH: AKTUELLER BUILD
 ===============================
-Version   : 4.08 (Dateiversion 4.8.0.0)
-Gebaut    : 12.11.2026 in der Linux-Sandbox von Claude (Testbau, nicht mit Bauen.cmd)
-Tests     : Sandbox 933 bestanden, 51 fehlgeschlagen (nur ohne Windows, alle schon auf 4.07), 70 übersprungen; Selbsttest der Oberfläche 63 Fälle; Windows-Tests stehen aus
-Quelltext : 45 Teile aus src, 42,224 Zeilen
+Version   : 4.09 (Dateiversion 4.9.0.0)
+Gebaut    : 13.11.2026 in der Linux-Sandbox von Claude (Testbau, nicht mit Bauen.cmd)
+Tests     : Sandbox 935 bestanden, 51 fehlgeschlagen (nur ohne Windows, dieselben wie auf 4.08), 75 übersprungen; Selbsttest der Oberfläche 68 Fälle; Windows-Tests stehen aus
+Quelltext : 45 Teile aus src, 42,165 Zeilen
 
 Dateien (SHA-256 zur Kontrolle auf dem Stick: Get-FileHash <Datei>)
-  LMB.exe                    2,725 KB  7f9dd96ecbd5475333a9ad73a5b0c27bf74091a9431cfb81a5b392376512221d
-  LeosMinibench.ps1          2,649 KB  da051d50fb543f0cc8cf4867783c23f23459e6df1b7a9791f9bcb910d303d7cd
+  LMB.exe                    2,730 KB  5bcdd588bde1116cea36e78c723e606285c9c8a186ac6d468bedbe11008dcae9
+  LeosMinibench.ps1          2,655 KB  a2a2c0ddd78f84b41e6e7c13e4b1b87dc20f9bbd6b209f24b0d4e305c3ced450
   LeosMinibench.cmd              1 KB  e9d1f704e9dfddc078ed0181c4ee80b59040f15b24203184d83e10442e09844c
   LMB.cmd                        1 KB  71f6f9665c3251681c678a718203f4d1df958db438b7788e02d6d9743cd6bf6d
 
 Testbau: LMB.exe ist mit dem Mono-Compiler aus demselben Startprogramm wie in Bauen.cmd übersetzt (Symbol, Manifest
 mit Administratorrechten und DPI-Angaben, Versionsangaben). Der nächste Lauf von Bauen.cmd ersetzt ihn.
-Änderungen dieser Version: Doku\Änderungen_v4.08.txt; alle Versionen: Seite Versionen im Programm und Doku\Versionshistorie.txt.
+Änderungen dieser Version: Doku\Änderungen_v4.09.txt; alle Versionen: Seite Versionen im Programm und Doku\Versionshistorie.txt.
 Diesen Ordner nicht von Hand ändern: Bauen.cmd erzeugt ihn bei jedem Bau neu aus src.

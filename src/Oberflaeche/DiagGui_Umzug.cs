@@ -89,280 +89,208 @@ public partial class DiagGui
         return Directory.Exists(def) ? def : "";
     }
 
+    // ab v4.09: Seite im Muster von Benchmark und Diagnose (bis v4.08 Abschnitte mit Kontrollkästchen). Links der Umfang
+    // in drei Karten (Benutzer-Bibliotheken, System und Programme, Zusatzordner), rechts Zielmedium und Sicherung mit
+    // Fortschritt. Die Kontrollkästchen bleiben als Werte bestehen, angezeigt werden Zeilen mit Schaltern (SchalterZeile);
+    // Profile und Zusatzordner, die erst der Schnell-Scan findet, stehen als Auswahlzeilen unter ihrer Zeile bzw. in
+    // ihrer Karte.
+    internal ModulSeite umzugSeite;
+    internal SettingRow[] umzugLibRows;
+    internal SettingRow[] umzugSysRows;
+    internal UnterBereich subUmzugProfile, subUmzugWlan;
+    // Sichtbarkeit der Bereiche unter Profile und WLAN als eigener Zustand (für Tests ohne angezeigtes Fenster)
+    internal bool subUmzugProfileOffen, subUmzugWlanOffen = true;
+    internal ZeilenKarte karteUmzugZusatz;
+    internal Label lblUmzugGroesse, lblUmzugPlatz;
+    // Größe und freien Platz neu rechnen und die Farben der Hinweise setzen (auch nach einem Wechsel des Farbschemas)
+    internal Action umzugRechne;
+
+    // Zeile zum freien Platz auf dem Ziel. Ohne Zielmedium und bei Zielen ohne lesbaren freien Platz (Netzlaufwerk) steht
+    // das da; "ausreichend" gibt es nur mit gemessenem freiem Platz und gemessenem Umfang.
+    // stufe: 0 gedämpft, 1 gut, 2 kritisch, 3 Warnung
+    public static string UmzugPlatzText(string zielPfad, string dateisystem, long frei, long bedarf, bool gemessen, out int stufe)
+    {
+        stufe = 0;
+        if (String.IsNullOrEmpty(zielPfad)) { stufe = 3; return "Kein Zielmedium gewählt"; }
+        if (String.Equals(dateisystem, "Netzwerk", StringComparison.OrdinalIgnoreCase)) return "Netzlaufwerk: Der freie Platz wird nicht geprüft";
+        if (frei <= 0) return "Freier Platz auf dem Ziel nicht lesbar";
+        string f = "Frei auf dem Ziel: " + (frei / 1073741824.0).ToString("N1") + " GB";
+        if (bedarf > frei) { stufe = 2; return f + ", nicht ausreichend"; }
+        if (!gemessen) return f;
+        stufe = 1; return f + ", ausreichend";
+    }
+
     Control BuildUmzugPage()
     {
         FlowLayoutPanel f = Page("System-Umzug & Neuinstallation", "Sichert pers\u00F6nliche Dateien, Desktop-Layout und Programme vor einer Neuinstallation und stellt sie mit 1 Klick wieder her.", -1);
+        umzugSeite = NeueModulSeite(f);
 
-        // 1. Ziel-Auswahl
-        f.Controls.Add(Section("Zielmedium f\u00FCr die Datensicherung"));
+        // 1. Umfang, links: Benutzer-Bibliotheken (Größe je Ordner nach dem Schnell-Scan)
+        ZeilenKarte kLib = umzugSeite.Karte("Benutzer-Bibliotheken", true);
+        LinkLabel lnkLibsAll = KartenVerweis("Alle an"), lnkLibsNone = KartenVerweis("Alle aus");
+        Tip(lnkLibsAll, "Alle Benutzer-Bibliotheken einschalten.");
+        Tip(lnkLibsNone, "Alle Benutzer-Bibliotheken ausschalten.");
+        kLib.KopfRechts.Controls.Add(lnkLibsAll); kLib.KopfRechts.Controls.Add(lnkLibsNone);
 
-        TableLayoutPanel targetTable = new TableLayoutPanel();
-        targetTable.AutoSize = true;
-        targetTable.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        targetTable.ColumnCount = 2;
-        targetTable.RowCount = 2;
-        targetTable.BackColor = UI.Panel;
-        targetTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-        targetTable.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        string[] libTitel = new string[] { "Desktop", "Dokumente", "Downloads", "Bilder", "Musik", "Videos" };
+        string[] libScope = new string[] { "Lib_Desktop", "Lib_Dokumente", "Lib_Downloads", "Lib_Bilder", "Lib_Musik", "Lib_Videos" };
+        string[] libDetail = new string[] {
+            "Dateien und Ordner auf dem Desktop", "Pers\u00F6nliche Dokumente", "Oft gro\u00DF, deshalb zun\u00E4chst aus",
+            "Fotos und Bildschirmfotos", "Musiksammlung", "Videosammlung" };
+        string[] libIcons = new string[] { UI.IcoBildschirm, UI.IcoDokument, UI.IcoHerunterladen, UI.IcoBild, UI.IcoMusik, UI.IcoVideo };
+        string[] libTips = new string[] {
+            "Sichert den Desktop-Ordner des aktuellen Benutzers.",
+            "Sichert den Dokumente-Ordner des aktuellen Benutzers.",
+            "Sichert den Downloads-Ordner (standardm\u00E4\u00DFig deaktiviert wegen oft hohem Datenvolumen).",
+            "Sichert den Bilder-Ordner des aktuellen Benutzers.",
+            "Sichert den Musik-Ordner des aktuellen Benutzers.",
+            "Sichert den Videos-Ordner des aktuellen Benutzers." };
+        CheckBox[] libChk = new CheckBox[libTitel.Length]; Badge[] libGroesse = new Badge[libTitel.Length]; long[] libSize = new long[libTitel.Length];
+        umzugLibRows = new SettingRow[libTitel.Length];
+        for (int i = 0; i < libTitel.Length; i++)
+        {
+            libChk[i] = Chk(libTitel[i], i != 2);
+            umzugLibRows[i] = SchalterZeile(libChk[i], libTitel[i], libDetail[i], libIcons[i], libTips[i], null);
+            libGroesse[i] = new Badge("", "skip"); Tip(libGroesse[i], "Gr\u00F6\u00DFe des Ordners, gemessen beim Schnell-Scan.");
+            umzugLibRows[i].AddBadge(libGroesse[i]);
+            kLib.Zeile(umzugLibRows[i]);
+        }
 
+        // System und Programme; Profile und das Klartext-Kennwort der WLAN-Profile stehen unter ihrer Zeile
+        ZeilenKarte kSys = umzugSeite.Karte("System und Programme", true);
+        CheckBox chkLayout = Chk("Desktop-Layout", true), chkSoftware = Chk("Software-Inventar", true), chkProfiles = Chk("Profile und Konfigurationen", false), chkWlan = Chk("WLAN-Profile", true);
+        SettingRow rLayout = SchalterZeile(chkLayout, "Desktop-Layout", "Hintergrundbild und Positionen der Symbole", UI.IcoAnpassen,
+            "Sichert das aktive Desktop-Wallpaper sowie die Icon-Koordinaten.", null);
+        SettingRow rSoft = SchalterZeile(chkSoftware, "Software-Inventar", "Winget-Paketliste und Bericht \u00FCber Programme, die von Hand zu installieren sind", UI.IcoApp,
+            "Erstellt einen Winget-Paketexport und einen Bericht \u00FCber manuell zu installierende Programme.", null);
+        SettingRow rProf = SchalterZeile(chkProfiles, "Profile und Konfigurationen", "Browser, E-Mail, Editoren und Werkzeuge", UI.IcoKontakt,
+            "Sichert Konfigurationsdateien, Sitzungen und Profile erkannter Anwendungen.", null);
+        subUmzugProfile = new UnterBereich(); subUmzugProfile.Visible = false;
+        Label lblScanHint = Lbl("Der Schnell-Scan ermittelt installierte Browser, E-Mail-Programme, Editoren und Werkzeuge. Danach lassen sich die Profile hier einzeln w\u00E4hlen.", 8.5f, false, UI.Muted);
+        lblScanHint.Margin = new Padding(0, 0, 0, UI.S(2));
+        subUmzugProfile.Inhalt.Controls.Add(lblScanHint);
+        SettingRow rWlan = SchalterZeile(chkWlan, "WLAN-Profile", "Gespeicherte Netzwerke zur automatischen Wiederherstellung", UI.IcoWlan,
+            "Sichert gespeicherte WLAN-Netzwerke zur automatischen Wiederherstellung.", null);
+        subUmzugWlan = new UnterBereich();
+        LaufwerkZeile zWlanClear = new LaufwerkZeile("WLAN-Passw\u00F6rter im Klartext mitsichern", "", "unverschl\u00FCsselt auf dem Zielmedium", false);
+        Tip(zWlanClear, "Achtung: Sichert Netzwerkschl\u00FCssel unverschl\u00FCsselt in XML-Dateien auf dem Zielmedium.");
+        subUmzugWlan.Inhalt.Controls.Add(zWlanClear);
+        kSys.Zeile(rLayout); kSys.Zeile(rSoft); kSys.Zeile(rProf); kSys.Zeile(subUmzugProfile); kSys.Zeile(rWlan); kSys.Zeile(subUmzugWlan);
+        umzugSysRows = new SettingRow[] { rLayout, rSoft, rProf, rWlan };
+
+        // Einschalten fragt nach (der Schlüssel liegt danach lesbar auf dem Zielmedium); bei Nein bleibt die Zeile aus
+        zWlanClear.CheckedChanged += delegate {
+            if (!zWlanClear.Checked) return;
+            DialogResult dr = MessageBox.Show(this,
+                "Sicherheits-Warnung:\r\n\r\n" +
+                "Wenn Sie diese Option aktivieren, werden alle gespeicherten WLAN-Passw\u00F6rter unverschl\u00FCsselt im Klartext in den exportierten XML-Dateien auf dem Zielmedium gespeichert.\r\n\r\n" +
+                "Jeder mit Zugriff auf das Zielmedium kann diese Passw\u00F6rter einsehen.\r\n\r\n" +
+                "M\u00F6chten Sie WLAN-Passw\u00F6rter wirklich im Klartext sichern?",
+                "WLAN-Passw\u00F6rter im Klartext sichern",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning);
+            if (dr != DialogResult.Yes) zWlanClear.Checked = false;
+        };
+
+        // Zusatzordner im Stamm von C: (findet der Schnell-Scan)
+        karteUmzugZusatz = umzugSeite.Karte("Zusatzordner auf Laufwerk C:", true);
+        Label lblZusatz = Lbl("Der Schnell-Scan sucht weitere Ordner im Stamm von Laufwerk C: und bietet sie hier zur Wahl an.", 8.5f, false, UI.Muted);
+        lblZusatz.Margin = new Padding(0, 0, 0, UI.S(2));
+        karteUmzugZusatz.Frei(lblZusatz);
+
+        // 2. Zielmedium, rechts
+        ZeilenKarte kZiel = umzugSeite.Karte("Zielmedium", false);
         DarkComboBox cmbDest = new DarkComboBox();
-        cmbDest.Dock = DockStyle.Fill;
-        cmbDest.Margin = new Padding(0, UI.S(2), UI.S(8), UI.S(2));
+        cmbDest.Margin = new Padding(0, 0, 0, UI.S(8));
         Tip(cmbDest, "W\u00E4hlen Sie das Ziellaufwerk oder die Netzwerkfreigabe f\u00FCr die Sicherung aus.");
+        kZiel.Zeile(cmbDest);
 
-        Button btnBrowse = UI.Secondary("Durchsuchen ...");
-        btnBrowse.Margin = new Padding(0, UI.S(2), 0, UI.S(2));
+        Button btnBrowse = UI.Secondary("Durchsuchen \u2026");
+        btnBrowse.Margin = new Padding(0, 0, 0, UI.S(8));
         Tip(btnBrowse, "Einen beliebigen Ordner auf einem lokalen Datentr\u00E4ger oder im Netzwerk ausw\u00E4hlen.");
-
-        targetTable.Controls.Add(cmbDest, 0, 0);
-        targetTable.Controls.Add(btnBrowse, 1, 0);
+        kZiel.Frei(btnBrowse);
 
         Label lblFatWarn = Lbl("Achtung: Das Zielmedium ist mit FAT32 formatiert. Einzeldateien ab 4 GB k\u00F6nnen nicht gespeichert werden (NTFS oder exFAT empfohlen).", 8.5f, false, UI.Warn);
-        lblFatWarn.AutoSize = true;
         lblFatWarn.Visible = false;
-        lblFatWarn.Margin = new Padding(0, UI.S(6), 0, 0);
-        lblFatWarn.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 32), 0);
+        lblFatWarn.Margin = new Padding(0, 0, 0, UI.S(6));
         Tip(lblFatWarn, "FAT32 unterst\u00FCtzt technisch keine Dateien \u00FCber 4 GB. F\u00FCr gro\u00DFe Sicherungen wird exFAT oder NTFS empfohlen.");
-        targetTable.Controls.Add(lblFatWarn, 0, 1);
-        targetTable.SetColumnSpan(lblFatWarn, 2);
+        kZiel.Frei(lblFatWarn);
+        Label hZiel = Lbl("Wechsellaufwerk (USB-Stick, externe SSD) oder konfigurierten NAS-Pfad als Sicherungsziel w\u00E4hlen.", 8.5f, false, UI.Muted);
+        hZiel.Margin = new Padding(0, 0, 0, UI.S(2));
+        kZiel.Frei(hZiel);
 
-        f.Controls.Add(Card(targetTable));
-        f.Controls.Add(Hint("Wechsellaufwerk (USB-Stick, externe SSD) oder konfigurierten NAS-Pfad als Sicherungsziel w\u00E4hlen.", 4));
+        // 3. Sicherung: Größe, freier Platz, Start, Schnell-Scan, Fortschritt und Protokoll
+        ZeilenKarte kSich = umzugSeite.Karte("Sicherung", false);
+        Label lblSummary = Lbl("Gesamtgr\u00F6\u00DFe: nach dem Schnell-Scan", 10.5f, true, UI.Text);
+        lblSummary.Margin = new Padding(0, 0, 0, UI.S(2));
+        Tip(lblSummary, "Umfang der gew\u00E4hlten Bereiche: Bibliotheken und Zusatzordner gemessen beim Schnell-Scan, Layout, Software-Inventar und Profile gesch\u00E4tzt.");
+        kSich.Frei(lblSummary); lblUmzugGroesse = lblSummary;
+        Label lblPlatz = Lbl("", UI.SchriftText, false, UI.Muted);
+        lblPlatz.Margin = new Padding(0, 0, 0, UI.S(10));
+        Tip(lblPlatz, "Vergleich zwischen dem Umfang der Sicherung und dem freien Speicher auf dem Zielmedium.");
+        kSich.Frei(lblPlatz); lblUmzugPlatz = lblPlatz;
 
-        // 2. Umfangs-Auswahl (mit manuellem Schnell-Scan per Knopfdruck)
-        f.Controls.Add(Section("Sicherungsumfang"));
-
-        FlowLayoutPanel scopePanel = new FlowLayoutPanel();
-        scopePanel.FlowDirection = FlowDirection.TopDown;
-        scopePanel.WrapContents = false;
-        scopePanel.AutoSize = true;
-        scopePanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        scopePanel.BackColor = UI.Panel;
-
-        // Zeile für manuellen Schnell-Scan
-        FlowLayoutPanel scanRow = Row();
-        scanRow.Margin = new Padding(0, 0, 0, UI.S(8));
-
-        Button btnStartScan = UI.Secondary("Schnell-Scan durchf\u00FChren");
-        Tip(btnStartScan, "Pr\u00FCft diesen PC auf vorhandene Bibliotheken, Desktop-Layout und installierte Anwendungsprofile.");
-
-        Label lblScanInfo = Lbl("Ermittelt vorab, welche Bibliotheken, Profile und Programme auf diesem PC vorhanden sind.", 8.5f, false, UI.Muted);
-        lblScanInfo.Margin = new Padding(UI.S(10), UI.S(4), 0, 0);
-        lblScanInfo.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 220), 0);
-        Tip(lblScanInfo, "Status des Vorab-Scans der installierten Anwendungen und Verzeichnisse.");
-
-        scanRow.Controls.Add(btnStartScan);
-        scanRow.Controls.Add(lblScanInfo);
-        scopePanel.Controls.Add(scanRow);
-
-        // Granulare Bibliotheken
-        FlowLayoutPanel libHeaderRow = Row();
-        libHeaderRow.Margin = new Padding(0, 0, 0, UI.S(2));
-        Label lblLibsHead = Lbl("Benutzer-Bibliotheken:", 9.5f, true, UI.Text);
-        lblLibsHead.Margin = new Padding(0, UI.S(2), UI.S(8), UI.S(2));
-        Tip(lblLibsHead, "Pers\u00F6nliche Standardbibliotheken des Benutzers ausw\u00E4hlen.");
-
-        LinkLabel lnkLibsAll = new LinkLabel();
-        lnkLibsAll.Text = "Alle an";
-        lnkLibsAll.AutoSize = true;
-        lnkLibsAll.Font = new Font("Segoe UI", 8.5f);
-        lnkLibsAll.LinkColor = UI.Accent;
-        lnkLibsAll.ActiveLinkColor = UI.Accent;
-        lnkLibsAll.Margin = new Padding(0, UI.S(4), 0, UI.S(2));
-        Tip(lnkLibsAll, "Alle Benutzer-Bibliotheken markieren.");
-
-        Label lblLibsSlash = Lbl("/", 8.5f, false, UI.Muted);
-        lblLibsSlash.Margin = new Padding(UI.S(2), UI.S(4), UI.S(2), UI.S(2));
-
-        LinkLabel lnkLibsNone = new LinkLabel();
-        lnkLibsNone.Text = "Alle aus";
-        lnkLibsNone.AutoSize = true;
-        lnkLibsNone.Font = new Font("Segoe UI", 8.5f);
-        lnkLibsNone.LinkColor = UI.Accent;
-        lnkLibsNone.ActiveLinkColor = UI.Accent;
-        lnkLibsNone.Margin = new Padding(0, UI.S(4), 0, UI.S(2));
-        Tip(lnkLibsNone, "Alle Benutzer-Bibliotheken abw\u00E4hlen.");
-
-        libHeaderRow.Controls.Add(lblLibsHead);
-        libHeaderRow.Controls.Add(lnkLibsAll);
-        libHeaderRow.Controls.Add(lblLibsSlash);
-        libHeaderRow.Controls.Add(lnkLibsNone);
-        scopePanel.Controls.Add(libHeaderRow);
-
-        FlowLayoutPanel libSubFlow = new FlowLayoutPanel();
-        libSubFlow.FlowDirection = FlowDirection.TopDown;
-        libSubFlow.WrapContents = false;
-        libSubFlow.AutoSize = true;
-        libSubFlow.Margin = new Padding(UI.S(16), 0, 0, UI.S(4));
-        libSubFlow.BackColor = UI.Panel;
-
-        CheckBox chkLibDesktop = Chk("Desktop", true);
-        Tip(chkLibDesktop, "Sichert den Desktop-Ordner des aktuellen Benutzers.");
-        libSubFlow.Controls.Add(chkLibDesktop);
-
-        CheckBox chkLibDocs = Chk("Dokumente", true);
-        Tip(chkLibDocs, "Sichert den Dokumente-Ordner des aktuellen Benutzers.");
-        libSubFlow.Controls.Add(chkLibDocs);
-
-        CheckBox chkLibDownloads = Chk("Downloads", false);
-        Tip(chkLibDownloads, "Sichert den Downloads-Ordner (standardm\u00E4\u00DFig deaktiviert wegen oft hohem Datenvolumen).");
-        libSubFlow.Controls.Add(chkLibDownloads);
-
-        CheckBox chkLibPictures = Chk("Bilder", true);
-        Tip(chkLibPictures, "Sichert den Bilder-Ordner des aktuellen Benutzers.");
-        libSubFlow.Controls.Add(chkLibPictures);
-
-        CheckBox chkLibMusic = Chk("Musik", true);
-        Tip(chkLibMusic, "Sichert den Musik-Ordner des aktuellen Benutzers.");
-        libSubFlow.Controls.Add(chkLibMusic);
-
-        CheckBox chkLibVideos = Chk("Videos", true);
-        Tip(chkLibVideos, "Sichert den Videos-Ordner des aktuellen Benutzers.");
-        libSubFlow.Controls.Add(chkLibVideos);
-
-        scopePanel.Controls.Add(libSubFlow);
-
-        CheckBox chkLayout = Chk("Desktop-Layout (Icon-Positionen & Hintergrundbild)", true);
-        Tip(chkLayout, "Sichert das aktive Desktop-Wallpaper sowie die Icon-Koordinaten.");
-        scopePanel.Controls.Add(chkLayout);
-
-        CheckBox chkSoftware = Chk("Software-Inventar (Winget-Paketliste & Programm-Report)", true);
-        Tip(chkSoftware, "Erstellt einen Winget-Paketexport und einen Bericht \u00FCber manuell zu installierende Programme.");
-        scopePanel.Controls.Add(chkSoftware);
-
-        CheckBox chkProfiles = Chk("Profile & Konfigurationen (Configs)", false);
-        Tip(chkProfiles, "Sichert Konfigurationsdateien, Sitzungen und Profile erkannter Anwendungen.");
-        scopePanel.Controls.Add(chkProfiles);
-
-        FlowLayoutPanel profSubFlow = new FlowLayoutPanel();
-        profSubFlow.FlowDirection = FlowDirection.TopDown;
-        profSubFlow.WrapContents = false;
-        profSubFlow.AutoSize = true;
-        profSubFlow.Margin = new Padding(UI.S(24), 0, 0, UI.S(4));
-        profSubFlow.BackColor = UI.Panel;
-
-        Label lblScanHint = Lbl("Klicke oben auf 'Schnell-Scan durchf\u00FChren', um installierte Browser, Mail-Clients, Editoren und Tools zu ermitteln.", 8.5f, false, UI.Muted);
-        lblScanHint.Margin = new Padding(UI.S(4), UI.S(2), 0, UI.S(4));
-        lblScanHint.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 60), 0);
-        Tip(lblScanHint, "Hinweis zur Erkennung vorhandener Anwendungsprofile auf diesem Computer.");
-        profSubFlow.Controls.Add(lblScanHint);
-
-        scopePanel.Controls.Add(profSubFlow);
-        CheckBox chkWlan = Chk("WLAN-Profile (gespeicherte Netzwerke)", true);
-        Tip(chkWlan, "Sichert gespeicherte WLAN-Netzwerke zur automatischen Wiederherstellung.");
-        scopePanel.Controls.Add(chkWlan);
-
-        FlowLayoutPanel wlanSubFlow = new FlowLayoutPanel();
-        wlanSubFlow.FlowDirection = FlowDirection.TopDown;
-        wlanSubFlow.WrapContents = false;
-        wlanSubFlow.AutoSize = true;
-        wlanSubFlow.Margin = new Padding(UI.S(24), 0, 0, UI.S(4));
-        wlanSubFlow.BackColor = UI.Panel;
-
-        CheckBox chkWlanClear = Chk("WLAN-Passw\u00F6rter im Klartext mitsichern", false);
-        Tip(chkWlanClear, "Achtung: Sichert Netzwerkschl\u00FCssel unverschl\u00FCsselt in XML-Dateien auf dem Zielmedium.");
-        wlanSubFlow.Controls.Add(chkWlanClear);
-        scopePanel.Controls.Add(wlanSubFlow);
-
-        chkWlan.CheckedChanged += delegate {
-            chkWlanClear.Enabled = chkWlan.Checked;
-            if (!chkWlan.Checked) chkWlanClear.Checked = false;
-        };
-
-        chkWlanClear.Click += delegate {
-            if (chkWlanClear.Checked)
-            {
-                DialogResult dr = MessageBox.Show(this,
-                    "Sicherheits-Warnung:\r\n\r\n" +
-                    "Wenn Sie diese Option aktivieren, werden alle gespeicherten WLAN-Passw\u00F6rter unverschl\u00FCsselt im Klartext in den exportierten XML-Dateien auf dem Zielmedium gespeichert.\r\n\r\n" +
-                    "Jeder mit Zugriff auf das Zielmedium kann diese Passw\u00F6rter einsehen.\r\n\r\n" +
-                    "M\u00F6chten Sie WLAN-Passw\u00F6rter wirklich im Klartext sichern?",
-                    "WLAN-Passw\u00F6rter im Klartext sichern",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Warning);
-                if (dr != DialogResult.Yes)
-                {
-                    chkWlanClear.Checked = false;
-                }
-            }
-        };
-
-        FlowLayoutPanel customPanel = new FlowLayoutPanel();
-        customPanel.FlowDirection = FlowDirection.TopDown;
-        customPanel.WrapContents = false;
-        customPanel.AutoSize = true;
-        customPanel.Margin = new Padding(0, UI.S(6), 0, 0);
-        customPanel.BackColor = UI.Panel;
-        scopePanel.Controls.Add(customPanel);
-
-        f.Controls.Add(Card(scopePanel));
-        f.Controls.Add(Hint("Alle gew\u00E4hlten Daten und Profile werden in ein autarkes 1-Klick-Wiederherstellungspaket gespiegelt.", 4));
-
-        // 3. Status- & Startbereich (inkl. Live-Log)
-        f.Controls.Add(Section("Status & Sicherung"));
-
-        FlowLayoutPanel statusPanel = new FlowLayoutPanel();
-        statusPanel.FlowDirection = FlowDirection.TopDown;
-        statusPanel.WrapContents = false;
-        statusPanel.AutoSize = true;
-        statusPanel.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        statusPanel.BackColor = UI.Panel;
-
-        Label lblSummary = Lbl("Pr\u00FCfe Speicherplatz ...", 9.5f, true, UI.Ok);
-        lblSummary.Margin = new Padding(0, 0, 0, UI.S(8));
-        lblSummary.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 32), 0);
-        Tip(lblSummary, "Vergleich zwischen gemessenem Datenvolumen und freiem Speicher auf dem Zielmedium.");
-        statusPanel.Controls.Add(lblSummary);
-
-        Button btnStartUmzug = UI.Primary("Umzug-Sicherung starten");
-        btnStartUmzug.Font = new Font("Segoe UI Semibold", 10.5f);
-        btnStartUmzug.Padding = new Padding(UI.S(16), UI.S(6), UI.S(16), UI.S(6));
-        btnStartUmzug.Margin = new Padding(0, 0, 0, UI.S(8));
+        FlowLayoutPanel knoepfe = Row();
+        knoepfe.Margin = new Padding(0, 0, 0, UI.S(8));
+        Button btnStartUmzug = UI.Primary("Sicherung starten");
+        btnStartUmzug.Font = new Font("Segoe UI Semibold", 10f);
+        btnStartUmzug.Padding = new Padding(UI.S(14), UI.S(4), UI.S(14), UI.S(4));
+        btnStartUmzug.Margin = new Padding(0, 0, UI.S(8), 0);
         Tip(btnStartUmzug, "Startet die Erstellung der System-Umzug-Sicherung und des autarken Wiederherstellungsskripts auf dem gew\u00E4hlten Zielmedium.");
-        statusPanel.Controls.Add(btnStartUmzug);
+        Button btnStartScan = UI.Secondary("Schnell-Scan");
+        btnStartScan.Margin = new Padding(0);
+        btnStartScan.Padding = new Padding(UI.S(12), UI.S(4), UI.S(12), UI.S(4));
+        Tip(btnStartScan, "Pr\u00FCft diesen PC auf vorhandene Bibliotheken, Desktop-Layout und installierte Anwendungsprofile und misst die Gr\u00F6\u00DFe der Ordner.");
+        knoepfe.Controls.Add(btnStartUmzug); knoepfe.Controls.Add(btnStartScan);
+        kSich.Frei(knoepfe);
+
+        bool gescannt = false;
+        Label lblScanInfo = Lbl("Der Schnell-Scan misst die Bibliotheken und sucht Profile, Programme und weitere Ordner auf diesem PC.", 8.5f, false, UI.Muted);
+        lblScanInfo.Margin = new Padding(0, 0, 0, UI.S(4));
+        Tip(lblScanInfo, "Status des Vorab-Scans der installierten Anwendungen und Verzeichnisse.");
+        kSich.Frei(lblScanInfo);
+        Label hSich = Lbl("Alle gew\u00E4hlten Daten und Profile werden in ein autarkes 1-Klick-Wiederherstellungspaket gespiegelt.", 8.5f, false, UI.Muted);
+        hSich.Margin = new Padding(0, 0, 0, UI.S(2));
+        kSich.Frei(hSich);
 
         Label lblUmzugProg = Lbl("Bereit zum Start.", 9f, true, UI.Accent);
+        lblUmzugProg.Tag = "accent";
         lblUmzugProg.Visible = false;
-        lblUmzugProg.Margin = new Padding(0, 0, 0, UI.S(4));
-        lblUmzugProg.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 32), 0);
+        lblUmzugProg.Margin = new Padding(0, UI.S(8), 0, UI.S(4));
         Tip(lblUmzugProg, "Zeigt den aktuellen Schritt des Sicherungslaufs an.");
-        statusPanel.Controls.Add(lblUmzugProg);
+        kSich.Frei(lblUmzugProg);
 
-        ProgressBar pbUmzug = new ProgressBar();
-        pbUmzug.Width = UI.S(UI.Gruppenbreite - 32);
-        pbUmzug.Height = UI.S(18);
-        pbUmzug.Minimum = 0;
-        pbUmzug.Maximum = 100;
-        pbUmzug.Value = 0;
+        FlatBar pbUmzug = new FlatBar();
+        pbUmzug.Height = UI.S(8);
+        pbUmzug.Fill = UI.Accent;
         pbUmzug.Visible = false;
         pbUmzug.Margin = new Padding(0, 0, 0, UI.S(4));
         Tip(pbUmzug, "Fortschrittsbalken der laufenden Sicherung.");
-        statusPanel.Controls.Add(pbUmzug);
+        kSich.Zeile(pbUmzug);
 
         Label lblUmzugDetail = Lbl("", 8.5f, false, UI.Muted);
         lblUmzugDetail.Visible = false;
         lblUmzugDetail.Margin = new Padding(0, 0, 0, UI.S(4));
-        lblUmzugDetail.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 32), 0);
         Tip(lblUmzugDetail, "Zeigt die aktuell kopierte Datei oder das aktuelle Unterverzeichnis an.");
-        statusPanel.Controls.Add(lblUmzugDetail);
+        kSich.Frei(lblUmzugDetail);
 
         TextBox txtUmzugLog = new TextBox();
         txtUmzugLog.Multiline = true;
         txtUmzugLog.ReadOnly = true;
         txtUmzugLog.ScrollBars = ScrollBars.Vertical;
+        txtUmzugLog.BorderStyle = BorderStyle.FixedSingle;
         txtUmzugLog.BackColor = UI.IsDark ? Color.FromArgb(24, 24, 24) : Color.FromArgb(245, 245, 245);
         txtUmzugLog.ForeColor = UI.IsDark ? Color.FromArgb(220, 220, 220) : Color.FromArgb(40, 40, 40);
         txtUmzugLog.Font = new Font("Consolas", 8.25f);
-        txtUmzugLog.Width = UI.S(UI.Gruppenbreite - 32);
-        txtUmzugLog.Height = UI.S(130);
-        txtUmzugLog.Margin = new Padding(0, UI.S(4), 0, 0);
+        txtUmzugLog.Height = UI.S(150);
+        txtUmzugLog.Margin = new Padding(0, UI.S(4), 0, UI.S(2));
         txtUmzugLog.Visible = false;
         Tip(txtUmzugLog, "Laufendes Protokoll der Sicherung.");
-        statusPanel.Controls.Add(txtUmzugLog);
+        kSich.Zeile(txtUmzugLog);
 
-        f.Controls.Add(Card(statusPanel));
+        f.Controls.Add(umzugSeite.Spalten);
 
-        long sizeDesktop = 0, sizeDocs = 0, sizeDownloads = 0, sizePictures = 0, sizeMusic = 0, sizeVideos = 0;
+        // Geschätzter Umfang der Bereiche ohne eigene Messung
         long sizeLayout = 10485760L;
         long sizeSoftware = 20971520L;
         long sizeProfBrowser = 314572800L;
@@ -372,12 +300,13 @@ public partial class DiagGui
         long sizeProfTerm = 5242880L;
         List<long> customSizes = new List<long>();
 
-        CheckBox chkProfBrowser = null;
-        CheckBox chkProfMail = null;
-        CheckBox chkProfDev = null;
-        CheckBox chkProfTools = null;
-        CheckBox chkProfTerm = null;
-        List<CheckBox> customBoxes = new List<CheckBox>();
+        // Auswahlzeilen der Profile (legt der Schnell-Scan an) und der Zusatzordner
+        LaufwerkZeile chkProfBrowser = null;
+        LaufwerkZeile chkProfMail = null;
+        LaufwerkZeile chkProfDev = null;
+        LaufwerkZeile chkProfTools = null;
+        LaufwerkZeile chkProfTerm = null;
+        List<LaufwerkZeile> customBoxes = new List<LaufwerkZeile>();
         List<string> customPaths = new List<string>();
 
         List<string> destPaths = new List<string>();
@@ -417,7 +346,9 @@ public partial class DiagGui
                     cmbDest.Items.Add(nasText);
                     destPaths.Add(nasPfad);
                     destFs.Add("Netzwerk");
-                    destFree.Add(107374182400L);
+                    // ab v4.09 ohne angenommenen freien Platz: Der Start greift nie auf das NAS zu, die Seite nennt das
+                    // (bis v4.08 standen hier fest 100 GB, die Seite meldete damit immer "Ausreichend")
+                    destFree.Add(0);
                 }
             }
             catch { }
@@ -437,80 +368,59 @@ public partial class DiagGui
 
         Action updateCalc = delegate {
             int selIdx = cmbDest.SelectedIndex;
+            string curPath = (selIdx >= 0 && selIdx < destPaths.Count) ? destPaths[selIdx] : "";
             string curFs = (selIdx >= 0 && selIdx < destFs.Count) ? destFs[selIdx] : "";
             long curFree = (selIdx >= 0 && selIdx < destFree.Count) ? destFree[selIdx] : 0;
-            bool isFat = curFs.IndexOf("FAT", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool isFat = curFs.IndexOf("FAT", StringComparison.OrdinalIgnoreCase) >= 0 && curFs.IndexOf("exFAT", StringComparison.OrdinalIgnoreCase) < 0;
             lblFatWarn.Visible = isFat;
+            lblFatWarn.ForeColor = UI.Warn;
 
-            long totalBytes = 0;
-            if (chkLibDesktop.Checked) totalBytes += sizeDesktop;
-            if (chkLibDocs.Checked) totalBytes += sizeDocs;
-            if (chkLibDownloads.Checked) totalBytes += sizeDownloads;
-            if (chkLibPictures.Checked) totalBytes += sizePictures;
-            if (chkLibMusic.Checked) totalBytes += sizeMusic;
-            if (chkLibVideos.Checked) totalBytes += sizeVideos;
+            long totalBytes = 0; int gewaehlt = 0, bereiche = libChk.Length + 4 + customBoxes.Count;
+            for (int i = 0; i < libChk.Length; i++) if (libChk[i].Checked) { totalBytes += libSize[i]; gewaehlt++; }
 
-            if (chkLayout.Checked) totalBytes += sizeLayout;
-            if (chkSoftware.Checked) totalBytes += sizeSoftware;
+            if (chkLayout.Checked) { totalBytes += sizeLayout; gewaehlt++; }
+            if (chkSoftware.Checked) { totalBytes += sizeSoftware; gewaehlt++; }
             if (chkProfiles.Checked)
             {
+                gewaehlt++;
                 if (chkProfBrowser != null && chkProfBrowser.Checked) totalBytes += sizeProfBrowser;
                 if (chkProfMail != null && chkProfMail.Checked) totalBytes += sizeProfMail;
                 if (chkProfDev != null && chkProfDev.Checked) totalBytes += sizeProfDev;
                 if (chkProfTools != null && chkProfTools.Checked) totalBytes += sizeProfTools;
                 if (chkProfTerm != null && chkProfTerm.Checked) totalBytes += sizeProfTerm;
             }
-
+            if (chkWlan.Checked) gewaehlt++;
 
             for (int i = 0; i < customBoxes.Count; i++)
             {
                 if (customBoxes[i].Checked)
                 {
                     totalBytes += (i < customSizes.Count) ? customSizes[i] : 0;
+                    gewaehlt++;
                 }
             }
 
-            double totalGb = totalBytes / 1073741824.0;
-            double freeGb = curFree / 1073741824.0;
-            string sizeStr = (totalGb >= 0.1 || totalBytes == 0) ? totalGb.ToString("N1") + " GB" : FormatByteSize(totalBytes);
+            // Bereiche unter Profile und WLAN nur bei eingeschalteter Zeile
+            if (subUmzugProfileOffen != chkProfiles.Checked) { subUmzugProfileOffen = chkProfiles.Checked; subUmzugProfile.Visible = subUmzugProfileOffen; }
+            if (subUmzugWlanOffen != chkWlan.Checked) { subUmzugWlanOffen = chkWlan.Checked; subUmzugWlan.Visible = subUmzugWlanOffen; }
 
-            if (curFree > 0 && totalBytes > curFree)
-            {
-                lblSummary.Text = "Gesamtgr\u00F6\u00DFe: " + sizeStr + " \u00B7 Freier Speicher auf Ziel: " + freeGb.ToString("N1") + " GB (Nicht ausreichend Speicherplatz!)";
-                lblSummary.ForeColor = UI.Crit;
-            }
-            else
-            {
-                lblSummary.Text = "Gesamtgr\u00F6\u00DFe: " + sizeStr + " \u00B7 Freier Speicher auf Ziel: " + freeGb.ToString("N1") + " GB (Ausreichend)";
-                lblSummary.ForeColor = UI.Ok;
-            }
+            double totalGb = totalBytes / 1073741824.0;
+            string sizeStr = (totalGb >= 0.1 || totalBytes == 0) ? totalGb.ToString("N1") + " GB" : FormatByteSize(totalBytes);
+            SetText(umzugSeite.Anzahl, gewaehlt + " von " + bereiche + " Bereichen");
+            SetText(umzugSeite.Dauer, gescannt ? "rund " + sizeStr : "Gr\u00F6\u00DFe nach dem Schnell-Scan");
+            SetText(lblSummary, gescannt ? "Gesamtgr\u00F6\u00DFe: rund " + sizeStr : "Gesamtgr\u00F6\u00DFe: nach dem Schnell-Scan");
+            int stufe;
+            SetText(lblPlatz, UmzugPlatzText(curPath, curFs, curFree, totalBytes, gescannt, out stufe));
+            lblPlatz.ForeColor = stufe == 1 ? UI.Ok : stufe == 2 ? UI.Crit : stufe == 3 ? UI.Warn : UI.Muted;
+            lblScanInfo.ForeColor = gescannt ? UI.Ok : UI.Muted;
+            pbUmzug.Fill = UI.Accent;
         };
+        umzugRechne = updateCalc;
 
         cmbDest.SelectedIndexChanged += delegate { updateCalc(); };
-        lnkLibsAll.LinkClicked += delegate {
-            chkLibDesktop.Checked = true;
-            chkLibDocs.Checked = true;
-            chkLibDownloads.Checked = true;
-            chkLibPictures.Checked = true;
-            chkLibMusic.Checked = true;
-            chkLibVideos.Checked = true;
-            updateCalc();
-        };
-        lnkLibsNone.LinkClicked += delegate {
-            chkLibDesktop.Checked = false;
-            chkLibDocs.Checked = false;
-            chkLibDownloads.Checked = false;
-            chkLibPictures.Checked = false;
-            chkLibMusic.Checked = false;
-            chkLibVideos.Checked = false;
-            updateCalc();
-        };
-        chkLibDesktop.CheckedChanged += delegate { updateCalc(); };
-        chkLibDocs.CheckedChanged += delegate { updateCalc(); };
-        chkLibDownloads.CheckedChanged += delegate { updateCalc(); };
-        chkLibPictures.CheckedChanged += delegate { updateCalc(); };
-        chkLibMusic.CheckedChanged += delegate { updateCalc(); };
-        chkLibVideos.CheckedChanged += delegate { updateCalc(); };
+        lnkLibsAll.LinkClicked += delegate { foreach (CheckBox c in libChk) c.Checked = true; };
+        lnkLibsNone.LinkClicked += delegate { foreach (CheckBox c in libChk) c.Checked = false; };
+        foreach (CheckBox c in libChk) c.CheckedChanged += delegate { updateCalc(); };
         chkLayout.CheckedChanged += delegate { updateCalc(); };
         chkSoftware.CheckedChanged += delegate { updateCalc(); };
         chkProfiles.CheckedChanged += delegate {
@@ -522,6 +432,20 @@ public partial class DiagGui
             if (chkProfTerm != null) chkProfTerm.Checked = on;
             updateCalc();
         };
+        chkWlan.CheckedChanged += delegate {
+            if (!chkWlan.Checked) zWlanClear.Checked = false;
+            updateCalc();
+        };
+
+        // Auswahlzeile eines Profils im Bereich unter "Profile und Konfigurationen"
+        Func<string, List<string>, string, LaufwerkZeile> profilZeile = delegate(string titel, List<string> gefunden, string hinweis) {
+            string liste = gefunden != null ? String.Join(", ", gefunden.ToArray()) : "";
+            LaufwerkZeile z = new LaufwerkZeile(titel, "", liste, true);
+            Tip(z, hinweis + (liste.Length > 0 ? "\r\nErkannt: " + liste : ""));
+            z.CheckedChanged += delegate { updateCalc(); };
+            subUmzugProfile.Inhalt.Controls.Add(z);
+            return z;
+        };
 
         Action runScan = delegate {
             btnStartScan.Enabled = false;
@@ -530,35 +454,24 @@ public partial class DiagGui
             string userProf = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
 
-            string pDesktop = GetUserShellFolder("Desktop", Environment.SpecialFolder.Desktop);
-            string pDocs = GetUserShellFolder("Personal", Environment.SpecialFolder.MyDocuments);
-            string pDownloads = GetDownloadsPath();
-            string pPictures = GetUserShellFolder("My Pictures", Environment.SpecialFolder.MyPictures);
-            string pMusic = GetUserShellFolder("My Music", Environment.SpecialFolder.MyMusic);
-            string pVideos = GetUserShellFolder("My Video", Environment.SpecialFolder.MyVideos);
+            string[] libPfad = new string[] {
+                GetUserShellFolder("Desktop", Environment.SpecialFolder.Desktop),
+                GetUserShellFolder("Personal", Environment.SpecialFolder.MyDocuments),
+                GetDownloadsPath(),
+                GetUserShellFolder("My Pictures", Environment.SpecialFolder.MyPictures),
+                GetUserShellFolder("My Music", Environment.SpecialFolder.MyMusic),
+                GetUserShellFolder("My Video", Environment.SpecialFolder.MyVideos) };
 
-            // Echte Größenmessung der Bibliotheken
-            sizeDesktop = SafeDirectorySize(pDesktop);
-            sizeDocs = SafeDirectorySize(pDocs);
-            sizeDownloads = SafeDirectorySize(pDownloads);
-            sizePictures = SafeDirectorySize(pPictures);
-            sizeMusic = SafeDirectorySize(pMusic);
-            sizeVideos = SafeDirectorySize(pVideos);
-
-            chkLibDesktop.Text = "Desktop (" + FormatByteSize(sizeDesktop) + ")";
-            chkLibDocs.Text = "Dokumente (" + FormatByteSize(sizeDocs) + ")";
-            chkLibDownloads.Text = "Downloads (" + FormatByteSize(sizeDownloads) + ")";
-            chkLibPictures.Text = "Bilder (" + FormatByteSize(sizePictures) + ")";
-            chkLibMusic.Text = "Musik (" + FormatByteSize(sizeMusic) + ")";
-            chkLibVideos.Text = "Videos (" + FormatByteSize(sizeVideos) + ")";
-
+            // Echte Größenmessung der Bibliotheken: Größe als Etikett, der Ordner als Beschreibung der Zeile
             int libCount = 0;
-            if (Directory.Exists(pDesktop)) libCount++;
-            if (Directory.Exists(pDocs)) libCount++;
-            if (Directory.Exists(pDownloads)) libCount++;
-            if (Directory.Exists(pPictures)) libCount++;
-            if (Directory.Exists(pMusic)) libCount++;
-            if (Directory.Exists(pVideos)) libCount++;
+            for (int i = 0; i < libPfad.Length; i++)
+            {
+                bool da = !String.IsNullOrEmpty(libPfad[i]) && Directory.Exists(libPfad[i]);
+                libSize[i] = SafeDirectorySize(libPfad[i]);
+                SetText(libGroesse[i], da ? FormatByteSize(libSize[i]) : "");
+                umzugLibRows[i].Description = da ? libPfad[i] : "Ordner auf diesem PC nicht gefunden";
+                if (da) libCount++;
+            }
 
             bool hasWp = false;
             try { hasWp = File.Exists(Path.Combine(roamApp, "Microsoft\\Windows\\Themes\\TranscodedWallpaper")); } catch { }
@@ -607,48 +520,28 @@ public partial class DiagGui
 
             int totalFound = libCount + (hasWp ? 1 : 0) + (hasWg ? 1 : 0) + foundBrowsers.Count + foundMail.Count + foundDev.Count + foundTools.Count + (hasTerminal ? 1 : 0);
 
+            gescannt = true;
             lblScanInfo.Text = "\u2713 Scan abgeschlossen: " + totalFound + " Komponenten und Profile auf diesem PC erkannt.";
             lblScanInfo.ForeColor = UI.Ok;
 
-            profSubFlow.Controls.Clear();
-
-            if (foundBrowsers.Count > 0) {
-                chkProfBrowser = Chk("Webbrowser: " + String.Join(", ", foundBrowsers.ToArray()), true);
-                Tip(chkProfBrowser, "Sichert Lesezeichen, Sitzungen und Einstellungen der erkannten Webbrowser.");
-                chkProfBrowser.CheckedChanged += delegate { updateCalc(); };
-                profSubFlow.Controls.Add(chkProfBrowser);
-            }
-            if (foundMail.Count > 0) {
-                chkProfMail = Chk("E-Mail-Clients: " + String.Join(", ", foundMail.ToArray()), true);
-                Tip(chkProfMail, "Sichert Kontoeinstellungen, Adressb\u00FCcher und E-Mail-Profile von Mozilla Thunderbird.");
-                chkProfMail.CheckedChanged += delegate { updateCalc(); };
-                profSubFlow.Controls.Add(chkProfMail);
-            }
-            if (foundDev.Count > 0) {
-                chkProfDev = Chk("Entwickler & Editoren: " + String.Join(", ", foundDev.ToArray()), true);
-                Tip(chkProfDev, "Sichert Benutzereinstellungen, Tastenbelegungen und Konfigurationsdateien von Entwicklungswerkzeugen.");
-                chkProfDev.CheckedChanged += delegate { updateCalc(); };
-                profSubFlow.Controls.Add(chkProfDev);
-            }
-            if (foundTools.Count > 0) {
-                chkProfTools = Chk("Tools & Remote: " + String.Join(", ", foundTools.ToArray()), true);
-                Tip(chkProfTools, "Sichert Serverlisten, FTP-Verbindungen und Session-Profile g\u00E4ngiger Hilfswerkzeuge.");
-                chkProfTools.CheckedChanged += delegate { updateCalc(); };
-                profSubFlow.Controls.Add(chkProfTools);
-            }
-            if (hasTerminal) {
-                chkProfTerm = Chk("Windows Terminal & Konsole (settings.json)", true);
-                Tip(chkProfTerm, "Sichert benutzerdefinierte Profile und Farbschemata des Windows Terminals.");
-                chkProfTerm.CheckedChanged += delegate { updateCalc(); };
-                profSubFlow.Controls.Add(chkProfTerm);
-            }
-            if (profSubFlow.Controls.Count == 0) {
-                Label lblNoProfs = Hint("Keine spezifischen Anwendungsprofile auf diesem PC gefunden.", 0);
+            // Profile: je erkannter Gruppe eine Auswahlzeile unter "Profile und Konfigurationen"
+            subUmzugProfile.Inhalt.SuspendLayout();
+            subUmzugProfile.Inhalt.Controls.Clear();
+            chkProfBrowser = null; chkProfMail = null; chkProfDev = null; chkProfTools = null; chkProfTerm = null;
+            if (foundBrowsers.Count > 0) chkProfBrowser = profilZeile("Webbrowser", foundBrowsers, "Sichert Lesezeichen, Sitzungen und Einstellungen der erkannten Webbrowser.");
+            if (foundMail.Count > 0) chkProfMail = profilZeile("E-Mail-Programme", foundMail, "Sichert Kontoeinstellungen, Adressb\u00FCcher und E-Mail-Profile von Mozilla Thunderbird.");
+            if (foundDev.Count > 0) chkProfDev = profilZeile("Entwicklung und Editoren", foundDev, "Sichert Benutzereinstellungen, Tastenbelegungen und Konfigurationsdateien von Entwicklungswerkzeugen.");
+            if (foundTools.Count > 0) chkProfTools = profilZeile("Werkzeuge und Fernzugriff", foundTools, "Sichert Serverlisten, FTP-Verbindungen und Session-Profile g\u00E4ngiger Hilfswerkzeuge.");
+            if (hasTerminal) chkProfTerm = profilZeile("Windows Terminal", new List<string>(new string[] { "settings.json" }), "Sichert benutzerdefinierte Profile und Farbschemata des Windows Terminals.");
+            if (subUmzugProfile.Inhalt.Controls.Count == 0) {
+                Label lblNoProfs = Lbl("Keine Anwendungsprofile auf diesem PC gefunden (Browser, E-Mail, Editoren, Werkzeuge).", 8.5f, false, UI.Muted);
+                lblNoProfs.Margin = new Padding(0, 0, 0, UI.S(2));
                 Tip(lblNoProfs, "Es wurden keine Standardprofile f\u00FCr Browser, Mail oder Tools gefunden.");
-                profSubFlow.Controls.Add(lblNoProfs);
+                subUmzugProfile.Inhalt.Controls.Add(lblNoProfs);
             }
+            subUmzugProfile.Inhalt.ResumeLayout(true);
+            subUmzugProfile.Ordne();
 
-            customPanel.Controls.Clear();
             customBoxes.Clear();
             customPaths.Clear();
             customSizes.Clear();
@@ -671,7 +564,7 @@ public partial class DiagGui
 
                         long cSize = SafeDirectorySize(di.FullName);
                         string cSizeStr = FormatByteSize(cSize);
-                        CheckBox cb = Chk("Ordner C:\\" + di.Name + (cSize > 0 ? " (" + cSizeStr + ")" : ""), false);
+                        LaufwerkZeile cb = new LaufwerkZeile("C:\\" + di.Name, "", cSizeStr, false);
                         cb.Tag = di.FullName;
                         Tip(cb, "Sichert das Verzeichnis C:\\" + di.Name + " (" + cSizeStr + ") in den Unterordner C_Laufwerk_Zusatz.");
                         cb.CheckedChanged += delegate { updateCalc(); };
@@ -682,17 +575,18 @@ public partial class DiagGui
                 }
             } catch { }
 
+            karteUmzugZusatz.Leere();
             if (customBoxes.Count > 0) {
-                Label lblCHead = Lbl("Erkannte Zusatzordner auf Laufwerk C:\\ (bei Bedarf w\u00E4hlen):", 9f, true, UI.Text);
-                lblCHead.Margin = new Padding(0, UI.S(8), 0, UI.S(2));
-                Tip(lblCHead, "Zusatzordner auf C:\\.");
-                customPanel.Controls.Add(lblCHead);
-                foreach (CheckBox cb in customBoxes) customPanel.Controls.Add(cb);
+                foreach (LaufwerkZeile cb in customBoxes) karteUmzugZusatz.Zeile(cb);
+                Label lblCHead = Lbl("Bei Bedarf w\u00E4hlen. Gesichert wird in den Unterordner C_Laufwerk_Zusatz.", 8.5f, false, UI.Muted);
+                lblCHead.Margin = new Padding(0, UI.S(2), 0, UI.S(2));
+                karteUmzugZusatz.Frei(lblCHead);
             } else {
-                Label lblNoC = Hint("Keine zus\u00E4tzlichen Stammordner auf Laufwerk C:\\ gefunden.", 0);
-                Tip(lblNoC, "Keine zus\u00E4tzlichen Ordner auf C:\\ vorhanden.");
-                customPanel.Controls.Add(lblNoC);
+                Label lblNoC = Lbl("Keine zus\u00E4tzlichen Stammordner auf Laufwerk C: gefunden.", 8.5f, false, UI.Muted);
+                lblNoC.Margin = new Padding(0, 0, 0, UI.S(2));
+                karteUmzugZusatz.Frei(lblNoC);
             }
+            karteUmzugZusatz.Breite(karteUmzugZusatz.Karte.Width);
 
             btnStartScan.Enabled = true;
             updateCalc();
@@ -719,7 +613,8 @@ public partial class DiagGui
                         free = di.AvailableFreeSpace;
                     }
                     catch { }
-                    string itemText = p + " (" + (free / 1073741824L) + " GB frei, " + fs + ")";
+                    // Ordner ohne lesbares Laufwerk (Freigabe \\Server\Ordner): ohne erfundene Angaben
+                    string itemText = free > 0 ? p + " (" + (free / 1073741824L) + " GB frei, " + fs + ")" : p;
                     cmbDest.Items.Add(itemText);
                     destPaths.Add(p);
                     destFs.Add(fs);
@@ -727,6 +622,13 @@ public partial class DiagGui
                     cmbDest.SelectedIndex = cmbDest.Items.Count - 1;
                 }
             }
+        };
+
+        // Während der Sicherung: Auswahl und Ziel gesperrt, die Schalter zeigen ihren Stand gedämpft
+        Action<bool> sperre = delegate(bool an) {
+            foreach (ZeilenKarte k in new ZeilenKarte[] { kLib, kSys, karteUmzugZusatz, kZiel }) k.Inhalt.Enabled = !an;
+            btnStartUmzug.Enabled = !an;
+            btnStartScan.Enabled = !an;
         };
 
         btnStartUmzug.Click += delegate {
@@ -739,12 +641,7 @@ public partial class DiagGui
             string targetPath = destPaths[selIdx];
 
             List<string> scopes = new List<string>();
-            if (chkLibDesktop.Checked) scopes.Add("Lib_Desktop");
-            if (chkLibDocs.Checked) scopes.Add("Lib_Dokumente");
-            if (chkLibDownloads.Checked) scopes.Add("Lib_Downloads");
-            if (chkLibPictures.Checked) scopes.Add("Lib_Bilder");
-            if (chkLibMusic.Checked) scopes.Add("Lib_Musik");
-            if (chkLibVideos.Checked) scopes.Add("Lib_Videos");
+            for (int i = 0; i < libChk.Length; i++) if (libChk[i].Checked) scopes.Add(libScope[i]);
             if (chkLayout.Checked) scopes.Add("Layout");
             if (chkSoftware.Checked) scopes.Add("Programme");
             if (chkProfiles.Checked)
@@ -760,19 +657,21 @@ public partial class DiagGui
             if (chkWlan.Checked)
             {
                 scopes.Add("Wlan");
-                if (chkWlanClear.Checked) scopes.Add("Wlan_Klartext");
-            }
-
-            if (scopes.Count == 0 && customBoxes.Count == 0)
-            {
-                MessageBox.Show(this, "Bitte w\u00E4hlen Sie mindestens eine Sicherungskomponente aus.", "System-Umzug", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
+                if (zWlanClear.Checked) scopes.Add("Wlan_Klartext");
             }
 
             List<string> chosenCustom = new List<string>();
             for (int i = 0; i < customBoxes.Count; i++)
             {
                 if (customBoxes[i].Checked) chosenCustom.Add(customPaths[i]);
+            }
+
+            // ab v4.09 zählen die gewählten Zusatzordner (bis v4.08 genügte, dass der Scan welche gefunden hatte: Die
+            // Sicherung startete dann auch ganz ohne Auswahl)
+            if (scopes.Count == 0 && chosenCustom.Count == 0)
+            {
+                MessageBox.Show(this, "Bitte w\u00E4hlen Sie mindestens eine Sicherungskomponente aus.", "System-Umzug", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
             }
 
             string scopeStr = String.Join(",", scopes.ToArray());
@@ -786,29 +685,7 @@ public partial class DiagGui
 
             if (MessageBox.Show(this, prompt, "System-Umzug starten", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
 
-            btnStartUmzug.Enabled = false;
-            btnStartScan.Enabled = false;
-            btnBrowse.Enabled = false;
-            cmbDest.Enabled = false;
-            lnkLibsAll.Enabled = false;
-            lnkLibsNone.Enabled = false;
-            chkLibDesktop.Enabled = false;
-            chkLibDocs.Enabled = false;
-            chkLibDownloads.Enabled = false;
-            chkLibPictures.Enabled = false;
-            chkLibMusic.Enabled = false;
-            chkLibVideos.Enabled = false;
-            chkLayout.Enabled = false;
-            chkSoftware.Enabled = false;
-            chkProfiles.Enabled = false;
-            chkWlan.Enabled = false;
-            chkWlanClear.Enabled = false;
-            if (chkProfBrowser != null) chkProfBrowser.Enabled = false;
-            if (chkProfMail != null) chkProfMail.Enabled = false;
-            if (chkProfDev != null) chkProfDev.Enabled = false;
-            if (chkProfTools != null) chkProfTools.Enabled = false;
-            if (chkProfTerm != null) chkProfTerm.Enabled = false;
-            foreach (CheckBox cb in customBoxes) cb.Enabled = false;
+            sperre(true);
 
             lblUmzugProg.Text = "Sicherung wird gestartet ...";
             lblUmzugProg.Visible = true;
@@ -927,30 +804,8 @@ public partial class DiagGui
                 try
                 {
                     BeginInvoke(new MethodInvoker(delegate {
-                        btnStartUmzug.Enabled = true;
-                        btnStartScan.Enabled = true;
-                        btnBrowse.Enabled = true;
-                        cmbDest.Enabled = true;
-                        lnkLibsAll.Enabled = true;
-                        lnkLibsNone.Enabled = true;
-                        chkLibDesktop.Enabled = true;
-                        chkLibDocs.Enabled = true;
-                        chkLibDownloads.Enabled = true;
-                        chkLibPictures.Enabled = true;
-                        chkLibMusic.Enabled = true;
-                        chkLibVideos.Enabled = true;
-                        chkLayout.Enabled = true;
-                        chkSoftware.Enabled = true;
-                        chkProfiles.Enabled = true;
-                        chkWlan.Enabled = true;
-                        chkWlanClear.Enabled = chkWlan.Checked;
-                        if (chkProfBrowser != null) chkProfBrowser.Enabled = true;
-                        if (chkProfMail != null) chkProfMail.Enabled = true;
-                        if (chkProfDev != null) chkProfDev.Enabled = true;
-                        if (chkProfTools != null) chkProfTools.Enabled = true;
-                        if (chkProfTerm != null) chkProfTerm.Enabled = true;
+                        sperre(false);
                         lblUmzugDetail.Visible = false;
-                        foreach (CheckBox cb in customBoxes) cb.Enabled = true;
 
                         if (isSuccess)
                         {

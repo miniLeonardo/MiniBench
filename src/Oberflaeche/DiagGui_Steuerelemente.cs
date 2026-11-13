@@ -265,6 +265,15 @@ public static class UI
     public const string IcoErgebnis = "\uE9D2";
     public const string IcoBlitz = "\uE945";
     public const string IcoDokument = "\uE8A5";
+    // ab v4.09: Symbole der Seite System-Umzug (Segoe MDL2 Assets / Fluent Icons)
+    public const string IcoBildschirm = "\uE770";
+    public const string IcoHerunterladen = "\uE896";
+    public const string IcoBild = "\uE8B9";
+    public const string IcoMusik = "\uE8D6";
+    public const string IcoVideo = "\uE714";
+    public const string IcoAnpassen = "\uE771";
+    public const string IcoKontakt = "\uE77B";
+    public const string IcoWlan = "\uE701";
 
     // Symbol nach Namen (Katalog und Vertrag nennen Felder wie "IcoShield"); unbekannt oder leer: ersatz
     public static string IconByName(string name, string ersatz)
@@ -1195,8 +1204,12 @@ public class DarkComboBox : ComboBox
 }
 
 // Moderner Windows 11 Toggle-Switch (Wintoys-Look, ab v3.9 mit UI.S(38) x UI.S(20))
+// ab v4.09: Das Element ist ringsum um Rand größer als die Pille. Vorher füllte die Pille das Element ganz aus: Die
+// geglättete Kontur lag auf der Kante, der Fokusrahmen außerhalb, beides wurde rechts und unten abgeschnitten.
 public class ToggleSwitch : Control
 {
+    public const int Rand = 3;
+    public const int PilleBreite = 38, PilleHoehe = 20;
     bool isChecked;
     bool hover;
     public event EventHandler CheckedChanged;
@@ -1209,7 +1222,7 @@ public class ToggleSwitch : Control
         Cursor = Cursors.Hand;
         AccessibleRole = AccessibleRole.CheckButton;
         AccessibleName = "Schalter";
-        Size = new Size(UI.S(38), UI.S(20));
+        Size = new Size(UI.S(PilleBreite) + 2 * UI.S(Rand), UI.S(PilleHoehe) + 2 * UI.S(Rand));
         BackColor = Color.Transparent;
     }
 
@@ -1238,6 +1251,18 @@ public class ToggleSwitch : Control
 
     // Umschalten durch den Nutzer (Klick, Leertaste, Klick auf die Zeile); gesperrt ohne Wirkung
     public void UserToggle() { if (!locked) Checked = !Checked; }
+
+    // Fläche der Pille im Element (für Layout und Selbsttest): liegt mit Abstand Rand innerhalb des Elements
+    public Rectangle Pille
+    {
+        get
+        {
+            int w = Math.Max(UI.S(12), Math.Min(UI.S(PilleBreite), Width - 2 * UI.S(Rand)));
+            int h = Math.Max(UI.S(8), Math.Min(UI.S(PilleHoehe), Height - 2 * UI.S(Rand)));
+            return new Rectangle((Width - w) / 2, (Height - h) / 2, w, h);
+        }
+    }
+    protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
 
     protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
     protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
@@ -1269,10 +1294,10 @@ public class ToggleSwitch : Control
         Graphics g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
-        int trackW = UI.S(38);
-        int trackH = UI.S(20);
-        int trackX = (Width - trackW) / 2;
-        int trackY = (Height - trackH) / 2;
+        // Pille in fester Größe in der Mitte; passt sie nicht ganz hinein (Element von außen kleiner gesetzt), schrumpft
+        // sie mit, damit Kontur und Fokusrahmen nie an der Kante liegen
+        Rectangle pille = Pille;
+        int trackW = pille.Width, trackH = pille.Height, trackX = pille.X, trackY = pille.Y;
         RectangleF trackRect = new RectangleF(trackX, trackY, trackW, trackH);
         float rad = trackH / 2f;
 
@@ -1284,7 +1309,9 @@ public class ToggleSwitch : Control
         {
             if (isChecked)
             {
-                Color fillColor = locked ? UI.Ok : hover ? UI.AccentHover : UI.Accent;
+                Color fillColor = locked ? UI.Ok : hover && Enabled ? UI.AccentHover : UI.Accent;
+                // deaktiviert (laufende Sicherung auf der Seite System-Umzug): Stand bleibt lesbar, Fläche gedämpft
+                if (!Enabled) fillColor = UI.Mix(fillColor, UI.Panel, 0.55);
                 using (SolidBrush b = new SolidBrush(fillColor)) g.FillPath(b, trackPath);
                 using (Pen p = new Pen(fillColor, 1f)) g.DrawPath(p, trackPath);
             }
@@ -1825,8 +1852,9 @@ public class SettingRow : Control
         int curRight = Width - UI.S(16);
         if (toggle != null)
         {
-            toggle.Location = new Point(curRight - toggle.Width, (Height - toggle.Height) / 2);
-            curRight -= toggle.Width + UI.S(10);
+            // die Pille endet wie bisher am rechten Rand der Zeile; der Rand des Elements (ab v4.09) ragt darüber hinaus
+            toggle.Location = new Point(curRight + UI.S(ToggleSwitch.Rand) - toggle.Width, (Height - toggle.Height) / 2);
+            curRight = toggle.Left + UI.S(ToggleSwitch.Rand) - UI.S(10);
         }
         List<Badge> visibleBadges = new List<Badge>();
         for (int i = 0; i < badges.Count; i++)
@@ -1857,6 +1885,7 @@ public class SettingRow : Control
     protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
     protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
     protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
+    protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
 
     protected override void OnMouseClick(MouseEventArgs e)
     {
@@ -1885,8 +1914,9 @@ public class SettingRow : Control
         g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
         RectangleF r = new RectangleF(1, 1, Width - 3, Height - 3);
-        Color bg = hover ? (UI.IsDark ? Color.FromArgb(42, 44, 48) : Color.FromArgb(246, 248, 252)) : UI.Panel;
-        Color border = hover ? (UI.IsDark ? Color.FromArgb(70, 74, 80) : Color.FromArgb(215, 219, 226)) : UI.Line;
+        bool hv = hover && Enabled;
+        Color bg = hv ? (UI.IsDark ? Color.FromArgb(42, 44, 48) : Color.FromArgb(246, 248, 252)) : UI.Panel;
+        Color border = hv ? (UI.IsDark ? Color.FromArgb(70, 74, 80) : Color.FromArgb(215, 219, 226)) : UI.Line;
 
         using (GraphicsPath p = UI.Round(r, UI.SF(6)))
         {
@@ -1897,7 +1927,7 @@ public class SettingRow : Control
         int curX = TextLinks;
         if (icon.Length > 0)
             using (Font fi = UI.SymbolFont(13f))
-                TextRenderer.DrawText(g, icon, fi, new Rectangle(UI.S(10), 0, UI.S(28), Height), UI.Accent, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoClipping);
+                TextRenderer.DrawText(g, icon, fi, new Rectangle(UI.S(10), 0, UI.S(28), Height), Enabled ? UI.Accent : UI.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoClipping);
         int rightBound = Width - UI.S(16);
         if (toggle != null) rightBound = Math.Min(rightBound, toggle.Left);
         for (int i = 0; i < badges.Count; i++)
@@ -1913,7 +1943,7 @@ public class SettingRow : Control
             Size tsz = TextRenderer.MeasureText(g, title ?? "", ft, new Size(textW, int.MaxValue), TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
             int titleH = Math.Max(tsz.Height, UI.S(18));
             int startY = string.IsNullOrEmpty(desc) ? (Height - titleH) / 2 : UI.S(7);
-            TextRenderer.DrawText(g, title ?? "", ft, new Rectangle(curX, startY, textW, titleH), UI.Text, TextFormatFlags.Left | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
+            TextRenderer.DrawText(g, title ?? "", ft, new Rectangle(curX, startY, textW, titleH), Enabled ? UI.Text : UI.Muted, TextFormatFlags.Left | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
 
             if (!string.IsNullOrEmpty(desc))
             {
@@ -1968,11 +1998,12 @@ public class LaufwerkZeile : Control
     protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
     protected override void OnMouseClick(MouseEventArgs e) { if (e.Button == MouseButtons.Left) { Focus(); Checked = !Checked; } base.OnMouseClick(e); }
     protected override void OnKeyDown(KeyEventArgs e) { if (e.KeyCode == Keys.Space) { Checked = !Checked; e.Handled = true; } base.OnKeyDown(e); }
+    protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
     protected override void OnPaint(PaintEventArgs e)
     {
         Graphics g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias; g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
         using (SolidBrush ob = new SolidBrush(UI.Panel)) g.FillRectangle(ob, ClientRectangle);
-        Color bg = hover ? (UI.IsDark ? Color.FromArgb(42, 44, 48) : Color.FromArgb(246, 248, 252)) : (UI.IsDark ? Color.FromArgb(30, 31, 33) : Color.FromArgb(250, 251, 252));
+        Color bg = hover && Enabled ? (UI.IsDark ? Color.FromArgb(42, 44, 48) : Color.FromArgb(246, 248, 252)) : (UI.IsDark ? Color.FromArgb(30, 31, 33) : Color.FromArgb(250, 251, 252));
         using (GraphicsPath p = UI.Round(new RectangleF(0.5f, 0.5f, Width - 2, Height - 2), UI.SF(6)))
         {
             using (SolidBrush b = new SolidBrush(bg)) g.FillPath(b, p);
@@ -1980,10 +2011,12 @@ public class LaufwerkZeile : Control
         }
         int bs = UI.S(16);
         Rectangle bx = new Rectangle(UI.S(10), (Height - bs) / 2, bs, bs);
+        // gesperrt (laufende Sicherung auf der Seite System-Umzug): Haken bleibt lesbar, Fläche gedämpft
+        Color akz = Enabled ? UI.Accent : UI.Mix(UI.Accent, UI.Panel, 0.55);
         using (GraphicsPath bp = UI.Round(bx, UI.SF(4)))
         {
-            using (SolidBrush bb = new SolidBrush(isChecked ? UI.Accent : UI.Panel)) g.FillPath(bb, bp);
-            using (Pen bpen = new Pen(isChecked ? UI.Accent : (UI.IsDark ? Color.FromArgb(90, 95, 105) : Color.FromArgb(160, 170, 185)), UI.SF(1.5f))) g.DrawPath(bpen, bp);
+            using (SolidBrush bb = new SolidBrush(isChecked ? akz : UI.Panel)) g.FillPath(bb, bp);
+            using (Pen bpen = new Pen(isChecked ? akz : (UI.IsDark ? Color.FromArgb(90, 95, 105) : Color.FromArgb(160, 170, 185)), UI.SF(1.5f))) g.DrawPath(bpen, bp);
         }
         if (isChecked) using (Pen ck = new Pen(UI.OnAccent, UI.SF(2f))) { ck.StartCap = LineCap.Round; ck.EndCap = LineCap.Round; g.DrawLines(ck, new PointF[] { new PointF(bx.X + bs * 0.24f, bx.Y + bs * 0.52f), new PointF(bx.X + bs * 0.44f, bx.Y + bs * 0.72f), new PointF(bx.X + bs * 0.78f, bx.Y + bs * 0.30f) }); }
         int x = bx.Right + UI.S(9), right = Width - UI.S(10);
@@ -2003,7 +2036,7 @@ public class LaufwerkZeile : Control
                 int bw = bus.Length > 0 ? bsz.Width + UI.S(14) : 0;
                 Size ns = TextRenderer.MeasureText(g, name, fn, new Size(int.MaxValue, Height), TextFormatFlags.NoPadding);
                 int nw = Math.Min(ns.Width, Math.Max(UI.S(40), right - x - bw - UI.S(8)));
-                TextRenderer.DrawText(g, name, fn, new Rectangle(x, 0, nw, Height), UI.Text, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                TextRenderer.DrawText(g, name, fn, new Rectangle(x, 0, nw, Height), Enabled ? UI.Text : UI.Muted, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
                 if (bus.Length > 0)
                 {
                     Color fg, bbg; UI.BadgeColors("skip", out fg, out bbg);
@@ -2108,9 +2141,10 @@ public class UnterBereich : Panel
     }
     public int InhaltBreite { get { return Math.Max(UI.S(120), Width - UI.S(14)); } }
     void Passe() { int h = Inhalt.Height + UI.S(8); if (Height != h) Height = h; }
-    protected override void OnResize(EventArgs e)
+    protected override void OnResize(EventArgs e) { base.OnResize(e); Ordne(); }
+    // Breite an den Inhalt weitergeben; nach einem neu aufgebauten Inhalt (Schnell-Scan der Seite System-Umzug) aufrufen
+    public void Ordne()
     {
-        base.OnResize(e);
         int w = InhaltBreite;
         foreach (Control c in Inhalt.Controls)
         {
@@ -2218,7 +2252,7 @@ public class FluentCard : Control
         Margin = new Padding(0, 0, 0, UI.S(8));
 
         toggle = new ToggleSwitch();
-        toggle.Location = new Point(Width - toggle.Width - UI.S(16), (Height - toggle.Height) / 2);
+        toggle.Location = new Point(Width - toggle.Width - UI.S(16) + UI.S(ToggleSwitch.Rand), (Height - toggle.Height) / 2);
         toggle.CheckedChanged += delegate
         {
             if (CheckedChanged != null) CheckedChanged(this, EventArgs.Empty);
@@ -2302,7 +2336,7 @@ public class FluentCard : Control
         }
         if (toggle != null && toggle.Visible)
         {
-            toggle.Location = new Point(curRight - toggle.Width, (Height - toggle.Height) / 2);
+            toggle.Location = new Point(curRight + UI.S(ToggleSwitch.Rand) - toggle.Width, (Height - toggle.Height) / 2);
         }
     }
 

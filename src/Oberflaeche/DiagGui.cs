@@ -763,11 +763,11 @@ public partial class DiagGui : Form
         Tip(cmbRef, "System oder Medianwert, gegen den die Messungen in Prozent angegeben werden (100 % = Referenz). Gespeicherte Referenz: die eigene Referenz (Referenz.json, festgelegt in der Datenbank), sonst der gespeicherte Median der Geräteklasse; Median: aus allen passenden Läufen der Datenbank.");
         Tip(btnUpdateMed, "Berechnet die Median-Referenzen für alle Systeme, Notebooks und Desktops aus der Datenbank neu und speichert sie als Referenz_Median.json, Referenz_Notebook.json und Referenz_Desktop.json. Die eigene Referenz (Referenz.json) bleibt unverändert.");
         // Lasttest
-        Tip(chkLCpu, "Alle logischen Prozessoren rechnen mit Ergebnisprüfung; Rechenfehler deuten auf Instabilität (Übertaktung, Spannung, Kühlung, Netzteil). Läuft in einem eigenen Prozess ohne Unterbrechungen. Mit Sensoren gibt es Takt- und Temperaturverlauf und den Drosselnachweis. Ersetzt ab v2.7 den CPU-Stabilitätstest der Diagnose.");
-        Tip(chkLRam, "Mustertest über einen Teil des freien Arbeitsspeichers mit Bitfehlerprüfung. Neben der CPU-Last läuft er mit niedriger Priorität auf einem Viertel der Threads.");
+        Tip(chkLCpu, lastTips[0]);
+        Tip(chkLRam, lastTips[1]);
         Tip(cmbLRamPct, "Anteil des freien Arbeitsspeichers, den der RAM-Test belegt. Mehr findet mehr Fehler, lässt Windows aber weniger Luft.");
-        Tip(chkLGpu, "Eigener Rendertest mit Direct3D 11 als Dauerlast auf den gewählten Grafikeinheiten gleichzeitig: Bilder/s-Verlauf, Bildprüfung alle 30 Sekunden und Erkennung von Treiber-Resets.");
-        Tip(chkLDisk, "Schreibt eine Testdatei (bis 4 GB), liest sie zurück und prüft jeden Block. Meldet Datenfehler, Ein-/Ausgabefehler und Controllerereignisse. Die Datei wird danach gelöscht.");
+        Tip(chkLGpu, lastTips[2]);
+        Tip(chkLDisk, lastTips[3]);
         Tip(cmbLDiskDrive, "Laufwerk für den Datenträgertest; es braucht mindestens 2 GB freien Platz.");
         foreach (ComboBox c in new ComboBox[] { cmbLCpu, cmbLRam, cmbLGpu, cmbLDisk }) Tip(c, "Dauer dieser Komponente. Alle gewählten Komponenten starten gleichzeitig, jede endet nach ihrer eigenen Dauer.");
         Tip(cmbLGpuSel, "Welche Grafikeinheiten der Rendertest belastet (gleich eingestellt wie im Benchmark).");
@@ -775,6 +775,9 @@ public partial class DiagGui : Form
         Tip(cmbLGpuShow, "Fenster, Vollbild oder ohne Anzeige für den Rendertest (gleich eingestellt wie im Benchmark).");
         Tip(cmbLAbortCpu, "Liegt die CPU-Temperatur über dieser Schwelle, endet der Test mit einem Befund. Automatisch: TjMax der CPU nach rund einer Minute (viele Notebooks laufen planmäßig an TjMax), sonst 100 °C. Feste Werte greifen nach rund 10 Sekunden.");
         Tip(cmbLAbortGpu, "Liegt die GPU-Temperatur rund 10 Sekunden über dieser Schwelle, endet der Test mit einem Befund.");
+        Tip(lnkLastAll, "Schaltet alle vier Komponenten ein.");
+        Tip(lnkLastNone, "Schaltet alle Komponenten aus.");
+        Tip(lnkLastSens, "Öffnet die Seite Sensoren live. Dort steht, ob der Treiber PawnIO für Messungen verwendet wird.");
         // Reparatur
         for (int i = 0; repChk != null && i < repChk.Length && i < repKeys.Length; i++)
         {
@@ -853,7 +856,7 @@ public partial class DiagGui : Form
         if (i == 3) UpdateLoadExtras();
         // ab v4.05: installierte Softwarepakete beim ersten Öffnen der Seite Tools im Hintergrund erkennen
         if (i == 6) { if (!paketGeprueft) StartSoftwareStateCheck(); if (toolsLayout != null) toolsLayout(); }
-        if (i == 1 || i == 2) OrdneModulSeiten();
+        if (IstModulSeite(i)) OrdneModulSeiten();
         ApplyNativeControlThemes();
         if (vorher != null) Ueberblendung.Starte(content, vorher);
     }

@@ -5,6 +5,16 @@ Neueste Version zuerst. Einzelheiten je Version in Doku\Änderungen_vX.Y.txt (ab
 keine Änderungsdateien mehr; die Einträge nennen nur, was im Quelltext und in den Änderungen zu 2.2 belegt ist.
 Die Liste steht auch im Programm (Info-Knopf oben rechts, Quelle: src\Oberflaeche\Versionen.cs).
 
+VERSION 4.09  (13.11.2026)  LASTTEST UND SYSTEM-UMZUG IM STIL DER ÜBRIGEN SEITEN, SCHALTER OHNE BESCHNITT
+=========================================================================================================
+• Seite Lasttest neu aufgebaut: links die Karte „Komponenten“ mit je einer Zeile (Symbol, Beschreibung, gewählte Dauer, Schalter) und „Alle an · Alle aus“. Dauer und Einstellungen stehen unter ihrer Komponente und nur, wenn sie eingeschaltet ist. Rechts die Abbruchschwellen und die Karte „Sensoren“: Sie nennt, woher CPU-Temperatur, Takt, Leistung und Lüfter des Laufs kommen (PawnIO vorübergehend, installiert oder nicht verwendet). Der Seitenkopf nennt „3 von 4 Komponenten“ und die Gesamtdauer.
+• Seite System-Umzug neu aufgebaut: links Benutzer-Bibliotheken, System und Programme und Zusatzordner als Zeilen mit Schalter, rechts Zielmedium und Sicherung mit Fortschritt und Protokoll. Nach dem Schnell-Scan trägt jede Bibliothek ihren Ordner und ihre Größe; erkannte Profile stehen als Auswahlzeilen unter „Profile und Konfigurationen“, weitere Ordner von Laufwerk C: in einer eigenen Karte. Während der Sicherung ist die Auswahl gesperrt.
+• Beide Seiten nutzen den Rahmen der Seiten Benchmark und Diagnose und ordnen sich unter 900 px Seitenbreite in einer Spalte. Vorlagen, Zeitschätzung, Startparameter und der Umfang der Sicherung sind unverändert; gespeicherte Vorlagen laden wie bisher.
+• Behoben: Die Schalter waren auf allen Seiten rechts und unten leicht abgeschnitten, weil die Pille ihr Element ganz ausfüllte. Das Element ist jetzt ringsum 3 px größer, die Pille steht an derselben Stelle.
+• Behoben: Die Datenpflege lief bei jedem Start, „Datenpflege: unverändert“ kam nie zustande (auf dem Stick 0,8 bis 1,5 s je Start). Sie entfernt den leeren Ordner Laufzeit\<PC>, der Start legt ihn wieder an, und der gespeicherte Stand zählte ihn mit.
+• Behoben, System-Umzug: Für ein Netzlaufwerk meldete die Seite fest „100,0 GB (Ausreichend)“, ohne Zielmedium „0,0 GB (Ausreichend)“ und vor dem Schnell-Scan „Gesamtgröße 0,0 GB“; jetzt steht da, was bekannt ist. exFAT löste die Warnung für FAT32 aus. Die Sicherung ließ sich ganz ohne Auswahl starten, sobald der Scan Zusatzordner gefunden hatte.
+• Behoben: Im Kopf der Seiten Benchmark und Diagnose blieb rechts eine Lücke, wenn der Text zu Anzahl oder Dauer kürzer wurde.
+
 VERSION 4.08  (12.11.2026)  ERGEBNIS ALS SEITE, BENCHMARK UND DIAGNOSE IM STIL DER ÜBRIGEN SEITEN
 =================================================================================================
 • Ergebnis: neuer Eintrag „Ergebnis“ in der Seitenleiste direkt unter Start, mit der Punktzahl als Pille. Er erscheint, sobald es ein Ergebnis gibt, und bleibt bis zum nächsten Lauf. Die Ergebnisseite ist jetzt eine Seite wie jede andere: Die Fußleiste bleibt, der Wechsel weg und zurück baut nichts neu auf, und Punktzahl, Balken und Ringe laufen nur beim ersten Anzeigen nach einem Lauf auf ihren Wert.

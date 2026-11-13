@@ -5,27 +5,26 @@ Seit 4.07 steht hier nur noch, was für die nächste Version gebraucht wird: Sta
 abgelehnte Vorschläge, Fallstricke. Was eine Version geändert hat, steht in CHANGELOG.md (kurz), in
 Doku\Versionshistorie.txt und in Doku\Änderungen_vX.Y.txt (ausführlich); es wird hier nicht wiederholt.
 
-## Stand: Version 4.08 (12.11.2026)
-Release-Commit "Release v4.08: Ergebnis als Seite, Benchmark und Diagnose im Stil der übrigen Seiten" von Claude
-vorbereitet (Grundlage ba3489b, Release v4.07), als git bundle übergeben.
+## Stand: Version 4.09 (13.11.2026)
+Release-Commit "Release v4.09: Lasttest und System-Umzug im Stil der übrigen Seiten, Schalter ohne Beschnitt" von Claude
+vorbereitet (Grundlage c9a16bb, Release v4.08), als git bundle übergeben. Das Bundle enthält auch v4.08, das am
+13.11.2026 im Projektordner noch nicht eingespielt war (dort lief der Testbau aus Aktueller Build).
 
-Inhalt von 4.08 (Einzelheiten in Doku\Änderungen_v4.08.txt):
-1. Ergebnis als Seite: Eintrag "Ergebnis" in der Seitenleiste unter Start, Seite bleibt erreichbar, Bewegung nur beim
-   ersten Anzeigen, Band "Zurück zum Ergebnis" auf der Seite Benchmark, "Erneut messen" statt "Zurück", nach dem
-   Programmstart der letzte Lauf dieses PCs aus der Datenbank.
-2. Datenbankeintrag mit optionalem Feld Vergleich (Name der Referenz, Prozent je Gruppe); Format weiter PC-Diagnose-DB/2.
-   Die Oberfläche rechnet Prozentwerte nie nach; Läufe vor 4.08 zeigen "nicht gespeichert".
-3. Seiten Benchmark und Diagnose im Muster von Wartung und Tools (Karten, Zeilen mit Schalter, zwei Spalten, ganze
-   Breite) auf dem gemeinsamen Rahmen DiagGui_Modulseite.cs.
-4. Startfenster zeigt die Version des geladenen Skripts und nennt die Abweichung von LMB.exe.
-5. Behoben: leere Kopfkarte der Ergebnisseite unter Windows, Verweis über dem Text, markiertes Modul, Name der Referenz.
+Inhalt von 4.09 (Einzelheiten in Doku\Änderungen_v4.09.txt):
+1. Seiten Lasttest und System-Umzug im Muster von Benchmark und Diagnose (Karten, Zeilen mit Schalter, Einstellungen
+   unter ihrer Zeile, zwei Spalten) auf dem gemeinsamen Rahmen DiagGui_Modulseite.cs. Damit hat keine Modulseite mehr
+   den alten Aufbau mit Kontrollkästchen.
+2. Schalter (ToggleSwitch) nicht mehr abgeschnitten: Element ringsum 3 px größer als die Pille, Lage der Pille gleich.
+3. Datenpflege beim Start: Der Stand zählt nur noch Laufzeitordner mit Inhalt; vorher lief sie bei jedem Start.
+4. System-Umzug nennt nur noch bekannte Angaben (kein fester freier Platz für das Netzlaufwerk, keine Gesamtgröße vor
+   dem Schnell-Scan), exFAT löst die FAT32-Warnung nicht mehr aus, Start ohne Auswahl nicht mehr möglich.
 
 ## Aufbau der Oberfläche (src\Oberflaeche, Reihenfolge in Oberflaeche.ps1)
 DiagGui.cs                 Rahmen: using-Zeilen für alle Teile, Felder, Start, Seitenleiste, Fußleiste, ShowPage, gemeinsame Bausteine
 DiagGui_Darstellung.cs     Farbschema, Titelleiste, native Steuerelemente
 DiagGui_Einstellungen.cs   Einstellungsdatei, Dialog Einstellungen, Fenstergröße, Netzlaufwerk-Dialog
 DiagGui_Update.cs          Update-Prüfung und Austausch der LMB.exe
-DiagGui_Modulseite.cs      ab 4.08: gemeinsamer Rahmen der Seiten Benchmark und Diagnose (ModulSeite, ZeilenKarte, SchalterZeile)
+DiagGui_Modulseite.cs      gemeinsamer Rahmen der Seiten Diagnose, Benchmark, Lasttest, System-Umzug (ModulSeite, ZeilenKarte, SchalterZeile)
 DiagGui_Startseite.cs, _Diagnose, _Benchmark, _Lasttest, _Wartung, _Optimierung, _Tools, _Sensoren, _Vergleich (Datenbank),
 _Umzug, _Aenderungen, _Versionen   je eine Seite
 DiagGui_Ablauf.cs          gewählte Module, Zeitschätzung, Start eines Laufs
@@ -38,13 +37,16 @@ DiagGui_Modelle.cs, Start.cs, Versionen.cs   Datenmodelle, Programmsymbol und St
 Seiten und Einträge der Seitenleiste teilen sich die Stellen 0 bis 10 (nav[i] gehört zu pages[i], 1 bis 5 sind die
 Module), danach folgen Versionen (versionPage) und Ergebnis (ergebnisPage). Viele Stellen sind fest im Code (ShowPage(2),
 nav[1].Checked): neue Seiten hinten anhängen, nie dazwischen.
-Werte hinter Schaltern: benchChk, diagChk, repChk, chkFast, chkInstall, chkMem und rbVoll, rbSchnell, rbCustom werden
-nicht angezeigt, tragen aber die Auswahl für Vorlagen, Zeitschätzung und Start. Sichtbar sind SettingRow und FeldAuswahl.
+Werte hinter Schaltern: benchChk, diagChk, repChk, chkFast, chkInstall, chkMem, chkLCpu bis chkLDisk und rbVoll,
+rbSchnell, rbCustom werden nicht angezeigt, tragen aber die Auswahl für Vorlagen, Zeitschätzung und Start. Sichtbar sind
+SettingRow und FeldAuswahl. Die Seite System-Umzug hält ihre Werte als lokale Kontrollkästchen in BuildUmzugPage.
+Seiten mit dem gemeinsamen Rahmen stehen in IstModulSeite (1, 2, 3, 8): ShowPage und die Größenänderung ordnen nur sie.
 Neue Seite: eigene Datei DiagGui_<Name>.cs ohne using-Zeilen, in Oberflaeche.ps1 eintragen. Tests suchen im Gesamttext
 (Get-GuiText in tests\Hilfen.ps1), nicht in einer bestimmten Datei.
 
 ## Versionen bisher (je eine Zeile, neueste zuerst)
-4.07 Eine Datei je Seite, kürzerer Start, Akzentfarbe, dezente Bewegung (ba3489b). 4.06 Update-Prüfung und Referenz
+4.08 Ergebnis als Seite, Benchmark und Diagnose im Stil der übrigen Seiten (c9a16bb). 4.07 Eine Datei je Seite,
+kürzerer Start, Akzentfarbe, dezente Bewegung (ba3489b). 4.06 Update-Prüfung und Referenz
 repariert (53a4d04). 4.05 Bereits aktive Optimierungen gesperrt, Tools-Seite kompakt,
 28 Softwarepakete (ebb4f81). 4.04 Veröffentlichen in einem Schritt, Referenz über die Datenbank (2a5cb46). 4.03
 Update-Funktion, SMART-Langtest, Datenbank (598b8b1). 4.02 PawnIO-Entfernung, plausiblere Messwerte, Einstellungen auf
@@ -55,30 +57,31 @@ b582625). 3.84 bis 3.87 GitHub, Sensoren, Update-Prüfung, Läufe je Gerät. 3.8
 Startseite, Konfigurationsprüfung, Dashboard in Bausteinen, LMB.exe. 3.64 bis 3.67 Gestaltungsregeln der Oberfläche.
 
 ## Offene Befunde
-1. 4.08 unter Windows bestätigen: Seiten Benchmark und Diagnose bei 100, 125 und 150 %, Kopfkarte der Ergebnisseite
-   ohne Leerraum, Eintrag "Ergebnis" nach dem Start, Band auf der Seite Benchmark, Hinweis im Startfenster bei
-   abweichendem Skript, freier Platz in den Laufwerkszeilen. Die Überblendung von 4.07 hat Leonardo am 12.11.2026
-   als gut bestätigt.
-2. Startzeit: Start.log im Projektordner enthält nur einen Start mit 4.07 (7,9 s mit Übersetzung, Hardwareabfrage
-   566 ms, Seiten 745 ms). "Datenpflege: unverändert" beim zweiten Start ist noch nicht belegt.
-3. Größter verbleibender Anteil am Start: powershell.exe und das Einlesen des Gesamtskripts (2,6 MB; Stick 1,0 s,
+1. 4.09 unter Windows bestätigen: Seiten Lasttest und System-Umzug bei 100, 125 und 150 %, die acht neuen Symbole der
+   Seite System-Umzug (UI.IcoBildschirm bis UI.IcoWlan, in der Sandbox nur Ersatzzeichen), Schnell-Scan und eine
+   Sicherung mit der neuen Seite, Schalter ohne Beschnitt auf allen Seiten und im Dialog Einstellungen.
+2. Von 4.08 unter Windows bestätigt (Aufnahme Leonardo, 13.11.2026): Eintrag "Ergebnis" mit Punktzahl, Titelzeile 4.08.
+   Noch offen: Seiten Benchmark und Diagnose bei 125 und 150 %, Kopfkarte der Ergebnisseite ohne Leerraum, Band auf
+   der Seite Benchmark, Hinweis im Startfenster bei abweichendem Skript, freier Platz in den Laufwerkszeilen.
+3. Startzeit: Start.log vom 13.11.2026 (4.08, ULB-PC10039): 4,0 bis 26,2 s je Start, Hardwareabfrage 0,8 bis 1,4 s, Seiten
+   zusammen rund 0,7 s (Lasttest 170 ms, Versionen 108 ms, Benchmark 90 ms). "Datenpflege: unverändert" kam nie; die
+   Ursache ist in 4.09 behoben und mit Tests belegt, der Beleg unter Windows ist der zweite Start mit 4.09.
+4. Größter verbleibender Anteil am Start: powershell.exe und das Einlesen des Gesamtskripts (2,6 MB; Stick 1,0 s,
    ULB-PC10039 2,7 s). Abhilfe wäre ein getrennter kleiner Startteil für die Oberfläche (Umbau von Zusammenbau,
    Launcher und $PSCommandPath der Arbeitsprozesse), nicht umgesetzt. Kleiner Schritt davor: die Seite Versionen
-   (150 ms, ein langes Textfeld) erst beim ersten Öffnen aufbauen.
-4. Seite Lasttest ist noch eine Tabelle mit Kontrollkästchen. Vorschlag im Muster von 4.08: links die Karte
-   "Komponenten" mit vier Zeilen (Symbol, Titel, Beschreibung, Schalter), Dauer und Einstellungen der Komponente im
-   Bereich unter ihrer Zeile, rechts die Karten "Abbruchschwelle" und "Gesamtdauer", Seitenkopf "3 von 4 Komponenten".
-   chkLCpu bis chkLDisk blieben als Werte; UpdateLoadEnabled entfiele zugunsten der Unterbereiche.
-5. Ergebnisseite, zweite Stufe: Auswahlfeld oben rechts für frühere Läufe dieses Geräts (ErgebnisAusEintrag kann jeden
+   (ein langes Textfeld) erst beim ersten Öffnen aufbauen.
+5. System-Umzug: Der Schnell-Scan misst im Vordergrund (Fenster reagiert so lange nicht); Layout, Software-Inventar und
+   Profile gehen mit festen Schätzwerten in die Gesamtgröße ein.
+6. Ergebnisseite, zweite Stufe: Auswahlfeld oben rechts für frühere Läufe dieses Geräts (ErgebnisAusEintrag kann jeden
    Eintrag zeigen). Nach einem Lauf ist die Laufansicht (Tests, Leistung, Protokoll) nicht mehr erreichbar.
-6. Kategorie Apps der Optimierung nutzt dasselbe Symbol wie Tools (UI.IcoApp = UI.IcoTools).
-7. Rendertest auf sehr schnellen Karten (RTX 3070): hoher Mikroruckler-Anteil und niedriges 1-%-Low nur im Benchmark.
-8. Unter Windows noch nicht bestätigt: smartctl -X und PCIe-Abfrage unter Last (4.03), winget export als Administrator,
+7. Kategorie Apps der Optimierung nutzt dasselbe Symbol wie Tools (UI.IcoApp = UI.IcoTools).
+8. Rendertest auf sehr schnellen Karten (RTX 3070): hoher Mikroruckler-Anteil und niedriges 1-%-Low nur im Benchmark.
+9. Unter Windows noch nicht bestätigt: smartctl -X und PCIe-Abfrage unter Last (4.03), winget export als Administrator,
    GPU-Z über den Uninstall-Eintrag, Menü "…" im dunklen Farbschema (4.05), "Jetzt suchen" hinter dem Proxy, "Median
    aktualisieren" mit Meldung (4.06), Akzentfarbe "wie Windows", Dialog Einstellungen bei 125 und 150 % (4.07).
-9. Die Sperre der Optimierung gilt bis zum nächsten Start; nach Rückgängig auf der Seite Änderungen erst dann wieder offen.
-10. README zeigt noch Aufnahmen älterer Versionen (Doku\Screenshots); echte Windows-Aufnahmen von 4.0x fehlen.
-11. Akzentfarbe gilt nicht im HTML-Bericht und im Dashboard; Wartung sperrt "Schnellstart deaktivieren" nicht als
+10. Die Sperre der Optimierung gilt bis zum nächsten Start; nach Rückgängig auf der Seite Änderungen erst dann wieder offen.
+11. README zeigt noch Aufnahmen älterer Versionen (Doku\Screenshots); echte Windows-Aufnahmen von 4.0x fehlen.
+12. Akzentfarbe gilt nicht im HTML-Bericht und im Dashboard; Wartung sperrt "Schnellstart deaktivieren" nicht als
     "bereits aktiv" wie die Optimierung.
 
 ## Abgelehnte Vorschläge (Entscheidung Leonardo, 10.11.2026): nicht umsetzen und nicht erneut vorschlagen
@@ -117,6 +120,15 @@ Schnelltest für Peripherie, sicheres Löschen, Testmatrix-Dateien.
     ohne Netz und ohne Systemordner laufen.
 12. Mock in einem It gilt im Pester-Nachbau der Sandbox über das It hinaus (echtes Pester begrenzt ihn): Ein neuer Test
     mit Mock Get-CimInstance lässt in der Sandbox einen Nachbarn bestehen, der sonst an WMI scheitert.
+13. Ein selbst gezeichnetes Element nie genau so groß machen wie seine Form: Geglättete Kontur und Fokusrahmen brauchen
+    Rand im Element (ToggleSwitch.Rand, bis 4.08 rechts und unten abgeschnitten).
+14. Lage aus dem gemessenen Text setzen (GetPreferredSize), nicht aus der Größe eines Felds mit AutoSize: Die stellt
+    sich erst beim nächsten Layout ein (Kopf der Modulseiten, Lücke rechts bis 4.08).
+15. Ein Stand, der entscheidet, ob eine Arbeit entfallen kann, darf nichts zählen, was diese Arbeit selbst verändert
+    und der Start wieder herstellt (Datenpflege und leerer Ordner Laufzeit\<PC>, 4.07 und 4.08).
+16. Die Oberfläche nennt keine angenommenen Werte: kein fester freier Platz für ein Ziel, das nicht abgefragt wird,
+    kein "ausreichend" ohne Messung (Vorgabe 11 gilt auch für die Seite System-Umzug).
 
 ## Letzter Commit
-Release-Commit v4.08 mit Tag v4.08 (Nachfolger von ba3489b, Release v4.07), übergeben als MiniBench_v4.08.bundle.
+Release-Commit v4.09 mit Tag v4.09 (Nachfolger von c9a16bb, Release v4.08), übergeben als MiniBench_v4.09.bundle; das
+Bundle enthält auch den Commit und den Tag von v4.08.
