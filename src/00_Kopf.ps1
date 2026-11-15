@@ -96,6 +96,8 @@ param(
     [switch]$AbgleichNeu,
     [string]$Entfernen = '',
     [string]$Umbenennen = '',
+    # Seite Änderungen (ab v4.10): erledigte Läufe und Protokolle anderer PCs ins Archiv, "Erledigt:30;Andere" (Hilfsmodus der Oberfläche)
+    [string]$AenderungenAufraeumen = '',
     [string]$NeuerName = '',
     # Referenzen (ab v3.6): Median aller Systeme, Notebooks und Desktops aktualisieren (Hilfsmodus der Oberfläche)
     [switch]$MedianAktualisieren,

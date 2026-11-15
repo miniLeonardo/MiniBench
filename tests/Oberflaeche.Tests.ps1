@@ -94,6 +94,12 @@ Describe 'Selbsttest der Oberfläche' {
         @{ Fall = 'Umzug.Seite' }
         @{ Fall = 'Umzug.Platz' }
         @{ Fall = 'Modulseite.Kopf' }
+        @{ Fall = 'Liste.Zeilen' }
+        @{ Fall = 'Aenderungen.Buendelung' }
+        @{ Fall = 'Aenderungen.Seite' }
+        @{ Fall = 'Sensoren.Seite' }
+        @{ Fall = 'Datenbank.Seite' }
+        @{ Fall = 'Versionen.Spaeter' }
     ) {
         Assert-GuiSelbsttest $Fall
     }

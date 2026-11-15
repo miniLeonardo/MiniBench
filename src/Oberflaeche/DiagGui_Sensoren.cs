@@ -136,6 +136,12 @@ public partial class DiagGui
     void SetSensorBadgeState(string state, string tooltip)
     {
         if (badgeSensStatus == null) return;
+        SetzeSensorBadge(badgeSensStatus, state, tooltip);
+        if (badgeSensSeite != null) SetzeSensorBadge(badgeSensSeite, state, tooltip);
+    }
+
+    void SetzeSensorBadge(Badge badgeSensStatus, string state, string tooltip)
+    {
         switch (state)
         {
             case "Vollstaendig":
@@ -168,57 +174,222 @@ public partial class DiagGui
 
     void UpdateSensTools()
     {
-        if (lblSensTools == null) return;
+        if (rowSensLhm == null) return;
         string pv = PawnIoVersion();
-        string t;
-        if (!LhmPresent) t = "LibreHardwareMonitor fehlt im Tools-Ordner. Ohne die Bibliothek zeigt die Seite nur Ersatzwerte (Windows-Takt, ACPI, nvidia-smi, Datenträger, Akku).";
-        else t = "LibreHardwareMonitor liegt im Tools-Ordner (geladen wird nur mit passender Prüfsumme).";
-        t += pv.Length > 0 ? "  PawnIO " + pv + " ist auf diesem PC installiert und bleibt unverändert." : (PawnSetupPresent ? "  PawnIO ist nicht installiert; das Setup liegt bereit." : "  PawnIO-Setup fehlt.");
-        lblSensTools.Text = t;
-        lblSensTools.ForeColor = LhmPresent ? UI.Muted : UI.Warn;
-        btnSensTools.Text = LhmPresent && PawnSetupPresent ? "Sensorwerkzeuge erneut holen" : "Sensorwerkzeuge holen";
+        // ab v4.10 zwei Zeilen mit Etikett statt eines Fließtexts; der volle Text steht im Hinweis beim Überfahren
+        string tl = LhmPresent ? "liegt im Tools-Ordner (geladen wird nur mit passender Prüfsumme)" : "fehlt im Tools-Ordner; ohne die Bibliothek zeigt die Seite nur Ersatzwerte (Windows-Takt, ACPI, nvidia-smi, Datenträger, Akku)";
+        rowSensLhm.Description = tl; rowSensLhm.StatusText = LhmPresent ? "vorhanden" : "fehlt"; rowSensLhm.StatusLevel = LhmPresent ? "ok" : "warn";
+        Tip(rowSensLhm, "LibreHardwareMonitor " + tl + ".");
+        string tp = pv.Length > 0 ? "Version " + pv + " ist auf diesem PC installiert und bleibt unverändert" : PawnSetupPresent ? "nicht installiert; das Setup liegt im Tools-Ordner bereit" : "nicht installiert; das Setup fehlt im Tools-Ordner";
+        rowSensPawn.Description = tp; rowSensPawn.StatusText = pv.Length > 0 ? "installiert" : PawnSetupPresent ? "bereit" : "fehlt"; rowSensPawn.StatusLevel = pv.Length > 0 ? "ok" : PawnSetupPresent ? "skip" : "warn";
+        Tip(rowSensPawn, "PawnIO: " + tp + ".");
+        btnSensTools.Text = LhmPresent && PawnSetupPresent ? "Erneut holen" : "Sensorwerkzeuge holen";
         UpdateSensStatusBadge();
         StartUpdateCheck();
     }
 
+    // Einzelner Wert der Sensorliste (ab v4.10 ohne Fensterelement je Zeile)
+    public class SensorWert
+    {
+        public string Gruppe = "", Name = "", Art = "", Quelle = "", Aktuell = "", Min = "", Max = "", Hinweis = "";
+        public bool Blass, Unplausibel;
+    }
+
+    internal ModulSeite sensSeite;
+    internal KennzahlZeile sensKpi;
+    internal ToolRow rowSensLhm, rowSensPawn;
+    internal SettingRow rowSensTreiber, rowSensBehalten;
+    internal Label lblSensAufz, lblSensVoll, lblSensAnzahl;
+    Badge badgeSensSeite;
+    internal Dictionary<int, SensorWert> sensWerte = new Dictionary<int, SensorWert>();
+    internal List<string> sensGruppen = new List<string>();
+    internal HashSet<string> sensZu = new HashSet<string>();
+    // Höchstzahl der aufgezeichneten Messzeilen; danach nimmt die Aufzeichnung nichts mehr auf und sagt das (bis v4.09 stillschweigend)
+    public const int SensZeilenMax = 50000;
+    internal bool sensVoll;
+    DateTime liveStart = DateTime.MinValue;
+    double sensErsteSek = double.NaN, sensLetzteSek = double.NaN;
+    // Kennzahlen: Spalte in SENSLEAD, Einheit; Min und Max seit dem Start der Live-Ansicht
+    static readonly int[] kpiSpalte = new int[] { 1, 2, 3, 4, 6, 7 };
+    static readonly string[] kpiTitel = new string[] { "CPU-Temperatur", "CPU-Takt", "CPU-Leistung", "GPU-Temperatur", "GPU-Leistung", "Lüfter" };
+    static readonly string[] kpiEinheit = new string[] { "°C", "MHz", "W", "°C", "W", "U/min" };
+    double[] kpiMin = new double[6], kpiMax = new double[6];
+
+    static string KpiZahl(double v) { return double.IsNaN(v) ? "" : Math.Round(v).ToString("N0", CultureInfo.GetCultureInfo("de-DE")); }
+
+    void LeereKennzahlen() { for (int i = 0; i < 6; i++) { kpiMin[i] = double.MaxValue; kpiMax[i] = double.MinValue; } if (sensKpi != null) sensKpi.Leere(); }
+
+    // Kennzahlen aus einer Zeile SENSLEAD (wie sie die Kurve bekommt); fehlt ein Wert, bleibt die Kachel bei "kein Wert"
+    internal void SetzeKennzahlen(double[] r)
+    {
+        if (sensKpi == null || r == null) return;
+        for (int i = 0; i < 6; i++)
+        {
+            double v = kpiSpalte[i] < r.Length ? r[kpiSpalte[i]] : double.NaN;
+            if (double.IsNaN(v)) { if (kpiMax[i] == double.MinValue) sensKpi.Setze(i, "", ""); continue; }
+            kpiMin[i] = Math.Min(kpiMin[i], v); kpiMax[i] = Math.Max(kpiMax[i], v);
+            string unter = "Min " + KpiZahl(kpiMin[i]) + "  \u00B7  Max " + KpiZahl(kpiMax[i]);
+            if (i == 1 && r.Length > 9 && !double.IsNaN(r[9])) unter = "höchster Kern " + KpiZahl(r[9]);
+            sensKpi.Setze(i, KpiZahl(v), unter);
+        }
+    }
+
+    static string DauerText(double sek)
+    {
+        if (double.IsNaN(sek) || sek < 0) return "0 s";
+        int s = (int)Math.Round(sek);
+        return s >= 3600 ? (s / 3600) + " h " + (s % 3600 / 60) + " min" : s >= 60 ? (s / 60) + " min " + (s % 60) + " s" : s + " s";
+    }
+
+    // Kopf rechts, Karte Aufzeichnung und Anzahl der Sensoren
+    internal void UpdateSensStand()
+    {
+        if (sensSeite == null) return;
+        if (liveRunning && liveStart != DateTime.MinValue)
+        {
+            TimeSpan t = DateTime.Now - liveStart;
+            SetText(sensSeite.Anzahl, "Live seit " + ((int)t.TotalMinutes).ToString("00") + ":" + t.Seconds.ToString("00"));
+        }
+        else SetText(sensSeite.Anzahl, "Live-Ansicht aus");
+        SetText(sensSeite.Dauer, sensWerte.Count > 0 ? Mehrzahl(sensWerte.Count, "Sensor", "Sensoren") : "keine Messwerte");
+        SetText(lblSensAnzahl, sensWerte.Count > 0 ? Mehrzahl(sensWerte.Count, "Wert", "Werte") : "keine Werte");
+        string z = sensRows.Count.ToString("N0", CultureInfo.GetCultureInfo("de-DE"));
+        SetText(lblSensAufz, sensRows.Count == 0 ? "Noch nichts aufgezeichnet." : "Dauer " + DauerText(sensLetzteSek - sensErsteSek) + "  \u00B7  " + z + (sensRows.Count == 1 ? " Messzeile" : " Messzeilen") + "  \u00B7  " + Mehrzahl(sensWerte.Count, "Sensor", "Sensoren"));
+        if (lblSensVoll != null && lblSensVoll.Visible != sensVoll) lblSensVoll.Visible = sensVoll;
+    }
+
+    // Zeilen der Sensorliste aus Gruppen und Werten
+    internal void FillSensList()
+    {
+        if (lvSens == null) return;
+        lvSens.Zeilen.Clear();
+        foreach (string grp in sensGruppen)
+        {
+            int n = 0; foreach (SensorWert w in sensWerte.Values) if (w.Gruppe == grp) n++;
+            ListenZeile kz = new ListenZeile(); kz.Art = "gruppe"; kz.Tag = grp; kz.Grund = 1; kz.Aufklappbar = true; kz.Offen = !sensZu.Contains(grp); kz.Waehlbar = false; kz.Hoehe = UI.S(28);
+            kz.Hinweis = Mehrzahl(n, "Wert", "Werte");
+            lvSens.Zeilen.Add(kz);
+            if (!kz.Offen) continue;
+            List<int> ids = new List<int>(sensWerte.Keys); ids.Sort();
+            foreach (int id in ids)
+            {
+                SensorWert w = sensWerte[id]; if (w.Gruppe != grp) continue;
+                ListenZeile z = new ListenZeile(); z.Art = "wert"; z.Tag = w; z.Waehlbar = false; z.Hoehe = UI.S(26); z.Blass = w.Blass; z.Hinweis = w.Hinweis;
+                lvSens.Zeilen.Add(z);
+            }
+        }
+        lvSens.Aktualisiere();
+    }
+
+    void ZeichneSensZeile(Graphics g, ListenZeile z, Rectangle r, bool markiert)
+    {
+        if (z.Art == "gruppe")
+        {
+            string grp = Convert.ToString(z.Tag); int p = grp.IndexOf("  \u00B7  ");
+            string a = p > 0 ? grp.Substring(0, p) : grp, b = p > 0 ? grp.Substring(p + 5) : "";
+            int aw = ZeilenListe.Breite(a, ZeilenListe.FKopf);
+            ZeilenListe.Schreibe(g, a, ZeilenListe.FKopf, new Rectangle(r.X, r.Y, aw, r.Height), UI.Text, false);
+            if (b.Length > 0) ZeilenListe.Schreibe(g, "\u00B7  " + b + (z.Offen ? "" : "  (" + z.Hinweis + ")"), ZeilenListe.FKlein, new Rectangle(r.X + aw + UI.S(4), r.Y, r.Right - r.X - aw - UI.S(14), r.Height), UI.Muted, false);
+            return;
+        }
+        SensorWert w = (SensorWert)z.Tag;
+        Rectangle zeile = new Rectangle(0, r.Y, lvSens.Width, r.Height);
+        Color c = w.Blass ? UI.Muted : UI.Text;
+        Rectangle c0 = lvSens.Zelle(0, zeile);
+        ZeilenListe.Schreibe(g, w.Name, ZeilenListe.FKlein, new Rectangle(r.X, r.Y, Math.Max(0, c0.Right - r.X - UI.S(6)), r.Height), c, false);
+        ZeilenListe.Schreibe(g, w.Art, ZeilenListe.FKlein, lvSens.Zelle(1, zeile), UI.Muted, false);
+        Rectangle ca = lvSens.Zelle(2, zeile);
+        if (w.Unplausibel) { int bw = ZeilenListe.EtikettBreite("unplausibel"); ZeilenListe.Etikett(g, "unplausibel", "crit", ca.Right - bw, r, 0); }
+        else ZeilenListe.Schreibe(g, w.Aktuell, ZeilenListe.FKopf, ca, c, true);
+        ZeilenListe.Schreibe(g, w.Min, ZeilenListe.FKlein, lvSens.Zelle(3, zeile), UI.Muted, true);
+        ZeilenListe.Schreibe(g, w.Max, ZeilenListe.FKlein, lvSens.Zelle(4, zeile), UI.Muted, true);
+        Rectangle cq = lvSens.Zelle(5, zeile);
+        ZeilenListe.Schreibe(g, w.Quelle, ZeilenListe.FKlein, new Rectangle(cq.X + UI.S(12), cq.Y, cq.Width - UI.S(12), cq.Height), UI.Muted, false);
+    }
+
+    // ab v4.10: Seite im Muster der Modulseiten. Oben Kennzahlen, links Verlauf und alle Sensoren, rechts Sensorwerkzeuge,
+    // Einstellungen und Aufzeichnung. cmbDriver und cmbKeep bleiben als Werte bestehen (Start eines Laufs, Vorlagen,
+    // Geraete.json), angezeigt werden Schalter.
     Control BuildSensorPage()
     {
-        FlowLayoutPanel f = Page("Sensoren live", "Zeigt Temperatur, Takt, Lüfter, Spannung und Leistung laufend an (Kurven der letzten zehn Minuten). CPU-Werte und Mainboard-Lüfter brauchen den Treiber PawnIO; er wird beim Beenden wieder entfernt.", -1);
-        lblSensTools = Lbl("", 9f, false, UI.Muted); lblSensTools.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); lblSensTools.Margin = new Padding(UI.S(4), 0, UI.S(4), UI.S(8)); f.Controls.Add(lblSensTools);
-        FlowLayoutPanel b = Row(); b.Margin = new Padding(UI.S(4), 0, 0, UI.S(8));
-        btnLive = UI.Primary("Live-Ansicht starten"); btnLive.Margin = new Padding(0); btnLive.Padding = new Padding(UI.S(14), UI.S(3), UI.S(14), UI.S(3)); btnLive.Font = new Font("Segoe UI Semibold", 9.75f);
+        FlowLayoutPanel f = Page("Sensoren live", "Zeigt Temperatur, Takt, Lüfter, Spannung und Leistung laufend an. CPU-Werte und Mainboard-Lüfter brauchen den Treiber PawnIO; er wird beim Beenden wieder entfernt. Während eines Laufs ist die Live-Ansicht aus; der Lasttest zeigt seine Kurven im Reiter Sensoren.", -1);
+        sensSeite = NeueModulSeite(f);
+        btnLive = UI.Primary("Live-Ansicht starten"); btnLive.Margin = new Padding(0); btnLive.Padding = new Padding(UI.S(14), UI.S(4), UI.S(14), UI.S(4)); btnLive.Font = new Font("Segoe UI Semibold", 9.75f);
         btnLive.Click += delegate { if (liveRunning) StopLive(); else StartLive(); };
-        btnSensTools = UI.Secondary("Sensorwerkzeuge holen"); btnSensTools.Margin = new Padding(UI.S(8), 0, 0, 0); btnSensTools.Click += delegate { FetchSensorTools(); };
-        btnSensSave = UI.Secondary("Aufzeichnung speichern"); btnSensSave.Margin = new Padding(UI.S(8), 0, 0, 0); btnSensSave.Enabled = false; btnSensSave.Click += delegate { SaveSensorCsv(); };
-        b.Controls.Add(btnLive); b.Controls.Add(btnSensTools); b.Controls.Add(btnSensSave);
-        f.Controls.Add(b);
-        FlowLayoutPanel bd = Row(); bd.Margin = new Padding(UI.S(4), 0, 0, UI.S(8));
-        bd.Controls.Add(RowLabel("PawnIO-Treiber", 120));
-        cmbDriver = Combo(270, new string[] { "vorübergehend verwenden (Standard)", "nicht verwenden" }, 0); bd.Controls.Add(cmbDriver);
-        Label ld = Lbl("gilt für Live-Ansicht, Diagnose, Benchmark und Lasttest; ein vorhandener PawnIO bleibt unverändert", UI.SchriftHinweis, false, UI.Muted); ld.Margin = new Padding(0, UI.S(5), 0, 0); ld.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 420), 0); bd.Controls.Add(ld);
-        f.Controls.Add(bd);
-        FlowLayoutPanel bk = Row(); bk.Margin = new Padding(UI.S(4), 0, 0, UI.S(8));
-        bk.Controls.Add(RowLabel("Hilfswerkzeuge", 120));
-        cmbKeep = Combo(270, new string[] { "nach dem Lauf entfernen (Standard)", "auf diesem PC behalten" }, 0); bk.Controls.Add(cmbKeep);
-        Label lk = Lbl("PawnIO und smartmontools, die Leos Minibench installiert hat; gilt je Gerät", UI.SchriftHinweis, false, UI.Muted); lk.Margin = new Padding(0, UI.S(5), 0, 0); lk.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 420), 0); bk.Controls.Add(lk);
-        f.Controls.Add(bk);
-        LoadDeviceTools();
-        cmbKeep.SelectedIndexChanged += delegate { SaveDeviceTools(); };
-        cmbDriver.SelectedIndexChanged += delegate { SaveDeviceTools(); UpdateSensStatusBadge(); };
-        lblSensInfo = Lbl("Live-Ansicht nicht gestartet.", 9f, false, UI.Muted); lblSensInfo.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); lblSensInfo.Margin = new Padding(UI.S(4), 0, UI.S(4), UI.S(6)); f.Controls.Add(lblSensInfo);
-        chartLive = new SensorChart(); chartLive.Width = UI.S(UI.Gruppenbreite); chartLive.Height = UI.S(330); chartLive.WindowSec = 600; chartLive.Margin = new Padding(UI.S(4), 0, 0, UI.S(8));
+        Tip(btnLive, "Startet oder beendet die laufende Anzeige aller Sensoren. Beim Beenden wird ein vorübergehend installierter Treiber wieder entfernt.");
+        sensSeite.KopfKnopf(btnLive);
+
+        sensKpi = new KennzahlZeile(kpiTitel, kpiEinheit, new Color[] { SensorChart.CpuFarbe, SensorChart.CpuFarbe, SensorChart.CpuFarbe, SensorChart.GpuFarbe, SensorChart.GpuFarbe, Color.FromArgb(156, 163, 175) });
+        Tip(sensKpi, "Leitwerte der Live-Ansicht mit dem kleinsten und größten Wert seit dem Start. Ohne Messwert steht \"kein Wert\".");
+        f.Controls.Add(sensKpi); sensSeite.Voll.Add(sensKpi);
+        LeereKennzahlen();
+        lblSensInfo = Lbl("Live-Ansicht nicht gestartet.", UI.SchriftHinweis, false, UI.Muted); lblSensInfo.Margin = new Padding(0, 0, 0, UI.S(UI.Abstand2));
+        f.Controls.Add(lblSensInfo); sensSeite.Voll.Add(lblSensInfo);
+
+        // links: Verlauf und alle Sensoren
+        ZeilenKarte kv = sensSeite.Karte("Verlauf", true);
+        Label lz = Lbl("letzte zehn Minuten", UI.SchriftHinweis, false, UI.Muted); lz.Margin = new Padding(0, UI.S(2), 0, 0); kv.KopfRechts.Controls.Add(lz);
+        chartLive = new SensorChart(); chartLive.Rahmen = false; chartLive.Height = UI.S(330); chartLive.WindowSec = 600; chartLive.Margin = new Padding(0, 0, 0, UI.S(2));
         chartLive.Empty = "Noch keine Messwerte. \"Live-Ansicht starten\" öffnet die Sensoren.";
-        f.Controls.Add(chartLive);
-        lvSens = new ListView(); lvSens.View = View.Details; lvSens.FullRowSelect = true; lvSens.Width = UI.S(UI.Gruppenbreite); lvSens.Height = UI.S(380); lvSens.BorderStyle = BorderStyle.FixedSingle; lvSens.HideSelection = false; lvSens.ShowGroups = true; lvSens.ShowItemToolTips = true; lvSens.Margin = new Padding(UI.S(4), 0, 0, UI.S(4));
-        EnableDarkListView(lvSens);
-        string[] cols = new string[] { "Sensor", "Art", "Aktuell", "Min", "Max", "Quelle" };
-        int[] w = new int[] { UI.S(240), UI.S(110), UI.S(100), UI.S(100), UI.S(100), UI.S(120) };
-        for (int i = 0; i < cols.Length; i++) lvSens.Columns.Add(cols[i], w[i], i >= 2 && i <= 4 ? HorizontalAlignment.Right : HorizontalAlignment.Left);
-        f.Controls.Add(lvSens);
-        Label hint = Lbl("\"Aufzeichnung speichern\" legt alle Werte als CSV unter Berichte\\Sensoren ab. Während eines Laufs ist die Live-Ansicht aus; der Lasttest zeigt seine Kurven im Reiter Sensoren.", 8.75f, false, UI.Muted);
-        hint.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); hint.Margin = new Padding(UI.S(4), UI.S(4), UI.S(4), 0); f.Controls.Add(hint);
+        kv.Zeile(chartLive);
+
+        ZeilenKarte kl = sensSeite.Karte("Alle Sensoren", true);
+        lblSensAnzahl = Lbl("keine Werte", UI.SchriftHinweis, false, UI.Muted); lblSensAnzahl.Margin = new Padding(0, UI.S(2), 0, 0); kl.KopfRechts.Controls.Add(lblSensAnzahl);
+        lvSens = new ZeilenListe(); lvSens.AutoHoehe = true; lvSens.Rahmen = false; lvSens.Tipp = tip; lvSens.Zeichner = ZeichneSensZeile; lvSens.TabStop = false; lvSens.Margin = new Padding(0, 0, 0, UI.S(2));
+        lvSens.Leer = "Noch keine Messwerte.";
+        lvSens.Spalten.Add(new ListenSpalte("Sensor", 0, false, 0)); lvSens.Spalten.Add(new ListenSpalte("Art", UI.S(128), false, 1));
+        lvSens.Spalten.Add(new ListenSpalte("Aktuell", UI.S(88), true, 2)); lvSens.Spalten.Add(new ListenSpalte("Min", UI.S(80), true, 3)); lvSens.Spalten.Add(new ListenSpalte("Max", UI.S(80), true, 4));
+        lvSens.Spalten.Add(new ListenSpalte("    Quelle", UI.S(92), false, 5));
+        foreach (ListenSpalte sp in lvSens.Spalten) sp.Sortierbar = false;
+        lvSens.AufklappGeklickt += delegate(ListenZeile z) { string grp = Convert.ToString(z.Tag); if (!sensZu.Remove(grp)) sensZu.Add(grp); FillSensList(); };
+        Tip(lvSens, "Alle Werte der Live-Ansicht je Gerät mit dem kleinsten und größten Wert seit dem Start. Grenzwerte des Herstellers stehen grau, verworfene Werte als \"unplausibel\" mit dem Grund im Hinweis.");
+        kl.Zeile(lvSens);
+        lvSens.Aktualisiere();
+
+        // rechts: Sensorwerkzeuge
+        ZeilenKarte kw = sensSeite.Karte("Sensorwerkzeuge", false);
+        badgeSensSeite = new Badge("", "ok"); badgeSensSeite.Margin = new Padding(UI.S(6), UI.S(2), 0, 0); kw.KopfRechts.Controls.Add(badgeSensSeite);
+        rowSensLhm = new ToolRow("LibreHardwareMonitor", "", UI.IcoSens); rowSensPawn = new ToolRow("PawnIO", "", UI.IcoShield);
+        kw.Zeile(rowSensLhm); kw.Zeile(rowSensPawn);
+        FlowLayoutPanel bt = Row(); bt.Margin = new Padding(0, UI.S(4), 0, UI.S(2));
+        btnSensTools = UI.Secondary("Sensorwerkzeuge holen"); btnSensTools.Margin = new Padding(0); btnSensTools.Click += delegate { FetchSensorTools(); };
+        bt.Controls.Add(btnSensTools);
+        kw.Frei(bt);
+        Label hw = Lbl("Aus den offiziellen GitHub-Releases, mit festen SHA-256-Werten geprüft. Abgelegt wird nur im Tools-Ordner.", 8.5f, false, UI.Muted); hw.Margin = new Padding(0, UI.S(4), 0, UI.S(2));
+        kw.Frei(hw);
+
+        // rechts: Einstellungen (Schalter als Anzeige, Auswahllisten als Wert)
+        ZeilenKarte ke = sensSeite.Karte("Einstellungen", false);
+        cmbDriver = Combo(270, new string[] { "vorübergehend verwenden (Standard)", "nicht verwenden" }, 0);
+        cmbKeep = Combo(270, new string[] { "nach dem Lauf entfernen (Standard)", "auf diesem PC behalten" }, 0);
+        LoadDeviceTools();
+        rowSensTreiber = new SettingRow("PawnIO-Treiber vorübergehend verwenden", "Für CPU-Werte und Mainboard-Lüfter. Gilt für Live-Ansicht, Diagnose, Benchmark und Lasttest; ein vorhandener PawnIO bleibt unverändert.");
+        rowSensBehalten = new SettingRow("Hilfswerkzeuge auf diesem PC behalten", "PawnIO und smartmontools, die Leos Minibench installiert hat. Aus: nach dem Lauf entfernen. Gilt je Gerät.");
+        rowSensTreiber.Checked = cmbDriver.SelectedIndex == 0; rowSensBehalten.Checked = cmbKeep.SelectedIndex == 1;
+        rowSensTreiber.Toggle.CheckedChanged += delegate { int i = rowSensTreiber.Toggle.Checked ? 0 : 1; if (cmbDriver.SelectedIndex != i) cmbDriver.SelectedIndex = i; };
+        rowSensBehalten.Toggle.CheckedChanged += delegate { int i = rowSensBehalten.Toggle.Checked ? 1 : 0; if (cmbKeep.SelectedIndex != i) cmbKeep.SelectedIndex = i; };
+        cmbKeep.SelectedIndexChanged += delegate { bool an = cmbKeep.SelectedIndex == 1; if (rowSensBehalten.Toggle.Checked != an) rowSensBehalten.Toggle.Checked = an; SaveDeviceTools(); };
+        cmbDriver.SelectedIndexChanged += delegate { bool an = cmbDriver.SelectedIndex == 0; if (rowSensTreiber.Toggle.Checked != an) rowSensTreiber.Toggle.Checked = an; SaveDeviceTools(); UpdateSensStatusBadge(); };
+        ke.Zeile(rowSensTreiber); ke.Zeile(rowSensBehalten);
+
+        // rechts: Aufzeichnung
+        ZeilenKarte ka = sensSeite.Karte("Aufzeichnung", false);
+        lblSensAufz = Lbl("Noch nichts aufgezeichnet.", UI.SchriftText, false, UI.Text); lblSensAufz.Margin = new Padding(0, 0, 0, UI.S(6));
+        ka.Frei(lblSensAufz);
+        lblSensVoll = Lbl("Aufzeichnung voll: Nach " + SensZeilenMax.ToString("N0", CultureInfo.GetCultureInfo("de-DE")) + " Messzeilen nimmt sie nichts mehr auf. Die Anzeige läuft weiter; zum Weiterschreiben speichern und die Live-Ansicht neu starten.", UI.SchriftHinweis, false, UI.Warn);
+        lblSensVoll.Margin = new Padding(0, 0, 0, UI.S(6)); lblSensVoll.Visible = false;
+        ka.Frei(lblSensVoll);
+        FlowLayoutPanel bs = Row(); bs.Margin = new Padding(0, 0, 0, UI.S(2));
+        btnSensSave = UI.Secondary("Als CSV speichern"); btnSensSave.Margin = new Padding(0); btnSensSave.Enabled = false; btnSensSave.Click += delegate { SaveSensorCsv(); };
+        bs.Controls.Add(btnSensSave);
+        ka.Frei(bs);
+        Label hs = Lbl("Nach dem Beenden der Live-Ansicht. Die Datei liegt danach unter Berichte\\Sensoren.", 8.5f, false, UI.Muted); hs.Margin = new Padding(0, UI.S(4), 0, UI.S(2));
+        ka.Frei(hs);
+
+        f.Controls.Add(sensSeite.Spalten);
         liveTimer = new Timer(); liveTimer.Interval = 250; liveTimer.Tick += delegate { OnLiveTick(); };
-        UpdateSensTools();
+        UpdateSensTools(); UpdateSensStand();
+        sensSeite.Ordne(SeitenBreite());
         return f;
     }
 
@@ -245,15 +416,17 @@ public partial class DiagGui
         liveProc.OutputDataReceived += delegate(object s, DataReceivedEventArgs e) { if (e.Data != null) liveQueue.Enqueue(e.Data); else liveEof = true; };
         liveProc.ErrorDataReceived += delegate(object s, DataReceivedEventArgs e) { if (e.Data != null && e.Data.Trim().Length > 0) liveQueue.Enqueue("@@SENSINFO|" + e.Data.Trim()); };
         liveProc.Exited += delegate { liveExited = true; };
-        sensItems.Clear(); sensMinMax.Clear(); sensUnit.Clear(); sensNames.Clear(); sensRows.Clear(); sensGroups.Clear();
-        lvSens.Items.Clear(); lvSens.Groups.Clear(); chartLive.Clear();
+        sensWerte.Clear(); sensMinMax.Clear(); sensUnit.Clear(); sensNames.Clear(); sensRows.Clear(); sensGruppen.Clear(); sensZu.Clear();
+        sensVoll = false; sensErsteSek = double.NaN; sensLetzteSek = double.NaN;
+        FillSensList(); chartLive.Clear(); LeereKennzahlen();
         string dummy; while (liveQueue.TryDequeue(out dummy)) { }
         liveExited = false; liveEof = false; liveStopping = false; liveExitSeen = DateTime.MinValue;
         try { liveProc.Start(); liveProc.BeginOutputReadLine(); liveProc.BeginErrorReadLine(); try { liveProc.StandardInput.Close(); } catch { } }
         catch (Exception ex) { MessageBox.Show(this, "PowerShell konnte nicht gestartet werden: " + ex.Message, "Leos Minibench", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
-        liveRunning = true;
+        liveRunning = true; liveStart = DateTime.Now;
         btnLive.Text = "Live-Ansicht beenden"; btnSensTools.Enabled = false; btnSensSave.Enabled = false;
         lblSensInfo.Text = drv ? "Wird gestartet, PawnIO wird vorübergehend installiert ..." : "Wird gestartet ...";
+        UpdateSensStand();
         liveTimer.Start();
     }
 
@@ -291,11 +464,12 @@ public partial class DiagGui
         string line; int n = 0;
         if (!liveQueue.IsEmpty)
         {
-            lvSens.BeginUpdate();
-            try { while (n < 2000 && liveQueue.TryDequeue(out line)) { n++; HandleLiveLine(line); } }
-            finally { lvSens.EndUpdate(); }
+            sensListeNeu = false;
+            while (n < 2000 && liveQueue.TryDequeue(out line)) { n++; HandleLiveLine(line); }
+            if (sensListeNeu) FillSensList(); else lvSens.Invalidate();
         }
         chartLive.Flush();
+        UpdateSensStand();
         bool killed = false;
         if (liveStopping && !liveExited && (DateTime.Now - liveStopAt).TotalSeconds > 240) { KillProc(liveProc); killed = true; }
         if (liveExited && liveExitSeen == DateTime.MinValue) liveExitSeen = DateTime.Now;
@@ -304,7 +478,7 @@ public partial class DiagGui
             liveRunning = false; liveStopping = false; liveTimer.Stop();
             btnLive.Enabled = true; btnLive.Text = "Live-Ansicht starten"; btnSensTools.Enabled = true; btnSensSave.Enabled = sensRows.Count > 0;
             if (killed || PawnMarkerExists) CleanupDriver();
-            UpdateSensTools();
+            UpdateSensTools(); UpdateSensStand();
             ReloadDb();
         }
     }
@@ -427,7 +601,8 @@ public partial class DiagGui
         return v.ToString(f, CultureInfo.GetCultureInfo("de-DE")) + " " + unit;
     }
 
-    void HandleLiveLine(string line)
+    bool sensListeNeu;
+    internal void HandleLiveLine(string line)
     {
         if (!line.StartsWith("@@")) return;
         string[] p = line.Substring(2).Split('|');
@@ -437,49 +612,51 @@ public partial class DiagGui
                 {
                     // SENSDEF|idx|Gruppe|Geraet|Art|Name|Einheit|Quelle
                     int idx = ToInt(p, 1);
-                    string grp = Get(p, 2) + "  ·  " + Get(p, 3);
-                    ListViewGroup lg;
-                    if (!sensGroups.TryGetValue(grp, out lg)) { lg = new ListViewGroup(grp, grp); sensGroups[grp] = lg; lvSens.Groups.Add(lg); }
+                    string grp = Get(p, 2) + "  \u00B7  " + Get(p, 3);
+                    if (!sensGruppen.Contains(grp)) sensGruppen.Add(grp);
                     string art = Get(p, 4);
-                    ListViewItem it = new ListViewItem(new string[] { Get(p, 5), art == "Grenzwert" ? "Grenzwert (Hersteller)" : art, "", "", "", Get(p, 7) }, lg);
+                    SensorWert w = new SensorWert(); w.Gruppe = grp; w.Name = Get(p, 5); w.Art = art == "Grenzwert" ? "Grenzwert (Hersteller)" : art; w.Quelle = Get(p, 7);
                     // Grenzwerte laut Hersteller sind keine Messwerte: grau und ohne Min/Max-Bewertung
-                    if (art == "Grenzwert" || art == "Abstand") { it.ForeColor = UI.Muted; it.ToolTipText = art == "Grenzwert" ? "Vorgabe des Herstellers, keine gemessene Temperatur" : "Abstand zur Höchsttemperatur TjMax"; }
-                    else it.ToolTipText = "Quelle: " + Get(p, 7);
-                    sensItems[idx] = it; sensUnit[idx] = Get(p, 6); sensMinMax[idx] = new double[] { double.MaxValue, double.MinValue };
+                    if (art == "Grenzwert" || art == "Abstand") { w.Blass = true; w.Hinweis = art == "Grenzwert" ? "Vorgabe des Herstellers, keine gemessene Temperatur" : "Abstand zur Höchsttemperatur TjMax"; }
+                    else w.Hinweis = "Quelle: " + Get(p, 7);
+                    sensWerte[idx] = w; sensUnit[idx] = Get(p, 6); sensMinMax[idx] = new double[] { double.MaxValue, double.MinValue };
                     while (sensNames.Count <= idx) sensNames.Add("");
                     sensNames[idx] = (Get(p, 2) + " " + Get(p, 3) + " " + Get(p, 5) + " (" + Get(p, 6) + ")").Replace(";", ",");
-                    lvSens.Items.Add(it);
+                    sensListeNeu = true;
                     break;
                 }
             case "SENSVAL":
                 {
                     // SENSVAL|Sekunde|idx:wert;idx:wert
-                    if (sensRows.Count < 50000) sensRows.Add(Get(p, 1) + "|" + Get(p, 2));
+                    if (sensRows.Count < SensZeilenMax)
+                    {
+                        sensRows.Add(Get(p, 1) + "|" + Get(p, 2));
+                        double sek = ParseD(Get(p, 1));
+                        if (!double.IsNaN(sek)) { if (double.IsNaN(sensErsteSek)) sensErsteSek = sek; sensLetzteSek = sek; }
+                    }
+                    else sensVoll = true;
                     foreach (string kv in Get(p, 2).Split(';'))
                     {
                         int c = kv.IndexOf(':'); if (c <= 0) continue;
                         int idx; if (!int.TryParse(kv.Substring(0, c), out idx)) continue;
                         double v = ParseD(kv.Substring(c + 1));
-                        ListViewItem it; if (!sensItems.TryGetValue(idx, out it) || double.IsNaN(v)) continue;
+                        SensorWert w; if (!sensWerte.TryGetValue(idx, out w) || double.IsNaN(v)) continue;
                         double[] mm = sensMinMax[idx]; mm[0] = Math.Min(mm[0], v); mm[1] = Math.Max(mm[1], v);
                         string u = sensUnit[idx];
-                        string a = FmtSens(v, u); if (it.SubItems[2].Text != a) { it.SubItems[2].Text = a; if (!it.UseItemStyleForSubItems) it.SubItems[2].ForeColor = it.ForeColor; }
-                        string mi = FmtSens(mm[0], u); if (it.SubItems[3].Text != mi) it.SubItems[3].Text = mi;
-                        string ma = FmtSens(mm[1], u); if (it.SubItems[4].Text != ma) it.SubItems[4].Text = ma;
+                        w.Aktuell = FmtSens(v, u); w.Unplausibel = false; w.Min = FmtSens(mm[0], u); w.Max = FmtSens(mm[1], u);
                     }
                     break;
                 }
             case "SENSBAD":
                 {
                     // SENSBAD|idx|Rohwert|Grund: unplausibler Wert, wird nicht angezeigt und zählt nicht für Min/Max
-                    ListViewItem it; int idx = ToInt(p, 1);
-                    if (!sensItems.TryGetValue(idx, out it)) break;
-                    if (it.SubItems[2].Text != "unplausibel") { it.SubItems[2].Text = "unplausibel"; it.UseItemStyleForSubItems = false; it.SubItems[2].ForeColor = UI.Crit; }
-                    string tip = "Verworfen: " + Get(p, 3) + " (Rohwert " + Get(p, 2) + ")";
-                    if (it.ToolTipText != tip) it.ToolTipText = tip;
+                    SensorWert w; int idx = ToInt(p, 1);
+                    if (!sensWerte.TryGetValue(idx, out w)) break;
+                    w.Unplausibel = true; w.Hinweis = "Verworfen: " + Get(p, 3) + " (Rohwert " + Get(p, 2) + ")";
+                    foreach (ListenZeile z in lvSens.Zeilen) if (z.Tag == w) z.Hinweis = w.Hinweis;
                     break;
                 }
-            case "SENSLEAD": chartLive.Add(p); break;
+            case "SENSLEAD": SetzeKennzahlen(chartLive.Add(p)); break;
             case "SENSINFO": lblSensInfo.Text = Get(p, 1); break;
             case "SENSSTAT": UpdateSensStatusBadge(Get(p, 1), Get(p, 2)); break;
             case "SENSEND": lblSensInfo.Text = "Beendet. " + Get(p, 1); break;

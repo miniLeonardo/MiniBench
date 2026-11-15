@@ -79,6 +79,12 @@ public static class GuiSelbsttest
         Fall("Umzug.Seite", UmzugSeite);
         Fall("Umzug.Platz", UmzugPlatz);
         Fall("Modulseite.Kopf", ModulseiteKopf);
+        Fall("Liste.Zeilen", ListeZeilen);
+        Fall("Aenderungen.Buendelung", AenderungenBuendelung);
+        Fall("Aenderungen.Seite", AenderungenSeite);
+        Fall("Sensoren.Seite", SensorenSeite);
+        Fall("Datenbank.Seite", DatenbankSeite);
+        Fall("Versionen.Spaeter", VersionenSpaeter);
         foreach (string l in outLines) System.Console.WriteLine(l);
         return 0;
     }
@@ -1016,7 +1022,7 @@ public static class GuiSelbsttest
         return d;
     }
     static void Raeume(string d) { try { System.IO.Directory.Delete(d, true); } catch { } }
-    static DiagGui NeueOberflaeche(string d, string[] disks) { return new DiagGui("", "", "", d, "4.09", disks ?? new string[0], new string[0], "G-test"); }
+    static DiagGui NeueOberflaeche(string d, string[] disks) { return new DiagGui("", "", "", d, "4.10", disks ?? new string[0], new string[0], "G-test"); }
 
     // Datenbankeintrag dieses PCs; mitVergleich und mitBefunden steuern die Felder, die es erst ab 4.08 bzw. bei Läufen gibt
     static void SchreibeLauf(string d, string datum, bool mitVergleich, bool mitBefunden)
@@ -1392,6 +1398,238 @@ public static class GuiSelbsttest
                 Ist(m.Dauer.Left > vorher && m.Dauer.Left + m.Dauer.GetPreferredSize(Size.Empty).Width == 1000, "kürzerer Text rückt nach rechts: " + m.Dauer.Left);
                 Ist(m.Dauer.Top >= m.Anzahl.Top + m.Anzahl.GetPreferredSize(Size.Empty).Height, "Dauer steht unter der Anzahl");
                 Ist(m.Kopf.Height >= m.Dauer.Top + m.Dauer.GetPreferredSize(Size.Empty).Height, "Kopf so hoch wie beide Zeilen");
+            }
+        }
+        finally { Raeume(d); }
+    }
+
+    // Selbst gezeichnete Liste (ab v4.10): Maße, Markierung, Ereignisse, Höhe ohne eigenen Bildlauf
+    static void ListeZeilen()
+    {
+        ZeilenListe l = new ZeilenListe(); l.Size = new Size(600, 200); l.ZeilenHoehe = 30;
+        l.Spalten.Add(new ListenSpalte("Name", 0, false, 0)); l.Spalten.Add(new ListenSpalte("Wert", 100, true, 7));
+        for (int i = 0; i < 20; i++) { ListenZeile z = new ListenZeile(); z.Tag = i; z.Haken = 0; z.Aufklappbar = i == 0; l.Zeilen.Add(z); }
+        l.Aktualisiere();
+        Ist(l.InhaltHoehe == 600 && l.KopfHoehe > 0, "Inhalt 20 Zeilen: " + l.InhaltHoehe);
+        Rectangle r = new Rectangle(0, 0, 580, 30);
+        Rectangle c1 = l.Zelle(1, r), c0 = l.Zelle(0, r);
+        Ist(c1.Width == 100 && c1.Right <= 580 && c0.Right == c1.X && c0.X == 0, "Spalte 1 rechts, Spalte 0 nimmt den Rest: " + c0 + " " + c1);
+        l.Rollen = 100000;
+        Ist(l.Rollen == l.InhaltHoehe - (200 - l.KopfHoehe - 2), "Bildlauf endet am Inhalt: " + l.Rollen);
+        int haken = 0, auf = 0, mark = 0;
+        l.HakenGeklickt += delegate(ListenZeile z) { haken++; }; l.AufklappGeklickt += delegate(ListenZeile z) { auf++; }; l.MarkierungGeaendert += delegate { mark++; };
+        l.Zeilen[3].Gesperrt = true;
+        l.LoeseHaken(l.Zeilen[2]); l.LoeseHaken(l.Zeilen[3]); l.LoeseAufklappen(l.Zeilen[0]); l.LoeseAufklappen(l.Zeilen[1]);
+        Ist(haken == 1 && auf == 1, "gesperrtes Kästchen und Zeile ohne Pfeil melden nichts: " + haken + "/" + auf);
+        l.Markiere(l.Zeilen[5], true);
+        Ist(mark == 1 && l.Markiert.Count == 1 && l.Fokus == l.Zeilen[5], "Markierung");
+        l.Zeilen.RemoveAt(5); l.Aktualisiere();
+        Ist(l.Markiert.Count == 0 && l.Fokus == null, "entfernte Zeile ist nicht mehr markiert");
+        ZeilenListe a = new ZeilenListe(); a.AutoHoehe = true; a.Rahmen = false; a.ZeilenHoehe = 26;
+        for (int i = 0; i < 7; i++) a.Zeilen.Add(new ListenZeile());
+        a.Aktualisiere();
+        Ist(a.Height == 7 * 26, "Höhe folgt dem Inhalt: " + a.Height);
+        KennzahlZeile k = new KennzahlZeile(new string[] { "A", "B" }, new string[] { "W", "W" }, new Color[] { Color.Red, Color.Blue });
+        Ist(k.Wert(0) == "" && k.Anzahl == 2, "Kennzahl beginnt ohne Wert");
+        k.Setze(1, "42", "Min 1"); Ist(k.Wert(1) == "42" && k.Unter(1) == "Min 1", "Kennzahl gesetzt");
+        k.Leere(); Ist(k.Wert(1) == "", "Kennzahl geleert");
+    }
+
+    static ChangeEntry Aend(string datei, string pc, string lauf, int id, string schritt, string titel, string art, string status)
+    {
+        ChangeEntry c = new ChangeEntry(); c.FilePath = datei; c.Computer = pc; c.Lauf = lauf; c.Id = id; c.Zeit = lauf; c.Schritt = schritt; c.Titel = titel; c.Art = art; c.Status = status;
+        c.Modul = "Optimierung"; c.Risiko = "Aendern"; c.Ziel = "HKLM:\\Ziel" + id; c.Vorher = "1"; c.Nachher = "0";
+        return c;
+    }
+
+    // Bündelung des Änderungsprotokolls nach Lauf und Maßnahme und die Regeln des Aufräumens (wie Move-ChangeArchiv)
+    static void AenderungenBuendelung()
+    {
+        string pc = System.Environment.MachineName;
+        System.Collections.Generic.List<ChangeEntry> e = new System.Collections.Generic.List<ChangeEntry>();
+        e.Add(Aend("a.json", pc, "2026-11-10 14:31:00", 2, "Telemetrie", "Diagnosedaten auf das Minimum", "Registry", "aktiv"));
+        e.Add(Aend("a.json", pc, "2026-11-10 14:31:00", 1, "Telemetrie", "Diagnosedaten auf das Minimum", "Registry", "aktiv"));
+        e.Add(Aend("a.json", pc, "2026-11-10 14:31:00", 3, "Dienste", "Dienste auf manuell", "Dienststart", "aktiv"));
+        e.Add(Aend("a.json", pc, "2026-11-10 14:31:00", 4, "Dienste", "Dienste auf manuell", "Dienststart", "rückgängig"));
+        e.Add(Aend("a.json", pc, "2026-11-10 14:31:00", 5, "Punkt", "Wiederherstellungspunkt", "Wiederherstellungspunkt", "nur Hinweis"));
+        e.Add(Aend("b.json", pc, "2026-09-01 10:00:00", 1, "X", "Alt", "Registry", "rückgängig"));
+        e.Add(Aend("c.json", "ANDERER-PC", "2026-11-12 09:00:00", 1, "X", "Fremd", "Registry", "aktiv"));
+        System.Collections.Generic.List<string[]> dateien = new System.Collections.Generic.List<string[]>();
+        dateien.Add(new string[] { "leer.json", pc, "2026-08-01 08:00:00" });
+        System.Collections.Generic.List<ChangeLauf> l = ChangeLauf.Gruppiere(e, dateien);
+        Ist(l.Count == 4 && l[0].FilePath == "c.json" && l[1].FilePath == "a.json" && l[3].FilePath == "leer.json", "vier Läufe, neueste zuerst: " + l.Count + " " + l[0].FilePath);
+        ChangeLauf a = l[1];
+        Ist(a.Massnahmen.Count == 3 && a.Massnahmen[0].Eintraege.Count == 2 && a.Massnahmen[0].Eintraege[0].Id == 1, "Maßnahmen in der Reihenfolge des Laufs");
+        Ist(a.Massnahmen[0].Umfang == "2 Registry-Werte" && a.Massnahmen[1].Umfang == "2 Dienste" && a.Massnahmen[2].Umfang == "HKLM:\\Ziel5", "Umfang: " + a.Massnahmen[0].Umfang + " / " + a.Massnahmen[2].Umfang);
+        Ist(a.Massnahmen[0].StatusText == "aktiv" && a.Massnahmen[1].StatusText == "1 von 2 aktiv" && a.Massnahmen[1].Gemischt, "Status der Maßnahme: " + a.Massnahmen[1].StatusText);
+        Ist(a.Aktiv == 3 && a.StatusText.StartsWith("3 aktiv") && a.DieserPc && !l[0].DieserPc && a.Module == "Optimierung", "Lauf: " + a.StatusText);
+        System.DateTime jetzt = new System.DateTime(2026, 11, 15);
+        System.Collections.Generic.List<ChangeLauf> erl = ChangeLauf.Aufzuraeumen(l, true, 30, false, jetzt);
+        Ist(erl.Count == 2 && erl.Contains(l[2]) && erl.Contains(l[3]), "erledigt und älter als 30 Tage: der alte und der leere Lauf, " + erl.Count);
+        Ist(ChangeLauf.Aufzuraeumen(l, true, 90, false, jetzt).Count == 1, "älter als 90 Tage nur der leere Lauf");
+        System.Collections.Generic.List<ChangeLauf> and = ChangeLauf.Aufzuraeumen(l, false, 0, true, jetzt);
+        Ist(and.Count == 1 && and[0] == l[0], "andere PCs auch mit aktiven Einträgen");
+        Ist(!ChangeLauf.Aufzuraeumen(l, true, 0, true, jetzt).Contains(a), "aktive Änderungen dieses PCs bleiben immer");
+        Ist(DiagGui.ChgAufraeumArg(true, 30, true) == "Erledigt:30;Andere" && DiagGui.ChgAufraeumArg(false, 0, true) == "Andere" && DiagGui.ChgAufraeumArg(false, 0, false) == "", "Argument für den Arbeitsprozess");
+    }
+
+    static void SchreibeAenderungen(string d, string pc, string datei, string lauf, int massnahmen, int je, string status)
+    {
+        string dir = System.IO.Path.Combine(System.IO.Path.Combine(d, "Änderungen"), pc);
+        System.IO.Directory.CreateDirectory(dir);
+        System.Text.StringBuilder b = new System.Text.StringBuilder();
+        b.Append("{\"Format\":\"Minibench-Aenderungen/1\",\"Computer\":\"").Append(pc).Append("\",\"GeraetId\":\"G-x\",\"Version\":\"4.10\",\"Lauf\":\"").Append(lauf).Append("\",\"Eintraege\":[");
+        int id = 0;
+        for (int m = 0; m < massnahmen; m++)
+            for (int k = 0; k < je; k++)
+            {
+                id++; if (id > 1) b.Append(",");
+                b.Append("{\"Id\":").Append(id).Append(",\"Zeit\":\"").Append(lauf).Append("\",\"Modul\":\"Optimierung\",\"Schritt\":\"S").Append(m).Append("\",\"Titel\":\"Maßnahme ").Append(m + 1)
+                    .Append("\",\"Risiko\":\"Aendern\",\"Art\":\"Registry\",\"Ziel\":\"HKLM:\\\\Test\\\\W").Append(id).Append("\",\"Vorher\":\"1\",\"Nachher\":\"0\",\"Gegenbefehl\":\"x\",\"Status\":\"").Append(status).Append("\",\"Ergebnis\":\"\"}");
+            }
+        b.Append("]}");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(dir, datei), b.ToString(), new System.Text.UTF8Encoding(false));
+    }
+
+    static int Zaehle(ZeilenListe l, string art) { int n = 0; foreach (ListenZeile z in l.Zeilen) if (z.Art == art) n++; return n; }
+    static DiagGui.ChgZeile ChgErste(DiagGui g, string art) { foreach (ListenZeile z in g.lvChg.Zeilen) if (z.Art == art) return (DiagGui.ChgZeile)z; return null; }
+
+    // Seite Änderungen (ab v4.10): zuerst nur dieser PC, gebündelt; Einträge erst beim Aufklappen; dreiwertige Haken; Band;
+    // andere PCs nur zur Ansicht; Aufbau auch mit über tausend Einträgen ohne Wartezeit
+    static void AenderungenSeite()
+    {
+        string d = NeuerDatenordner(); string pc = System.Environment.MachineName;
+        try
+        {
+            SchreibeAenderungen(d, pc, "20261110_143100.json", "2026-11-10 14:31:00", 20, 3, "aktiv");
+            SchreibeAenderungen(d, pc, "20261001_100000.json", "2026-10-01 10:00:00", 2, 1, "rückgängig");
+            for (int i = 0; i < 8; i++) SchreibeAenderungen(d, "FREMD" + i, "20261020_12000" + i + ".json", "2026-10-20 12:00:0" + i, 40, 4, "aktiv");
+            using (DiagGui g = NeueOberflaeche(d, null))
+            {
+                Ist(g.changeLaeufe.Count == 10 && !g.chgAllePcs, "zehn Läufe geladen, Ansicht dieser PC");
+                Ist(Zaehle(g.lvChg, "lauf") == 2 && Zaehle(g.lvChg, "andere") == 1, "zwei Läufe dieses PCs und die Zeile der anderen PCs: " + g.lvChg.Zeilen.Count);
+                Ist(Zaehle(g.lvChg, "massnahme") == DiagGui.ChgMassnahmenZuerst && Zaehle(g.lvChg, "mehr") == 1 && Zaehle(g.lvChg, "eintrag") == 0, "neuester Lauf aufgeklappt mit den ersten Maßnahmen, noch ohne Einträge");
+                Ist(g.chgSeite.Anzahl.Text.StartsWith("60 Änderungen") && g.chgSeite.Unter.Text.StartsWith("1.342 Einträge"), "Kopf: " + g.chgSeite.Anzahl.Text + " / " + g.chgSeite.Unter.Text);
+                Ist(!g.chgSeite.BandSichtbar && !g.btnUndo.Enabled, "ohne Haken kein Band");
+                DiagGui.ChgZeile m = ChgErste(g, "massnahme");
+                g.ChgKlappe(m);
+                Ist(Zaehle(g.lvChg, "eintrag") == 3, "Einträge entstehen beim Aufklappen der Maßnahme");
+                g.ChgHakenUm(ChgErste(g, "eintrag"));
+                Ist(ChgErste(g, "massnahme").Haken == 2 && ChgErste(g, "lauf").Haken == 2 && g.chgHaken.Count == 1, "ein Eintrag: Maßnahme und Lauf teilweise");
+                Ist(g.chgSeite.BandSichtbar && g.btnUndo.Enabled && g.chgSeite.BandText.Text == "1 Änderung angehakt", "Band: " + g.chgSeite.BandText.Text);
+                g.ChgHakenUm(ChgErste(g, "massnahme"));
+                Ist(ChgErste(g, "massnahme").Haken == 1 && g.chgHaken.Count == 3, "Haken an der Maßnahme wählt alle ihre Einträge");
+                g.ChgHakenUm(ChgErste(g, "lauf"));
+                Ist(ChgErste(g, "lauf").Haken == 1 && g.chgHaken.Count == 60 && g.btnUndo.Text.StartsWith("60 "), "Haken am Lauf wählt alles Zurücknehmbare: " + g.chgHaken.Count);
+                g.ChgHakenUm(ChgErste(g, "lauf"));
+                Ist(g.chgHaken.Count == 0 && !g.chgSeite.BandSichtbar, "zweiter Klick hebt auf");
+                DiagGui.ChgZeile mehr = ChgErste(g, "mehr");
+                g.ChgVerweis(mehr);
+                Ist(Zaehle(g.lvChg, "massnahme") == 20 && Zaehle(g.lvChg, "mehr") == 0, "weitere Maßnahmen anzeigen");
+                DiagGui.ChgZeile alt = null; foreach (ListenZeile z in g.lvChg.Zeilen) if (z.Art == "lauf") alt = (DiagGui.ChgZeile)z;
+                Ist(alt.Gesperrt && alt.Haken == 0, "Lauf ohne aktive Einträge ist gesperrt");
+                g.ChgVerweis(ChgErste(g, "andere"));
+                Ist(g.chgAllePcs && g.chgUmfang.Selected == 1 && Zaehle(g.lvChg, "lauf") == 10 && Zaehle(g.lvChg, "andere") == 0, "Alle PCs zeigt zehn Läufe");
+                DiagGui.ChgZeile fremd = null; foreach (ListenZeile z in g.lvChg.Zeilen) { DiagGui.ChgZeile c = (DiagGui.ChgZeile)z; if (c.Art == "lauf" && !c.Lauf.DieserPc) { fremd = c; break; } }
+                Ist(fremd != null && fremd.Gesperrt, "Läufe anderer PCs lassen sich nicht anhaken");
+                g.ChgHakenUm(fremd);
+                Ist(g.chgHaken.Count == 0, "Klick auf gesperrten Lauf ändert nichts");
+                // alle Läufe aufklappen: rund 400 Zeilen aus 1.342 Einträgen, ohne spürbare Wartezeit
+                foreach (ChangeLauf l in g.changeLaeufe) { g.chgOffen.Add(l.FilePath); g.chgAlles.Add(l.FilePath); }
+                g.FillChangeList();
+                Ist(Zaehle(g.lvChg, "massnahme") == 342 && g.chgAufbauMs < 1500, "Aufbau mit allen Maßnahmen: " + Zaehle(g.lvChg, "massnahme") + " Zeilen in " + g.chgAufbauMs + " ms");
+            }
+        }
+        finally { Raeume(d); }
+    }
+
+    // Seite Sensoren live (ab v4.10): Schalter und Auswahllisten gleich, Werte der Liste, Kennzahlen, volle Aufzeichnung
+    static void SensorenSeite()
+    {
+        string d = NeuerDatenordner();
+        try
+        {
+            using (DiagGui g = NeueOberflaeche(d, null))
+            {
+                Ist(g.sensSeite != null && g.sensSeite.KartenLinks.Count == 2 && g.sensSeite.KartenRechts.Count == 3, "zwei Karten links, drei rechts");
+                Ist(g.rowSensTreiber.Checked == (g.cmbDriver.SelectedIndex == 0) && g.rowSensBehalten.Checked == (g.cmbKeep.SelectedIndex == 1), "Schalter zeigen die Werte der Auswahllisten");
+                g.rowSensTreiber.Toggle.Checked = false; g.rowSensBehalten.Toggle.Checked = true;
+                Ist(g.cmbDriver.SelectedIndex == 1 && g.cmbKeep.SelectedIndex == 1, "Schalter setzen die Auswahllisten");
+                g.cmbDriver.SelectedIndex = 0; g.cmbKeep.SelectedIndex = 0;
+                Ist(g.rowSensTreiber.Checked && !g.rowSensBehalten.Checked, "Auswahllisten (Vorlage, Geraete.json) setzen die Schalter");
+                Ist(g.sensKpi.Wert(0) == "" && g.lvSens.Zeilen.Count == 0, "ohne Messung keine Werte");
+                g.HandleLiveLine("@@SENSDEF|0|Prozessor|Ryzen|Temperatur|Core|°C|LHM");
+                g.HandleLiveLine("@@SENSDEF|1|Prozessor|Ryzen|Grenzwert|TjMax|°C|Hersteller");
+                g.HandleLiveLine("@@SENSDEF|2|Grafik|Radeon|Temperatur|GPU Core|°C|LHM");
+                g.HandleLiveLine("@@SENSVAL|0|0:61;1:95;2:48");
+                g.HandleLiveLine("@@SENSVAL|2|0:66;2:47");
+                g.HandleLiveLine("@@SENSBAD|2|255|außerhalb des Bereichs");
+                g.HandleLiveLine("@@SENSLEAD|0|61|4200|70||||900");
+                g.HandleLiveLine("@@SENSLEAD|2|66|4300|82||||950||5000");
+                g.FillSensList(); g.UpdateSensStand();
+                Ist(g.sensWerte.Count == 3 && g.sensGruppen.Count == 2 && g.lvSens.Zeilen.Count == 5, "zwei Gruppen mit drei Werten: " + g.lvSens.Zeilen.Count);
+                Ist(g.sensWerte[0].Aktuell == "66 °C" && g.sensWerte[0].Min == "61 °C" && g.sensWerte[0].Max == "66 °C", "Aktuell, Min, Max: " + g.sensWerte[0].Aktuell + " " + g.sensWerte[0].Min);
+                Ist(g.sensWerte[1].Blass && g.sensWerte[1].Art == "Grenzwert (Hersteller)" && g.sensWerte[2].Unplausibel && g.sensWerte[2].Hinweis.Contains("255"), "Grenzwert grau, verworfener Wert mit Grund");
+                Ist(g.sensKpi.Wert(0) == "66" && g.sensKpi.Unter(0).StartsWith("Min 61") && g.sensKpi.Unter(1).StartsWith("höchster Kern") && g.sensKpi.Wert(3) == "", "Kennzahlen: " + g.sensKpi.Wert(0) + " / " + g.sensKpi.Unter(0) + " / GPU ohne Wert");
+                Ist(g.sensKpi.Wert(5) == "950", "Lüfter: " + g.sensKpi.Wert(5));
+                g.sensZu.Add(g.sensGruppen[0]); g.FillSensList();
+                Ist(g.lvSens.Zeilen.Count == 3 && !g.lvSens.Zeilen[0].Offen, "zugeklappte Gruppe zeigt nur ihren Kopf");
+                Ist(g.lblSensAufz.Text.StartsWith("Dauer 2 s") && g.lblSensAufz.Text.Contains("2 Messzeilen") && !g.sensVoll, "Aufzeichnung: " + g.lblSensAufz.Text);
+                for (int i = 0; i < DiagGui.SensZeilenMax; i++) g.HandleLiveLine("@@SENSVAL|" + (3 + i) + "|0:60");
+                g.UpdateSensStand();
+                Ist(g.sensVoll && g.lblSensAufz.Text.Contains("50.000 Messzeilen"), "volle Aufzeichnung wird gemeldet: " + g.lblSensAufz.Text);
+            }
+        }
+        finally { Raeume(d); }
+    }
+
+    static DiagGui.DbZeile DbErste(DiagGui g, bool gruppe) { foreach (ListenZeile z in g.lvDb.Zeilen) { DiagGui.DbZeile x = (DiagGui.DbZeile)z; if (x.Gruppe == gruppe) return x; } return null; }
+
+    // Seite Datenbank (ab v4.10): Gerät steht für den neuesten Lauf, ältere darunter; Haken und Band; Markierung und Detailbereich
+    static void DatenbankSeite()
+    {
+        string d = NeuerDatenordner();
+        try
+        {
+            SchreibeLauf(d, "2026-11-10 14:20", true, true); SchreibeLauf(d, "2026-11-02 19:05", false, true); SchreibeLauf(d, "2026-10-21 17:36", false, false);
+            using (DiagGui g = NeueOberflaeche(d, null))
+            {
+                Ist(g.lvDb.Zeilen.Count == 1 && DbErste(g, true).Anzahl == 3 && DbErste(g, true).Aufklappbar && DbErste(g, true).E.Datum == "2026-11-10 14:20", "ein Gerät mit drei Läufen, Zeile zeigt den neuesten");
+                Ist(g.dbSeite.Anzahl.Text.StartsWith("1 Gerät") && g.dbSeite.Anzahl.Text.EndsWith("3 Läufe"), "Kopf: " + g.dbSeite.Anzahl.Text);
+                Ist(!g.dbSeite.BandSichtbar && !g.btnDashboard.Enabled && g.SelectedDbEntry() == null && !g.DbSoll(g.btnOpenReport) && !g.DbSoll(g.lnkDbDelete), "ohne Haken und Markierung keine Aktionen");
+                g.lvDb.LoeseAufklappen(DbErste(g, true));
+                Ist(g.lvDb.Zeilen.Count == 3 && DbErste(g, false).E.Datum == "2026-11-02 19:05", "aufgeklappt folgen die älteren Läufe");
+                g.lvDb.LoeseHaken(DbErste(g, true)); g.lvDb.LoeseHaken(DbErste(g, false));
+                Ist(g.dbHaken.Count == 2 && g.dbSeite.BandSichtbar && g.btnDashboard.Enabled && g.btnDashboard.Text == "Im Dashboard vergleichen (2)" && g.dbSeite.BandText.Text == "2 Läufe angehakt", "Band: " + g.dbSeite.BandText.Text + " / " + g.btnDashboard.Text);
+                g.lvDb.Markiere(DbErste(g, false), true);
+                Ist(g.SelectedDbEntry() != null && g.SelectedDbEntry().Datum == "2026-11-02 19:05" && g.DbMarkierte().Count == 1, "Markierung liefert den Lauf");
+                // die Seite steht im Hintergrund (Visible der Kinder ist falsch): Die Aktionen gelten trotzdem als sichtbar und werden geordnet
+                Ist(g.DbSoll(g.btnOpenReport) && g.DbSoll(g.btnVerlauf) && g.DbSoll(g.lnkDbName) && g.DbSoll(g.lnkDbDelete) && g.btnOpenReport.Top > 60, "Aktionen des markierten Laufs: " + g.btnOpenReport.Top);
+                g.lvDb.LoeseAufklappen(DbErste(g, true));
+                Ist(g.lvDb.Zeilen.Count == 1 && g.dbHaken.Count == 1 && g.btnDashboard.Text == "Im Dashboard vergleichen (1)", "zugeklappt entfällt der Haken des älteren Laufs");
+                g.lvDb.Markiere(DbErste(g, true), true);
+                Ist(g.SelectedDbEntry().Datum == "2026-11-10 14:20", "Zeile des Geräts steht für den neuesten Lauf");
+                g.OnDbColumnClick(2);
+                Ist(g.lvDb.SortSpalte == 2 && g.DbMarkierte().Count == 1, "Sortieren hält die Markierung");
+                g.OrdneDbDetail();
+                Ist(g.dbDetail.AutoScrollMinSize.Height > 100, "Detailbereich misst seinen Inhalt: " + g.dbDetail.AutoScrollMinSize.Height);
+            }
+        }
+        finally { Raeume(d); }
+    }
+
+    // Seite Versionen entsteht erst beim ersten Öffnen (ab v4.10)
+    static void VersionenSpaeter()
+    {
+        string d = NeuerDatenordner();
+        try
+        {
+            using (DiagGui g = NeueOberflaeche(d, null))
+            {
+                Ist(!g.versionenGefuellt, "beim Start noch nicht gefüllt");
+                g.ShowPage(g.versionPage);
+                Ist(g.versionenGefuellt, "nach dem Öffnen gefüllt");
+                g.ShowPage(0);
             }
         }
         finally { Raeume(d); }

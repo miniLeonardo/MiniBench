@@ -2,6 +2,24 @@
 
 Alle wesentlichen Änderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v4.10 (15.11.2026)
+
+### Neu
+* **Protokoll aufräumen:** „Aufräumen …“ auf der Seite Änderungen verschiebt erledigte Läufe (älter als 30, 90 oder 180 Tage) und auf Wunsch die Protokolle anderer PCs nach Minibench-Daten\Archiv\Änderungen. Gelöscht wird nichts, aktive Änderungen dieses PCs bleiben immer.
+* **Kennzahlen der Sensoren:** sechs Leitwerte mit Min und Max seit dem Start über Verlauf und Sensorliste.
+* **Detailbereich der Datenbank:** markierter Lauf mit Punktzahl, gespeichertem Vergleich mit der Referenz, Hardware, Befunden und allen Aktionen.
+
+### Verbessert
+* **Seite Änderungen:** zuerst nur dieser PC, gebündelt nach Lauf und Maßnahme, Einzelwerte erst beim Aufklappen, Haken an Lauf und Maßnahme, Band für die Auswahl; „Alle PCs“ nur zur Ansicht.
+* **Seite Sensoren live:** Karten für Verlauf, alle Sensoren, Sensorwerkzeuge, Einstellungen (Schalter) und Aufzeichnung im Rahmen der Modulseiten.
+* **Seite Datenbank:** Gerät mit Hardware in einer Zeile, ältere Läufe darunter, Band für angehakte Läufe; Sortieren, Doppelklick, F2, Eingabetaste und Kontextmenü wie bisher.
+* **Optimierung:** Nach „Rückgängig“ sind zurückgenommene Einstellungen sofort wieder wählbar.
+* **Start:** Versionshistorie entsteht erst beim ersten Öffnen der Seite Info und Versionen.
+
+### Behoben
+* **Seite Änderungen:** lange Wartezeit beim Öffnen mit vielen Einträgen (eine Zeile mit Kontrollkästchen je Eintrag aller PCs, Neuzählung aller Haken je Zeile).
+* **Sensoren:** Die Aufzeichnung endete nach 50.000 Messzeilen ohne Meldung.
+
 ## v4.09 (13.11.2026)
 
 ### Verbessert

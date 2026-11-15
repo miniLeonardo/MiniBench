@@ -96,6 +96,8 @@ param(
     [switch]$AbgleichNeu,
     [string]$Entfernen = '',
     [string]$Umbenennen = '',
+    # Seite Änderungen (ab v4.10): erledigte Läufe und Protokolle anderer PCs ins Archiv, "Erledigt:30;Andere" (Hilfsmodus der Oberfläche)
+    [string]$AenderungenAufraeumen = '',
     [string]$NeuerName = '',
     # Referenzen (ab v3.6): Median aller Systeme, Notebooks und Desktops aktualisieren (Hilfsmodus der Oberfläche)
     [switch]$MedianAktualisieren,
@@ -220,9 +222,9 @@ if ('ä' -ne [string][char]0xE4 -and $PSCommandPath) {
 
 #region ---------- Administratorrechte ----------
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-# Vergleich, Import, Export, Dashboard, Datenpflege sowie Abgleich, Entfernen, Umbenennen und MedianAktualisieren
+# Vergleich, Import, Export, Dashboard, Datenpflege sowie Abgleich, Entfernen, Umbenennen, AenderungenAufraeumen und MedianAktualisieren
 # arbeiten nur im Datenordner und brauchen keine Administratorrechte
-if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $ExportLauf -and -not $Datenpflege -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardModus -and -not $DashboardSysteme -and -not $Abgleich -and -not $Entfernen -and -not $Umbenennen -and -not $MedianAktualisieren -and -not $Umzug) {
+if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $ExportLauf -and -not $Datenpflege -and -not $Dashboard -and -not $DashboardExport -and -not $DashboardModus -and -not $DashboardSysteme -and -not $Abgleich -and -not $Entfernen -and -not $Umbenennen -and -not $AenderungenAufraeumen -and -not $MedianAktualisieren -and -not $Umzug) {
     if (-not $PSCommandPath) { return }
     # Netzlaufwerke sind im Administratorkontext nicht verbunden: Skript und Datenordner als UNC-Pfad weitergeben
     function ConvertTo-Unc([string]$Path) {
@@ -247,7 +249,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
 }
 #endregion
 
-$ScriptVersion = '4.09'
+$ScriptVersion = '4.10'
 $AppName       = 'Leos Minibench'
 # Eingebettete Referenzprofile für Leos Minibench (v3.0)
 $script:EmbeddedReferences = @{
@@ -3795,6 +3797,79 @@ function Invoke-ChangeUndo([string]$Spec) {
     }
     return [pscustomobject]@{ Rueckgaengig = $done; Probleme = $fail }
 }
+# Aufräumen (ab v4.10, Seite Änderungen): Protokolldateien samt ihrem Ordner mit Sicherungsdateien nach
+# Minibench-Daten\Archiv\Änderungen\<Zeit>\<PC> verschieben. Gelöscht wird nichts (Vorgabe 14).
+#   Erledigt:<Tage>  Läufe ohne aktiven Eintrag, älter als <Tage> (0 = jedes Alter), von allen PCs
+#   Andere           alle Protokolle anderer PCs, auch mit aktiven Einträgen (auf diesem PC nicht zurücknehmbar)
+# Protokolle dieses PCs mit aktiven Einträgen bleiben immer: Sonst ginge Rückgängig verloren, und der Start könnte
+# vorübergehende Änderungen (Restore-TemporaryChanges) nicht mehr zurücknehmen. Die Oberfläche rechnet dieselben Regeln
+# für die Anzeige (ChangeLauf.Aufzuraeumen).
+function Move-ChangeArchiv([string]$Spec, [string]$Root = (Get-ChangeRoot), [string]$DataDir = $script:DataDir, [string]$Computer = $env:COMPUTERNAME, [datetime]$Jetzt = (Get-Date)) {
+    $res = [pscustomobject]@{ Verschoben = 0; Eintraege = 0; Fehler = 0; Zeilen = (New-Object System.Collections.Generic.List[string]); Archiv = '' }
+    $erledigt = $false; $tage = 0; $andere = $false
+    foreach ($t in @(([string]$Spec) -split ';' | ForEach-Object { $_.Trim().Trim('"') } | Where-Object { $_ })) {
+        if ($t -match '^Erledigt(:(\d+))?$') { $erledigt = $true; $tage = [int]$Matches[2] }
+        elseif ($t -eq 'Andere') { $andere = $true }
+        else { $res.Fehler++; $res.Zeilen.Add(('Unbekannte Angabe: {0}' -f $t)) }
+    }
+    if (-not $Root -or -not $DataDir -or -not (Test-Path -LiteralPath $Root) -or (-not $erledigt -and -not $andere)) { $res.Zeilen.Add('Nichts zu verschieben.'); return $res }
+    $stempel = $Jetzt.ToString('yyyyMMdd_HHmmss')
+    $arch = Join-Path (Join-Path (Join-Path $DataDir 'Archiv') 'Änderungen') $stempel
+    $res.Archiv = $arch
+    $einzeln = New-Object System.Collections.Generic.List[string]
+    $ordner = @{}
+    foreach ($f in @(Get-ChildItem -LiteralPath $Root -Recurse -File -Filter '*.json' -ErrorAction SilentlyContinue)) {
+        if ($script:ChangeFile -and $f.FullName -eq $script:ChangeFile) { continue }
+        $j = Read-ChangeFile $f.FullName
+        if (-not $j) { continue }
+        $ein = @($j.Eintraege | Where-Object { $_ })
+        $aktiv = @($ein | Where-Object { [string]$_.Status -eq 'aktiv' }).Count
+        $dieser = ([string]$j.Computer -eq $Computer)
+        $zeit = $null; $zt = [string]$j.Lauf
+        if (-not $zt -and $ein.Count) { $zt = [string]$ein[0].Zeit }
+        $d = [datetime]::MinValue
+        foreach ($fmt in 'yyyy-MM-dd HH:mm:ss', 'yyyy-MM-dd HH:mm') {
+            if ([datetime]::TryParseExact($zt, $fmt, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$d)) { $zeit = $d; break }
+        }
+        $weg = $false
+        if ($andere -and -not $dieser) { $weg = $true }
+        if ($erledigt -and $aktiv -eq 0 -and ($tage -le 0 -or ($zeit -and ($Jetzt - $zeit).TotalDays -gt $tage))) { $weg = $true }
+        if (-not $weg -or ($dieser -and $aktiv -gt 0)) { continue }
+        $pc = Split-Path (Split-Path $f.FullName -Parent) -Leaf
+        $ziel = Join-Path $arch $pc
+        try {
+            New-Item -ItemType Directory -Path $ziel -Force -ErrorAction Stop | Out-Null
+            $sich = $f.FullName -replace '\.json$', ''
+            if (Test-Path -LiteralPath $sich -PathType Container) { Move-Item -LiteralPath $sich -Destination (Join-Path $ziel (Split-Path $sich -Leaf)) -ErrorAction Stop }
+            Move-Item -LiteralPath $f.FullName -Destination (Join-Path $ziel $f.Name) -ErrorAction Stop
+            $res.Verschoben++; $res.Eintraege += $ein.Count
+            $einzeln.Add(('{0}\{1}: {2} Einträge, davon {3} aktiv' -f $pc, $f.Name, $ein.Count, $aktiv))
+            $ordner[(Split-Path $f.FullName -Parent)] = $true
+        } catch { $res.Fehler++; $res.Zeilen.Add(('{0}\{1}: {2}' -f $pc, $f.Name, $_.Exception.Message)) }
+    }
+    # leere Ordner der PCs entfernen (enthalten keine Daten mehr)
+    foreach ($o in $ordner.Keys) {
+        try { if (-not @(Get-ChildItem -LiteralPath $o -Force -ErrorAction Stop).Count) { Remove-Item -LiteralPath $o -Force -ErrorAction Stop } } catch { }
+    }
+    if ($res.Verschoben) {
+        $res.Zeilen.Insert(0, ('{0} Protokolle mit {1} Einträgen nach Archiv\Änderungen\{2} verschoben. Gelöscht wurde nichts.' -f $res.Verschoben, $res.Eintraege, $stempel))
+        try {
+            $log = New-Object System.Text.StringBuilder
+            [void]$log.AppendLine(('{0:yyyy-MM-dd HH:mm} Änderungsprotokoll aufgeräumt v{1} ({2}), Datenordner {3}' -f $Jetzt, $ScriptVersion, $Spec, $DataDir))
+            foreach ($z in $einzeln) { [void]$log.AppendLine('  ' + $z) }
+            [IO.File]::AppendAllText((Join-Path (Join-Path $DataDir 'Archiv') 'Datenpflege.log'), $log.ToString(), (New-Object Text.UTF8Encoding($true)))
+        } catch { }
+    } elseif (-not $res.Fehler) { $res.Zeilen.Add('Nichts zu verschieben.') }
+    return $res
+}
+
+# Hilfsmodus der Oberfläche: -AenderungenAufraeumen "Erledigt:30;Andere", am Ende @@RESULT|verschoben|Fehler
+if ($AenderungenAufraeumen) {
+    $r = Move-ChangeArchiv ([string]$AenderungenAufraeumen)
+    foreach ($z in $r.Zeilen) { Write-Host $z }
+    Send-GuiEvent 'RESULT' $r.Verschoben $r.Fehler
+    exit $(if ($r.Fehler) { 1 } else { 0 })
+}
 #endregion
 #region ---------- Portable Werkzeuge mit Manifest ----------
 # Externe Programme auf dem Stick liegen unter Minibench-Daten\Tools. Tools.json hält je Werkzeug Datei, Version,
@@ -6413,7 +6488,7 @@ public partial class DiagGui : Form
     static readonly int[] smartMinutes = new int[] { 30, 60, 90, 120, 180, 240, 360 };
     // Hilfswerkzeuge (PawnIO, smartmontools per winget): je Gerät entfernen, behalten oder jedes Mal fragen (Geraete.json)
     string deviceId = "";
-    ComboBox cmbKeep;
+    internal ComboBox cmbKeep;
     // GPU-Rendertest (ab v2.6): Auflösung und Anzeige, auf den Seiten Benchmark und Lasttest gleich eingestellt
     ComboBox cmbGpuRes, cmbGpuShow, cmbLGpuRes, cmbLGpuShow;
     bool syncGpu;
@@ -6481,18 +6556,16 @@ public partial class DiagGui : Form
     bool liveRunning, liveStopping;
     DateTime liveStopAt;
     Button btnLive, btnSensTools, btnSensSave;
-    ComboBox cmbDriver;
+    internal ComboBox cmbDriver;
     int psuWattage = 650;
     string psuRating = "80 PLUS Bronze";
-    Label lblSensTools, lblSensInfo;
+    Label lblSensInfo;
     SensorChart chartLive, chartRun;
-    ListView lvSens;
-    Dictionary<int, ListViewItem> sensItems = new Dictionary<int, ListViewItem>();
+    internal ZeilenListe lvSens;
     Dictionary<int, double[]> sensMinMax = new Dictionary<int, double[]>();
     Dictionary<int, string> sensUnit = new Dictionary<int, string>();
     List<string> sensNames = new List<string>();
     List<string> sensRows = new List<string>();
-    Dictionary<string, ListViewGroup> sensGroups = new Dictionary<string, ListViewGroup>();
     Label lblRunSens;
     // Reparatur
     string[] repKeys = new string[] {
@@ -6526,7 +6599,7 @@ public partial class DiagGui : Form
     CheckBox[] repChk;
     CheckBox chkRestorePoint;
     // Datenbank
-    ListView lvDb;
+    internal ZeilenListe lvDb;
     Label lblDbPath;
     // Modulverträge und Änderungsprotokoll
     Dictionary<string, string[]> modInfo = new Dictionary<string, string[]>();   // Name -> Titel, Kurz, Admin, Risiko, Neustart
@@ -6539,8 +6612,9 @@ public partial class DiagGui : Form
     Dictionary<string, GroupHeader> repCatToggle = new Dictionary<string, GroupHeader>();
     string changeDir = "";
     List<ChangeEntry> changes = new List<ChangeEntry>();
-    ListView lvChg;
-    Button btnUndo;
+    internal List<ChangeLauf> changeLaeufe = new List<ChangeLauf>();
+    internal ZeilenListe lvChg;
+    internal Button btnUndo;
     // Fuß
     Label lblSel;
     LinkLabel lnkAblage;
@@ -6552,7 +6626,7 @@ public partial class DiagGui : Form
     Label lblDbClean;
     Button btnDbClean;
     // ab v2.7: Seite Versionen (Verweis oben rechts im Kopf, keine eigene Schaltfläche in der Modulliste)
-    int versionPage = -1;
+    internal int versionPage = -1;
 
     // Hinweise beim Überfahren mit der Maus (ab v2.7): kurze Erklärung zu jedem Bedienelement
     ToolTip tip = NewTip();
@@ -6808,13 +6882,14 @@ public partial class DiagGui : Form
 
     // ab v4.07: Datenbank und Änderungsprotokoll werden gleichzeitig gelesen (zwei unabhängige Ordner mit JSON-Dateien),
     // beim Start schon ab dem Beginn des Konstruktors (StartDbVorladen), während Kopfzeile und Farbschema entstehen.
-    List<DbEntry> dbVor; List<ChangeEntry> changesVor; Thread dbVorThread, changesVorThread;
+    List<DbEntry> dbVor; List<ChangeEntry> changesVor; List<string[]> changeDateienVor; Thread dbVorThread, changesVorThread;
 
     void StartDbVorladen()
     {
         string d = dbDir, c = changeDir;
         dbVorThread = new Thread(delegate() { try { dbVor = DbEntry.Load(d); } catch { dbVor = null; } });
-        changesVorThread = new Thread(delegate() { try { changesVor = ChangeEntry.Load(c); } catch { changesVor = null; } });
+        List<string[]> cd = new List<string[]>(); changeDateienVor = cd;
+        changesVorThread = new Thread(delegate() { try { changesVor = ChangeEntry.Load(c, cd); } catch { changesVor = null; } });
         dbVorThread.IsBackground = true; changesVorThread.IsBackground = true;
         dbVorThread.Start(); changesVorThread.Start();
     }
@@ -6826,7 +6901,8 @@ public partial class DiagGui : Form
         try { changesVorThread.Join(); } catch { }
         db = dbVor ?? new List<DbEntry>();
         changes = changesVor ?? new List<ChangeEntry>();
-        dbVor = null; changesVor = null; dbVorThread = null; changesVorThread = null;
+        changeLaeufe = ChangeLauf.Gruppiere(changes, changesVor != null ? changeDateienVor : null);
+        dbVor = null; changesVor = null; changeDateienVor = null; dbVorThread = null; changesVorThread = null;
     }
 
     internal void ReloadDb()
@@ -7115,6 +7191,10 @@ public partial class DiagGui : Form
         Tip(btnSensSave, "Speichert alle Werte der Live-Ansicht als CSV unter Berichte\\Sensoren.");
         Tip(cmbDriver, "PawnIO ist der Treiber, den LibreHardwareMonitor für CPU-Temperatur, CPU-Takt, CPU-Leistung und Mainboard-Lüfter braucht. Standardmäßig aktiv für alle Messungen. Ein bereits installierter PawnIO bleibt immer unverändert.");
         Tip(cmbKeep, "Was nach dem Lauf mit PawnIO und smartmontools geschieht, die Leos Minibench installiert hat: nach dem Lauf entfernen (keine Reste) oder auf diesem PC behalten. Gespeichert je Gerät in Geraete.json.");
+        Tip(rowSensTreiber, "PawnIO ist der Treiber, den LibreHardwareMonitor für CPU-Temperatur, CPU-Takt, CPU-Leistung und Mainboard-Lüfter braucht. Standardmäßig aktiv für alle Messungen. Ein bereits installierter PawnIO bleibt immer unverändert.");
+        Tip(rowSensTreiber.Toggle, "PawnIO ist der Treiber, den LibreHardwareMonitor für CPU-Temperatur, CPU-Takt, CPU-Leistung und Mainboard-Lüfter braucht. Standardmäßig aktiv für alle Messungen. Ein bereits installierter PawnIO bleibt immer unverändert.");
+        Tip(rowSensBehalten, "Was nach dem Lauf mit PawnIO und smartmontools geschieht, die Leos Minibench installiert hat: nach dem Lauf entfernen (keine Reste) oder auf diesem PC behalten. Gespeichert je Gerät in Geraete.json.");
+        Tip(rowSensBehalten.Toggle, "Was nach dem Lauf mit PawnIO und smartmontools geschieht, die Leos Minibench installiert hat: nach dem Lauf entfernen (keine Reste) oder auf diesem PC behalten. Gespeichert je Gerät in Geraete.json.");
         // Vergleichsdatenbank, Änderungen, Fuß
         Tip(btnCompare, "Vergleicht die angehakten Systeme in einem HTML-Bericht (mindestens zwei).");
         Tip(btnDbClean, "Datenpflege: verschiebt nicht mehr vergleichbare Lasttests älterer Versionen, abgebrochene Läufe ohne Bericht und kurze Läufe (Funktionstest, Lasttest nach wenigen Sekunden beendet, Lauf ohne Messwert) sowie ungenutzte Teile von smartmontools nach Minibench-Daten\\Archiv. Gelöscht werden nur ältere Übersetzungen im Cache und Reste der Live-Ansicht; das Protokoll steht in Archiv\\Datenpflege.log.");
@@ -7168,6 +7248,7 @@ public partial class DiagGui : Form
         content.AutoScrollPosition = new Point(0, 0);
         for (int k = 0; k < pages.Count; k++) pages[k].Visible = (k == i);
         if (i == ergebnisPage) ErgebnisSeiteGezeigt();
+        if (i == versionPage) FuelleVersionen();
         // ab v4.0: Auf Werkzeugseiten (Tools bis Versionen) nur Ablaufzeile und Startknopf, ohne Vorlagen
         if (fo != null && foot != null) { bool modulSeite = i <= 5; if (fo.Visible != modulSeite) { fo.Visible = modulSeite; foot.Height = UI.S(modulSeite ? 76 : 62); } }
         if (i == 3) UpdateLoadExtras();
@@ -7392,9 +7473,6 @@ public partial class DiagGui
         try { SetPreferredAppMode(UI.IsDark ? 2 : 0); } catch { }
         if (content != null && content.IsHandleCreated) try { SetWindowTheme(content.Handle, subApp, null); } catch { }
         if (left != null && left.IsHandleCreated) try { SetWindowTheme(left.Handle, subApp, null); } catch { }
-        if (lvDb != null && lvDb.IsHandleCreated) try { SetWindowTheme(lvDb.Handle, subApp, null); } catch { }
-        if (lvSens != null && lvSens.IsHandleCreated) try { SetWindowTheme(lvSens.Handle, subApp, null); } catch { }
-        if (lvChg != null && lvChg.IsHandleCreated) try { SetWindowTheme(lvChg.Handle, subApp, null); } catch { }
         if (clbCompare != null && clbCompare.IsHandleCreated) try { SetWindowTheme(clbCompare.Handle, subApp, null); } catch { }
         if (txtLog != null && txtLog.IsHandleCreated) try { SetWindowTheme(txtLog.Handle, subApp, null); } catch { }
         ApplyNativeThemeRecursive(this, subApp);
@@ -7503,6 +7581,8 @@ public partial class DiagGui
             foreach (Label w in new Label[] { lblAkku, lblRestoreWarn }) if (w != null) { w.ForeColor = UI.Warn; w.BackColor = UI.WarnBg; }
             foreach (Panel b in modBanners) if (b != null) { b.BackColor = UI.InfoBg; foreach (Control k in b.Controls) { if (k is LinkLabel) ((LinkLabel)k).LinkColor = UI.Accent; else k.ForeColor = UI.Text; } }
             if (bandErg != null) { bandErg.BackColor = UI.AccentSoft; if (lblBandErg != null) lblBandErg.ForeColor = UI.Text; }
+            foreach (ListenSeite ls in listenSeiten) ls.Farben();
+            if (lblSensVoll != null) lblSensVoll.ForeColor = UI.Warn;
             // ab v4.08: Zeile zur Referenz und die aufgebaute Ergebnisseite tragen eigene Farben (Warnung, Urteil): neu setzen
             UpdateRefState(); FuelleLetztesErgebnis();
             if (erg != null && ergebnisAufbauten > 0 && !ergVeraltet) FuelleErgebnis();
@@ -7568,7 +7648,7 @@ public partial class DiagGui
             c.BackColor = UI.Bg;
             c.Invalidate();
         }
-        else if (c is SensorChart)
+        else if (c is SensorChart || c is ZeilenListe || c is KennzahlZeile)
         {
             c.BackColor = UI.Panel;
             c.Invalidate();
@@ -8740,6 +8820,9 @@ public partial class DiagGui
         // Elemente über die ganze Seitenbreite (Bänder, Auswahl des Umfangs)
         public readonly List<Control> Voll = new List<Control>();
         Label titel, einleitung;
+        // ab v4.10: Knopf ganz rechts im Kopf (Seite Sensoren live); Anzahl und Dauer rücken links daneben
+        Control kopfKnopf;
+        public void KopfKnopf(Control c) { kopfKnopf = c; Kopf.Controls.Add(c); c.SizeChanged += delegate { OrdneKopf(); }; OrdneKopf(); }
         public int Breite { get; private set; }
         public bool Zweispaltig { get; private set; }
 
@@ -8793,8 +8876,15 @@ public partial class DiagGui
             if (Breite <= 0) return;
             Size sa = Anzahl.GetPreferredSize(Size.Empty), sd = Dauer.GetPreferredSize(Size.Empty);
             Size ra = new Size(Math.Max(sa.Width, sd.Width), sa.Height + UI.S(1) + sd.Height);
-            Anzahl.Location = new Point(Math.Max(0, Breite - sa.Width), UI.S(4));
-            Dauer.Location = new Point(Math.Max(0, Breite - sd.Width), UI.S(4) + sa.Height + UI.S(1));
+            int rechts = Breite;
+            if (kopfKnopf != null)
+            {
+                Size sk = kopfKnopf.GetPreferredSize(Size.Empty);
+                kopfKnopf.Location = new Point(Math.Max(0, Breite - sk.Width), UI.S(4));
+                rechts = Breite - sk.Width - UI.S(UI.Abstand3); ra = new Size(ra.Width + sk.Width + UI.S(UI.Abstand3), Math.Max(ra.Height, sk.Height));
+            }
+            Anzahl.Location = new Point(Math.Max(0, rechts - sa.Width), UI.S(4));
+            Dauer.Location = new Point(Math.Max(0, rechts - sd.Width), UI.S(4) + sa.Height + UI.S(1));
             int ew = Math.Max(UI.S(240), Breite - ra.Width - UI.S(UI.Abstand5));
             int ty = titel.PreferredSize.Height + UI.S(UI.Abstand1);
             int eh = TextRenderer.MeasureText(einleitung.Text, einleitung.Font, new Size(ew, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height + UI.S(2);
@@ -8827,12 +8917,121 @@ public partial class DiagGui
         }
     }
 
+    // ab v4.10: Seite mit einer Liste, die den Rest der Höhe füllt und selbst rollt (Datenbank, Änderungen): Kopf mit Titel
+    // und Einleitung links und zwei Zeilen Zusammenfassung rechts, Leiste mit Bedienelementen links und Knöpfen rechts,
+    // Band für die angehakte Auswahl, darunter die Liste und wahlweise ein Seitenteil rechts (unter 900 px darunter).
+    public class ListenSeite
+    {
+        public readonly Panel Seite = new Panel();
+        public readonly Label Titel, Einleitung, Anzahl, Unter, BandText, BandUnter;
+        public readonly FlowLayoutPanel Links = new FlowLayoutPanel(), Rechts = new FlowLayoutPanel();
+        public readonly Panel Band = new Panel();
+        public readonly LinkLabel BandVerweis = new LinkLabel();
+        public readonly Button BandKnopf;
+        public Control Inhalt, Seitenteil, Fuss;
+        public int SeitenteilBreite = 300, SeitenteilHoehe = 250;
+        bool bandSichtbar;
+
+        public ListenSeite(string titel, string einleitung, string knopf)
+        {
+            Seite.Dock = DockStyle.Fill; Seite.BackColor = UI.Panel;
+            Titel = Lbl(titel, UI.SchriftTitel, true, UI.Text); Titel.Location = new Point(0, 0);
+            Einleitung = Lbl(einleitung, UI.SchriftText, false, UI.Muted); Einleitung.AutoSize = false;
+            Anzahl = Lbl("", 10.5f, true, UI.Text); Unter = Lbl("", UI.SchriftText, false, UI.Muted);
+            foreach (FlowLayoutPanel p in new FlowLayoutPanel[] { Links, Rechts }) { p.AutoSize = true; p.AutoSizeMode = AutoSizeMode.GrowAndShrink; p.WrapContents = false; p.BackColor = UI.Panel; p.Margin = new Padding(0); }
+            Band.BackColor = UI.AccentSoft; Band.Height = UI.S(44); Band.Visible = false;
+            BandText = Lbl("", UI.SchriftText, true, UI.Accent); BandText.Tag = "accent";
+            BandUnter = Lbl("", UI.SchriftText, false, UI.Text); BandUnter.AutoSize = false; BandUnter.AutoEllipsis = true; BandUnter.Height = UI.S(20);
+            BandVerweis.Text = "Auswahl aufheben"; BandVerweis.AutoSize = true; BandVerweis.Font = new Font("Segoe UI", UI.SchriftHinweis); BandVerweis.BackColor = Color.Transparent;
+            BandVerweis.LinkColor = UI.Accent; BandVerweis.ActiveLinkColor = UI.AccentHover; BandVerweis.LinkBehavior = LinkBehavior.HoverUnderline;
+            BandKnopf = UI.Primary(knopf); BandKnopf.Font = new Font("Segoe UI Semibold", 9.75f); BandKnopf.Padding = new Padding(UI.S(14), UI.S(3), UI.S(14), UI.S(3)); BandKnopf.Margin = new Padding(0);
+            Band.Controls.Add(BandText); Band.Controls.Add(BandUnter); Band.Controls.Add(BandVerweis); Band.Controls.Add(BandKnopf);
+            Band.Resize += delegate { OrdneBand(); }; BandKnopf.SizeChanged += delegate { OrdneBand(); }; BandText.TextChanged += delegate { OrdneBand(); };
+            Seite.Controls.Add(Titel); Seite.Controls.Add(Einleitung); Seite.Controls.Add(Anzahl); Seite.Controls.Add(Unter);
+            Seite.Controls.Add(Links); Seite.Controls.Add(Rechts); Seite.Controls.Add(Band);
+            Seite.Resize += delegate { Ordne(); };
+            Anzahl.TextChanged += delegate { Ordne(); }; Unter.TextChanged += delegate { Ordne(); };
+            Links.SizeChanged += delegate { Ordne(); }; Rechts.SizeChanged += delegate { Ordne(); };
+        }
+
+        public void Fuege(Control inhalt, Control seitenteil, Control fuss)
+        {
+            Inhalt = inhalt; Seitenteil = seitenteil; Fuss = fuss;
+            foreach (Control c in new Control[] { inhalt, seitenteil, fuss }) if (c != null) Seite.Controls.Add(c);
+            Ordne();
+        }
+
+        // eigener Zustand statt Band.Visible: Das ist falsch, solange die Seite nicht angezeigt wird
+        public bool BandSichtbar { get { return bandSichtbar; } set { if (bandSichtbar == value) return; bandSichtbar = value; Band.Visible = value; Ordne(); } }
+        public void Farben() { Band.BackColor = UI.AccentSoft; BandText.ForeColor = UI.Accent; BandUnter.ForeColor = UI.Text; BandVerweis.LinkColor = UI.Accent; }
+
+        void OrdneBand()
+        {
+            int h = Band.Height, x = UI.S(12);
+            Size st = BandText.GetPreferredSize(Size.Empty), sk = BandKnopf.GetPreferredSize(Size.Empty), sv = BandVerweis.GetPreferredSize(Size.Empty);
+            BandText.Location = new Point(x, (h - st.Height) / 2);
+            BandKnopf.Location = new Point(Band.Width - sk.Width - UI.S(8), (h - sk.Height) / 2);
+            BandVerweis.Location = new Point(BandKnopf.Left - sv.Width - UI.S(12), (h - sv.Height) / 2);
+            int ux = x + st.Width + UI.S(8);
+            BandUnter.SetBounds(ux, (h - BandUnter.Height) / 2, Math.Max(0, BandVerweis.Left - ux - UI.S(8)), BandUnter.Height);
+        }
+
+        bool ordnet;
+        public void Ordne()
+        {
+            if (ordnet) return;
+            int w = Seite.ClientSize.Width, h = Seite.ClientSize.Height;
+            if (w < UI.S(200) || h < UI.S(100)) return;
+            ordnet = true;
+            try
+            {
+                Size sa = Anzahl.GetPreferredSize(Size.Empty), su = Unter.GetPreferredSize(Size.Empty);
+                int rw = Math.Max(sa.Width, su.Width);
+                Anzahl.Location = new Point(w - sa.Width, UI.S(4)); Unter.Location = new Point(w - su.Width, UI.S(4) + sa.Height + UI.S(1));
+                int ew = Math.Max(UI.S(240), w - rw - UI.S(UI.Abstand5));
+                int ty = Titel.PreferredSize.Height + UI.S(UI.Abstand1);
+                int eh = TextRenderer.MeasureText(Einleitung.Text, Einleitung.Font, new Size(ew, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height + UI.S(2);
+                Einleitung.SetBounds(0, ty, ew, eh);
+                int y = Math.Max(ty + eh, UI.S(4) + sa.Height + UI.S(1) + su.Height) + UI.S(UI.Abstand3);
+                // Leiste: rechts die Knöpfe, links die Bedienelemente; passt beides nicht nebeneinander, die Knöpfe darunter
+                bool neben = Links.Width + Rechts.Width + UI.S(12) <= w;
+                int lh = Math.Max(Links.Height, neben ? Rechts.Height : 0);
+                Links.Location = new Point(0, y + (lh - Links.Height) / 2);
+                if (neben) Rechts.Location = new Point(w - Rechts.Width, y + (lh - Rechts.Height) / 2);
+                else { Rechts.Location = new Point(0, y + lh + UI.S(6)); lh += UI.S(6) + Rechts.Height; }
+                if (lh > 0) y += lh + UI.S(UI.Abstand3);
+                if (bandSichtbar) { Band.SetBounds(0, y, w, Band.Height); y += Band.Height + UI.S(UI.Abstand2); }
+                int unten = h;
+                if (Fuss != null)
+                {
+                    int fh = Fuss is Label ? TextRenderer.MeasureText(Fuss.Text.Length > 0 ? Fuss.Text : " ", Fuss.Font, new Size(w, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height + UI.S(2) : Fuss.Height;
+                    // nicht nach Fuss.Visible fragen: Das ist falsch, solange die Seite im Hintergrund steht
+                    Fuss.SetBounds(0, h - fh, w, fh); unten = h - fh - UI.S(6);
+                }
+                int rest = Math.Max(UI.S(120), unten - y);
+                if (Seitenteil == null) { if (Inhalt != null) Inhalt.SetBounds(0, y, w, rest); }
+                else if (ToolSpalten(w) >= 2)
+                {
+                    int sw = UI.S(SeitenteilBreite), gap = UI.S(UI.Abstand4);
+                    Inhalt.SetBounds(0, y, w - sw - gap, rest); Seitenteil.SetBounds(w - sw, y, sw, rest);
+                }
+                else
+                {
+                    int sh = Math.Min(UI.S(SeitenteilHoehe), rest / 2), gap = UI.S(UI.Abstand3);
+                    Inhalt.SetBounds(0, y, w, rest - sh - gap); Seitenteil.SetBounds(0, y + rest - sh, w, sh);
+                }
+            }
+            finally { ordnet = false; }
+        }
+    }
+    internal List<ListenSeite> listenSeiten = new List<ListenSeite>();
+
     // Ordnet die Modulseiten nach der Seitenbreite neu (Größe des Fensters, Wechsel der Seite)
     List<ModulSeite> modulSeiten = new List<ModulSeite>();
     void OrdneModulSeiten() { int w = SeitenBreite(); foreach (ModulSeite m in modulSeiten) m.Ordne(w); }
 
-    // Seiten mit diesem Rahmen: Diagnose, Benchmark, Lasttest und System-Umzug (Nummern wie in der Seitenleiste)
-    static bool IstModulSeite(int i) { return i == 1 || i == 2 || i == 3 || i == 8; }
+    // Seiten mit diesem Rahmen: Diagnose, Benchmark, Lasttest, Sensoren live (ab v4.10) und System-Umzug (Nummern wie in der Seitenleiste)
+    static bool IstModulSeite(int i) { return i == 1 || i == 2 || i == 3 || i == 7 || i == 8; }
 
     ModulSeite NeueModulSeite(FlowLayoutPanel f)
     {
@@ -13244,6 +13443,12 @@ public partial class DiagGui
     void SetSensorBadgeState(string state, string tooltip)
     {
         if (badgeSensStatus == null) return;
+        SetzeSensorBadge(badgeSensStatus, state, tooltip);
+        if (badgeSensSeite != null) SetzeSensorBadge(badgeSensSeite, state, tooltip);
+    }
+
+    void SetzeSensorBadge(Badge badgeSensStatus, string state, string tooltip)
+    {
         switch (state)
         {
             case "Vollstaendig":
@@ -13276,57 +13481,222 @@ public partial class DiagGui
 
     void UpdateSensTools()
     {
-        if (lblSensTools == null) return;
+        if (rowSensLhm == null) return;
         string pv = PawnIoVersion();
-        string t;
-        if (!LhmPresent) t = "LibreHardwareMonitor fehlt im Tools-Ordner. Ohne die Bibliothek zeigt die Seite nur Ersatzwerte (Windows-Takt, ACPI, nvidia-smi, Datenträger, Akku).";
-        else t = "LibreHardwareMonitor liegt im Tools-Ordner (geladen wird nur mit passender Prüfsumme).";
-        t += pv.Length > 0 ? "  PawnIO " + pv + " ist auf diesem PC installiert und bleibt unverändert." : (PawnSetupPresent ? "  PawnIO ist nicht installiert; das Setup liegt bereit." : "  PawnIO-Setup fehlt.");
-        lblSensTools.Text = t;
-        lblSensTools.ForeColor = LhmPresent ? UI.Muted : UI.Warn;
-        btnSensTools.Text = LhmPresent && PawnSetupPresent ? "Sensorwerkzeuge erneut holen" : "Sensorwerkzeuge holen";
+        // ab v4.10 zwei Zeilen mit Etikett statt eines Fließtexts; der volle Text steht im Hinweis beim Überfahren
+        string tl = LhmPresent ? "liegt im Tools-Ordner (geladen wird nur mit passender Prüfsumme)" : "fehlt im Tools-Ordner; ohne die Bibliothek zeigt die Seite nur Ersatzwerte (Windows-Takt, ACPI, nvidia-smi, Datenträger, Akku)";
+        rowSensLhm.Description = tl; rowSensLhm.StatusText = LhmPresent ? "vorhanden" : "fehlt"; rowSensLhm.StatusLevel = LhmPresent ? "ok" : "warn";
+        Tip(rowSensLhm, "LibreHardwareMonitor " + tl + ".");
+        string tp = pv.Length > 0 ? "Version " + pv + " ist auf diesem PC installiert und bleibt unverändert" : PawnSetupPresent ? "nicht installiert; das Setup liegt im Tools-Ordner bereit" : "nicht installiert; das Setup fehlt im Tools-Ordner";
+        rowSensPawn.Description = tp; rowSensPawn.StatusText = pv.Length > 0 ? "installiert" : PawnSetupPresent ? "bereit" : "fehlt"; rowSensPawn.StatusLevel = pv.Length > 0 ? "ok" : PawnSetupPresent ? "skip" : "warn";
+        Tip(rowSensPawn, "PawnIO: " + tp + ".");
+        btnSensTools.Text = LhmPresent && PawnSetupPresent ? "Erneut holen" : "Sensorwerkzeuge holen";
         UpdateSensStatusBadge();
         StartUpdateCheck();
     }
 
+    // Einzelner Wert der Sensorliste (ab v4.10 ohne Fensterelement je Zeile)
+    public class SensorWert
+    {
+        public string Gruppe = "", Name = "", Art = "", Quelle = "", Aktuell = "", Min = "", Max = "", Hinweis = "";
+        public bool Blass, Unplausibel;
+    }
+
+    internal ModulSeite sensSeite;
+    internal KennzahlZeile sensKpi;
+    internal ToolRow rowSensLhm, rowSensPawn;
+    internal SettingRow rowSensTreiber, rowSensBehalten;
+    internal Label lblSensAufz, lblSensVoll, lblSensAnzahl;
+    Badge badgeSensSeite;
+    internal Dictionary<int, SensorWert> sensWerte = new Dictionary<int, SensorWert>();
+    internal List<string> sensGruppen = new List<string>();
+    internal HashSet<string> sensZu = new HashSet<string>();
+    // Höchstzahl der aufgezeichneten Messzeilen; danach nimmt die Aufzeichnung nichts mehr auf und sagt das (bis v4.09 stillschweigend)
+    public const int SensZeilenMax = 50000;
+    internal bool sensVoll;
+    DateTime liveStart = DateTime.MinValue;
+    double sensErsteSek = double.NaN, sensLetzteSek = double.NaN;
+    // Kennzahlen: Spalte in SENSLEAD, Einheit; Min und Max seit dem Start der Live-Ansicht
+    static readonly int[] kpiSpalte = new int[] { 1, 2, 3, 4, 6, 7 };
+    static readonly string[] kpiTitel = new string[] { "CPU-Temperatur", "CPU-Takt", "CPU-Leistung", "GPU-Temperatur", "GPU-Leistung", "Lüfter" };
+    static readonly string[] kpiEinheit = new string[] { "°C", "MHz", "W", "°C", "W", "U/min" };
+    double[] kpiMin = new double[6], kpiMax = new double[6];
+
+    static string KpiZahl(double v) { return double.IsNaN(v) ? "" : Math.Round(v).ToString("N0", CultureInfo.GetCultureInfo("de-DE")); }
+
+    void LeereKennzahlen() { for (int i = 0; i < 6; i++) { kpiMin[i] = double.MaxValue; kpiMax[i] = double.MinValue; } if (sensKpi != null) sensKpi.Leere(); }
+
+    // Kennzahlen aus einer Zeile SENSLEAD (wie sie die Kurve bekommt); fehlt ein Wert, bleibt die Kachel bei "kein Wert"
+    internal void SetzeKennzahlen(double[] r)
+    {
+        if (sensKpi == null || r == null) return;
+        for (int i = 0; i < 6; i++)
+        {
+            double v = kpiSpalte[i] < r.Length ? r[kpiSpalte[i]] : double.NaN;
+            if (double.IsNaN(v)) { if (kpiMax[i] == double.MinValue) sensKpi.Setze(i, "", ""); continue; }
+            kpiMin[i] = Math.Min(kpiMin[i], v); kpiMax[i] = Math.Max(kpiMax[i], v);
+            string unter = "Min " + KpiZahl(kpiMin[i]) + "  \u00B7  Max " + KpiZahl(kpiMax[i]);
+            if (i == 1 && r.Length > 9 && !double.IsNaN(r[9])) unter = "höchster Kern " + KpiZahl(r[9]);
+            sensKpi.Setze(i, KpiZahl(v), unter);
+        }
+    }
+
+    static string DauerText(double sek)
+    {
+        if (double.IsNaN(sek) || sek < 0) return "0 s";
+        int s = (int)Math.Round(sek);
+        return s >= 3600 ? (s / 3600) + " h " + (s % 3600 / 60) + " min" : s >= 60 ? (s / 60) + " min " + (s % 60) + " s" : s + " s";
+    }
+
+    // Kopf rechts, Karte Aufzeichnung und Anzahl der Sensoren
+    internal void UpdateSensStand()
+    {
+        if (sensSeite == null) return;
+        if (liveRunning && liveStart != DateTime.MinValue)
+        {
+            TimeSpan t = DateTime.Now - liveStart;
+            SetText(sensSeite.Anzahl, "Live seit " + ((int)t.TotalMinutes).ToString("00") + ":" + t.Seconds.ToString("00"));
+        }
+        else SetText(sensSeite.Anzahl, "Live-Ansicht aus");
+        SetText(sensSeite.Dauer, sensWerte.Count > 0 ? Mehrzahl(sensWerte.Count, "Sensor", "Sensoren") : "keine Messwerte");
+        SetText(lblSensAnzahl, sensWerte.Count > 0 ? Mehrzahl(sensWerte.Count, "Wert", "Werte") : "keine Werte");
+        string z = sensRows.Count.ToString("N0", CultureInfo.GetCultureInfo("de-DE"));
+        SetText(lblSensAufz, sensRows.Count == 0 ? "Noch nichts aufgezeichnet." : "Dauer " + DauerText(sensLetzteSek - sensErsteSek) + "  \u00B7  " + z + (sensRows.Count == 1 ? " Messzeile" : " Messzeilen") + "  \u00B7  " + Mehrzahl(sensWerte.Count, "Sensor", "Sensoren"));
+        if (lblSensVoll != null && lblSensVoll.Visible != sensVoll) lblSensVoll.Visible = sensVoll;
+    }
+
+    // Zeilen der Sensorliste aus Gruppen und Werten
+    internal void FillSensList()
+    {
+        if (lvSens == null) return;
+        lvSens.Zeilen.Clear();
+        foreach (string grp in sensGruppen)
+        {
+            int n = 0; foreach (SensorWert w in sensWerte.Values) if (w.Gruppe == grp) n++;
+            ListenZeile kz = new ListenZeile(); kz.Art = "gruppe"; kz.Tag = grp; kz.Grund = 1; kz.Aufklappbar = true; kz.Offen = !sensZu.Contains(grp); kz.Waehlbar = false; kz.Hoehe = UI.S(28);
+            kz.Hinweis = Mehrzahl(n, "Wert", "Werte");
+            lvSens.Zeilen.Add(kz);
+            if (!kz.Offen) continue;
+            List<int> ids = new List<int>(sensWerte.Keys); ids.Sort();
+            foreach (int id in ids)
+            {
+                SensorWert w = sensWerte[id]; if (w.Gruppe != grp) continue;
+                ListenZeile z = new ListenZeile(); z.Art = "wert"; z.Tag = w; z.Waehlbar = false; z.Hoehe = UI.S(26); z.Blass = w.Blass; z.Hinweis = w.Hinweis;
+                lvSens.Zeilen.Add(z);
+            }
+        }
+        lvSens.Aktualisiere();
+    }
+
+    void ZeichneSensZeile(Graphics g, ListenZeile z, Rectangle r, bool markiert)
+    {
+        if (z.Art == "gruppe")
+        {
+            string grp = Convert.ToString(z.Tag); int p = grp.IndexOf("  \u00B7  ");
+            string a = p > 0 ? grp.Substring(0, p) : grp, b = p > 0 ? grp.Substring(p + 5) : "";
+            int aw = ZeilenListe.Breite(a, ZeilenListe.FKopf);
+            ZeilenListe.Schreibe(g, a, ZeilenListe.FKopf, new Rectangle(r.X, r.Y, aw, r.Height), UI.Text, false);
+            if (b.Length > 0) ZeilenListe.Schreibe(g, "\u00B7  " + b + (z.Offen ? "" : "  (" + z.Hinweis + ")"), ZeilenListe.FKlein, new Rectangle(r.X + aw + UI.S(4), r.Y, r.Right - r.X - aw - UI.S(14), r.Height), UI.Muted, false);
+            return;
+        }
+        SensorWert w = (SensorWert)z.Tag;
+        Rectangle zeile = new Rectangle(0, r.Y, lvSens.Width, r.Height);
+        Color c = w.Blass ? UI.Muted : UI.Text;
+        Rectangle c0 = lvSens.Zelle(0, zeile);
+        ZeilenListe.Schreibe(g, w.Name, ZeilenListe.FKlein, new Rectangle(r.X, r.Y, Math.Max(0, c0.Right - r.X - UI.S(6)), r.Height), c, false);
+        ZeilenListe.Schreibe(g, w.Art, ZeilenListe.FKlein, lvSens.Zelle(1, zeile), UI.Muted, false);
+        Rectangle ca = lvSens.Zelle(2, zeile);
+        if (w.Unplausibel) { int bw = ZeilenListe.EtikettBreite("unplausibel"); ZeilenListe.Etikett(g, "unplausibel", "crit", ca.Right - bw, r, 0); }
+        else ZeilenListe.Schreibe(g, w.Aktuell, ZeilenListe.FKopf, ca, c, true);
+        ZeilenListe.Schreibe(g, w.Min, ZeilenListe.FKlein, lvSens.Zelle(3, zeile), UI.Muted, true);
+        ZeilenListe.Schreibe(g, w.Max, ZeilenListe.FKlein, lvSens.Zelle(4, zeile), UI.Muted, true);
+        Rectangle cq = lvSens.Zelle(5, zeile);
+        ZeilenListe.Schreibe(g, w.Quelle, ZeilenListe.FKlein, new Rectangle(cq.X + UI.S(12), cq.Y, cq.Width - UI.S(12), cq.Height), UI.Muted, false);
+    }
+
+    // ab v4.10: Seite im Muster der Modulseiten. Oben Kennzahlen, links Verlauf und alle Sensoren, rechts Sensorwerkzeuge,
+    // Einstellungen und Aufzeichnung. cmbDriver und cmbKeep bleiben als Werte bestehen (Start eines Laufs, Vorlagen,
+    // Geraete.json), angezeigt werden Schalter.
     Control BuildSensorPage()
     {
-        FlowLayoutPanel f = Page("Sensoren live", "Zeigt Temperatur, Takt, Lüfter, Spannung und Leistung laufend an (Kurven der letzten zehn Minuten). CPU-Werte und Mainboard-Lüfter brauchen den Treiber PawnIO; er wird beim Beenden wieder entfernt.", -1);
-        lblSensTools = Lbl("", 9f, false, UI.Muted); lblSensTools.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); lblSensTools.Margin = new Padding(UI.S(4), 0, UI.S(4), UI.S(8)); f.Controls.Add(lblSensTools);
-        FlowLayoutPanel b = Row(); b.Margin = new Padding(UI.S(4), 0, 0, UI.S(8));
-        btnLive = UI.Primary("Live-Ansicht starten"); btnLive.Margin = new Padding(0); btnLive.Padding = new Padding(UI.S(14), UI.S(3), UI.S(14), UI.S(3)); btnLive.Font = new Font("Segoe UI Semibold", 9.75f);
+        FlowLayoutPanel f = Page("Sensoren live", "Zeigt Temperatur, Takt, Lüfter, Spannung und Leistung laufend an. CPU-Werte und Mainboard-Lüfter brauchen den Treiber PawnIO; er wird beim Beenden wieder entfernt. Während eines Laufs ist die Live-Ansicht aus; der Lasttest zeigt seine Kurven im Reiter Sensoren.", -1);
+        sensSeite = NeueModulSeite(f);
+        btnLive = UI.Primary("Live-Ansicht starten"); btnLive.Margin = new Padding(0); btnLive.Padding = new Padding(UI.S(14), UI.S(4), UI.S(14), UI.S(4)); btnLive.Font = new Font("Segoe UI Semibold", 9.75f);
         btnLive.Click += delegate { if (liveRunning) StopLive(); else StartLive(); };
-        btnSensTools = UI.Secondary("Sensorwerkzeuge holen"); btnSensTools.Margin = new Padding(UI.S(8), 0, 0, 0); btnSensTools.Click += delegate { FetchSensorTools(); };
-        btnSensSave = UI.Secondary("Aufzeichnung speichern"); btnSensSave.Margin = new Padding(UI.S(8), 0, 0, 0); btnSensSave.Enabled = false; btnSensSave.Click += delegate { SaveSensorCsv(); };
-        b.Controls.Add(btnLive); b.Controls.Add(btnSensTools); b.Controls.Add(btnSensSave);
-        f.Controls.Add(b);
-        FlowLayoutPanel bd = Row(); bd.Margin = new Padding(UI.S(4), 0, 0, UI.S(8));
-        bd.Controls.Add(RowLabel("PawnIO-Treiber", 120));
-        cmbDriver = Combo(270, new string[] { "vorübergehend verwenden (Standard)", "nicht verwenden" }, 0); bd.Controls.Add(cmbDriver);
-        Label ld = Lbl("gilt für Live-Ansicht, Diagnose, Benchmark und Lasttest; ein vorhandener PawnIO bleibt unverändert", UI.SchriftHinweis, false, UI.Muted); ld.Margin = new Padding(0, UI.S(5), 0, 0); ld.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 420), 0); bd.Controls.Add(ld);
-        f.Controls.Add(bd);
-        FlowLayoutPanel bk = Row(); bk.Margin = new Padding(UI.S(4), 0, 0, UI.S(8));
-        bk.Controls.Add(RowLabel("Hilfswerkzeuge", 120));
-        cmbKeep = Combo(270, new string[] { "nach dem Lauf entfernen (Standard)", "auf diesem PC behalten" }, 0); bk.Controls.Add(cmbKeep);
-        Label lk = Lbl("PawnIO und smartmontools, die Leos Minibench installiert hat; gilt je Gerät", UI.SchriftHinweis, false, UI.Muted); lk.Margin = new Padding(0, UI.S(5), 0, 0); lk.MaximumSize = new Size(UI.S(UI.Gruppenbreite - 420), 0); bk.Controls.Add(lk);
-        f.Controls.Add(bk);
-        LoadDeviceTools();
-        cmbKeep.SelectedIndexChanged += delegate { SaveDeviceTools(); };
-        cmbDriver.SelectedIndexChanged += delegate { SaveDeviceTools(); UpdateSensStatusBadge(); };
-        lblSensInfo = Lbl("Live-Ansicht nicht gestartet.", 9f, false, UI.Muted); lblSensInfo.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); lblSensInfo.Margin = new Padding(UI.S(4), 0, UI.S(4), UI.S(6)); f.Controls.Add(lblSensInfo);
-        chartLive = new SensorChart(); chartLive.Width = UI.S(UI.Gruppenbreite); chartLive.Height = UI.S(330); chartLive.WindowSec = 600; chartLive.Margin = new Padding(UI.S(4), 0, 0, UI.S(8));
+        Tip(btnLive, "Startet oder beendet die laufende Anzeige aller Sensoren. Beim Beenden wird ein vorübergehend installierter Treiber wieder entfernt.");
+        sensSeite.KopfKnopf(btnLive);
+
+        sensKpi = new KennzahlZeile(kpiTitel, kpiEinheit, new Color[] { SensorChart.CpuFarbe, SensorChart.CpuFarbe, SensorChart.CpuFarbe, SensorChart.GpuFarbe, SensorChart.GpuFarbe, Color.FromArgb(156, 163, 175) });
+        Tip(sensKpi, "Leitwerte der Live-Ansicht mit dem kleinsten und größten Wert seit dem Start. Ohne Messwert steht \"kein Wert\".");
+        f.Controls.Add(sensKpi); sensSeite.Voll.Add(sensKpi);
+        LeereKennzahlen();
+        lblSensInfo = Lbl("Live-Ansicht nicht gestartet.", UI.SchriftHinweis, false, UI.Muted); lblSensInfo.Margin = new Padding(0, 0, 0, UI.S(UI.Abstand2));
+        f.Controls.Add(lblSensInfo); sensSeite.Voll.Add(lblSensInfo);
+
+        // links: Verlauf und alle Sensoren
+        ZeilenKarte kv = sensSeite.Karte("Verlauf", true);
+        Label lz = Lbl("letzte zehn Minuten", UI.SchriftHinweis, false, UI.Muted); lz.Margin = new Padding(0, UI.S(2), 0, 0); kv.KopfRechts.Controls.Add(lz);
+        chartLive = new SensorChart(); chartLive.Rahmen = false; chartLive.Height = UI.S(330); chartLive.WindowSec = 600; chartLive.Margin = new Padding(0, 0, 0, UI.S(2));
         chartLive.Empty = "Noch keine Messwerte. \"Live-Ansicht starten\" öffnet die Sensoren.";
-        f.Controls.Add(chartLive);
-        lvSens = new ListView(); lvSens.View = View.Details; lvSens.FullRowSelect = true; lvSens.Width = UI.S(UI.Gruppenbreite); lvSens.Height = UI.S(380); lvSens.BorderStyle = BorderStyle.FixedSingle; lvSens.HideSelection = false; lvSens.ShowGroups = true; lvSens.ShowItemToolTips = true; lvSens.Margin = new Padding(UI.S(4), 0, 0, UI.S(4));
-        EnableDarkListView(lvSens);
-        string[] cols = new string[] { "Sensor", "Art", "Aktuell", "Min", "Max", "Quelle" };
-        int[] w = new int[] { UI.S(240), UI.S(110), UI.S(100), UI.S(100), UI.S(100), UI.S(120) };
-        for (int i = 0; i < cols.Length; i++) lvSens.Columns.Add(cols[i], w[i], i >= 2 && i <= 4 ? HorizontalAlignment.Right : HorizontalAlignment.Left);
-        f.Controls.Add(lvSens);
-        Label hint = Lbl("\"Aufzeichnung speichern\" legt alle Werte als CSV unter Berichte\\Sensoren ab. Während eines Laufs ist die Live-Ansicht aus; der Lasttest zeigt seine Kurven im Reiter Sensoren.", 8.75f, false, UI.Muted);
-        hint.MaximumSize = new Size(UI.S(UI.Gruppenbreite), 0); hint.Margin = new Padding(UI.S(4), UI.S(4), UI.S(4), 0); f.Controls.Add(hint);
+        kv.Zeile(chartLive);
+
+        ZeilenKarte kl = sensSeite.Karte("Alle Sensoren", true);
+        lblSensAnzahl = Lbl("keine Werte", UI.SchriftHinweis, false, UI.Muted); lblSensAnzahl.Margin = new Padding(0, UI.S(2), 0, 0); kl.KopfRechts.Controls.Add(lblSensAnzahl);
+        lvSens = new ZeilenListe(); lvSens.AutoHoehe = true; lvSens.Rahmen = false; lvSens.Tipp = tip; lvSens.Zeichner = ZeichneSensZeile; lvSens.TabStop = false; lvSens.Margin = new Padding(0, 0, 0, UI.S(2));
+        lvSens.Leer = "Noch keine Messwerte.";
+        lvSens.Spalten.Add(new ListenSpalte("Sensor", 0, false, 0)); lvSens.Spalten.Add(new ListenSpalte("Art", UI.S(128), false, 1));
+        lvSens.Spalten.Add(new ListenSpalte("Aktuell", UI.S(88), true, 2)); lvSens.Spalten.Add(new ListenSpalte("Min", UI.S(80), true, 3)); lvSens.Spalten.Add(new ListenSpalte("Max", UI.S(80), true, 4));
+        lvSens.Spalten.Add(new ListenSpalte("    Quelle", UI.S(92), false, 5));
+        foreach (ListenSpalte sp in lvSens.Spalten) sp.Sortierbar = false;
+        lvSens.AufklappGeklickt += delegate(ListenZeile z) { string grp = Convert.ToString(z.Tag); if (!sensZu.Remove(grp)) sensZu.Add(grp); FillSensList(); };
+        Tip(lvSens, "Alle Werte der Live-Ansicht je Gerät mit dem kleinsten und größten Wert seit dem Start. Grenzwerte des Herstellers stehen grau, verworfene Werte als \"unplausibel\" mit dem Grund im Hinweis.");
+        kl.Zeile(lvSens);
+        lvSens.Aktualisiere();
+
+        // rechts: Sensorwerkzeuge
+        ZeilenKarte kw = sensSeite.Karte("Sensorwerkzeuge", false);
+        badgeSensSeite = new Badge("", "ok"); badgeSensSeite.Margin = new Padding(UI.S(6), UI.S(2), 0, 0); kw.KopfRechts.Controls.Add(badgeSensSeite);
+        rowSensLhm = new ToolRow("LibreHardwareMonitor", "", UI.IcoSens); rowSensPawn = new ToolRow("PawnIO", "", UI.IcoShield);
+        kw.Zeile(rowSensLhm); kw.Zeile(rowSensPawn);
+        FlowLayoutPanel bt = Row(); bt.Margin = new Padding(0, UI.S(4), 0, UI.S(2));
+        btnSensTools = UI.Secondary("Sensorwerkzeuge holen"); btnSensTools.Margin = new Padding(0); btnSensTools.Click += delegate { FetchSensorTools(); };
+        bt.Controls.Add(btnSensTools);
+        kw.Frei(bt);
+        Label hw = Lbl("Aus den offiziellen GitHub-Releases, mit festen SHA-256-Werten geprüft. Abgelegt wird nur im Tools-Ordner.", 8.5f, false, UI.Muted); hw.Margin = new Padding(0, UI.S(4), 0, UI.S(2));
+        kw.Frei(hw);
+
+        // rechts: Einstellungen (Schalter als Anzeige, Auswahllisten als Wert)
+        ZeilenKarte ke = sensSeite.Karte("Einstellungen", false);
+        cmbDriver = Combo(270, new string[] { "vorübergehend verwenden (Standard)", "nicht verwenden" }, 0);
+        cmbKeep = Combo(270, new string[] { "nach dem Lauf entfernen (Standard)", "auf diesem PC behalten" }, 0);
+        LoadDeviceTools();
+        rowSensTreiber = new SettingRow("PawnIO-Treiber vorübergehend verwenden", "Für CPU-Werte und Mainboard-Lüfter. Gilt für Live-Ansicht, Diagnose, Benchmark und Lasttest; ein vorhandener PawnIO bleibt unverändert.");
+        rowSensBehalten = new SettingRow("Hilfswerkzeuge auf diesem PC behalten", "PawnIO und smartmontools, die Leos Minibench installiert hat. Aus: nach dem Lauf entfernen. Gilt je Gerät.");
+        rowSensTreiber.Checked = cmbDriver.SelectedIndex == 0; rowSensBehalten.Checked = cmbKeep.SelectedIndex == 1;
+        rowSensTreiber.Toggle.CheckedChanged += delegate { int i = rowSensTreiber.Toggle.Checked ? 0 : 1; if (cmbDriver.SelectedIndex != i) cmbDriver.SelectedIndex = i; };
+        rowSensBehalten.Toggle.CheckedChanged += delegate { int i = rowSensBehalten.Toggle.Checked ? 1 : 0; if (cmbKeep.SelectedIndex != i) cmbKeep.SelectedIndex = i; };
+        cmbKeep.SelectedIndexChanged += delegate { bool an = cmbKeep.SelectedIndex == 1; if (rowSensBehalten.Toggle.Checked != an) rowSensBehalten.Toggle.Checked = an; SaveDeviceTools(); };
+        cmbDriver.SelectedIndexChanged += delegate { bool an = cmbDriver.SelectedIndex == 0; if (rowSensTreiber.Toggle.Checked != an) rowSensTreiber.Toggle.Checked = an; SaveDeviceTools(); UpdateSensStatusBadge(); };
+        ke.Zeile(rowSensTreiber); ke.Zeile(rowSensBehalten);
+
+        // rechts: Aufzeichnung
+        ZeilenKarte ka = sensSeite.Karte("Aufzeichnung", false);
+        lblSensAufz = Lbl("Noch nichts aufgezeichnet.", UI.SchriftText, false, UI.Text); lblSensAufz.Margin = new Padding(0, 0, 0, UI.S(6));
+        ka.Frei(lblSensAufz);
+        lblSensVoll = Lbl("Aufzeichnung voll: Nach " + SensZeilenMax.ToString("N0", CultureInfo.GetCultureInfo("de-DE")) + " Messzeilen nimmt sie nichts mehr auf. Die Anzeige läuft weiter; zum Weiterschreiben speichern und die Live-Ansicht neu starten.", UI.SchriftHinweis, false, UI.Warn);
+        lblSensVoll.Margin = new Padding(0, 0, 0, UI.S(6)); lblSensVoll.Visible = false;
+        ka.Frei(lblSensVoll);
+        FlowLayoutPanel bs = Row(); bs.Margin = new Padding(0, 0, 0, UI.S(2));
+        btnSensSave = UI.Secondary("Als CSV speichern"); btnSensSave.Margin = new Padding(0); btnSensSave.Enabled = false; btnSensSave.Click += delegate { SaveSensorCsv(); };
+        bs.Controls.Add(btnSensSave);
+        ka.Frei(bs);
+        Label hs = Lbl("Nach dem Beenden der Live-Ansicht. Die Datei liegt danach unter Berichte\\Sensoren.", 8.5f, false, UI.Muted); hs.Margin = new Padding(0, UI.S(4), 0, UI.S(2));
+        ka.Frei(hs);
+
+        f.Controls.Add(sensSeite.Spalten);
         liveTimer = new Timer(); liveTimer.Interval = 250; liveTimer.Tick += delegate { OnLiveTick(); };
-        UpdateSensTools();
+        UpdateSensTools(); UpdateSensStand();
+        sensSeite.Ordne(SeitenBreite());
         return f;
     }
 
@@ -13353,15 +13723,17 @@ public partial class DiagGui
         liveProc.OutputDataReceived += delegate(object s, DataReceivedEventArgs e) { if (e.Data != null) liveQueue.Enqueue(e.Data); else liveEof = true; };
         liveProc.ErrorDataReceived += delegate(object s, DataReceivedEventArgs e) { if (e.Data != null && e.Data.Trim().Length > 0) liveQueue.Enqueue("@@SENSINFO|" + e.Data.Trim()); };
         liveProc.Exited += delegate { liveExited = true; };
-        sensItems.Clear(); sensMinMax.Clear(); sensUnit.Clear(); sensNames.Clear(); sensRows.Clear(); sensGroups.Clear();
-        lvSens.Items.Clear(); lvSens.Groups.Clear(); chartLive.Clear();
+        sensWerte.Clear(); sensMinMax.Clear(); sensUnit.Clear(); sensNames.Clear(); sensRows.Clear(); sensGruppen.Clear(); sensZu.Clear();
+        sensVoll = false; sensErsteSek = double.NaN; sensLetzteSek = double.NaN;
+        FillSensList(); chartLive.Clear(); LeereKennzahlen();
         string dummy; while (liveQueue.TryDequeue(out dummy)) { }
         liveExited = false; liveEof = false; liveStopping = false; liveExitSeen = DateTime.MinValue;
         try { liveProc.Start(); liveProc.BeginOutputReadLine(); liveProc.BeginErrorReadLine(); try { liveProc.StandardInput.Close(); } catch { } }
         catch (Exception ex) { MessageBox.Show(this, "PowerShell konnte nicht gestartet werden: " + ex.Message, "Leos Minibench", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
-        liveRunning = true;
+        liveRunning = true; liveStart = DateTime.Now;
         btnLive.Text = "Live-Ansicht beenden"; btnSensTools.Enabled = false; btnSensSave.Enabled = false;
         lblSensInfo.Text = drv ? "Wird gestartet, PawnIO wird vorübergehend installiert ..." : "Wird gestartet ...";
+        UpdateSensStand();
         liveTimer.Start();
     }
 
@@ -13399,11 +13771,12 @@ public partial class DiagGui
         string line; int n = 0;
         if (!liveQueue.IsEmpty)
         {
-            lvSens.BeginUpdate();
-            try { while (n < 2000 && liveQueue.TryDequeue(out line)) { n++; HandleLiveLine(line); } }
-            finally { lvSens.EndUpdate(); }
+            sensListeNeu = false;
+            while (n < 2000 && liveQueue.TryDequeue(out line)) { n++; HandleLiveLine(line); }
+            if (sensListeNeu) FillSensList(); else lvSens.Invalidate();
         }
         chartLive.Flush();
+        UpdateSensStand();
         bool killed = false;
         if (liveStopping && !liveExited && (DateTime.Now - liveStopAt).TotalSeconds > 240) { KillProc(liveProc); killed = true; }
         if (liveExited && liveExitSeen == DateTime.MinValue) liveExitSeen = DateTime.Now;
@@ -13412,7 +13785,7 @@ public partial class DiagGui
             liveRunning = false; liveStopping = false; liveTimer.Stop();
             btnLive.Enabled = true; btnLive.Text = "Live-Ansicht starten"; btnSensTools.Enabled = true; btnSensSave.Enabled = sensRows.Count > 0;
             if (killed || PawnMarkerExists) CleanupDriver();
-            UpdateSensTools();
+            UpdateSensTools(); UpdateSensStand();
             ReloadDb();
         }
     }
@@ -13535,7 +13908,8 @@ public partial class DiagGui
         return v.ToString(f, CultureInfo.GetCultureInfo("de-DE")) + " " + unit;
     }
 
-    void HandleLiveLine(string line)
+    bool sensListeNeu;
+    internal void HandleLiveLine(string line)
     {
         if (!line.StartsWith("@@")) return;
         string[] p = line.Substring(2).Split('|');
@@ -13545,49 +13919,51 @@ public partial class DiagGui
                 {
                     // SENSDEF|idx|Gruppe|Geraet|Art|Name|Einheit|Quelle
                     int idx = ToInt(p, 1);
-                    string grp = Get(p, 2) + "  ·  " + Get(p, 3);
-                    ListViewGroup lg;
-                    if (!sensGroups.TryGetValue(grp, out lg)) { lg = new ListViewGroup(grp, grp); sensGroups[grp] = lg; lvSens.Groups.Add(lg); }
+                    string grp = Get(p, 2) + "  \u00B7  " + Get(p, 3);
+                    if (!sensGruppen.Contains(grp)) sensGruppen.Add(grp);
                     string art = Get(p, 4);
-                    ListViewItem it = new ListViewItem(new string[] { Get(p, 5), art == "Grenzwert" ? "Grenzwert (Hersteller)" : art, "", "", "", Get(p, 7) }, lg);
+                    SensorWert w = new SensorWert(); w.Gruppe = grp; w.Name = Get(p, 5); w.Art = art == "Grenzwert" ? "Grenzwert (Hersteller)" : art; w.Quelle = Get(p, 7);
                     // Grenzwerte laut Hersteller sind keine Messwerte: grau und ohne Min/Max-Bewertung
-                    if (art == "Grenzwert" || art == "Abstand") { it.ForeColor = UI.Muted; it.ToolTipText = art == "Grenzwert" ? "Vorgabe des Herstellers, keine gemessene Temperatur" : "Abstand zur Höchsttemperatur TjMax"; }
-                    else it.ToolTipText = "Quelle: " + Get(p, 7);
-                    sensItems[idx] = it; sensUnit[idx] = Get(p, 6); sensMinMax[idx] = new double[] { double.MaxValue, double.MinValue };
+                    if (art == "Grenzwert" || art == "Abstand") { w.Blass = true; w.Hinweis = art == "Grenzwert" ? "Vorgabe des Herstellers, keine gemessene Temperatur" : "Abstand zur Höchsttemperatur TjMax"; }
+                    else w.Hinweis = "Quelle: " + Get(p, 7);
+                    sensWerte[idx] = w; sensUnit[idx] = Get(p, 6); sensMinMax[idx] = new double[] { double.MaxValue, double.MinValue };
                     while (sensNames.Count <= idx) sensNames.Add("");
                     sensNames[idx] = (Get(p, 2) + " " + Get(p, 3) + " " + Get(p, 5) + " (" + Get(p, 6) + ")").Replace(";", ",");
-                    lvSens.Items.Add(it);
+                    sensListeNeu = true;
                     break;
                 }
             case "SENSVAL":
                 {
                     // SENSVAL|Sekunde|idx:wert;idx:wert
-                    if (sensRows.Count < 50000) sensRows.Add(Get(p, 1) + "|" + Get(p, 2));
+                    if (sensRows.Count < SensZeilenMax)
+                    {
+                        sensRows.Add(Get(p, 1) + "|" + Get(p, 2));
+                        double sek = ParseD(Get(p, 1));
+                        if (!double.IsNaN(sek)) { if (double.IsNaN(sensErsteSek)) sensErsteSek = sek; sensLetzteSek = sek; }
+                    }
+                    else sensVoll = true;
                     foreach (string kv in Get(p, 2).Split(';'))
                     {
                         int c = kv.IndexOf(':'); if (c <= 0) continue;
                         int idx; if (!int.TryParse(kv.Substring(0, c), out idx)) continue;
                         double v = ParseD(kv.Substring(c + 1));
-                        ListViewItem it; if (!sensItems.TryGetValue(idx, out it) || double.IsNaN(v)) continue;
+                        SensorWert w; if (!sensWerte.TryGetValue(idx, out w) || double.IsNaN(v)) continue;
                         double[] mm = sensMinMax[idx]; mm[0] = Math.Min(mm[0], v); mm[1] = Math.Max(mm[1], v);
                         string u = sensUnit[idx];
-                        string a = FmtSens(v, u); if (it.SubItems[2].Text != a) { it.SubItems[2].Text = a; if (!it.UseItemStyleForSubItems) it.SubItems[2].ForeColor = it.ForeColor; }
-                        string mi = FmtSens(mm[0], u); if (it.SubItems[3].Text != mi) it.SubItems[3].Text = mi;
-                        string ma = FmtSens(mm[1], u); if (it.SubItems[4].Text != ma) it.SubItems[4].Text = ma;
+                        w.Aktuell = FmtSens(v, u); w.Unplausibel = false; w.Min = FmtSens(mm[0], u); w.Max = FmtSens(mm[1], u);
                     }
                     break;
                 }
             case "SENSBAD":
                 {
                     // SENSBAD|idx|Rohwert|Grund: unplausibler Wert, wird nicht angezeigt und zählt nicht für Min/Max
-                    ListViewItem it; int idx = ToInt(p, 1);
-                    if (!sensItems.TryGetValue(idx, out it)) break;
-                    if (it.SubItems[2].Text != "unplausibel") { it.SubItems[2].Text = "unplausibel"; it.UseItemStyleForSubItems = false; it.SubItems[2].ForeColor = UI.Crit; }
-                    string tip = "Verworfen: " + Get(p, 3) + " (Rohwert " + Get(p, 2) + ")";
-                    if (it.ToolTipText != tip) it.ToolTipText = tip;
+                    SensorWert w; int idx = ToInt(p, 1);
+                    if (!sensWerte.TryGetValue(idx, out w)) break;
+                    w.Unplausibel = true; w.Hinweis = "Verworfen: " + Get(p, 3) + " (Rohwert " + Get(p, 2) + ")";
+                    foreach (ListenZeile z in lvSens.Zeilen) if (z.Tag == w) z.Hinweis = w.Hinweis;
                     break;
                 }
-            case "SENSLEAD": chartLive.Add(p); break;
+            case "SENSLEAD": SetzeKennzahlen(chartLive.Add(p)); break;
             case "SENSINFO": lblSensInfo.Text = Get(p, 1); break;
             case "SENSSTAT": UpdateSensStatusBadge(Get(p, 1), Get(p, 2)); break;
             case "SENSEND": lblSensInfo.Text = "Beendet. " + Get(p, 1); break;
@@ -13625,188 +14001,31 @@ public partial class DiagGui
 // Vergleichsdatenbank und Systemvergleich (Teilklasse DiagGui)
 public partial class DiagGui
 {
-    class DbItemComparer : System.Collections.IComparer
+    // ab v4.10: Zeile der Datenbankliste. Gruppe = Zeile eines Geräts (steht für dessen neuesten Lauf), sonst ein
+    // älterer Lauf darunter. Bis v4.09 ein natives Listenfeld mit eigenen Gruppenköpfen (DbListView).
+    public class DbZeile : ListenZeile
     {
-        int col;
-        bool asc;
-        public DbItemComparer(int column, bool ascending) { col = column; asc = ascending; }
-        public int Column { get { return col; } }
-        public bool Ascending { get { return asc; } }
-
-        public int Compare(object x, object y)
-        {
-            ListViewItem itemX = x as ListViewItem;
-            ListViewItem itemY = y as ListViewItem;
-            if (itemX == null || itemY == null) return 0;
-            DbEntry dx = itemX.Tag as DbEntry;
-            DbEntry dy = itemY.Tag as DbEntry;
-            if (dx == null || dy == null) return 0;
-
-            int res = CompareDbEntries(dx, dy, col);
-            return asc ? res : -res;
-        }
+        public DbEntry E; public string Key = "", Name = ""; public bool Gruppe; public int Anzahl = 1;
     }
 
-    class DbListView : ListView
+    internal ListenSeite dbSeite;
+    internal DetailKarte dbDetail;
+    internal HashSet<string> dbHaken = new HashSet<string>();
+    internal LinkLabel lnkDbName, lnkDbRef, lnkDbBasis, lnkDbExport, lnkDbDelete;
+    Button btnDbFolder;
+    Label lblDbHint;
+    FlowLayoutPanel dbFuss;
+
+    static string DbKey(DbEntry e) { return e.IsReference ? "REF" : (String.IsNullOrEmpty(e.GeraetKey) ? "PC:" + (e.Computer ?? "").ToUpperInvariant() : e.GeraetKey); }
+
+    // markierte Läufe (Zeilen der Liste), in der Reihenfolge der Liste
+    internal List<DbEntry> DbMarkierte()
     {
-        [StructLayout(LayoutKind.Sequential)]
-        public struct LVGROUP
-        {
-            public uint cbSize;
-            public uint mask;
-            [MarshalAs(UnmanagedType.LPWStr)] public string pszHeader;
-            public int cchHeader;
-            [MarshalAs(UnmanagedType.LPWStr)] public string pszFooter;
-            public int cchFooter;
-            public int iGroupId;
-            public uint stateMask;
-            public uint state;
-            public uint uAlign;
-            [MarshalAs(UnmanagedType.LPWStr)] public string pszSubtitle;
-            public uint cchSubtitle;
-            [MarshalAs(UnmanagedType.LPWStr)] public string pszTask;
-            public uint cchTask;
-            [MarshalAs(UnmanagedType.LPWStr)] public string pszDescriptionTop;
-            public uint cchDescriptionTop;
-            [MarshalAs(UnmanagedType.LPWStr)] public string pszDescriptionBottom;
-            public uint cchDescriptionBottom;
-            public int iTitleImage;
-            public int iExtendedImage;
-            public int iFirstItem;
-            public uint cItems;
-            [MarshalAs(UnmanagedType.LPWStr)] public string pszSubsetTitle;
-            public uint cchSubsetTitle;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct RECT { public int left, top, right, bottom; }
-
-        public const int LVM_FIRST = 0x1000;
-        public const int LVM_SETGROUPINFO = LVM_FIRST + 147;
-        public const int LVM_GETGROUPRECT = LVM_FIRST + 98;
-        public const int LVM_GETGROUPSTATE = LVM_FIRST + 92;
-        public const uint LVGF_STATE = 0x00000004;
-        public const uint LVGS_COLLAPSED = 0x00000001;
-        public const uint LVGS_COLLAPSIBLE = 0x00000008;
-        public const int LVGGR_LABEL = 2;
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto)]
-        public static extern int SendMessage(IntPtr hWnd, int msg, int wParam, ref LVGROUP lParam);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto)]
-        public static extern int SendMessage(IntPtr hWnd, int msg, int wParam, ref RECT lParam);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto)]
-        public static extern int SendMessage(IntPtr hWnd, int msg, int wParam, int lParam);
-
-        static PropertyInfo groupPropId = typeof(ListViewGroup).GetProperty("ID", BindingFlags.Instance | BindingFlags.NonPublic);
-
-        public event EventHandler GroupStateChanged;
-
-        public DbListView()
-        {
-            DoubleBuffered = true;
-        }
-
-        public static int GetGroupId(ListViewGroup g)
-        {
-            if (g == null || groupPropId == null) return -1;
-            try { return (int)groupPropId.GetValue(g, null); } catch { return -1; }
-        }
-
-        public void SetGroupState(ListViewGroup g, bool collapsible, bool collapsed)
-        {
-            if (Environment.OSVersion.Platform != PlatformID.Win32NT) return;
-            if (!IsHandleCreated) { IntPtr h = Handle; }
-            int id = GetGroupId(g);
-            if (id < 0) return;
-            try
-            {
-                LVGROUP grp = new LVGROUP();
-                grp.cbSize = (uint)Marshal.SizeOf(typeof(LVGROUP));
-                grp.mask = LVGF_STATE;
-                grp.stateMask = LVGS_COLLAPSIBLE | LVGS_COLLAPSED;
-                uint state = 0;
-                if (collapsible) state |= LVGS_COLLAPSIBLE;
-                if (collapsed) state |= LVGS_COLLAPSED;
-                grp.state = state;
-                SendMessage(Handle, LVM_SETGROUPINFO, id, ref grp);
-            }
-            catch { }
-        }
-
-        public bool IsGroupCollapsed(ListViewGroup g)
-        {
-            if (Environment.OSVersion.Platform != PlatformID.Win32NT) return false;
-            if (!IsHandleCreated) return false;
-            int id = GetGroupId(g);
-            if (id < 0) return false;
-            try
-            {
-                int state = SendMessage(Handle, LVM_GETGROUPSTATE, id, (int)LVGS_COLLAPSED);
-                return (state & (int)LVGS_COLLAPSED) != 0;
-            }
-            catch { return false; }
-        }
-
-        protected override void OnMouseUp(MouseEventArgs e)
-        {
-            base.OnMouseUp(e);
-            if (GroupStateChanged != null) GroupStateChanged(this, EventArgs.Empty);
-        }
-
-        protected override void OnKeyUp(KeyEventArgs e)
-        {
-            base.OnKeyUp(e);
-            if (GroupStateChanged != null) GroupStateChanged(this, EventArgs.Empty);
-        }
-
-        protected override void WndProc(ref Message m)
-        {
-            base.WndProc(ref m);
-            // Repaint group headers in Dark Mode with high contrast
-            if (m.Msg == 0x000F && UI.IsDark && Groups.Count > 0 && Environment.OSVersion.Platform == PlatformID.Win32NT)
-            {
-                PaintGroupHeadersDark();
-            }
-        }
-
-        void PaintGroupHeadersDark()
-        {
-            try
-            {
-                Rectangle client = ClientRectangle;
-                using (Graphics g = Graphics.FromHwnd(Handle))
-                using (SolidBrush bgBrush = new SolidBrush(BackColor))
-                using (Font f = new Font("Segoe UI Semibold", 9.25f))
-                {
-                    foreach (ListViewGroup grp in Groups)
-                    {
-                        int id = GetGroupId(grp);
-                        if (id < 0) continue;
-                        RECT rc = new RECT();
-                        rc.top = LVGGR_LABEL;
-                        if (SendMessage(Handle, LVM_GETGROUPRECT, id, ref rc) != 0)
-                        {
-                            if (rc.right > rc.left && rc.bottom > rc.top)
-                            {
-                                if (rc.bottom <= client.Top || rc.top >= client.Bottom) continue;
-                                Rectangle r = new Rectangle(rc.left - 2, rc.top, (rc.right - rc.left) + 6, (rc.bottom - rc.top) + 2);
-                                r.Intersect(client);
-                                if (r.Width > 0 && r.Height > 0)
-                                {
-                                    g.FillRectangle(bgBrush, r);
-                                    Color textCol = (grp.Name == "REF") ? UI.Text : UI.Accent;
-                                    TextRenderer.DrawText(g, grp.Header, f, r, textCol, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            catch { }
-        }
+        List<DbEntry> l = new List<DbEntry>();
+        if (lvDb != null) foreach (ListenZeile z in lvDb.Zeilen) if (lvDb.Markiert.Contains(z)) { DbZeile d = z as DbZeile; if (d != null && d.E != null) l.Add(d.E); }
+        return l;
     }
+    DbZeile DbMarkierteZeile() { if (lvDb == null) return null; List<ListenZeile> m = lvDb.Markiert; return m.Count == 1 ? m[0] as DbZeile : null; }
 
     HashSet<string> expandedGroups = new HashSet<string>();
 
@@ -13879,18 +14098,19 @@ public partial class DiagGui
     int dbSortCol = -1;
     bool dbSortAsc = true;
     Button btnRename;
-    Button btnCompare, btnDashboard, btnVerlauf, btnOpenReport, btnExport, btnSetRef, btnToggleGroups, btnActions;
+    internal Button btnCompare, btnDashboard, btnVerlauf, btnOpenReport, btnExport, btnSetRef, btnToggleGroups;
 
-    void OnDbColumnClick(object sender, ColumnClickEventArgs e)
+    // Spalte: 0 System, 1 Datum, 2 Punkte, 3 CPU, 4 GPU, 5 RAM, 6 CPU multi, 7 RAM lesen, 8 Grafiktest, 9 Befunde
+    internal void OnDbColumnClick(int spalte)
     {
-        if (e.Column == dbSortCol)
+        if (spalte == dbSortCol)
         {
             dbSortAsc = !dbSortAsc;
         }
         else
         {
-            dbSortCol = e.Column;
-            dbSortAsc = (e.Column == 0 || e.Column == 3 || e.Column == 4 || e.Column == 5);
+            dbSortCol = spalte;
+            dbSortAsc = (spalte == 0 || spalte == 3 || spalte == 4 || spalte == 5);
         }
         FillDbList();
     }
@@ -13938,12 +14158,13 @@ public partial class DiagGui
     void RenameSelectedEntry()
     {
         DbEntry target = null;
-        ListViewItem lvi = null;
-        if (lvDb != null && lvDb.SelectedItems.Count == 1) { lvi = lvDb.SelectedItems[0]; target = (DbEntry)lvi.Tag; }
-        else if (lvDb != null && lvDb.CheckedItems.Count == 1) { lvi = lvDb.CheckedItems[0]; target = (DbEntry)lvi.Tag; }
+        DbZeile lvi = DbMarkierteZeile();
+        if (lvi != null) target = lvi.E;
+        else if (CheckedEntries().Count == 1) { target = CheckedEntries()[0]; foreach (ListenZeile z in lvDb.Zeilen) { DbZeile d = z as DbZeile; if (d != null && d.E == target) { lvi = d; break; } } }
         if (target == null || target.IsReference) return;
 
-        bool isMasterGroup = lvi != null && (lvi.Text.StartsWith("\u25B6 ") || lvi.Text.StartsWith("\u25BC "));
+        // Zeile eines Geräts mit mehreren Läufen: Der Name gilt für alle Läufe des Geräts
+        bool isMasterGroup = lvi != null && lvi.Gruppe && lvi.Anzahl > 1;
         List<string> pathsToRename = new List<string>();
         string currentName = "";
 
@@ -13989,226 +14210,486 @@ public partial class DiagGui
 
     Control BuildDbPage()
     {
-        Panel f = new Panel(); f.Dock = DockStyle.Fill; f.BackColor = UI.Panel;
-        FlowLayoutPanel top = Page("Datenbank", "Alle gespeicherten Läufe, nach Gerät gebündelt. Zum Vergleichen Systeme anhaken und \"Im Dashboard vergleichen\" wählen. Doppelklick öffnet den Bericht, ein Klick auf einen Spaltenkopf sortiert.", -1);
-        top.Dock = DockStyle.Top;
-        top.AutoSize = true;
-        lblDbPath = Lbl(NasAblage.AblageText(dataDir), 9f, false, UI.Muted); lblDbPath.Margin = new Padding(UI.S(4), 0, UI.S(4), UI.S(4)); top.Controls.Add(lblDbPath);
+        dbSeite = new ListenSeite("Datenbank", "Alle gespeicherten Läufe, nach Gerät gebündelt. Zum Vergleichen Läufe anhaken und \"Im Dashboard vergleichen\" wählen. Doppelklick öffnet den Bericht, ein Klick auf einen Spaltenkopf sortiert.", "Im Dashboard vergleichen");
+        listenSeiten.Add(dbSeite);
+        btnDashboard = dbSeite.BandKnopf;
+        btnDashboard.Click += delegate { OpenDashboard(); };
+        btnDashboard.Enabled = false;
+        Tip(btnDashboard, "Öffnet das interaktive HTML5-Dashboard für detaillierten System- und Benchmark-Vergleich der ausgewählten Läufe.");
+        dbSeite.BandVerweis.LinkClicked += delegate { dbHaken.Clear(); FillDbList(); };
+        Tip(dbSeite.BandVerweis, "Entfernt alle Haken.");
 
-        FlowLayoutPanel topTools = Row();
-        topTools.Margin = new Padding(UI.S(4), 0, UI.S(4), UI.S(8));
+        lblDbHint = Lbl("Graue Einträge enthalten keine Benchmark-Werte.", UI.SchriftHinweis, false, UI.Muted); lblDbHint.Margin = new Padding(0, UI.S(6), 0, 0);
+        dbSeite.Links.Controls.Add(lblDbHint);
+
         Button imp = UI.Secondary("Importieren …"); imp.Margin = new Padding(0); imp.Click += delegate { ImportRuns(); };
         Tip(imp, "Importiert Durchläufe aus .minibench-Paketen, .zip-Archiven, .json-Dateien oder Ausgabeordnern früherer Läufe in die Datenbank samt Bericht.");
         btnToggleGroups = UI.Secondary("Alle aufklappen"); btnToggleGroups.Margin = new Padding(UI.S(8), 0, 0, 0); btnToggleGroups.Click += delegate { ToggleAllGroups(); };
         Tip(btnToggleGroups, "Klappt alle Gerätegruppen in der Datenbank ein oder aus.");
         Button rel = UI.Secondary("Aktualisieren"); rel.Margin = new Padding(UI.S(8), 0, 0, 0); rel.Click += delegate { RefreshAndSync(); };
         Tip(rel, "Liest Datenbank und Referenz neu ein. Ist ein Netzlaufwerk eingerichtet und erreichbar, werden Berichte, Datenbank und Änderungsprotokolle vorher in beide Richtungen abgeglichen.");
-
         btnDbClean = UI.Secondary("Aufräumen …"); btnDbClean.Margin = new Padding(UI.S(8), 0, 0, 0); btnDbClean.Click += delegate { CleanData(); }; btnDbClean.Enabled = dataDir.Length > 0;
+        dbSeite.Rechts.Controls.Add(imp); dbSeite.Rechts.Controls.Add(btnToggleGroups); dbSeite.Rechts.Controls.Add(rel); dbSeite.Rechts.Controls.Add(btnDbClean);
 
-        topTools.Controls.Add(imp);
-        topTools.Controls.Add(btnToggleGroups);
-        topTools.Controls.Add(rel);
-        topTools.Controls.Add(btnDbClean);
-        top.Controls.Add(topTools);
+        // Fuß: Ablage und Meldung der Datenpflege
+        dbFuss = new FlowLayoutPanel(); dbFuss.FlowDirection = FlowDirection.TopDown; dbFuss.WrapContents = false; dbFuss.AutoSize = true; dbFuss.AutoSizeMode = AutoSizeMode.GrowAndShrink; dbFuss.BackColor = UI.Panel;
+        lblDbPath = Lbl(NasAblage.AblageText(dataDir), UI.SchriftHinweis, false, UI.Muted); lblDbPath.Margin = new Padding(0, 0, 0, 0); dbFuss.Controls.Add(lblDbPath);
+        lblDbClean = Lbl(DatenpflegeInfo, UI.SchriftHinweis, false, UI.Muted); lblDbClean.Visible = DatenpflegeInfo.Length > 0; lblDbClean.Margin = new Padding(0, UI.S(2), 0, 0); dbFuss.Controls.Add(lblDbClean);
+        dbSeite.Seite.Resize += delegate { int w = Math.Max(UI.S(200), dbSeite.Seite.ClientSize.Width); lblDbPath.MaximumSize = new Size(w, 0); lblDbClean.MaximumSize = new Size(w, 0); };
+        dbFuss.SizeChanged += delegate { dbSeite.Ordne(); };
 
-        FlowLayoutPanel bottom = new FlowLayoutPanel(); bottom.FlowDirection = FlowDirection.TopDown; bottom.WrapContents = false; bottom.AutoSize = true; bottom.BackColor = UI.Panel; bottom.Dock = DockStyle.Bottom;
-        Label hint = Lbl("Graue Einträge enthalten keine Benchmark-Werte.", UI.SchriftHinweis, false, UI.Muted); hint.Margin = new Padding(UI.S(4), UI.S(4), UI.S(4), 0); bottom.Controls.Add(hint);
-        FlowLayoutPanel b = Row(); b.Margin = new Padding(UI.S(4), UI.S(10), 0, 0);
-
-        btnDashboard = UI.Primary("Im Dashboard vergleichen"); btnDashboard.Margin = new Padding(0); btnDashboard.Padding = new Padding(UI.S(14), UI.S(3), UI.S(14), UI.S(3)); btnDashboard.Font = new Font("Segoe UI Semibold", 9.75f);
-        btnDashboard.Click += delegate { OpenDashboard(); };
-        btnDashboard.Enabled = false;
-        Tip(btnDashboard, "Öffnet das interaktive HTML5-Dashboard für detaillierten System- und Benchmark-Vergleich der ausgewählten Läufe.");
-
-        btnOpenReport = UI.Secondary("Bericht öffnen"); btnOpenReport.Margin = new Padding(UI.S(8), 0, 0, 0);
-        btnOpenReport.Click += delegate {
-            DbEntry target = null;
-            if (lvDb != null && lvDb.SelectedItems.Count > 0) target = (DbEntry)lvDb.SelectedItems[0].Tag;
-            if (target != null) OpenEntry(target);
-        };
-        btnOpenReport.Visible = false;
-        Tip(btnOpenReport, "Öffnet den vollständigen HTML-Diagnosebericht des markierten Systems.");
-
-        btnVerlauf = UI.Secondary("Verlauf"); btnVerlauf.Margin = new Padding(UI.S(8), 0, 0, 0);
-        btnVerlauf.Click += delegate { OpenDeviceHistory(); };
-        btnVerlauf.Visible = false;
-        Tip(btnVerlauf, "Öffnet das interaktive Dashboard im Verlaufsmodus für alle Läufe des markierten Geräts.");
-
-        // ab v4.03: Seltenes im Menü Aktionen, Löschen eingeschlossen. Die Knöpfe für einen Lauf erscheinen erst,
-        // wenn einer markiert ist (UpdateDbButtons); vorher standen fünf Knöpfe dauerhaft da, meist ausgegraut.
-        ContextMenu cmActions = new ContextMenu();
-        MenuItem maFolder = new MenuItem("Berichtsordner öffnen", delegate { DbEntry s = SelectedDbEntry(); if (s != null) OpenEntryFolder(s); });
-        MenuItem maRef = new MenuItem("Als Referenz festlegen (persistent)", delegate { SetSelectedAsReference(); });
-        MenuItem maBase = new MenuItem("Als Basis im Dashboard öffnen (temporär)", delegate { OpenDashboardWithBase(); });
-        MenuItem maRename = new MenuItem("Name ändern ...", delegate { RenameSelectedEntry(); });
-        MenuItem maExport = new MenuItem("Lauf exportieren ...", delegate { ExportSelected(); });
-        MenuItem maDelete = new MenuItem("Lauf löschen ...", delegate { DeleteSelected(); });
-        cmActions.MenuItems.AddRange(new MenuItem[] { maFolder, new MenuItem("-"), maRef, maBase, new MenuItem("-"), maRename, maExport, new MenuItem("-"), maDelete });
-        cmActions.Popup += delegate {
-            int selN = lvDb != null ? lvDb.SelectedItems.Count : 0; int chkN = CheckedEntries().Count;
-            maFolder.Enabled = maRef.Enabled = maBase.Enabled = maRename.Enabled = maExport.Enabled = selN == 1;
-            maDelete.Enabled = chkN > 0 || selN == 1;
-            maDelete.Text = chkN > 1 ? String.Format("Angehakte Läufe löschen ({0}) ...", chkN) : chkN == 1 ? "Angehakten Lauf löschen ..." : "Lauf löschen ...";
-        };
-
-        btnActions = UI.Secondary("Aktionen \u25BE"); btnActions.Margin = new Padding(UI.S(8), 0, 0, 0);
-        btnActions.Click += delegate { cmActions.Show(btnActions, new Point(0, btnActions.Height)); };
-        btnActions.Visible = false;
-        Tip(btnActions, "Für den markierten Lauf: Berichtsordner öffnen, als Referenz festlegen, Name ändern, exportieren oder löschen.");
-
-        btnSetRef = UI.Secondary("Als Referenz ..."); Tip(btnSetRef, "Legt das markierte System als dauerhafte Vergleichsreferenz fest.");
-        btnRename = UI.Secondary("Name ändern ..."); Tip(btnRename, "Ändert den Anzeigenamen des markierten Systems.");
-        btnExport = UI.Secondary("Lauf exportieren ..."); Tip(btnExport, "Exportiert den markierten Lauf als eigenständiges Paket.");
-        btnCompare = UI.Secondary("Vergleichen"); Tip(btnCompare, "Systeme vergleichen.");
-
-        b.Controls.Add(btnDashboard); b.Controls.Add(btnOpenReport); b.Controls.Add(btnVerlauf); b.Controls.Add(btnActions); bottom.Controls.Add(b);
-
-        lblDbClean = Lbl(DatenpflegeInfo, UI.SchriftHinweis, false, UI.Muted); lblDbClean.Visible = DatenpflegeInfo.Length > 0;
-        lblDbClean.Margin = new Padding(UI.S(4), UI.S(8), UI.S(4), 0); bottom.Controls.Add(lblDbClean);
-        bottom.Resize += delegate { lblDbClean.MaximumSize = new Size(Math.Max(UI.S(200), bottom.ClientSize.Width - UI.S(10)), 0); };
-
-        DbListView dlv = new DbListView();
-        dlv.GroupStateChanged += delegate { UpdateToggleGroupsButton(); };
-        lvDb = dlv; lvDb.View = View.Details; lvDb.FullRowSelect = true; lvDb.CheckBoxes = true; lvDb.Dock = DockStyle.Fill; lvDb.BorderStyle = BorderStyle.FixedSingle; lvDb.HideSelection = false; lvDb.ShowItemToolTips = true;
-        EnableDarkListView(lvDb);
-        string[] cols = new string[] { "System", "Datum", "Punkte", "CPU", "GPU", "RAM", "CPU multi", "RAM lesen", "Grafiktest", "Befunde" };
-        int[] w = new int[] { UI.S(140), UI.S(95), UI.S(65), UI.S(130), UI.S(120), UI.S(125), UI.S(80), UI.S(80), UI.S(80), UI.S(70) };
-        for (int i = 0; i < cols.Length; i++) lvDb.Columns.Add(cols[i], w[i]);
-        lvDb.Resize += delegate {
-            if (lvDb.Columns.Count < 10) return;
-            int clientW = lvDb.ClientSize.Width;
-            int fixedW = lvDb.Columns[1].Width + lvDb.Columns[2].Width + lvDb.Columns[5].Width +
-                         lvDb.Columns[6].Width + lvDb.Columns[7].Width + lvDb.Columns[8].Width + lvDb.Columns[9].Width;
-            int avail = clientW - fixedW - UI.S(4);
-            if (avail > UI.S(300))
-            {
-                int wSys = (int)(avail * 0.36);
-                int wCpu = (int)(avail * 0.34);
-                int wGpu = avail - wSys - wCpu;
-                lvDb.Columns[0].Width = Math.Max(UI.S(130), wSys);
-                lvDb.Columns[3].Width = Math.Max(UI.S(110), wCpu);
-                lvDb.Columns[4].Width = Math.Max(UI.S(100), wGpu);
-            }
-        };
-        lvDb.DoubleClick += delegate {
-            if (lvDb.SelectedItems.Count == 0) return;
-            ListViewItem selIt = lvDb.SelectedItems[0];
-            Point pt = lvDb.PointToClient(Cursor.Position);
-            ListViewHitTestInfo hit = lvDb.HitTest(pt);
-            if (hit.Item != null && (hit.Item.Text.StartsWith("\u25B6 ") || hit.Item.Text.StartsWith("\u25BC ")) && pt.X <= hit.Item.Bounds.Left + UI.S(45))
-            {
-                DbEntry target = hit.Item.Tag as DbEntry;
-                if (target != null)
-                {
-                    string k = target.IsReference ? "REF" : (String.IsNullOrEmpty(target.GeraetKey) ? "PC:" + (target.Computer ?? "").ToUpperInvariant() : target.GeraetKey);
-                    ToggleGroup(k);
-                    return;
-                }
-            }
-            OpenEntry((DbEntry)selIt.Tag);
-        };
-        lvDb.MouseClick += delegate(object sender, MouseEventArgs e) {
-            if (e.Button != MouseButtons.Left) return;
-            ListViewHitTestInfo hit = lvDb.HitTest(e.Location);
-            if (hit.Item != null && hit.Location != ListViewHitTestLocations.StateImage)
-            {
-                if ((hit.Item.Text.StartsWith("\u25B6 ") || hit.Item.Text.StartsWith("\u25BC ")) && e.X <= hit.Item.Bounds.Left + UI.S(45))
-                {
-                    DbEntry target = hit.Item.Tag as DbEntry;
-                    if (target != null)
-                    {
-                        string k = target.IsReference ? "REF" : (String.IsNullOrEmpty(target.GeraetKey) ? "PC:" + (target.Computer ?? "").ToUpperInvariant() : target.GeraetKey);
-                        ToggleGroup(k);
-                    }
-                }
-            }
-        };
+        lvDb = new ZeilenListe(); lvDb.Tipp = tip; lvDb.Zeichner = ZeichneDbZeile; lvDb.Mehrfach = true; lvDb.ZeilenHoehe = UI.S(44);
+        lvDb.Leer = "Noch keine Läufe gespeichert. Ein Lauf mit Benchmark legt den ersten Eintrag an; \"Importieren …\" holt frühere Läufe.";
+        lvDb.Spalten.Add(new ListenSpalte("System", 0, false, 0)); lvDb.Spalten.Add(new ListenSpalte("Zuletzt", UI.S(104), false, 1));
+        lvDb.Spalten.Add(new ListenSpalte("Punkte", UI.S(70), true, 2)); lvDb.Spalten.Add(new ListenSpalte("CPU multi", UI.S(80), true, 6));
+        lvDb.Spalten.Add(new ListenSpalte("RAM lesen", UI.S(88), true, 7)); lvDb.Spalten.Add(new ListenSpalte("Grafik", UI.S(82), true, 8));
+        lvDb.Spalten.Add(new ListenSpalte("    Befunde", UI.S(86), false, 9));
+        lvDb.Spalten[6].Hinweis = "Befunde des Laufs: kritisch / Warnungen / Hinweise";
+        lvDb.Spalten[5].Hinweis = "Bilder je Sekunde im Rendertest, sonst der Speicherdurchsatz der Grafikeinheit";
+        lvDb.SpalteGeklickt += OnDbColumnClick;
+        lvDb.HakenGeklickt += delegate(ListenZeile z) { DbZeile d = (DbZeile)z; if (d.E == null || String.IsNullOrEmpty(d.E.Path)) return; if (!dbHaken.Remove(d.E.Path)) dbHaken.Add(d.E.Path); FillDbList(); };
+        lvDb.AufklappGeklickt += delegate(ListenZeile z) { ToggleGroup(((DbZeile)z).Key); };
+        lvDb.Geoeffnet += delegate(ListenZeile z) { DbZeile d = (DbZeile)z; if (d.E != null) OpenEntry(d.E); };
+        lvDb.MarkierungGeaendert += delegate { UpdateDbButtons(); };
         lvDb.KeyDown += delegate(object sender, KeyEventArgs e) {
-            if ((e.KeyCode == Keys.Right || e.KeyCode == Keys.Left) && lvDb.SelectedItems.Count == 1)
-            {
-                ListViewItem it = lvDb.SelectedItems[0];
-                DbEntry target = it.Tag as DbEntry;
-                if (target != null)
-                {
-                    string k = target.IsReference ? "REF" : (String.IsNullOrEmpty(target.GeraetKey) ? "PC:" + (target.Computer ?? "").ToUpperInvariant() : target.GeraetKey);
-                    if (e.KeyCode == Keys.Right && it.Text.StartsWith("\u25B6 ")) { ToggleGroup(k); e.Handled = true; }
-                    else if (e.KeyCode == Keys.Left && it.Text.StartsWith("\u25BC ")) { ToggleGroup(k); e.Handled = true; }
-                }
-            }
-            else if (e.KeyCode == Keys.F2 && lvDb.SelectedItems.Count == 1)
-            {
-                RenameSelectedEntry();
-                e.Handled = true;
-            }
-            else if (e.KeyCode == Keys.Enter && lvDb.SelectedItems.Count > 0)
-            {
-                OpenEntry((DbEntry)lvDb.SelectedItems[0].Tag);
-                e.Handled = true;
-            }
+            if (e.KeyCode == Keys.F2 && lvDb.Markiert.Count == 1) { RenameSelectedEntry(); e.Handled = true; }
         };
-        lvDb.ItemChecked += delegate { UpdateDbButtons(); };
-        lvDb.SelectedIndexChanged += delegate { UpdateDbButtons(); };
-        lvDb.ColumnClick += OnDbColumnClick;
-        Tip(lvDb, "Datenbank aller gespeicherten Systeme. Ein Klick auf die Spaltenköpfe sortiert nach Datum, Gesamtwertung, CPU oder GPU.");
+        Tip(lvDb, "Datenbank aller gespeicherten Systeme. Ein Klick auf die Spaltenköpfe sortiert nach Datum, Gesamtwertung oder Messwert; nach CPU, GPU und RAM sortiert das Kontextmenü.");
 
         ContextMenu cm = new ContextMenu();
         MenuItem miDashboard = new MenuItem("Im Dashboard vergleichen", delegate { OpenDashboard(); });
         MenuItem miHistory = new MenuItem("Geräte-Verlauf im Dashboard öffnen", delegate { OpenDeviceHistory(); });
         MenuItem miSetRef = new MenuItem("Als Referenz festlegen (persistent)", delegate { SetSelectedAsReference(); });
         MenuItem miDashboardBase = new MenuItem("Als Basis im Dashboard öffnen (temporär)", delegate { OpenDashboardWithBase(); });
-        MenuItem miSep1 = new MenuItem("-");
         MenuItem miExpandAll = new MenuItem("Alle aufklappen", delegate { SetAllGroupsCollapsed(false); });
         MenuItem miCollapseAll = new MenuItem("Alle einklappen", delegate { SetAllGroupsCollapsed(true); });
-        MenuItem miSep3 = new MenuItem("-");
+        MenuItem miSort = new MenuItem("Sortieren nach");
+        miSort.MenuItems.Add(new MenuItem("Prozessor", delegate { OnDbColumnClick(3); }));
+        miSort.MenuItems.Add(new MenuItem("Grafik", delegate { OnDbColumnClick(4); }));
+        miSort.MenuItems.Add(new MenuItem("Arbeitsspeicher", delegate { OnDbColumnClick(5); }));
+        miSort.MenuItems.Add(new MenuItem("Datum, neueste zuerst", delegate { dbSortCol = -1; dbSortAsc = true; FillDbList(); }));
         MenuItem miRename = new MenuItem("Name ändern ...", delegate { RenameSelectedEntry(); });
-        MenuItem miOpen = new MenuItem("Bericht öffnen", delegate { if (lvDb.SelectedItems.Count > 0) OpenEntry((DbEntry)lvDb.SelectedItems[0].Tag); });
+        MenuItem miOpen = new MenuItem("Bericht öffnen", delegate { DbEntry s = SelectedDbEntry(); if (s != null) OpenEntry(s); });
         MenuItem miFolder = new MenuItem("Berichtsordner öffnen", delegate { DbEntry s = SelectedDbEntry(); if (s != null) OpenEntryFolder(s); });
         MenuItem miExport = new MenuItem("Lauf exportieren ...", delegate { ExportSelected(); });
-        MenuItem miSep2 = new MenuItem("-");
         MenuItem miDelete = new MenuItem("Aus Datenbank entfernen", delegate { DeleteSelected(); });
-        cm.MenuItems.Add(miDashboard);
-        cm.MenuItems.Add(miHistory);
-        cm.MenuItems.Add(miSetRef);
-        cm.MenuItems.Add(miDashboardBase);
-        cm.MenuItems.Add(miSep1);
-        cm.MenuItems.Add(miExpandAll);
-        cm.MenuItems.Add(miCollapseAll);
-        cm.MenuItems.Add(miSep3);
-        cm.MenuItems.Add(miRename);
-        cm.MenuItems.Add(miOpen);
-        cm.MenuItems.Add(miFolder);
-        cm.MenuItems.Add(miExport);
-        cm.MenuItems.Add(miSep2);
-        cm.MenuItems.Add(miDelete);
+        cm.MenuItems.AddRange(new MenuItem[] { miDashboard, miHistory, miSetRef, miDashboardBase, new MenuItem("-"), miExpandAll, miCollapseAll, miSort, new MenuItem("-"), miRename, miOpen, miFolder, miExport, new MenuItem("-"), miDelete });
         cm.Popup += delegate {
             List<string> expandable = GetExpandableKeys();
             miExpandAll.Enabled = expandable.Count > 0 && expandedGroups.Count < expandable.Count;
             miCollapseAll.Enabled = expandable.Count > 0 && expandedGroups.Count > 0;
-            int selN = lvDb.SelectedItems.Count;
-            int chkN = CheckedEntries().Count;
+            List<DbEntry> selL = DbMarkierte(), chkL = CheckedEntries();
+            int selN = selL.Count, chkN = chkL.Count;
             miDashboard.Enabled = chkN >= 1 || selN >= 1;
             miHistory.Enabled = (GetSelectedDeviceTarget() != null);
             miSetRef.Enabled = selN == 1 || (selN == 0 && chkN == 1);
             miDashboardBase.Enabled = selN == 1 || (selN == 0 && chkN == 1);
             DbEntry selTarget = null;
-            if (selN == 1) selTarget = lvDb.SelectedItems[0].Tag as DbEntry;
-            else if (chkN == 1) selTarget = lvDb.CheckedItems[0].Tag as DbEntry;
+            if (selN == 1) selTarget = selL[0];
+            else if (chkN == 1) selTarget = chkL[0];
             miRename.Enabled = (selTarget != null && !selTarget.IsReference && (selN == 1 || (selN == 0 && chkN == 1)));
             miOpen.Enabled = selN == 1; miFolder.Enabled = selN == 1;
             miExport.Enabled = selN == 1 || (selN == 0 && chkN == 1);
             miDelete.Enabled = chkN >= 1 || selN >= 1;
+            miDelete.Text = chkN > 1 ? String.Format("Angehakte Läufe entfernen ({0})", chkN) : "Aus Datenbank entfernen";
         };
         lvDb.ContextMenu = cm;
 
-        f.Controls.Add(lvDb);
-        f.Controls.Add(bottom);
-        f.Controls.Add(top);
-        top.SendToBack();
-        bottom.SendToBack();
+        // Detailbereich rechts: der markierte Lauf mit den Aktionen, die bis v4.09 im Menü "Aktionen" standen
+        dbDetail = new DetailKarte(); dbDetail.Zeichne = ZeichneDbDetail; dbDetail.AutoScroll = true; dbDetail.Padding = new Padding(0);
+        dbDetail.Scroll += delegate { dbDetail.Invalidate(); }; dbDetail.MouseWheel += delegate { dbDetail.Invalidate(); };
+        dbSeite.SeitenteilBreite = 320;
+        lnkDbName = KartenVerweis("Name ändern"); lnkDbName.Margin = new Padding(0); lnkDbName.LinkClicked += delegate { RenameSelectedEntry(); };
+        Tip(lnkDbName, "Ändert den Anzeigenamen des markierten Systems (F2). In der Zeile eines Geräts gilt der Name für alle seine Läufe.");
+        btnOpenReport = UI.Secondary("Bericht öffnen"); btnOpenReport.Margin = new Padding(0);
+        btnOpenReport.Click += delegate { DbEntry s = SelectedDbEntry(); if (s != null) OpenEntry(s); };
+        Tip(btnOpenReport, "Öffnet den vollständigen HTML-Diagnosebericht des markierten Systems.");
+        btnVerlauf = UI.Secondary("Verlauf"); btnVerlauf.Margin = new Padding(0);
+        btnVerlauf.Click += delegate { OpenDeviceHistory(); };
+        Tip(btnVerlauf, "Öffnet das interaktive Dashboard im Verlaufsmodus für alle Läufe des markierten Geräts.");
+        btnDbFolder = UI.Secondary("Ordner"); btnDbFolder.Margin = new Padding(0);
+        btnDbFolder.Click += delegate { DbEntry s = SelectedDbEntry(); if (s != null) OpenEntryFolder(s); };
+        Tip(btnDbFolder, "Öffnet den Berichtsordner des markierten Laufs im Explorer.");
+        lnkDbRef = KartenVerweis("Als Referenz festlegen (persistent)"); lnkDbRef.LinkClicked += delegate { SetSelectedAsReference(); };
+        Tip(lnkDbRef, "Legt das markierte System als dauerhafte Vergleichsreferenz (100 %) fest.");
+        lnkDbBasis = KartenVerweis("Als Basis im Dashboard öffnen (temporär)"); lnkDbBasis.LinkClicked += delegate { OpenDashboardWithBase(); };
+        Tip(lnkDbBasis, "Öffnet das Dashboard mit dem markierten Lauf als Vergleichsbasis, zusammen mit den angehakten Läufen. Die gespeicherte Referenz bleibt unverändert.");
+        lnkDbExport = KartenVerweis("Lauf exportieren …"); lnkDbExport.LinkClicked += delegate { ExportSelected(); };
+        Tip(lnkDbExport, "Exportiert den markierten Lauf als eigenständiges Paket.");
+        lnkDbDelete = KartenVerweis("Lauf entfernen …"); lnkDbDelete.LinkClicked += delegate { DeleteSelected(); };
+        Tip(lnkDbDelete, "Verschiebt den markierten Lauf oder die angehakten Läufe samt Berichtsordner ins Archiv des Datenordners (mit Rückfrage).");
+        foreach (LinkLabel l in new LinkLabel[] { lnkDbRef, lnkDbBasis, lnkDbExport, lnkDbDelete }) l.Margin = new Padding(0);
+        foreach (Button b in new Button[] { btnOpenReport, btnVerlauf, btnDbFolder }) b.Padding = new Padding(UI.S(6), UI.S(3), UI.S(6), UI.S(3));
+        foreach (Control c in new Control[] { lnkDbName, btnOpenReport, btnVerlauf, btnDbFolder, lnkDbRef, lnkDbBasis, lnkDbExport, lnkDbDelete }) dbDetail.Controls.Add(c);
+        dbDetail.Resize += delegate { OrdneDbDetail(); };
 
+        // unbenutzte Knöpfe früherer Versionen bleiben als Felder für die Hinweise bestehen
+        btnSetRef = UI.Secondary("Als Referenz ..."); Tip(btnSetRef, "Legt das markierte System als dauerhafte Vergleichsreferenz fest.");
+        btnRename = UI.Secondary("Name ändern ..."); Tip(btnRename, "Ändert den Anzeigenamen des markierten Systems.");
+        btnExport = UI.Secondary("Lauf exportieren ..."); Tip(btnExport, "Exportiert den markierten Lauf als eigenständiges Paket.");
+        btnCompare = UI.Secondary("Vergleichen");
+
+        dbSeite.Fuege(lvDb, dbDetail, dbFuss);
         FillDbList();
-        return f;
+        return dbSeite.Seite;
+    }
+
+    // Befunde "0 / 2 / 5" farbig: kritisch rot und Warnungen gelb, sobald es welche gibt
+    static void ZeichneBefunde(Graphics g, string befunde, Rectangle r, bool blass)
+    {
+        string[] t = (befunde ?? "").Split('/');
+        int k, w, h;
+        if (t.Length != 3 || !int.TryParse(t[0].Trim(), out k) || !int.TryParse(t[1].Trim(), out w) || !int.TryParse(t[2].Trim(), out h)) { ZeilenListe.Schreibe(g, befunde, ZeilenListe.FKlein, r, UI.Muted, false); return; }
+        int x = r.X;
+        string[] teile = new string[] { k.ToString(), "/", w.ToString(), "/", h.ToString() };
+        Color[] farbe = new Color[] { k > 0 && !blass ? UI.Crit : UI.Muted, UI.Muted, w > 0 && !blass ? UI.Warn : UI.Muted, UI.Muted, UI.Muted };
+        for (int i = 0; i < teile.Length; i++)
+        {
+            Font f = (i == 0 && k > 0) || (i == 2 && w > 0) ? ZeilenListe.FKopf : ZeilenListe.FKlein;
+            int tw = TextRenderer.MeasureText(g, teile[i], f, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix).Width;
+            TextRenderer.DrawText(g, teile[i], f, new Rectangle(x, r.Y, tw + UI.S(2), r.Height), farbe[i], TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
+            x += tw + UI.S(4);
+        }
+    }
+
+    static string DbHardware(DbEntry e)
+    {
+        List<string> t = new List<string>();
+        string c = DbEntry.CleanCpuName(e.Cpu); if (c.Length > 0) t.Add(c);
+        if (e.Gpu.Length > 0) t.Add(e.Gpu);
+        if (e.Ram.Length > 0) t.Add(e.Ram);
+        return String.Join("  ·  ", t.ToArray());
+    }
+
+    static string DbGrafikWert(DbEntry e) { return e.Get("GPU|REND") > 0 ? Num(e.Get("GPU|REND"), "N0") + " FPS" : (e.Get("GPU|VMB") > 0 ? Num(e.Get("GPU|VMB"), "N0") + " GB/s" : ""); }
+
+    void ZeichneDbZeile(Graphics g, ListenZeile zeile, Rectangle r, bool markiert)
+    {
+        DbZeile z = (DbZeile)zeile; DbEntry e = z.E; if (e == null) return;
+        Rectangle voll = new Rectangle(0, r.Y, r.Right, r.Height);
+        Color c = z.Blass ? UI.Muted : UI.Text;
+        Rectangle c0 = lvDb.Zelle(0, voll);
+        int grenze = c0.Right - UI.S(8);
+        if (z.Gruppe)
+        {
+            int halb = r.Height / 2;
+            string et = e.IsReference ? (z.Anzahl > 1 ? z.Anzahl + " Referenzen" : "Referenz") : (z.Anzahl > 1 ? z.Anzahl + " Läufe" : "");
+            int ew = ZeilenListe.EtikettBreite(et);
+            int nw = Math.Min(ZeilenListe.Breite(z.Name, ZeilenListe.FFett), Math.Max(UI.S(40), grenze - r.X - (ew > 0 ? ew + UI.S(8) : 0)));
+            Rectangle oben = new Rectangle(r.X, r.Y + UI.S(4), nw, halb - UI.S(2));
+            ZeilenListe.Schreibe(g, z.Name, ZeilenListe.FFett, oben, c, false);
+            if (ew > 0) ZeilenListe.Etikett(g, et, e.IsReference ? "akzent" : "skip", r.X + nw + UI.S(8), oben, 0);
+            ZeilenListe.Schreibe(g, DbHardware(e), ZeilenListe.FKlein, new Rectangle(r.X, r.Y + halb, grenze - r.X, halb - UI.S(4)), UI.Muted, false);
+        }
+        else ZeilenListe.Schreibe(g, z.Name, ZeilenListe.FText, new Rectangle(r.X, r.Y, grenze - r.X, r.Height), c, false);
+        Color wc = z.Gruppe ? c : UI.Muted;
+        ZeilenListe.Schreibe(g, ShortDate(e.Datum), ZeilenListe.FKlein, lvDb.Zelle(1, voll), wc, false);
+        ZeilenListe.Schreibe(g, e.OverallScore > 0 ? Num(e.OverallScore, "N0") : "", z.Gruppe ? ZeilenListe.FFett : ZeilenListe.FText, lvDb.Zelle(2, voll), c, true);
+        ZeilenListe.Schreibe(g, Num(e.Get("CPU|MT"), "N0"), ZeilenListe.FKlein, lvDb.Zelle(3, voll), wc, true);
+        ZeilenListe.Schreibe(g, Num(e.Get("RAM|Lesen"), "N1") + (e.Get("RAM|Lesen") > 0 ? " GB/s" : ""), ZeilenListe.FKlein, lvDb.Zelle(4, voll), wc, true);
+        ZeilenListe.Schreibe(g, DbGrafikWert(e), ZeilenListe.FKlein, lvDb.Zelle(5, voll), wc, true);
+        Rectangle cb = lvDb.Zelle(6, voll);
+        ZeichneBefunde(g, e.Befunde, new Rectangle(cb.X + UI.S(14), cb.Y, cb.Width - UI.S(14), cb.Height), z.Blass);
+    }
+
+    // Sichtbarkeit der Aktionen als eigener Zustand: Control.Visible ist falsch, solange die Seite im Hintergrund steht
+    // (Neuladen nach einem Lauf), und der Detailbereich ordnete sich dann ohne seine Knöpfe
+    internal Dictionary<Control, bool> dbSoll = new Dictionary<Control, bool>();
+    void DbZeige(Control c, bool an) { dbSoll[c] = an; if (c.Visible != an) c.Visible = an; }
+    internal bool DbSoll(Control c) { bool an; return dbSoll.TryGetValue(c, out an) && an; }
+
+    DbZeile NeueDbZeile(DbEntry e, string name, string key, bool gruppe, int anzahl)
+    {
+        DbZeile z = new DbZeile(); z.E = e; z.Tag = e; z.Name = name; z.Key = key; z.Gruppe = gruppe; z.Anzahl = anzahl; z.Art = gruppe ? "geraet" : "lauf";
+        z.Haken = dbHaken.Contains(e.Path) ? 1 : 0;
+        bool hasBench = e.HasBench || e.OverallScore > 0;
+        z.Blass = !hasBench;
+        z.Hinweis = WrapTip(e.DisplayName + (e.Disk.Length > 0 ? "\r\n" + e.Disk : "") + (hasBench ? "" : "\r\n(ohne Benchmark-Werte)"));
+        if (gruppe) { z.Hoehe = UI.S(44); z.Aufklappbar = anzahl > 1; z.Offen = expandedGroups.Contains(key); }
+        else { z.Hoehe = UI.S(28); z.Ebene = 1; z.Grund = 2; }
+        return z;
+    }
+
+    internal void FillDbList()
+    {
+        if (lvDb == null) return;
+
+        // Markierung über den Neuaufbau halten (Pfad und Art der Zeile)
+        List<string> selKeys = new List<string>();
+        foreach (ListenZeile z in lvDb.Markiert) { DbZeile d = z as DbZeile; if (d != null && d.E != null) selKeys.Add((d.Gruppe ? "G|" : "L|") + d.E.Path); }
+
+        Dictionary<string, List<DbEntry>> grpMap = new Dictionary<string, List<DbEntry>>();
+        List<string> orderedKeys = new List<string>();
+
+        foreach (DbEntry e in db)
+        {
+            string k = DbKey(e);
+            if (!grpMap.ContainsKey(k))
+            {
+                grpMap[k] = new List<DbEntry>();
+                if (k != "REF") orderedKeys.Add(k);
+            }
+            grpMap[k].Add(e);
+        }
+
+        foreach (KeyValuePair<string, List<DbEntry>> kv in grpMap)
+        {
+            kv.Value.Sort(delegate(DbEntry a, DbEntry b) {
+                return String.Compare(b.Datum, a.Datum, StringComparison.Ordinal);
+            });
+        }
+
+        orderedKeys.Sort(delegate(string k1, string k2) {
+            DbEntry e1 = grpMap[k1].Count > 0 ? grpMap[k1][0] : null;
+            DbEntry e2 = grpMap[k2].Count > 0 ? grpMap[k2][0] : null;
+            if (e1 == null && e2 == null) return 0;
+            if (e1 == null) return 1;
+            if (e2 == null) return -1;
+            int r = CompareDbEntries(e1, e2, dbSortCol >= 0 ? dbSortCol : 1);
+            if (dbSortCol < 0) return -r;
+            return dbSortAsc ? r : -r;
+        });
+
+        // ab v4.10 steht die Referenz oben (bis v4.09 am Ende der Liste)
+        if (grpMap.ContainsKey("REF")) orderedKeys.Insert(0, "REF");
+
+        lvDb.Zeilen.Clear();
+        int geraete = 0;
+        foreach (string k in orderedKeys)
+        {
+            List<DbEntry> entries = grpMap[k];
+            if (entries.Count == 0) continue;
+
+            if (k == "REF")
+            {
+                DbEntry refRep = null;
+                foreach (DbEntry re in entries)
+                {
+                    if (re.DisplayName.IndexOf("Median", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        refRep = re;
+                        break;
+                    }
+                }
+                if (refRep == null) refRep = entries[0];
+
+                if (entries.Count == 1) lvDb.Zeilen.Add(NeueDbZeile(entries[0], entries[0].DisplayName, k, true, 1));
+                else
+                {
+                    DbZeile kopf = NeueDbZeile(refRep, "Referenz-Systeme", k, true, entries.Count);
+                    lvDb.Zeilen.Add(kopf);
+                    if (kopf.Offen) foreach (DbEntry e in entries) lvDb.Zeilen.Add(NeueDbZeile(e, e.DisplayName, k, false, 1));
+                }
+            }
+            else
+            {
+                geraete++;
+                DbEntry newest = entries[0];
+                string devName = "";
+                foreach (DbEntry e in entries)
+                {
+                    if (!String.IsNullOrEmpty(e.Name))
+                    {
+                        devName = e.Name;
+                        break;
+                    }
+                }
+                if (String.IsNullOrEmpty(devName))
+                {
+                    devName = !String.IsNullOrEmpty(newest.DisplayName) ? newest.DisplayName : (!String.IsNullOrEmpty(newest.Computer) ? newest.Computer : "System");
+                }
+
+                DbZeile kopf = NeueDbZeile(newest, devName, k, true, entries.Count);
+                lvDb.Zeilen.Add(kopf);
+                // wie bisher steht die Zeile des Geräts für den neuesten Lauf, darunter folgen die älteren
+                if (kopf.Offen) for (int i = 1; i < entries.Count; i++) lvDb.Zeilen.Add(NeueDbZeile(entries[i], entries[i].DisplayName, k, false, 1));
+            }
+        }
+
+        // Haken gelten nur für sichtbare Zeilen (wie bisher): Beim Zuklappen eines Geräts entfallen die seiner älteren Läufe
+        HashSet<string> sichtbar = new HashSet<string>();
+        foreach (ListenZeile z in lvDb.Zeilen) sichtbar.Add(((DbZeile)z).E.Path);
+        dbHaken.IntersectWith(sichtbar);
+        lvDb.SortSpalte = dbSortCol < 0 ? 1 : dbSortCol; lvDb.SortAuf = dbSortCol < 0 ? false : dbSortAsc;
+        lvDb.Aktualisiere();
+        List<ListenZeile> wieder = new List<ListenZeile>();
+        foreach (ListenZeile z in lvDb.Zeilen) { DbZeile d = (DbZeile)z; if (selKeys.Contains((d.Gruppe ? "G|" : "L|") + d.E.Path)) wieder.Add(z); }
+        lvDb.MarkiereMehrere(wieder);
+
+        int laeufe = 0; foreach (DbEntry e in db) if (!e.IsReference) laeufe++;
+        SetText(dbSeite.Anzahl, Mehrzahl(geraete, "Gerät", "Geräte") + "  ·  " + Mehrzahl(laeufe, "Lauf", "Läufe"));
+        SetText(dbSeite.Unter, AblageKurz(dataDir));
+        UpdateToggleGroupsButton();
+        if (navDb != null) { navDb.Desc = db.Count + " Systeme, vergleichen und verwalten"; navDb.Invalidate(); }
+        UpdateDbButtons();
+    }
+
+    List<DbEntry> CheckedEntries()
+    {
+        List<DbEntry> l = new List<DbEntry>();
+        if (lvDb == null) return l;
+        // in der Reihenfolge der Liste; eine Zeile je Lauf
+        foreach (ListenZeile z in lvDb.Zeilen) { DbZeile d = z as DbZeile; if (d != null && d.E != null && dbHaken.Contains(d.E.Path) && !l.Contains(d.E)) l.Add(d.E); }
+        return l;
+    }
+
+    internal void UpdateDbButtons()
+    {
+        if (btnDashboard == null || dbSeite == null) return;
+        List<DbEntry> chk = CheckedEntries();
+        int chkN = chk.Count;
+        int selN = DbMarkierte().Count;
+
+        btnDashboard.Enabled = (chkN >= 1);
+        btnDashboard.Text = (chkN >= 1 ? String.Format("Im Dashboard vergleichen ({0})", chkN) : "Im Dashboard vergleichen");
+        List<string> namen = new List<string>(); foreach (DbEntry e in chk) if (!namen.Contains(e.DisplayName)) namen.Add(e.DisplayName);
+        SetText(dbSeite.BandText, chkN == 1 ? "1 Lauf angehakt" : chkN + " Läufe angehakt");
+        SetText(dbSeite.BandUnter, String.Join(", ", namen.ToArray()));
+        dbSeite.BandSichtbar = chkN >= 1;
+
+        // Aktionen des Detailbereichs: für genau einen markierten Lauf; Entfernen auch für angehakte Läufe
+        DbEntry sel = SelectedDbEntry();
+        foreach (Control c in new Control[] { btnOpenReport, btnDbFolder, lnkDbRef, lnkDbBasis, lnkDbExport }) DbZeige(c, selN == 1);
+        DbZeige(btnVerlauf, selN == 1 && GetSelectedDeviceTarget() != null);
+        DbZeige(lnkDbName, selN == 1 && sel != null && !sel.IsReference);
+        DbZeige(lnkDbDelete, selN == 1 || chkN > 0);
+        SetText(lnkDbDelete, chkN > 1 ? "Angehakte Läufe entfernen (" + chkN + ") …" : chkN == 1 ? "Angehakten Lauf entfernen …" : "Lauf entfernen …");
+        OrdneDbDetail();
+    }
+
+    internal DbEntry SelectedDbEntry() { List<DbEntry> m = DbMarkierte(); return m.Count == 1 ? m[0] : null; }
+
+    // ------------------------------------------------------------ Detailbereich
+    static readonly string[] dbGruppen = new string[] { "CPU", "GPU", "RAM", "Laufwerke" };
+
+    static string DbBefundText(DbEntry e)
+    {
+        if (e.NK >= 0 && e.NW >= 0 && e.NI >= 0) return e.NK + " kritisch  ·  " + Mehrzahl(e.NW, "Warnung", "Warnungen") + "  ·  " + Mehrzahl(e.NI, "Hinweis", "Hinweise");
+        string[] t = (e.Befunde ?? "").Split('/'); int k, w, h;
+        if (t.Length == 3 && int.TryParse(t[0].Trim(), out k) && int.TryParse(t[1].Trim(), out w) && int.TryParse(t[2].Trim(), out h)) return k + " kritisch  ·  " + Mehrzahl(w, "Warnung", "Warnungen") + "  ·  " + Mehrzahl(h, "Hinweis", "Hinweise");
+        return e.Befunde.Length > 0 ? e.Befunde : "nicht gespeichert";
+    }
+
+    // Zeichnet den Inhalt des Detailbereichs ab der Höhe oben (Bildlauf) und liefert die untere Kante; g == null misst nur
+    int DbDetailInhalt(Graphics g, int oben)
+    {
+        int x = UI.S(16), w = Math.Max(UI.S(120), dbDetail.ClientSize.Width - UI.S(32)), y = oben + UI.S(14);
+        List<DbEntry> m = DbMarkierte();
+        TextFormatFlags um = TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding;
+        if (m.Count != 1)
+        {
+            string t = m.Count == 0 ? "Einen Lauf markieren, um Einzelheiten und Aktionen zu sehen." : m.Count + " Läufe markiert. Zum Vergleichen anhaken oder das Kontextmenü nutzen.";
+            int th = TextRenderer.MeasureText(t, ZeilenListe.FText, new Size(w, int.MaxValue), um).Height;
+            if (g != null) TextRenderer.DrawText(g, t, ZeilenListe.FText, new Rectangle(x, y, w, th), UI.Muted, um);
+            return y + th + UI.S(12);
+        }
+        DbEntry e = m[0]; DbZeile z = DbMarkierteZeile();
+        using (Font fn = new Font("Segoe UI Semibold", 11.5f)) using (Font fp = new Font("Segoe UI", 18f, FontStyle.Bold))
+        {
+            string name = z != null && z.Gruppe ? z.Name : e.DisplayName;
+            int nh = fn.Height + UI.S(2);
+            if (g != null) ZeilenListe.Schreibe(g, name, fn, new Rectangle(x - UI.S(2), y, w - (DbSoll(lnkDbName) ? lnkDbName.PreferredSize.Width + UI.S(8) : 0), nh), UI.Text, false);
+            y += nh + UI.S(2);
+            string zeile = FormatRunDate(e.Datum) + (z != null && z.Gruppe && z.Anzahl > 1 && !e.IsReference ? "  ·  neuester von " + z.Anzahl + " Läufen" : "") + (e.Module.Length > 0 ? "\r\n" + e.Module : "");
+            Size zs = TextRenderer.MeasureText(zeile, ZeilenListe.FKlein, new Size(w, int.MaxValue), um);
+            int zh = Math.Min(zs.Height, ZeilenListe.FKlein.Height * 4 + UI.S(2));
+            if (g != null) TextRenderer.DrawText(g, zeile, ZeilenListe.FKlein, new Rectangle(x, y, w, zh), UI.Muted, um);
+            y += zh + UI.S(10);
+            if (e.OverallScore > 0)
+            {
+                string p = Num(e.OverallScore, "N0"); int ph = fp.Height;
+                if (g != null)
+                {
+                    int pw = TextRenderer.MeasureText(g, p, fp, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding).Width;
+                    TextRenderer.DrawText(g, p, fp, new Rectangle(x - UI.S(3), y, w, ph), UI.Accent, TextFormatFlags.Left | TextFormatFlags.NoPrefix);
+                    TextRenderer.DrawText(g, "Punkte", ZeilenListe.FKlein, new Rectangle(x + pw + UI.S(8), y + ph - ZeilenListe.FKlein.Height - UI.S(5), UI.S(80), ZeilenListe.FKlein.Height + 2), UI.Muted, TextFormatFlags.Left);
+                }
+                y += ph + UI.S(4);
+            }
+            else
+            {
+                if (g != null) TextRenderer.DrawText(g, "ohne Benchmark-Werte", ZeilenListe.FText, new Rectangle(x, y, w, UI.S(20)), UI.Muted, TextFormatFlags.Left);
+                y += UI.S(24);
+            }
+            // Vergleich mit der Referenz, wie ihn der Lauf gespeichert hat (ab v4.08)
+            if (e.HatVergleich && e.GruppenPct.Count > 0)
+            {
+                if (g != null) ZeilenListe.Schreibe(g, "gegen " + (e.RefName.Length > 0 ? e.RefName : "die Referenz des Laufs"), ZeilenListe.FKlein, new Rectangle(x, y, w, UI.S(18)), UI.Muted, false);
+                y += UI.S(20);
+                List<string> keys = new List<string>(); foreach (string k in dbGruppen) if (e.GruppenPct.ContainsKey(k)) keys.Add(k);
+                foreach (string k in e.GruppenPct.Keys) if (!keys.Contains(k)) keys.Add(k);
+                foreach (string k in keys)
+                {
+                    if (g != null)
+                    {
+                        double pct = e.GruppenPct[k]; int lw = UI.S(104), vw = UI.S(48), bh = UI.S(6);
+                        ZeilenListe.Schreibe(g, GroupName(k), ZeilenListe.FKlein, new Rectangle(x, y, lw, UI.S(20)), UI.Text, false);
+                        ZeilenListe.Schreibe(g, pct.ToString("0", CultureInfo.GetCultureInfo("de-DE")) + " %", ZeilenListe.FKlein, new Rectangle(x + w - vw, y, vw, UI.S(20)), UI.Text, true);
+                        Rectangle bar = new Rectangle(x + lw, y + (UI.S(20) - bh) / 2, Math.Max(UI.S(20), w - lw - vw - UI.S(6)), bh);
+                        // Balken bis 200 %, Marke bei 100 %
+                        using (SolidBrush bb = new SolidBrush(UI.Mix(UI.Panel, UI.Muted, 0.28))) g.FillRectangle(bb, bar);
+                        using (SolidBrush bf = new SolidBrush(pct >= 95 ? UI.Ok : pct >= 70 ? UI.Warn : UI.Crit)) g.FillRectangle(bf, bar.X, bar.Y, (int)(bar.Width * Math.Min(200.0, Math.Max(0.0, pct)) / 200.0), bar.Height);
+                        using (SolidBrush bm = new SolidBrush(UI.Text)) g.FillRectangle(bm, bar.X + bar.Width / 2, bar.Y - UI.S(2), Math.Max(1, UI.S(1)), bar.Height + UI.S(4));
+                    }
+                    y += UI.S(22);
+                }
+            }
+            else if (e.OverallScore > 0 && !e.IsReference)
+            {
+                string t = "Vergleich mit der Referenz: nicht gespeichert (Lauf vor Version 4.08 oder Import). Der Bericht nennt ihn.";
+                int th = TextRenderer.MeasureText(t, ZeilenListe.FKlein, new Size(w, int.MaxValue), um).Height;
+                if (g != null) TextRenderer.DrawText(g, t, ZeilenListe.FKlein, new Rectangle(x, y, w, th), UI.Muted, um);
+                y += th + UI.S(2);
+            }
+            y += UI.S(6);
+            if (g != null) using (Pen pl = new Pen(UI.Line)) g.DrawLine(pl, x, y, x + w, y);
+            y += UI.S(8);
+            string[] kn = new string[] { "Prozessor", "Grafik", "Speicher", "Laufwerke", "Befunde" };
+            string[] kw = new string[] { e.CpuDisplay, e.Gpu, e.Ram, e.Disk, e.IsReference ? "" : DbBefundText(e) };
+            int kl = UI.S(74);
+            for (int i = 0; i < kn.Length; i++)
+            {
+                if (kw[i].Length == 0) continue;
+                Size ws = TextRenderer.MeasureText(kw[i], ZeilenListe.FKlein, new Size(w - kl, int.MaxValue), um);
+                int wh = Math.Min(Math.Max(ws.Height, ZeilenListe.FKlein.Height), ZeilenListe.FKlein.Height * 3 + UI.S(2));
+                if (g != null)
+                {
+                    TextRenderer.DrawText(g, kn[i], ZeilenListe.FKlein, new Rectangle(x, y, kl, wh), UI.Muted, TextFormatFlags.Left | TextFormatFlags.NoPrefix);
+                    TextRenderer.DrawText(g, kw[i], ZeilenListe.FKlein, new Rectangle(x + kl, y, w - kl, wh), UI.Text, um);
+                }
+                y += wh + UI.S(4);
+            }
+        }
+        return y + UI.S(8);
+    }
+
+    void ZeichneDbDetail(Graphics g) { DbDetailInhalt(g, dbDetail.AutoScrollPosition.Y); }
+
+    // Knöpfe und Verweise unter dem gezeichneten Inhalt
+    internal void OrdneDbDetail()
+    {
+        if (dbDetail == null || lnkDbName == null) return;
+        // Lagen im Bildlauf: Kindelemente stehen um die Bildlaufposition versetzt
+        int ab = dbDetail.AutoScrollPosition.Y;
+        int x = UI.S(16), y = DbDetailInhalt(null, ab), w = Math.Max(UI.S(120), dbDetail.ClientSize.Width - UI.S(32));
+        lnkDbName.Location = new Point(dbDetail.ClientSize.Width - UI.S(16) - lnkDbName.PreferredSize.Width, ab + UI.S(18));
+        int bx = x, zeile = 0;
+        foreach (Button b in new Button[] { btnOpenReport, btnVerlauf, btnDbFolder })
+        {
+            if (!DbSoll(b)) continue;
+            Size s = b.GetPreferredSize(Size.Empty);
+            if (bx > x && bx + s.Width > x + w) { bx = x; y += zeile + UI.S(6); zeile = 0; }
+            b.Location = new Point(bx, y); bx += s.Width + UI.S(8); zeile = Math.Max(zeile, s.Height);
+        }
+        if (zeile > 0) y += zeile + UI.S(12);
+        foreach (LinkLabel l in new LinkLabel[] { lnkDbRef, lnkDbBasis, lnkDbExport, lnkDbDelete })
+        {
+            if (!DbSoll(l)) continue;
+            l.Location = new Point(x - UI.S(2), y); y += l.PreferredSize.Height + UI.S(6);
+        }
+        Size min = new Size(0, y - ab + UI.S(8));
+        if (dbDetail.AutoScrollMinSize != min) dbDetail.AutoScrollMinSize = min;
+        dbDetail.Invalidate();
     }
 
     static string ShortDate(string d)
@@ -14286,210 +14767,6 @@ public partial class DiagGui
         return res;
     }
 
-    ListViewItem CreateDbItem(DbEntry e, string systemText)
-    {
-        string gesamt = e.OverallScore > 0 ? Num(e.OverallScore, "N0") : "";
-        string gpu = e.Get("GPU|REND") > 0 ? Num(e.Get("GPU|REND"), "N0") + " FPS" : (e.Get("GPU|VMB") > 0 ? Num(e.Get("GPU|VMB"), "N0") + " GB/s" : "");
-        ListViewItem it = new ListViewItem(new string[] {
-            systemText,
-            ShortDate(e.Datum),
-            gesamt,
-            e.Cpu,
-            e.Gpu,
-            e.Ram,
-            Num(e.Get("CPU|MT"), "N0"),
-            Num(e.Get("RAM|Lesen"), "N1") + (e.Get("RAM|Lesen") > 0 ? " GB/s" : ""),
-            gpu,
-            e.Befunde
-        });
-        it.Tag = e;
-        bool hasBench = e.HasBench || e.OverallScore > 0;
-        it.ToolTipText = e.DisplayName + (e.Disk.Length > 0 ? "\r\n" + e.Disk : "") + (hasBench ? "" : "\r\n(ohne Benchmark-Werte)");
-        if (!hasBench) it.ForeColor = UI.Muted;
-        return it;
-    }
-
-    void FillDbList()
-    {
-        if (lvDb == null) return;
-
-        HashSet<string> checkedPaths = new HashSet<string>();
-        foreach (ListViewItem it in lvDb.CheckedItems)
-        {
-            DbEntry e = it.Tag as DbEntry;
-            if (e != null && !String.IsNullOrEmpty(e.Path)) checkedPaths.Add(e.Path);
-        }
-        string selectedPath = null;
-        if (lvDb.SelectedItems.Count > 0)
-        {
-            DbEntry sel = lvDb.SelectedItems[0].Tag as DbEntry;
-            if (sel != null && !String.IsNullOrEmpty(sel.Path)) selectedPath = sel.Path;
-        }
-
-        lvDb.BeginUpdate();
-        lvDb.ListViewItemSorter = null;
-        lvDb.Items.Clear();
-        lvDb.Groups.Clear();
-        lvDb.ShowGroups = false;
-
-        Dictionary<string, List<DbEntry>> grpMap = new Dictionary<string, List<DbEntry>>();
-        List<string> orderedKeys = new List<string>();
-
-        foreach (DbEntry e in db)
-        {
-            string k = e.IsReference ? "REF" : (String.IsNullOrEmpty(e.GeraetKey) ? "PC:" + (e.Computer ?? "").ToUpperInvariant() : e.GeraetKey);
-            if (!grpMap.ContainsKey(k))
-            {
-                grpMap[k] = new List<DbEntry>();
-                if (k != "REF") orderedKeys.Add(k);
-            }
-            grpMap[k].Add(e);
-        }
-
-        foreach (KeyValuePair<string, List<DbEntry>> kv in grpMap)
-        {
-            kv.Value.Sort(delegate(DbEntry a, DbEntry b) {
-                return String.Compare(b.Datum, a.Datum, StringComparison.Ordinal);
-            });
-        }
-
-        orderedKeys.Sort(delegate(string k1, string k2) {
-            DbEntry e1 = grpMap[k1].Count > 0 ? grpMap[k1][0] : null;
-            DbEntry e2 = grpMap[k2].Count > 0 ? grpMap[k2][0] : null;
-            if (e1 == null && e2 == null) return 0;
-            if (e1 == null) return 1;
-            if (e2 == null) return -1;
-            int r = CompareDbEntries(e1, e2, dbSortCol >= 0 ? dbSortCol : 1);
-            if (dbSortCol < 0) return -r;
-            return dbSortAsc ? r : -r;
-        });
-
-        if (grpMap.ContainsKey("REF")) orderedKeys.Add("REF");
-
-        foreach (string k in orderedKeys)
-        {
-            List<DbEntry> entries = grpMap[k];
-            if (entries.Count == 0) continue;
-
-            if (k == "REF")
-            {
-                DbEntry refRep = null;
-                foreach (DbEntry re in entries)
-                {
-                    if (re.DisplayName.IndexOf("Median", StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        refRep = re;
-                        break;
-                    }
-                }
-                if (refRep == null) refRep = entries[0];
-
-                if (entries.Count == 1)
-                {
-                    ListViewItem it = CreateDbItem(entries[0], "  " + entries[0].DisplayName);
-                    if (checkedPaths.Contains(entries[0].Path)) it.Checked = true;
-                    if (selectedPath == entries[0].Path) it.Selected = true;
-                    lvDb.Items.Add(it);
-                }
-                else
-                {
-                    bool expanded = expandedGroups.Contains("REF");
-                    string masterTitle = (expanded ? "\u25BC " : "\u25B6 ") + "Referenz-Systeme (" + entries.Count + ")";
-                    ListViewItem masterIt = CreateDbItem(refRep, masterTitle);
-                    if (checkedPaths.Contains(refRep.Path)) masterIt.Checked = true;
-                    if (selectedPath == refRep.Path) masterIt.Selected = true;
-                    lvDb.Items.Add(masterIt);
-
-                    if (expanded)
-                    {
-                        foreach (DbEntry e in entries)
-                        {
-                            ListViewItem childIt = CreateDbItem(e, "    " + e.DisplayName);
-                            if (checkedPaths.Contains(e.Path)) childIt.Checked = true;
-                            if (selectedPath == e.Path) childIt.Selected = true;
-                            lvDb.Items.Add(childIt);
-                        }
-                    }
-                }
-            }
-            else
-            {
-                DbEntry newest = entries[0];
-                string devName = "";
-                foreach (DbEntry e in entries)
-                {
-                    if (!String.IsNullOrEmpty(e.Name))
-                    {
-                        devName = e.Name;
-                        break;
-                    }
-                }
-                if (String.IsNullOrEmpty(devName))
-                {
-                    devName = !String.IsNullOrEmpty(newest.DisplayName) ? newest.DisplayName : (!String.IsNullOrEmpty(newest.Computer) ? newest.Computer : "System");
-                }
-
-                if (entries.Count == 1)
-                {
-                    ListViewItem it = CreateDbItem(newest, "  " + devName);
-                    if (checkedPaths.Contains(newest.Path)) it.Checked = true;
-                    if (selectedPath == newest.Path) it.Selected = true;
-                    lvDb.Items.Add(it);
-                }
-                else
-                {
-                    bool expanded = expandedGroups.Contains(k);
-                    string masterTitle = (expanded ? "\u25BC " : "\u25B6 ") + devName + " (" + entries.Count + ")";
-                    ListViewItem masterIt = CreateDbItem(newest, masterTitle);
-                    if (checkedPaths.Contains(newest.Path)) masterIt.Checked = true;
-                    if (selectedPath == newest.Path) masterIt.Selected = true;
-                    lvDb.Items.Add(masterIt);
-
-                    if (expanded)
-                    {
-                        for (int i = 1; i < entries.Count; i++)
-                        {
-                            DbEntry e = entries[i];
-                            ListViewItem childIt = CreateDbItem(e, "    " + e.DisplayName);
-                            if (checkedPaths.Contains(e.Path)) childIt.Checked = true;
-                            if (selectedPath == e.Path) childIt.Selected = true;
-                            lvDb.Items.Add(childIt);
-                        }
-                    }
-                }
-            }
-        }
-
-        lvDb.EndUpdate();
-        UpdateToggleGroupsButton();
-        if (navDb != null) { navDb.Desc = db.Count + " Systeme, vergleichen und verwalten"; navDb.Invalidate(); }
-        UpdateDbButtons();
-    }
-
-    List<DbEntry> CheckedEntries()
-    {
-        List<DbEntry> l = new List<DbEntry>();
-        if (lvDb != null) foreach (ListViewItem it in lvDb.CheckedItems) l.Add((DbEntry)it.Tag);
-        return l;
-    }
-
-    void UpdateDbButtons()
-    {
-        if (btnDashboard == null) return;
-        int chkN = CheckedEntries().Count;
-        int selN = (lvDb != null ? lvDb.SelectedItems.Count : 0);
-
-        btnDashboard.Enabled = (chkN >= 1);
-        btnDashboard.Text = (chkN >= 1 ? String.Format("Im Dashboard vergleichen ({0})", chkN) : "Im Dashboard vergleichen");
-
-        // Knöpfe für einen Lauf nur bei Markierung; Aktionen auch bei angehakten Läufen (Löschen)
-        if (btnOpenReport != null) btnOpenReport.Visible = (selN == 1);
-        if (btnVerlauf != null) btnVerlauf.Visible = (selN == 1 && GetSelectedDeviceTarget() != null);
-        if (btnActions != null) btnActions.Visible = (selN == 1 || chkN > 0);
-    }
-
-    DbEntry SelectedDbEntry() { return lvDb != null && lvDb.SelectedItems.Count == 1 ? lvDb.SelectedItems[0].Tag as DbEntry : null; }
-
     // Berichtsordner eines Laufs im Explorer (auch für Einträge mit altem UNC-Pfad, dann der gleichnamige Ordner im Datenordner)
     void OpenEntryFolder(DbEntry e)
     {
@@ -14513,8 +14790,8 @@ public partial class DiagGui
     void SetSelectedAsReference()
     {
         DbEntry target = null;
-        if (lvDb != null && lvDb.SelectedItems.Count > 0) target = (DbEntry)lvDb.SelectedItems[0].Tag;
-        else if (lvDb != null && lvDb.CheckedItems.Count == 1) target = (DbEntry)lvDb.CheckedItems[0].Tag;
+        if (DbMarkierte().Count > 0) target = DbMarkierte()[0];
+        else if (CheckedEntries().Count == 1) target = CheckedEntries()[0];
         if (target == null || !target.HasBench)
         {
             UI.Hinweis("Bitte wählen Sie ein System mit Benchmark-Werten aus.", "Referenz festlegen", this);
@@ -14550,8 +14827,8 @@ public partial class DiagGui
     void OpenDashboardWithBase()
     {
         DbEntry target = null;
-        if (lvDb != null && lvDb.SelectedItems.Count > 0) target = (DbEntry)lvDb.SelectedItems[0].Tag;
-        else if (lvDb != null && lvDb.CheckedItems.Count == 1) target = (DbEntry)lvDb.CheckedItems[0].Tag;
+        if (DbMarkierte().Count > 0) target = DbMarkierte()[0];
+        else if (CheckedEntries().Count == 1) target = CheckedEntries()[0];
         if (target == null) return;
 
         List<DbEntry> sel = CheckedEntries();
@@ -14603,22 +14880,9 @@ public partial class DiagGui
         List<DbEntry> targets = new List<DbEntry>();
         if (lvDb != null)
         {
-            if (lvDb.SelectedItems.Count > 0)
-            {
-                foreach (ListViewItem it in lvDb.SelectedItems)
-                {
-                    DbEntry e = it.Tag as DbEntry;
-                    if (e != null && !e.IsReference) targets.Add(e);
-                }
-            }
-            else if (lvDb.CheckedItems.Count > 0)
-            {
-                foreach (ListViewItem it in lvDb.CheckedItems)
-                {
-                    DbEntry e = it.Tag as DbEntry;
-                    if (e != null && !e.IsReference) targets.Add(e);
-                }
-            }
+            List<DbEntry> quelle = DbMarkierte();
+            if (quelle.Count == 0) quelle = CheckedEntries();
+            foreach (DbEntry e in quelle) if (e != null && !e.IsReference) targets.Add(e);
         }
         if (targets.Count == 0) return null;
         string firstKey = !String.IsNullOrEmpty(targets[0].GeraetKey) ? targets[0].GeraetKey : targets[0].Computer;
@@ -14669,10 +14933,7 @@ public partial class DiagGui
         Cursor = Cursors.WaitCursor;
         List<string> lines = new List<string>(); string res = "";
         List<DbEntry> sel = CheckedEntries();
-        if (sel.Count == 0 && lvDb != null && lvDb.SelectedItems.Count > 0)
-        {
-            foreach (ListViewItem it in lvDb.SelectedItems) sel.Add((DbEntry)it.Tag);
-        }
+        if (sel.Count == 0) sel.AddRange(DbMarkierte());
         string args = "-Dashboard";
         if (sel.Count > 0)
         {
@@ -14697,11 +14958,7 @@ public partial class DiagGui
     void DeleteSelected()
     {
         List<DbEntry> sel = CheckedEntries();
-        if (sel.Count == 0 && lvDb != null && lvDb.SelectedItems.Count == 1)
-        {
-            DbEntry e = lvDb.SelectedItems[0].Tag as DbEntry;
-            if (e != null) sel.Add(e);
-        }
+        if (sel.Count == 0 && DbMarkierte().Count == 1) sel.Add(DbMarkierte()[0]);
         if (sel.Count == 0) return;
         StringBuilder sb = new StringBuilder();
         foreach (DbEntry e in sel) sb.AppendLine("·  " + e.DisplayName + "  " + e.Datum);
@@ -14805,8 +15062,8 @@ public partial class DiagGui
     void ExportSelected()
     {
         DbEntry target = null;
-        if (lvDb != null && lvDb.SelectedItems.Count == 1) target = (DbEntry)lvDb.SelectedItems[0].Tag;
-        else if (lvDb != null && lvDb.CheckedItems.Count == 1) target = (DbEntry)lvDb.CheckedItems[0].Tag;
+        if (DbMarkierte().Count == 1) target = DbMarkierte()[0];
+        else if (CheckedEntries().Count == 1) target = CheckedEntries()[0];
         if (target == null) return;
 
         using (SaveFileDialog sfd = new SaveFileDialog())
@@ -15749,55 +16006,63 @@ public partial class DiagGui
 // Seite Änderungen (Teilklasse DiagGui)
 public partial class DiagGui
 {
+    // ab v4.10: Die Seite zeigt zuerst nur die Läufe dieses PCs, gebündelt nach Lauf und Maßnahme; die einzelnen Werte
+    // (Ziel, vorher, nachher) entstehen erst beim Aufklappen. Bis v4.09 stand hier ein Listenfeld mit einer Zeile je
+    // Eintrag aller PCs: Bei rund tausend Einträgen zählte es beim ersten Anzeigen für jede Zeile alle Haken neu.
+    public class ChgZeile : ListenZeile
+    {
+        public ChangeLauf Lauf; public ChangeMassnahme Mass; public ChangeEntry Eintrag;
+        public string Schluessel { get { return Art + "|" + (Lauf != null ? Lauf.FilePath : "") + "|" + (Mass != null ? Mass.Key : "") + "|" + (Eintrag != null ? Eintrag.Id.ToString() : ""); } }
+    }
+
+    // Maßnahmen eines Laufs, die ohne "weitere anzeigen" sichtbar sind
+    public const int ChgMassnahmenZuerst = 12;
+    internal ListenSeite chgSeite;
+    internal FeldAuswahl chgUmfang;
+    internal bool chgAllePcs;
+    internal HashSet<string> chgHaken = new HashSet<string>(), chgOffen = new HashSet<string>(), chgAlles = new HashSet<string>();
+    bool chgErsterAufbau = true;
+    Button btnChgClean;
+    // Dauer des letzten Aufbaus der Liste (Start.log, Selbsttest)
+    internal long chgAufbauMs;
+
     Control BuildChangePage()
     {
-        Panel f = new Panel(); f.Dock = DockStyle.Fill; f.BackColor = UI.Panel;
-        FlowLayoutPanel top = Page("Änderungen", "Alles, was Leos Minibench an einem PC verändert hat, mit Vorher-Wert. Einträge der Stufe Ändern lassen sich auf dem PC, auf dem sie entstanden sind, zurücknehmen. Eingriffe stehen mit dem Weg zurück als Hinweis in der Liste.", -1);
-        top.Dock = DockStyle.Top;
-        top.AutoSize = true;
-        Label lp = Lbl("Protokoll: " + (changeDir.Length > 0 ? changeDir : "(nicht verfügbar)"), 9f, false, UI.Muted); lp.Margin = new Padding(UI.S(4), 0, UI.S(4), UI.S(8)); top.Controls.Add(lp);
-
-        FlowLayoutPanel bottom = new FlowLayoutPanel(); bottom.FlowDirection = FlowDirection.TopDown; bottom.WrapContents = false; bottom.AutoSize = true; bottom.BackColor = UI.Panel; bottom.Dock = DockStyle.Bottom;
-        Label hint = Lbl("Anhaken lassen sich nur aktive Einträge dieses PCs. Graue Einträge sind Hinweise, bereits zurückgenommen oder stammen von einem anderen PC.", 8.75f, false, UI.Muted); hint.Margin = new Padding(UI.S(4), UI.S(4), UI.S(4), 0); bottom.Controls.Add(hint);
-        FlowLayoutPanel b = Row(); b.Margin = new Padding(UI.S(4), UI.S(10), 0, 0);
-        btnUndo = UI.Primary("Rückgängig machen"); btnUndo.Margin = new Padding(0); btnUndo.Padding = new Padding(UI.S(14), UI.S(3), UI.S(14), UI.S(3)); btnUndo.Font = new Font("Segoe UI Semibold", 9.75f);
+        chgSeite = new ListenSeite("Änderungen", "Alles, was Leos Minibench an einem PC verändert hat, mit Vorher-Wert. Einträge der Stufe Ändern lassen sich auf dem PC, auf dem sie entstanden sind, zurücknehmen. Eingriffe stehen mit dem Weg zurück als Hinweis in der Liste.", "Rückgängig machen");
+        listenSeiten.Add(chgSeite);
+        btnUndo = chgSeite.BandKnopf;
         btnUndo.Click += delegate { UndoSelected(); };
-        Button rel = UI.Secondary("Aktualisieren"); rel.Margin = new Padding(UI.S(8), 0, 0, 0); rel.Click += delegate { ReloadDb(); };
-        Button open = UI.Secondary("Protokollordner"); open.Margin = new Padding(UI.S(8), 0, 0, 0); open.Click += delegate { if (changeDir.Length > 0 && Directory.Exists(changeDir)) OpenShell(changeDir); else if (dataDir.Length > 0) OpenShell(dataDir); };
+        Tip(btnUndo, "Nimmt die angehakten Änderungen auf diesem PC zurück (mit Rückfrage).");
+        chgSeite.BandVerweis.LinkClicked += delegate { chgHaken.Clear(); FillChangeList(); };
+        Tip(chgSeite.BandVerweis, "Entfernt alle Haken.");
+
+        chgUmfang = new FeldAuswahl(new string[] { "Dieser PC", "Alle PCs" }, new string[] { "", "" });
+        chgUmfang.Size = new Size(UI.S(300), UI.S(46)); chgUmfang.Margin = new Padding(0);
+        chgUmfang.SelectedChanged += delegate { chgAllePcs = chgUmfang.Selected == 1; FillChangeList(); };
+        Tip(chgUmfang, "Dieser PC: nur Läufe, die hier entstanden sind und sich hier zurücknehmen lassen. Alle PCs: zusätzlich die Protokolle anderer PCs aus dem Datenordner, nur zur Ansicht.");
+        chgSeite.Links.Controls.Add(chgUmfang);
+
+        Button rel = UI.Secondary("Aktualisieren"); rel.Margin = new Padding(0); rel.Click += delegate { ReloadDb(); };
+        Button open = UI.Secondary("Protokollordner"); open.Click += delegate { if (changeDir.Length > 0 && Directory.Exists(changeDir)) OpenShell(changeDir); else if (dataDir.Length > 0) OpenShell(dataDir); };
+        btnChgClean = UI.Secondary("Aufräumen …"); btnChgClean.Click += delegate { ChangeAufraeumen(); }; btnChgClean.Enabled = dataDir.Length > 0;
         Tip(rel, "Liest das Änderungsprotokoll neu ein.");
-        Tip(open, "Öffnet den Protokollordner.");
-        b.Controls.Add(btnUndo); b.Controls.Add(rel); b.Controls.Add(open); bottom.Controls.Add(b);
+        Tip(open, "Öffnet den Protokollordner" + (changeDir.Length > 0 ? " (" + changeDir + ")." : "."));
+        Tip(btnChgClean, "Verschiebt erledigte Läufe und auf Wunsch die Protokolle anderer PCs ins Archiv des Datenordners. Gelöscht wird nichts, aktive Änderungen dieses PCs bleiben immer.");
+        chgSeite.Rechts.Controls.Add(rel); chgSeite.Rechts.Controls.Add(open); chgSeite.Rechts.Controls.Add(btnChgClean);
 
-        lvChg = new ListView(); lvChg.View = View.Details; lvChg.FullRowSelect = true; lvChg.CheckBoxes = true; lvChg.Dock = DockStyle.Fill; lvChg.BorderStyle = BorderStyle.FixedSingle; lvChg.HideSelection = false; lvChg.ShowItemToolTips = true;
-        EnableDarkListView(lvChg);
-        string[] cols = new string[] { "Zeit", "Computer", "Maßnahme", "Ziel", "Vorher", "Nachher", "Status" };
-        int[] w = new int[] { UI.S(112), UI.S(100), UI.S(170), UI.S(190), UI.S(90), UI.S(110), UI.S(96) };
-        for (int i = 0; i < cols.Length; i++) lvChg.Columns.Add(cols[i], w[i]);
-        lvChg.Resize += delegate {
-            int rem = lvChg.ClientSize.Width;
-            for (int i = 0; i < lvChg.Columns.Count - 1; i++) rem -= lvChg.Columns[i].Width;
-            if (rem > UI.S(60)) lvChg.Columns[lvChg.Columns.Count - 1].Width = rem - 2;
-        };
-        lvChg.ItemCheck += delegate(object sender, ItemCheckEventArgs e)
-        {
-            ChangeEntry c = lvChg.Items[e.Index].Tag as ChangeEntry;
-            if (c != null && !c.Undoable && e.NewValue == CheckState.Checked) e.NewValue = CheckState.Unchecked;
-        };
-        lvChg.ItemChecked += delegate(object sender, ItemCheckedEventArgs e)
-        {
-            ChangeEntry c = e.Item.Tag as ChangeEntry;
-            if (e.Item.Checked && c != null && !c.Undoable) { e.Item.Checked = false; return; }
-            UpdateChangeButtons();
-        };
+        lvChg = new ZeilenListe(); lvChg.Tipp = tip; lvChg.Zeichner = ZeichneChgZeile; lvChg.ZeilenHoehe = UI.S(32);
+        lvChg.Leer = "Auf diesem PC hat Leos Minibench noch nichts verändert.";
+        lvChg.HakenGeklickt += delegate(ListenZeile z) { ChgHakenUm((ChgZeile)z); };
+        lvChg.AufklappGeklickt += delegate(ListenZeile z) { ChgKlappe((ChgZeile)z); };
+        lvChg.Geoeffnet += delegate(ListenZeile z) { if (z.Aufklappbar) ChgKlappe((ChgZeile)z); };
+        lvChg.VerweisGeklickt += delegate(ListenZeile z) { ChgVerweis((ChgZeile)z); };
+        Tip(lvChg, "Änderungsprotokoll, nach Lauf und Maßnahme gebündelt. Ein Haken an einem Lauf oder einer Maßnahme wählt alle zurücknehmbaren Einträge darunter.");
 
-        f.Controls.Add(lvChg);
-        f.Controls.Add(bottom);
-        f.Controls.Add(top);
-        top.SendToBack();
-        bottom.SendToBack();
-
+        Label hint = Lbl("Anhaken lassen sich nur aktive Einträge dieses PCs. Hinweise, bereits Zurückgenommenes und Einträge anderer PCs sind gesperrt.", UI.SchriftHinweis, false, UI.Muted);
+        hint.AutoSize = false;
+        chgSeite.Fuege(lvChg, null, hint);
         FillChangeList();
-        return f;
+        return chgSeite.Seite;
     }
 
     static string ShortTime(string d)
@@ -15823,53 +16088,286 @@ public partial class DiagGui
         return d;
     }
 
-    void FillChangeList()
+    static string Mehrzahl(int n, string eins, string viele) { return n.ToString("N0", CultureInfo.GetCultureInfo("de-DE")) + " " + (n == 1 ? eins : viele); }
+
+    // Zustand eines Kästchens aus den zurücknehmbaren Einträgen: 0 aus, 1 an, 2 teilweise; gesperrt ohne solche Einträge
+    int ChgHakenStand(List<ChangeEntry> l, out bool gesperrt)
+    {
+        int n = 0, an = 0;
+        foreach (ChangeEntry c in l) if (c.Undoable) { n++; if (chgHaken.Contains(c.Schluessel)) an++; }
+        gesperrt = n == 0;
+        return an == 0 ? 0 : an == n ? 1 : 2;
+    }
+
+    // Baut die sichtbaren Zeilen aus Läufen, aufgeklappten Maßnahmen und deren Einträgen
+    internal void FillChangeList()
     {
         if (lvChg == null) return;
-        lvChg.BeginUpdate(); lvChg.Items.Clear();
-        int open = 0;
-        foreach (ChangeEntry c in changes)
+        Stopwatch sw = Stopwatch.StartNew();
+        // Haken, deren Eintrag es nicht mehr gibt oder der nicht mehr zurücknehmbar ist, entfallen
+        HashSet<string> gueltig = new HashSet<string>(); int open = 0, hier = 0;
+        foreach (ChangeEntry c in changes) { if (c.Undoable) { open++; gueltig.Add(c.Schluessel); } if (String.Equals(c.Computer, Environment.MachineName, StringComparison.OrdinalIgnoreCase)) hier++; }
+        chgHaken.IntersectWith(gueltig);
+        string fokus = lvChg.Fokus is ChgZeile ? ((ChgZeile)lvChg.Fokus).Schluessel : "";
+
+        List<ChangeLauf> sicht = new List<ChangeLauf>(); int andereLaeufe = 0, andereEintraege = 0; HashSet<string> anderePcs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (ChangeLauf l in changeLaeufe)
         {
-            ListViewItem it = new ListViewItem(new string[] { ShortTime(c.Zeit), c.Computer, c.Titel, c.Ziel, c.Vorher, c.Nachher, c.Status });
-            it.Tag = c;
-            it.ToolTipText = ContractStep.RiskLabel(c.Risiko) + " · " + c.Art + (c.Gegenbefehl.Length > 0 ? "\r\nZurück: " + c.Gegenbefehl : "") + (c.Ergebnis.Length > 0 ? "\r\n" + c.Ergebnis : "");
-            if (!c.Undoable) it.ForeColor = UI.Muted; else open++;
-            lvChg.Items.Add(it);
+            if (l.Eintraege.Count == 0) continue;
+            if (l.DieserPc || chgAllePcs) sicht.Add(l);
+            if (!l.DieserPc) { andereLaeufe++; andereEintraege += l.Eintraege.Count; anderePcs.Add(l.Computer); }
         }
-        lvChg.EndUpdate();
+        // beim ersten Aufbau den neuesten Lauf dieses PCs aufklappen
+        if (chgErsterAufbau && changeLaeufe.Count > 0) { chgErsterAufbau = false; foreach (ChangeLauf l in sicht) if (l.DieserPc) { chgOffen.Add(l.FilePath); break; } }
+
+        lvChg.Zeilen.Clear();
+        foreach (ChangeLauf l in sicht)
+        {
+            bool gesperrt; ChgZeile zl = new ChgZeile(); zl.Art = "lauf"; zl.Lauf = l; zl.Tag = l; zl.Grund = 1; zl.Hoehe = UI.S(38); zl.Aufklappbar = true; zl.Offen = chgOffen.Contains(l.FilePath);
+            zl.Haken = ChgHakenStand(l.Eintraege, out gesperrt); zl.Gesperrt = gesperrt;
+            zl.Hinweis = WrapTip("Lauf vom " + FormatRunDate(l.Zeit) + " auf " + l.Computer + (l.DieserPc ? "" : " (anderer PC, hier nicht zurücknehmbar)") + "\r\nProtokoll: " + l.FilePath);
+            lvChg.Zeilen.Add(zl);
+            if (!zl.Offen) continue;
+            bool alles = chgAlles.Contains(l.FilePath) || l.Massnahmen.Count <= ChgMassnahmenZuerst + 2;
+            int zeige = alles ? l.Massnahmen.Count : ChgMassnahmenZuerst;
+            for (int i = 0; i < zeige; i++)
+            {
+                ChangeMassnahme m = l.Massnahmen[i];
+                ChgZeile zm = new ChgZeile(); zm.Art = "massnahme"; zm.Lauf = l; zm.Mass = m; zm.Tag = m; zm.Ebene = 1; zm.Aufklappbar = true; zm.Offen = chgOffen.Contains(l.FilePath + "|" + m.Key);
+                zm.Haken = ChgHakenStand(m.Eintraege, out gesperrt); zm.Gesperrt = gesperrt;
+                zm.Hinweis = WrapTip(ContractStep.RiskLabel(m.Risiko) + " · " + m.Umfang + (m.Eintraege.Count == 1 ? ChgEintragHinweis(m.Eintraege[0]) : ""));
+                lvChg.Zeilen.Add(zm);
+                if (!zm.Offen) continue;
+                foreach (ChangeEntry c in m.Eintraege)
+                {
+                    ChgZeile ze = new ChgZeile(); ze.Art = "eintrag"; ze.Lauf = l; ze.Mass = m; ze.Eintrag = c; ze.Tag = c; ze.Ebene = 2; ze.Grund = 2; ze.Hoehe = UI.S(26);
+                    ze.Haken = chgHaken.Contains(c.Schluessel) ? 1 : 0; ze.Gesperrt = !c.Undoable; ze.Blass = !c.Undoable;
+                    ze.Hinweis = WrapTip(ContractStep.RiskLabel(c.Risiko) + " · " + c.Art + " · " + c.Status + "\r\n" + c.Ziel + ChgEintragHinweis(c));
+                    lvChg.Zeilen.Add(ze);
+                }
+            }
+            if (!alles)
+            {
+                ChgZeile zw = new ChgZeile(); zw.Art = "mehr"; zw.Lauf = l; zw.Verweis = true; zw.Waehlbar = false; zw.Ebene = 1; zw.Hoehe = UI.S(30);
+                zw.Tag = Mehrzahl(l.Massnahmen.Count - zeige, "weitere Maßnahme", "weitere Maßnahmen") + " anzeigen";
+                lvChg.Zeilen.Add(zw);
+            }
+        }
+        if (!chgAllePcs && andereLaeufe > 0)
+        {
+            ChgZeile za = new ChgZeile(); za.Art = "andere"; za.Verweis = true; za.Waehlbar = false; za.Hoehe = UI.S(38);
+            za.Tag = Mehrzahl(anderePcs.Count, "Gerät", "Geräte") + ", " + Mehrzahl(andereLaeufe, "Lauf", "Läufe") + ", " + Mehrzahl(andereEintraege, "Eintrag", "Einträge") + " · nur zur Ansicht, Rückgängig geht nur auf dem jeweiligen PC";
+            za.Hinweis = "Zeigt auch die Protokolle anderer PCs aus dem Datenordner.";
+            lvChg.Zeilen.Add(za);
+        }
+        lvChg.Leer = changes.Count == 0 ? "Das Änderungsprotokoll ist leer." : "Auf diesem PC hat Leos Minibench noch nichts verändert.";
+        lvChg.Aktualisiere();
+        if (fokus.Length > 0) foreach (ListenZeile z in lvChg.Zeilen) if (((ChgZeile)z).Schluessel == fokus) { lvChg.Markiere(z, false); break; }
+
+        chgUmfang.SetUnterzeile(0, Mehrzahl(hier, "Eintrag", "Einträge"));
+        chgUmfang.SetUnterzeile(1, Mehrzahl(changes.Count, "Eintrag", "Einträge"));
+        SetText(chgSeite.Anzahl, open == 0 ? "Nichts rückgängig zu machen" : open == 1 ? "1 Änderung auf diesem PC rückgängig machbar" : open + " Änderungen auf diesem PC rückgängig machbar");
+        SetText(chgSeite.Unter, Mehrzahl(changes.Count, "Eintrag", "Einträge") + " im Protokoll");
         if (navChg != null) { navChg.Desc = open == 1 ? "1 Änderung rückgängig machbar" : open > 1 ? open + " Änderungen rückgängig machbar" : changes.Count + (changes.Count == 1 ? " Eintrag" : " Einträge") + " im Protokoll"; navChg.Invalidate(); }
         UpdateChangeButtons();
+        chgAufbauMs = sw.ElapsedMilliseconds;
+    }
+
+    static string ChgEintragHinweis(ChangeEntry c)
+    {
+        return (c.Vorher.Length > 0 || c.Nachher.Length > 0 ? "\r\nVorher: " + c.Vorher + "\r\nNachher: " + c.Nachher : "") + (c.Gegenbefehl.Length > 0 ? "\r\nZurück: " + c.Gegenbefehl : "") + (c.Ergebnis.Length > 0 ? "\r\n" + c.Ergebnis : "");
+    }
+
+    internal void ChgHakenUm(ChgZeile z)
+    {
+        List<ChangeEntry> l = z.Art == "lauf" ? z.Lauf.Eintraege : z.Art == "massnahme" ? z.Mass.Eintraege : new List<ChangeEntry>(new ChangeEntry[] { z.Eintrag });
+        bool gesperrt; bool an = ChgHakenStand(l, out gesperrt) != 1;
+        if (gesperrt) return;
+        foreach (ChangeEntry c in l) if (c.Undoable) { if (an) chgHaken.Add(c.Schluessel); else chgHaken.Remove(c.Schluessel); }
+        FillChangeList();
+    }
+
+    internal void ChgKlappe(ChgZeile z)
+    {
+        string k = z.Art == "lauf" ? z.Lauf.FilePath : z.Art == "massnahme" ? z.Lauf.FilePath + "|" + z.Mass.Key : "";
+        if (k.Length == 0) return;
+        if (!chgOffen.Remove(k)) chgOffen.Add(k);
+        FillChangeList();
+    }
+
+    internal void ChgVerweis(ChgZeile z)
+    {
+        if (z.Art == "mehr") { chgAlles.Add(z.Lauf.FilePath); FillChangeList(); }
+        else if (z.Art == "andere") chgUmfang.Selected = 1;
+    }
+
+    void ZeichneChgZeile(Graphics g, ListenZeile zeile, Rectangle r, bool markiert)
+    {
+        ChgZeile z = (ChgZeile)zeile;
+        int rechts = r.Right - UI.S(12);
+        if (z.Art == "lauf")
+        {
+            ChangeLauf l = z.Lauf;
+            string st = l.StatusText; int sw = ZeilenListe.Breite(st, ZeilenListe.FKlein);
+            ZeilenListe.Schreibe(g, st, ZeilenListe.FKlein, new Rectangle(rechts - sw, r.Y, sw, r.Height), l.Aktiv > 0 ? UI.Text : UI.Muted, true);
+            int x = r.X, grenze = rechts - sw - UI.S(12);
+            string d = FormatRunDate(l.Zeit); int dw = ZeilenListe.Breite(d, ZeilenListe.FFett);
+            ZeilenListe.Schreibe(g, d, ZeilenListe.FFett, new Rectangle(x, r.Y, Math.Min(dw, grenze - x), r.Height), UI.Text, false); x += dw + UI.S(8);
+            if (x < grenze) x += ZeilenListe.Etikett(g, l.Module, "akzent", x, r, 0) + UI.S(8);
+            if (chgAllePcs && x < grenze) x += ZeilenListe.Etikett(g, l.Computer, l.DieserPc ? "info" : "skip", x, r, 0) + UI.S(8);
+            ZeilenListe.Schreibe(g, Mehrzahl(l.Massnahmen.Count, "Maßnahme", "Maßnahmen") + ", " + Mehrzahl(l.Eintraege.Count, "Eintrag", "Einträge"), ZeilenListe.FKlein, new Rectangle(x, r.Y, grenze - x, r.Height), UI.Muted, false);
+        }
+        else if (z.Art == "massnahme")
+        {
+            ChangeMassnahme m = z.Mass;
+            int bw = UI.S(112); string st = m.StatusText;
+            ZeilenListe.Etikett(g, st, ChangeMassnahme.StatusStufe(st), rechts - bw, r, bw);
+            string risiko = ContractStep.RiskLabel(m.Risiko); int rw = ZeilenListe.EtikettBreite(risiko);
+            ZeilenListe.Etikett(g, risiko, UI.RiskLevel(m.Risiko), rechts - bw - UI.S(8) - rw, r, 0);
+            int grenze = rechts - bw - UI.S(8) - rw - UI.S(12);
+            int tw = Math.Min(ZeilenListe.Breite(m.Titel, ZeilenListe.FFett), grenze - r.X);
+            ZeilenListe.Schreibe(g, m.Titel, ZeilenListe.FFett, new Rectangle(r.X, r.Y, tw, r.Height), z.Gesperrt ? UI.Muted : UI.Text, false);
+            ZeilenListe.Schreibe(g, "·  " + m.Umfang, ZeilenListe.FKlein, new Rectangle(r.X + tw + UI.S(4), r.Y, grenze - r.X - tw - UI.S(4), r.Height), UI.Muted, false);
+        }
+        else if (z.Art == "eintrag")
+        {
+            ChangeEntry c = z.Eintrag;
+            int nw = UI.S(150), vw = UI.S(170), pw = UI.S(22);
+            int x = rechts;
+            if (z.Mass.Gemischt) { int sw = UI.S(112); ZeilenListe.Schreibe(g, c.Status, ZeilenListe.FKlein, new Rectangle(x - sw, r.Y, sw, r.Height), UI.Muted, true); x -= sw + UI.S(8); }
+            ZeilenListe.Schreibe(g, c.Nachher, ZeilenListe.FKopf, new Rectangle(x - nw, r.Y, nw, r.Height), z.Blass ? UI.Muted : UI.Text, false); x -= nw;
+            if (c.Vorher.Length > 0 || c.Nachher.Length > 0) ZeilenListe.Schreibe(g, "→", ZeilenListe.FKlein, new Rectangle(x - pw, r.Y, pw, r.Height), UI.Muted, false);
+            x -= pw;
+            ZeilenListe.Schreibe(g, c.Vorher, ZeilenListe.FKlein, new Rectangle(x - vw, r.Y, vw - UI.S(6), r.Height), UI.Muted, true); x -= vw;
+            ZeilenListe.Schreibe(g, c.Ziel, ZeilenListe.FFest, new Rectangle(r.X, r.Y, x - r.X - UI.S(8), r.Height), z.Blass ? UI.Muted : UI.Text, false);
+        }
+        else if (z.Art == "mehr")
+        {
+            TextRenderer.DrawText(g, Convert.ToString(z.Tag), ZeilenListe.FKlein, r, UI.Accent, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+        }
+        else if (z.Art == "andere")
+        {
+            string a = "Anzeigen"; int aw = ZeilenListe.Breite(a, ZeilenListe.FKlein);
+            ZeilenListe.Schreibe(g, a, ZeilenListe.FKlein, new Rectangle(rechts - aw, r.Y, aw, r.Height), UI.Accent, true);
+            int tw = ZeilenListe.Breite("Andere PCs", ZeilenListe.FFett);
+            ZeilenListe.Schreibe(g, "Andere PCs", ZeilenListe.FFett, new Rectangle(r.X, r.Y, tw, r.Height), UI.Text, false);
+            ZeilenListe.Schreibe(g, Convert.ToString(z.Tag), ZeilenListe.FKlein, new Rectangle(r.X + tw + UI.S(8), r.Y, rechts - aw - UI.S(12) - r.X - tw - UI.S(8), r.Height), UI.Muted, false);
+        }
     }
 
     List<ChangeEntry> CheckedChanges()
     {
         List<ChangeEntry> l = new List<ChangeEntry>();
-        if (lvChg != null) foreach (ListViewItem it in lvChg.CheckedItems) { ChangeEntry c = it.Tag as ChangeEntry; if (c != null && c.Undoable) l.Add(c); }
+        foreach (ChangeEntry c in changes) if (c.Undoable && chgHaken.Contains(c.Schluessel)) l.Add(c);
         return l;
     }
 
     void UpdateChangeButtons()
     {
-        if (btnUndo == null) return;
-        int n = CheckedChanges().Count;
+        if (btnUndo == null || chgSeite == null) return;
+        List<ChangeEntry> sel = CheckedChanges(); int n = sel.Count;
+        HashSet<string> mass = new HashSet<string>(); foreach (ChangeEntry c in sel) mass.Add(c.FilePath + "|" + c.Schritt + "\n" + c.Titel);
         btnUndo.Enabled = n > 0;
         btnUndo.Text = n > 1 ? n + " Änderungen rückgängig machen" : "Rückgängig machen";
+        SetText(chgSeite.BandText, n == 1 ? "1 Änderung angehakt" : n + " Änderungen angehakt");
+        SetText(chgSeite.BandUnter, "aus " + Mehrzahl(mass.Count, "Maßnahme", "Maßnahmen"));
+        chgSeite.BandSichtbar = n > 0;
     }
 
     void UndoSelected()
     {
         List<ChangeEntry> sel = CheckedChanges();
         if (sel.Count == 0) return;
-        StringBuilder sb = new StringBuilder(); List<string> spec = new List<string>();
-        foreach (ChangeEntry c in sel) { sb.AppendLine("·  " + c.Titel + ": " + c.Ziel + " wieder " + c.Vorher); spec.Add(c.FilePath + "*" + c.Id); }
-        if (MessageBox.Show(this, "Diese Änderungen zurücknehmen?\r\n\r\n" + sb.ToString(), "Rückgängig machen", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        // Rückfrage nach Maßnahmen gebündelt: Ein Lauf der Optimierung hat über hundert Einträge
+        StringBuilder sb = new StringBuilder(); List<string> spec = new List<string>(); List<string> k = new List<string>(); Dictionary<string, int> anz = new Dictionary<string, int>();
+        foreach (ChangeEntry c in sel)
+        {
+            spec.Add(c.FilePath + "*" + c.Id);
+            string t = c.Titel; if (!anz.ContainsKey(t)) { anz[t] = 0; k.Add(t); } anz[t]++;
+        }
+        if (sel.Count <= 12) foreach (ChangeEntry c in sel) sb.AppendLine("·  " + c.Titel + ": " + c.Ziel + " wieder " + c.Vorher);
+        else
+        {
+            for (int i = 0; i < k.Count && i < 20; i++) sb.AppendLine("·  " + k[i] + (anz[k[i]] > 1 ? " (" + anz[k[i]] + " Einträge)" : ""));
+            if (k.Count > 20) sb.AppendLine("·  und " + (k.Count - 20) + " weitere Maßnahmen");
+        }
+        if (MessageBox.Show(this, (sel.Count == 1 ? "Diese Änderung zurücknehmen?" : "Diese " + sel.Count + " Änderungen zurücknehmen?") + "\r\n\r\n" + sb.ToString(), "Rückgängig machen", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
         // ab 3.53 ohne Einfrieren der Oberfläche: Softwarepakete brauchen für winget uninstall bis zu 20 Minuten je Paket
         int pakete = 0; foreach (ChangeEntry c in sel) if (c.Art == "Softwarepaket") pakete++;
         List<string> lines = new List<string>();
         try { RunHelperPumped("-Rueckgaengig \"" + String.Join(";", spec.ToArray()) + "\"", out lines, 300 + pakete * WingetFristPaketSek); }
         catch (Exception ex) { lines.Add("Rückgängig fehlgeschlagen: " + ex.Message); }
         ReloadDb();
+        // ab v4.10: Zustand der Optimierung neu lesen, damit zurückgenommene Einstellungen sofort wieder wählbar sind
+        // (bis v4.09 blieb ihr Schalter bis zum nächsten Start als "bereits aktiv" gesperrt)
+        StartOptStateCheck();
         MessageBox.Show(this, lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Keine Rückmeldung vom Arbeitsprozess.", "Rückgängig", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    // ------------------------------------------------------------ Aufräumen
+    static readonly int[] chgAlterTage = new int[] { 30, 90, 180, 0 };
+
+    // Argument für den Arbeitsprozess, etwa "Erledigt:30;Andere"
+    public static string ChgAufraeumArg(bool erledigt, int tage, bool andere)
+    {
+        List<string> t = new List<string>();
+        if (erledigt) t.Add("Erledigt:" + tage);
+        if (andere) t.Add("Andere");
+        return String.Join(";", t.ToArray());
+    }
+
+    void ChangeAufraeumen()
+    {
+        if (dataDir.Length == 0) return;
+        if (running || liveRunning) { UI.Hinweis("Aufräumen ist erst möglich, wenn der Lauf oder die Live-Ansicht beendet ist: Beide schreiben in das Änderungsprotokoll.", "Protokoll aufräumen", this); return; }
+        Form dlg = new Form();
+        dlg.Text = "Protokoll aufräumen"; dlg.FormBorderStyle = FormBorderStyle.FixedDialog; dlg.MaximizeBox = false; dlg.MinimizeBox = false;
+        dlg.StartPosition = FormStartPosition.CenterParent; dlg.ClientSize = new Size(UI.S(560), UI.S(372)); dlg.BackColor = UI.Bg; dlg.Font = new Font("Segoe UI", 9.5f);
+        int x = UI.S(18), w = UI.S(524), y = UI.S(14);
+        Label kopf = new Label(); kopf.Text = "Verschiebt Protokolldateien nach Minibench-Daten\\Archiv\\Änderungen. Gelöscht wird nichts; zurücklegen lässt sich eine Datei von Hand in den Ordner Änderungen."; kopf.SetBounds(x, y, w, UI.S(40)); y += UI.S(48);
+        CheckBox cbErl = new CheckBox(); cbErl.Text = "Erledigte Läufe aller PCs, älter als"; cbErl.Checked = true; cbErl.AutoSize = true; cbErl.Location = new Point(x, y + UI.S(2));
+        ComboBox cmbAlter = Combo(120, new string[] { "30 Tage", "90 Tage", "180 Tage", "jedes Alter" }, 0);
+        Label lErl = new Label(); lErl.SetBounds(x + UI.S(20), y + UI.S(30), w - UI.S(20), UI.S(38)); lErl.ForeColor = UI.Muted;
+        y += UI.S(76);
+        CheckBox cbAnd = new CheckBox(); cbAnd.Text = "Alle Protokolle anderer PCs, auch mit aktiven Änderungen"; cbAnd.Checked = false; cbAnd.AutoSize = true; cbAnd.Location = new Point(x, y);
+        Label lAnd = new Label(); lAnd.SetBounds(x + UI.S(20), y + UI.S(26), w - UI.S(20), UI.S(56)); lAnd.ForeColor = UI.Muted;
+        y += UI.S(90);
+        Label fest = new Label(); fest.Text = "Aktive Änderungen dieses PCs bleiben immer erhalten. Ist ein Netzlaufwerk eingerichtet, verschiebt der nächste Abgleich die Dateien dort ebenfalls ins Archiv, bei vielen Dateien nach Rückfrage."; fest.SetBounds(x, y, w, UI.S(56)); fest.ForeColor = UI.Muted;
+        y += UI.S(64);
+        Label summe = new Label(); summe.SetBounds(x, y + UI.S(8), UI.S(280), UI.S(22));
+        Button ok = UI.Primary("Archivieren"); ok.Font = new Font("Segoe UI Semibold", 9.75f); ok.Padding = new Padding(UI.S(14), UI.S(3), UI.S(14), UI.S(3)); ok.AutoSize = false; ok.SetBounds(UI.S(316), y, UI.S(116), UI.S(34)); ok.DialogResult = DialogResult.OK;
+        Button ab = UI.Secondary("Abbrechen"); ab.AutoSize = false; ab.Margin = new Padding(0); ab.SetBounds(UI.S(440), y, UI.S(102), UI.S(34)); ab.DialogResult = DialogResult.Cancel;
+        dlg.Controls.Add(kopf); dlg.Controls.Add(cbErl); dlg.Controls.Add(cmbAlter); dlg.Controls.Add(lErl); dlg.Controls.Add(cbAnd); dlg.Controls.Add(lAnd); dlg.Controls.Add(fest); dlg.Controls.Add(summe); dlg.Controls.Add(ok); dlg.Controls.Add(ab);
+        cmbAlter.Margin = new Padding(0);
+        cmbAlter.Location = new Point(x + cbErl.PreferredSize.Width + UI.S(8), cbErl.Top - UI.S(3));
+        dlg.AcceptButton = ok; dlg.CancelButton = ab;
+        EventHandler rechne = delegate
+        {
+            int tage = chgAlterTage[Math.Max(0, Math.Min(chgAlterTage.Length - 1, cmbAlter.SelectedIndex))];
+            List<ChangeLauf> erl = ChangeLauf.Aufzuraeumen(changeLaeufe, true, tage, false, DateTime.Now), and = ChangeLauf.Aufzuraeumen(changeLaeufe, false, 0, true, DateTime.Now);
+            List<ChangeLauf> alle = ChangeLauf.Aufzuraeumen(changeLaeufe, cbErl.Checked, tage, cbAnd.Checked, DateTime.Now);
+            int ee = 0, ae = 0, aa = 0, ge = 0; foreach (ChangeLauf l in erl) ee += l.Eintraege.Count; foreach (ChangeLauf l in and) { ae += l.Eintraege.Count; aa += l.Aktiv; } foreach (ChangeLauf l in alle) ge += l.Eintraege.Count;
+            lErl.Text = "Läufe ohne aktive Einträge (nur Hinweise, Zurückgenommenes oder leer): " + Mehrzahl(erl.Count, "Datei", "Dateien") + ", " + Mehrzahl(ee, "Eintrag", "Einträge") + ".";
+            lAnd.Text = Mehrzahl(and.Count, "Datei", "Dateien") + ", " + Mehrzahl(ae, "Eintrag", "Einträge") + ", davon " + aa + " aktiv. Rückgängig ist auf jenem PC danach erst wieder möglich, wenn die Datei aus dem Archiv zurückgelegt wird.";
+            summe.Text = alle.Count == 0 ? "Nichts zu verschieben." : Mehrzahl(alle.Count, "Datei", "Dateien") + " mit " + Mehrzahl(ge, "Eintrag", "Einträgen") + " werden verschoben.";
+            ok.Enabled = alle.Count > 0; cmbAlter.Enabled = cbErl.Checked;
+        };
+        cbErl.CheckedChanged += rechne; cbAnd.CheckedChanged += rechne; cmbAlter.SelectedIndexChanged += rechne;
+        Tip(cbErl, "Läufe, in denen nichts mehr zurückzunehmen ist. Sie dienen nur noch dem Nachlesen.");
+        Tip(cmbAlter, "Mindestalter eines erledigten Laufs.");
+        Tip(cbAnd, "Protokolle, die auf anderen PCs entstanden sind. Auf diesem PC lassen sie sich nicht zurücknehmen, auf dem jeweiligen PC aber schon, solange die Datei im Ordner Änderungen liegt.");
+        UI.ThemeDialog(dlg);
+        lErl.ForeColor = UI.Muted; lAnd.ForeColor = UI.Muted; fest.ForeColor = UI.Muted;
+        rechne(null, EventArgs.Empty);
+        if (dlg.ShowDialog(this) != DialogResult.OK) { dlg.Dispose(); return; }
+        string arg = ChgAufraeumArg(cbErl.Checked, chgAlterTage[Math.Max(0, Math.Min(chgAlterTage.Length - 1, cmbAlter.SelectedIndex))], cbAnd.Checked);
+        dlg.Dispose();
+        if (arg.Length == 0) return;
+        List<string> lines = new List<string>(); string res = "";
+        try { res = RunHelperPumped("-AenderungenAufraeumen " + Q(arg), out lines, 300); }
+        catch (Exception ex) { lines.Add("Aufräumen fehlgeschlagen: " + ex.Message); }
+        ReloadDb();
+        UI.Hinweis(lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Keine Rückmeldung vom Arbeitsprozess.", "Protokoll aufräumen", this);
     }
 }
 // Seite Info und Versionen (Teilklasse DiagGui)
@@ -15889,8 +16387,23 @@ public partial class DiagGui
             SaveUpdateCheckPreference(chkAutoUpdate.Checked);
         };
         top.Controls.Add(chkAutoUpdate);
-        RichTextBox rt = new RichTextBox(); rt.ReadOnly = true; rt.BorderStyle = BorderStyle.FixedSingle; rt.BackColor = UI.Panel; rt.ForeColor = UI.Text;
+        // ab v4.10: Die Versionshistorie (ein langes Textfeld, beim Start rund 100 bis 170 ms) entsteht erst beim ersten
+        // Öffnen der Seite (FuelleVersionen aus ShowPage)
+        RichTextBox rt = new RichTextBox(); rtVersionen = rt; rt.ReadOnly = true; rt.BorderStyle = BorderStyle.FixedSingle; rt.BackColor = UI.Panel; rt.ForeColor = UI.Text;
         rt.Dock = DockStyle.Fill; rt.DetectUrls = false; rt.ScrollBars = RichTextBoxScrollBars.Vertical; rt.Font = new Font("Segoe UI", 9.75f);
+        f.Controls.Add(rt);
+        f.Controls.Add(top);
+        top.SendToBack();
+        return f;
+    }
+
+    RichTextBox rtVersionen;
+    internal bool versionenGefuellt;
+    internal void FuelleVersionen()
+    {
+        if (versionenGefuellt || rtVersionen == null) return;
+        versionenGefuellt = true;
+        RichTextBox rt = rtVersionen;
         Font fh = new Font("Segoe UI Semibold", 11f), fd = new Font("Segoe UI", 9f), fb = new Font("Segoe UI", 9.75f);
         foreach (Versionshistorie.Eintrag e in Versionshistorie.Liste)
         {
@@ -15902,10 +16415,6 @@ public partial class DiagGui
             rt.AppendText(e.Text + "\r\n\r\n\r\n");
         }
         rt.SelectionStart = 0; rt.ScrollToCaret();
-        f.Controls.Add(rt);
-        f.Controls.Add(top);
-        top.SendToBack();
-        return f;
     }
 }
 // Ablauf: gewählte Module, Zeitschätzung, Start eines Laufs (Teilklasse DiagGui)
@@ -18033,6 +18542,500 @@ public class FarbPunkt : Control
         using (SolidBrush b = new SolidBrush(c)) g.FillEllipse(b, rand, rand, Width - 2 * rand - 1, Height - 2 * rand - 1);
         if (gewaehlt || hover || Focused)
             using (Pen p = new Pen(gewaehlt ? c : UI.Muted, gewaehlt ? UI.S(2) : 1f)) g.DrawEllipse(p, 1.5f, 1.5f, Width - 4, Height - 4);
+    }
+}
+// Selbst gezeichnete Liste und Kennzahlen (ab v4.10) für die Seiten Sensoren live, Datenbank und Änderungen.
+// Die Liste zeichnet nur die sichtbaren Zeilen und kennt keine Fensterelemente je Zeile: Ihr Aufbau kostet deshalb bei
+// tausend Einträgen so viel wie bei zehn. Bis v4.09 standen dort native Listenfelder (ListView); die Seite Änderungen
+// zählte beim ersten Anzeigen für jede der rund tausend Zeilen alle Haken neu.
+
+// Eine Zeile der Liste. Was sie zeigt, bestimmt die Seite über Tag, Art und den Zeichner der Liste.
+public class ListenZeile
+{
+    public object Tag;
+    public string Art = "";
+    public int Ebene, Hoehe;
+    // Haken: -1 ohne Kästchen, 0 aus, 1 an, 2 teilweise. Gesperrt: Kästchen sichtbar, aber nicht änderbar.
+    public int Haken = -1;
+    public bool Gesperrt, Aufklappbar, Offen, Blass, Verweis;
+    public bool Waehlbar = true;
+    // Grund: 0 Fläche der Seite, 1 Kopfzeile einer Gruppe, 2 Unterzeile
+    public int Grund;
+    public string Hinweis = "";
+}
+
+public class ListenSpalte
+{
+    public string Titel = "", Hinweis = "";
+    public int Breite;
+    public bool Rechts, Sortierbar = true;
+    // Schlüssel der Spalte für die Seite (Sortierung)
+    public int Nr;
+    public ListenSpalte(string titel, int breite, bool rechts, int nr) { Titel = titel; Breite = breite; Rechts = rechts; Nr = nr; }
+}
+
+public delegate void ZeilenZeichner(Graphics g, ListenZeile z, Rectangle r, bool markiert);
+
+public class ZeilenListe : Control
+{
+    public readonly List<ListenZeile> Zeilen = new List<ListenZeile>();
+    // Spalte 0 nimmt den Rest der Breite, alle weiteren stehen mit fester Breite rechts davon
+    public readonly List<ListenSpalte> Spalten = new List<ListenSpalte>();
+    public ZeilenZeichner Zeichner;
+    public int ZeilenHoehe = UI.S(30);
+    // AutoHoehe: Die Liste ist so hoch wie ihr Inhalt und rollt nicht selbst (Seite mit eigenem Bildlauf)
+    public bool AutoHoehe, Mehrfach, ChevronPlatz = true, Rahmen = true;
+    public string Leer = "";
+    public int SortSpalte = -1;
+    public bool SortAuf = true;
+    public ToolTip Tipp;
+    public event Action<ListenZeile> HakenGeklickt, AufklappGeklickt, Geoeffnet, VerweisGeklickt;
+    public event Action<int> SpalteGeklickt;
+    public event EventHandler MarkierungGeaendert;
+
+    List<ListenZeile> markiert = new List<ListenZeile>();
+    ListenZeile fokus, anker, hover;
+    int rollen, hoverSpalte = -1;
+    bool zieht; int ziehStartY, ziehStartRollen;
+
+    public static readonly Font FText = new Font("Segoe UI", 9.5f), FFett = new Font("Segoe UI Semibold", 9.5f), FKlein = new Font("Segoe UI", 8.75f),
+        FKopf = new Font("Segoe UI Semibold", 8.75f), FFest = new Font("Consolas", 8.75f), FEtikett = new Font("Segoe UI Semibold", 8.25f);
+
+    public ZeilenListe()
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
+        TabStop = true; BackColor = UI.Panel; AccessibleRole = AccessibleRole.List;
+        Size = new Size(UI.S(400), UI.S(200));
+    }
+
+    // ------------------------------------------------------------ Maße
+    public int KopfHoehe { get { return Spalten.Count > 0 ? UI.S(28) : 0; } }
+    int Rand { get { return Rahmen ? 1 : 0; } }
+    int LeisteBreite { get { return UI.S(10); } }
+    int HoeheVon(ListenZeile z) { return z.Hoehe > 0 ? z.Hoehe : ZeilenHoehe; }
+    public int InhaltHoehe { get { int h = 0; foreach (ListenZeile z in Zeilen) h += HoeheVon(z); return h; } }
+    int Sichtbar { get { return Math.Max(0, Height - KopfHoehe - 2 * Rand); } }
+    int RollenMax { get { return AutoHoehe ? 0 : Math.Max(0, InhaltHoehe - Sichtbar); } }
+    bool LeisteNoetig { get { return RollenMax > 0; } }
+    int ZeilenBreite { get { return Width - 2 * Rand - (LeisteNoetig ? LeisteBreite : 0); } }
+    public int Rollen { get { return rollen; } set { int v = Math.Max(0, Math.Min(RollenMax, value)); if (v != rollen) { rollen = v; Invalidate(); } } }
+
+    // Höhe für eine Liste, die nicht selbst rollt
+    public int WunschHoehe { get { return KopfHoehe + 2 * Rand + Math.Max(InhaltHoehe, Zeilen.Count == 0 && Leer.Length > 0 ? UI.S(56) : 0); } }
+
+    // Nach jeder Änderung an Zeilen aufrufen: hält Markierung und Bildlauf gültig und zeichnet neu
+    public void Aktualisiere()
+    {
+        for (int i = markiert.Count - 1; i >= 0; i--) if (!Zeilen.Contains(markiert[i])) markiert.RemoveAt(i);
+        if (fokus != null && !Zeilen.Contains(fokus)) fokus = null;
+        if (anker != null && !Zeilen.Contains(anker)) anker = null;
+        if (hover != null && !Zeilen.Contains(hover)) hover = null;
+        if (AutoHoehe) { int h = WunschHoehe; if (Height != h) Height = h; }
+        if (rollen > RollenMax) rollen = RollenMax;
+        Invalidate();
+    }
+
+    // Lage einer Spalte in einer Zeile (r ist die ganze Zeile ohne Bildlaufleiste)
+    public Rectangle Zelle(int spalte, Rectangle r)
+    {
+        int rechts = r.Right - UI.S(10);
+        for (int i = Spalten.Count - 1; i >= 1; i--)
+        {
+            int w = Spalten[i].Breite;
+            if (i == spalte) return new Rectangle(rechts - w, r.Y, w, r.Height);
+            rechts -= w;
+        }
+        return new Rectangle(r.X, r.Y, Math.Max(0, rechts - r.X), r.Height);
+    }
+
+    // Beginn des Inhalts einer Zeile hinter Einrückung, Kästchen und Pfeil
+    public int InhaltLinks(ListenZeile z)
+    {
+        int x = UI.S(10) + z.Ebene * UI.S(22);
+        if (z.Haken >= 0) x += UI.S(24);
+        if (ChevronPlatz || z.Aufklappbar) x += UI.S(18);
+        return x;
+    }
+    Rectangle HakenFeld(ListenZeile z, Rectangle r) { int x = r.X + UI.S(10) + z.Ebene * UI.S(22); return new Rectangle(x, r.Y + (r.Height - UI.S(16)) / 2, UI.S(16), UI.S(16)); }
+    Rectangle PfeilFeld(ListenZeile z, Rectangle r) { int x = r.X + UI.S(10) + z.Ebene * UI.S(22) + (z.Haken >= 0 ? UI.S(24) : 0); return new Rectangle(x, r.Y, UI.S(16), r.Height); }
+
+    Rectangle ZeileRechteck(ListenZeile ziel)
+    {
+        int y = Rand + KopfHoehe - rollen;
+        foreach (ListenZeile z in Zeilen) { int h = HoeheVon(z); if (z == ziel) return new Rectangle(Rand, y, ZeilenBreite, h); y += h; }
+        return Rectangle.Empty;
+    }
+    public ListenZeile ZeileBei(int py)
+    {
+        if (py < Rand + KopfHoehe) return null;
+        int y = Rand + KopfHoehe - rollen;
+        foreach (ListenZeile z in Zeilen) { int h = HoeheVon(z); if (py >= y && py < y + h) return z; y += h; }
+        return null;
+    }
+
+    // ------------------------------------------------------------ Markierung
+    public List<ListenZeile> Markiert { get { return new List<ListenZeile>(markiert); } }
+    public ListenZeile Fokus { get { return fokus; } }
+    public void Markiere(ListenZeile z, bool melden)
+    {
+        markiert.Clear(); if (z != null && z.Waehlbar) { markiert.Add(z); fokus = z; anker = z; }
+        Invalidate();
+        if (melden && MarkierungGeaendert != null) MarkierungGeaendert(this, EventArgs.Empty);
+    }
+    public void MarkiereMehrere(List<ListenZeile> l)
+    {
+        markiert.Clear(); foreach (ListenZeile z in l) if (z.Waehlbar && Zeilen.Contains(z)) markiert.Add(z);
+        fokus = markiert.Count > 0 ? markiert[0] : null; anker = fokus; Invalidate();
+    }
+    public void Zeige(ListenZeile z)
+    {
+        if (z == null || AutoHoehe) return;
+        Rectangle r = ZeileRechteck(z); if (r.IsEmpty) return;
+        int oben = Rand + KopfHoehe;
+        if (r.Y < oben) Rollen = rollen - (oben - r.Y);
+        else if (r.Bottom > Height - Rand) Rollen = rollen + (r.Bottom - (Height - Rand));
+    }
+
+    // ------------------------------------------------------------ Ereignisse von außen (auch für den Selbsttest)
+    public void LoeseHaken(ListenZeile z) { if (z != null && z.Haken >= 0 && !z.Gesperrt && HakenGeklickt != null) HakenGeklickt(z); }
+    public void LoeseAufklappen(ListenZeile z) { if (z != null && z.Aufklappbar && AufklappGeklickt != null) AufklappGeklickt(z); }
+    public void LoeseOeffnen(ListenZeile z) { if (z != null && Geoeffnet != null) Geoeffnet(z); }
+    public void LoeseVerweis(ListenZeile z) { if (z != null && z.Verweis && VerweisGeklickt != null) VerweisGeklickt(z); }
+
+    // ------------------------------------------------------------ Maus
+    int SpalteBei(int px)
+    {
+        Rectangle r = new Rectangle(Rand, Rand, ZeilenBreite, KopfHoehe);
+        for (int i = 0; i < Spalten.Count; i++) { Rectangle c = Zelle(i, r); if (px >= c.X && px < c.Right) return i; }
+        return -1;
+    }
+    Rectangle Schieber()
+    {
+        if (!LeisteNoetig) return Rectangle.Empty;
+        int bahn = Sichtbar, gesamt = Math.Max(1, InhaltHoehe);
+        int h = Math.Max(UI.S(24), bahn * bahn / gesamt);
+        int y = Rand + KopfHoehe + (RollenMax > 0 ? (int)((long)(bahn - h) * rollen / RollenMax) : 0);
+        return new Rectangle(Width - Rand - LeisteBreite + UI.S(2), y, LeisteBreite - UI.S(4), h);
+    }
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+        if (CanFocus) Focus();
+        if (LeisteNoetig && e.X >= Width - Rand - LeisteBreite)
+        {
+            Rectangle s = Schieber();
+            if (e.Y >= s.Y && e.Y < s.Bottom) { zieht = true; ziehStartY = e.Y; ziehStartRollen = rollen; }
+            else Rollen = rollen + (e.Y < s.Y ? -Sichtbar : Sichtbar);
+            return;
+        }
+        if (e.Y < Rand + KopfHoehe)
+        {
+            int sp = SpalteBei(e.X);
+            if (e.Button == MouseButtons.Left && sp >= 0 && Spalten[sp].Sortierbar && SpalteGeklickt != null) SpalteGeklickt(Spalten[sp].Nr);
+            return;
+        }
+        ListenZeile z = ZeileBei(e.Y); if (z == null) return;
+        Rectangle r = ZeileRechteck(z);
+        if (e.Button == MouseButtons.Left)
+        {
+            if (z.Verweis) { LoeseVerweis(z); return; }
+            Rectangle hf = HakenFeld(z, r); hf.Inflate(UI.S(4), UI.S(6));
+            if (z.Haken >= 0 && hf.Contains(e.Location)) { if (!z.Gesperrt) LoeseHaken(z); return; }
+            if (z.Aufklappbar && PfeilFeld(z, r).Contains(e.Location)) { LoeseAufklappen(z); return; }
+            // Kopfzeilen ohne eigene Auswahl klappen bei jedem Klick auf oder zu
+            if (z.Aufklappbar && !z.Waehlbar) { LoeseAufklappen(z); return; }
+        }
+        if (!z.Waehlbar) return;
+        bool strg = (ModifierKeys & Keys.Control) != 0, um = (ModifierKeys & Keys.Shift) != 0;
+        if (e.Button == MouseButtons.Right) { if (!markiert.Contains(z)) Markiere(z, true); return; }
+        if (Mehrfach && strg) { if (markiert.Contains(z)) markiert.Remove(z); else markiert.Add(z); fokus = z; anker = z; }
+        else if (Mehrfach && um && anker != null && Zeilen.Contains(anker))
+        {
+            int a = Zeilen.IndexOf(anker), b = Zeilen.IndexOf(z); if (a > b) { int t = a; a = b; b = t; }
+            markiert.Clear(); for (int i = a; i <= b; i++) if (Zeilen[i].Waehlbar) markiert.Add(Zeilen[i]);
+            fokus = z;
+        }
+        else { markiert.Clear(); markiert.Add(z); fokus = z; anker = z; }
+        Invalidate();
+        if (MarkierungGeaendert != null) MarkierungGeaendert(this, EventArgs.Empty);
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        if (zieht)
+        {
+            int bahn = Sichtbar - Schieber().Height;
+            if (bahn > 0) Rollen = ziehStartRollen + (int)((long)(e.Y - ziehStartY) * RollenMax / bahn);
+            return;
+        }
+        ListenZeile z = e.X < Rand + ZeilenBreite ? ZeileBei(e.Y) : null;
+        int sp = e.Y < Rand + KopfHoehe ? SpalteBei(e.X) : -1;
+        if (z != hover || sp != hoverSpalte)
+        {
+            hover = z; hoverSpalte = sp; Invalidate();
+            Cursor = (z != null && (z.Verweis || (z.Aufklappbar && !z.Waehlbar))) || (sp >= 0 && Spalten[sp].Sortierbar) ? Cursors.Hand : Cursors.Default;
+            if (Tipp != null) Tipp.SetToolTip(this, z != null ? z.Hinweis : sp >= 0 ? Spalten[sp].Hinweis : "");
+        }
+    }
+    protected override void OnMouseUp(MouseEventArgs e) { zieht = false; base.OnMouseUp(e); }
+    protected override void OnMouseLeave(EventArgs e) { if (hover != null || hoverSpalte >= 0) { hover = null; hoverSpalte = -1; Invalidate(); } base.OnMouseLeave(e); }
+
+    protected override void OnMouseDoubleClick(MouseEventArgs e)
+    {
+        base.OnMouseDoubleClick(e);
+        if (e.Button != MouseButtons.Left) return;
+        ListenZeile z = ZeileBei(e.Y); if (z == null || z.Verweis) return;
+        Rectangle r = ZeileRechteck(z);
+        Rectangle hf = HakenFeld(z, r); hf.Inflate(UI.S(4), UI.S(6));
+        if (z.Haken >= 0 && hf.Contains(e.Location)) { if (!z.Gesperrt) LoeseHaken(z); return; }
+        if (z.Aufklappbar && (PfeilFeld(z, r).Contains(e.Location) || !z.Waehlbar)) { LoeseAufklappen(z); return; }
+        LoeseOeffnen(z);
+    }
+
+    protected override void OnMouseWheel(MouseEventArgs e)
+    {
+        // Rollt die Liste nicht selbst oder steht sie am Anschlag, bekommt die Seite das Rad
+        int vorher = rollen;
+        if (!AutoHoehe) Rollen = rollen - Math.Sign(e.Delta) * 3 * ZeilenHoehe;
+        HandledMouseEventArgs h = e as HandledMouseEventArgs;
+        if (h != null) h.Handled = rollen != vorher;
+        if (rollen == vorher) base.OnMouseWheel(e);
+    }
+
+    // ------------------------------------------------------------ Tastatur
+    protected override bool IsInputKey(Keys k)
+    {
+        Keys c = k & Keys.KeyCode;
+        return c == Keys.Up || c == Keys.Down || c == Keys.Left || c == Keys.Right || c == Keys.Enter || base.IsInputKey(k);
+    }
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Handled || Zeilen.Count == 0) return;
+        int i = fokus != null ? Zeilen.IndexOf(fokus) : -1;
+        int seite = Math.Max(1, Sichtbar / Math.Max(1, ZeilenHoehe) - 1);
+        int neu = i;
+        if (e.KeyCode == Keys.Down) neu = i + 1;
+        else if (e.KeyCode == Keys.Up) neu = i - 1;
+        else if (e.KeyCode == Keys.PageDown) neu = i + seite;
+        else if (e.KeyCode == Keys.PageUp) neu = i - seite;
+        else if (e.KeyCode == Keys.Home) neu = 0;
+        else if (e.KeyCode == Keys.End) neu = Zeilen.Count - 1;
+        else if (e.KeyCode == Keys.Space && fokus != null) { LoeseHaken(fokus); e.Handled = true; return; }
+        else if (e.KeyCode == Keys.Right && fokus != null && fokus.Aufklappbar && !fokus.Offen) { LoeseAufklappen(fokus); e.Handled = true; return; }
+        else if (e.KeyCode == Keys.Left && fokus != null && fokus.Aufklappbar && fokus.Offen) { LoeseAufklappen(fokus); e.Handled = true; return; }
+        else if (e.KeyCode == Keys.Enter && fokus != null) { if (fokus.Verweis) LoeseVerweis(fokus); else LoeseOeffnen(fokus); e.Handled = true; return; }
+        else return;
+        int richtung = neu >= i ? 1 : -1;
+        neu = Math.Max(0, Math.Min(Zeilen.Count - 1, neu));
+        while (neu >= 0 && neu < Zeilen.Count && !Zeilen[neu].Waehlbar && !Zeilen[neu].Verweis) neu += richtung;
+        if (neu < 0 || neu >= Zeilen.Count) { e.Handled = true; return; }
+        ListenZeile z = Zeilen[neu];
+        markiert.Clear(); if (z.Waehlbar) markiert.Add(z); fokus = z; anker = z;
+        Zeige(z); Invalidate(); e.Handled = true;
+        if (MarkierungGeaendert != null) MarkierungGeaendert(this, EventArgs.Empty);
+    }
+    protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
+    protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
+    protected override void OnResize(EventArgs e) { base.OnResize(e); if (rollen > RollenMax) rollen = RollenMax; }
+
+    // ------------------------------------------------------------ Zeichnen
+    public static Color KopfGrund { get { return UI.Mix(UI.Panel, UI.Text, UI.IsDark ? 0.045 : 0.035); } }
+    public static Color UnterGrund { get { return UI.Mix(UI.Panel, UI.Bg, UI.IsDark ? 0.55 : 0.5); } }
+    public static Color Trenner { get { return UI.Mix(UI.Panel, UI.Line, 0.55); } }
+
+    // Text mit Auslassung in einem Rechteck
+    public static void Schreibe(Graphics g, string text, Font f, Rectangle r, Color c, bool rechts)
+    {
+        if (String.IsNullOrEmpty(text) || r.Width <= 0) return;
+        TextRenderer.DrawText(g, text, f, r, c, (rechts ? TextFormatFlags.Right : TextFormatFlags.Left) | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
+    }
+    public static int Breite(string text, Font f) { return String.IsNullOrEmpty(text) ? 0 : TextRenderer.MeasureText(text, f, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width; }
+    public static int EtikettBreite(string text) { return String.IsNullOrEmpty(text) ? 0 : TextRenderer.MeasureText(text, FEtikett, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding).Width + UI.S(14); }
+
+    // Etikett wie Badge, linksbündig bei x; liefert die Breite. Stufe "akzent" nutzt die Akzentfarbe.
+    public static int Etikett(Graphics g, string text, string stufe, int x, Rectangle zeile, int festeBreite)
+    {
+        if (String.IsNullOrEmpty(text)) return 0;
+        Color fg, bg;
+        if (stufe == "akzent") { fg = UI.Accent; bg = UI.AccentSoft; } else UI.BadgeColors(stufe, out fg, out bg);
+        int w = festeBreite > 0 ? festeBreite : EtikettBreite(text), h = UI.S(18);
+        Rectangle r = new Rectangle(x, zeile.Y + (zeile.Height - h) / 2, w, h);
+        using (GraphicsPath p = UI.Round(new RectangleF(r.X, r.Y, r.Width - 1, r.Height - 1), (h - 1) / 2f))
+        using (SolidBrush b = new SolidBrush(bg)) g.FillPath(b, p);
+        TextRenderer.DrawText(g, text, FEtikett, r, fg, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
+        return w;
+    }
+
+    public static void ZeichneHaken(Graphics g, Rectangle r, int zustand, bool gesperrt)
+    {
+        RectangleF f = new RectangleF(r.X + 0.5f, r.Y + 0.5f, r.Width - 1, r.Height - 1);
+        using (GraphicsPath p = UI.Round(f, UI.SF(4)))
+        {
+            if (gesperrt)
+            {
+                using (SolidBrush b = new SolidBrush(UI.Mix(UI.Panel, UI.Line, 0.35))) g.FillPath(b, p);
+                using (Pen pen = new Pen(UI.Line, 1f)) g.DrawPath(pen, p);
+                return;
+            }
+            if (zustand == 0) { using (Pen pen = new Pen(UI.Muted, UI.SF(1.4f))) g.DrawPath(pen, p); return; }
+            using (SolidBrush b = new SolidBrush(UI.Accent)) g.FillPath(b, p);
+        }
+        using (Pen pen = new Pen(UI.OnAccent, UI.SF(1.8f)))
+        {
+            pen.StartCap = LineCap.Round; pen.EndCap = LineCap.Round; pen.LineJoin = LineJoin.Round;
+            float w = r.Width, x = r.X, y = r.Y;
+            if (zustand == 2) g.DrawLine(pen, x + w * 0.27f, y + w * 0.5f, x + w * 0.73f, y + w * 0.5f);
+            else g.DrawLines(pen, new PointF[] { new PointF(x + w * 0.25f, y + w * 0.52f), new PointF(x + w * 0.43f, y + w * 0.70f), new PointF(x + w * 0.76f, y + w * 0.32f) });
+        }
+    }
+
+    static void ZeichnePfeil(Graphics g, Rectangle r, bool offen, Color c)
+    {
+        float cx = r.X + r.Width / 2f, cy = r.Y + r.Height / 2f, a = UI.SF(3.5f);
+        using (Pen pen = new Pen(c, UI.SF(1.5f)))
+        {
+            pen.StartCap = LineCap.Round; pen.EndCap = LineCap.Round; pen.LineJoin = LineJoin.Round;
+            if (offen) g.DrawLines(pen, new PointF[] { new PointF(cx - a, cy - a / 2), new PointF(cx, cy + a / 2), new PointF(cx + a, cy - a / 2) });
+            else g.DrawLines(pen, new PointF[] { new PointF(cx - a / 2, cy - a), new PointF(cx + a / 2, cy), new PointF(cx - a / 2, cy + a) });
+        }
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.Clear(UI.Panel);
+        int zb = ZeilenBreite, oben = Rand + KopfHoehe;
+        // Zeilen
+        Region alt = g.Clip;
+        g.SetClip(new Rectangle(Rand, oben, Width - 2 * Rand, Math.Max(0, Height - oben - Rand)));
+        int y = oben - rollen;
+        using (Pen linie = new Pen(Trenner))
+            for (int i = 0; i < Zeilen.Count; i++)
+            {
+                ListenZeile z = Zeilen[i]; int h = HoeheVon(z);
+                if (y + h > oben && y < Height)
+                {
+                    Rectangle r = new Rectangle(Rand, y, zb, h);
+                    bool m = markiert.Contains(z);
+                    Color grund = m ? UI.AccentSoft : z.Grund == 1 ? KopfGrund : z.Grund == 2 ? UnterGrund : UI.Panel;
+                    if (!m && z == hover && (z.Waehlbar || z.Aufklappbar || z.Verweis)) grund = UI.Mix(grund, UI.Text, 0.05);
+                    using (SolidBrush b = new SolidBrush(grund)) g.FillRectangle(b, r);
+                    g.DrawLine(linie, r.X, r.Bottom - 1, r.Right, r.Bottom - 1);
+                    if (z.Haken >= 0) ZeichneHaken(g, HakenFeld(z, r), z.Haken, z.Gesperrt);
+                    if (z.Aufklappbar) ZeichnePfeil(g, PfeilFeld(z, r), z.Offen, UI.Muted);
+                    int x = r.X + InhaltLinks(z);
+                    if (Zeichner != null) Zeichner(g, z, new Rectangle(x, r.Y, Math.Max(0, r.Right - x), h), m);
+                    if (z == fokus && Focused && !m) using (Pen fp = new Pen(UI.Accent)) g.DrawRectangle(fp, r.X, r.Y, r.Width - 1, r.Height - 2);
+                }
+                y += h;
+                if (y > Height) break;
+            }
+        if (Zeilen.Count == 0 && Leer.Length > 0)
+            TextRenderer.DrawText(g, Leer, FText, new Rectangle(Rand + UI.S(12), oben, Width - UI.S(24), Math.Max(UI.S(40), Height - oben - Rand)), UI.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
+        g.Clip = alt;
+        // Spaltenkopf
+        if (KopfHoehe > 0)
+        {
+            Rectangle kr = new Rectangle(Rand, Rand, zb, KopfHoehe);
+            using (SolidBrush b = new SolidBrush(UI.Panel)) g.FillRectangle(b, new Rectangle(Rand, Rand, Width - 2 * Rand, KopfHoehe));
+            for (int i = 0; i < Spalten.Count; i++)
+            {
+                Rectangle c = Zelle(i, kr);
+                if (i == 0) { int ein = UI.S(10) + (ChevronPlatz ? UI.S(18) : 0) + (Zeilen.Count > 0 && Zeilen[0].Haken >= 0 ? UI.S(24) : 0); c = new Rectangle(c.X + ein, c.Y, Math.Max(0, c.Width - ein), c.Height); }
+                bool aktiv = Spalten[i].Nr == SortSpalte;
+                string t = Spalten[i].Titel + (aktiv ? (SortAuf ? " ▴" : " ▾") : "");
+                Schreibe(g, t, FKopf, c, aktiv ? UI.Accent : i == hoverSpalte && Spalten[i].Sortierbar ? UI.Text : UI.Muted, Spalten[i].Rechts);
+            }
+            using (Pen p = new Pen(UI.Line)) g.DrawLine(p, Rand, Rand + KopfHoehe - 1, Width - Rand - 1, Rand + KopfHoehe - 1);
+        }
+        // Bildlaufleiste
+        if (LeisteNoetig)
+        {
+            Rectangle s = Schieber();
+            using (GraphicsPath p = UI.Round(new RectangleF(s.X, s.Y + 2, s.Width, s.Height - 4), s.Width / 2f))
+            using (SolidBrush b = new SolidBrush(UI.Mix(UI.Panel, UI.Muted, zieht ? 0.75 : 0.45))) g.FillPath(b, p);
+        }
+        if (Rahmen) using (Pen p = new Pen(UI.Line)) g.DrawRectangle(p, 0, 0, Width - 1, Height - 1);
+    }
+}
+
+// Kennzahlen nebeneinander (Seite Sensoren live): Titel mit Farbpunkt, Wert mit Einheit, eine Zeile darunter.
+public class KennzahlZeile : Control
+{
+    string[] titel, einheit, wert, unter;
+    Color[] farbe;
+    public KennzahlZeile(string[] titel, string[] einheit, Color[] farbe)
+    {
+        this.titel = titel; this.einheit = einheit; this.farbe = farbe;
+        wert = new string[titel.Length]; unter = new string[titel.Length];
+        for (int i = 0; i < titel.Length; i++) { wert[i] = ""; unter[i] = ""; }
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        BackColor = UI.Panel; AccessibleRole = AccessibleRole.Grouping;
+        Size = new Size(UI.S(780), UI.S(74)); Margin = new Padding(0, 0, 0, UI.S(UI.Abstand3));
+    }
+    public int Anzahl { get { return titel.Length; } }
+    public string Wert(int i) { return wert[i]; }
+    public string Unter(int i) { return unter[i]; }
+    // wert leer: "kein Wert" (nichts annehmen, was nicht gemessen ist)
+    public void Setze(int i, string w, string u)
+    {
+        if (i < 0 || i >= titel.Length) return;
+        w = w ?? ""; u = u ?? "";
+        if (wert[i] == w && unter[i] == u) return;
+        wert[i] = w; unter[i] = u; Invalidate();
+    }
+    public void Leere() { for (int i = 0; i < titel.Length; i++) { wert[i] = ""; unter[i] = ""; } Invalidate(); }
+    int Je { get { return Width >= UI.S(700) ? titel.Length : Width >= UI.S(420) ? (titel.Length + 1) / 2 : 2; } }
+    public int ZeilenAnzahl { get { return (titel.Length + Je - 1) / Je; } }
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+        int h = ZeilenAnzahl * UI.S(74) + (ZeilenAnzahl - 1) * UI.S(8);
+        if (Height != h) Height = h;
+    }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias; g.Clear(Parent != null ? Parent.BackColor : UI.Panel);
+        int je = Je, gap = UI.S(8), kh = UI.S(74);
+        int kw = (Width - (je - 1) * gap) / je;
+        using (Font ft = new Font("Segoe UI", 8.75f)) using (Font fw = new Font("Segoe UI", 15f, FontStyle.Bold)) using (Font fe = new Font("Segoe UI", 9f)) using (Font fu = new Font("Segoe UI", 8.25f))
+            for (int i = 0; i < titel.Length; i++)
+            {
+                Rectangle r = new Rectangle((i % je) * (kw + gap), (i / je) * (kh + gap), kw, kh);
+                using (GraphicsPath p = UI.Round(new RectangleF(r.X + 0.5f, r.Y + 0.5f, r.Width - 2, r.Height - 2), UI.SF(8)))
+                {
+                    using (SolidBrush b = new SolidBrush(ZeilenListe.KopfGrund)) g.FillPath(b, p);
+                    using (Pen pen = new Pen(UI.Line)) g.DrawPath(pen, p);
+                }
+                int x = r.X + UI.S(12);
+                using (SolidBrush b = new SolidBrush(farbe[i])) g.FillRectangle(b, x, r.Y + UI.S(13), UI.S(8), UI.S(8));
+                TextRenderer.DrawText(g, titel[i], ft, new Rectangle(x + UI.S(13), r.Y + UI.S(8), kw - UI.S(30), UI.S(18)), UI.Muted, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                bool da = wert[i].Length > 0;
+                string w = da ? wert[i] : "kein Wert";
+                Rectangle wr = new Rectangle(x - UI.S(3), r.Y + UI.S(25), kw - UI.S(14), UI.S(28));
+                if (da)
+                {
+                    int ww = TextRenderer.MeasureText(g, w, fw, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding).Width;
+                    TextRenderer.DrawText(g, w, fw, wr, UI.Text, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+                    TextRenderer.DrawText(g, einheit[i], fe, new Rectangle(wr.X + ww + UI.S(9), wr.Y + UI.S(4), Math.Max(0, wr.Width - ww - UI.S(9)), UI.S(22)), UI.Muted, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+                }
+                else TextRenderer.DrawText(g, w, fe, new Rectangle(x, wr.Y, wr.Width, wr.Height), UI.Muted, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+                TextRenderer.DrawText(g, unter[i], fu, new Rectangle(x, r.Y + UI.S(52), kw - UI.S(18), UI.S(16)), UI.Muted, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            }
+    }
+}
+
+// Karte mit selbst gezeichnetem Inhalt und Bedienelementen darunter (Detailbereich der Seite Datenbank)
+public class DetailKarte : CardPanel
+{
+    public Action<Graphics> Zeichne;
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        if (Zeichne != null) Zeichne(e.Graphics);
     }
 }
 // Grafische Oberflaeche: Steuerelemente
@@ -20851,6 +21854,10 @@ class SensorChart : Control
     public double CpuLimit = double.NaN, GpuLimit = double.NaN, TjMax = double.NaN;
     public string Empty = "Noch keine Messwerte.";
     static readonly Color CpuColor = Color.FromArgb(37, 99, 235), CoreColor = Color.FromArgb(125, 160, 245), GpuColor = Color.FromArgb(194, 65, 12), IGpuColor = Color.FromArgb(202, 138, 4);
+    // ab v4.10: Farben der Reihen für die Kennzahlen der Seite Sensoren live; Rahmen aus, wenn die Kurve in einer Karte steht
+    public static Color CpuFarbe { get { return CpuColor; } }
+    public static Color GpuFarbe { get { return GpuColor; } }
+    public bool Rahmen = true;
     struct Series { public int Col; public Color Color; public string Label; public bool Dash; public Series(int c, Color k, string l, bool d) { Col = c; Color = k; Label = l; Dash = d; } }
     public SensorChart()
     {
@@ -20897,7 +21904,7 @@ class SensorChart : Control
     {
         Graphics g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
         g.Clear(BackColor);
-        using (Pen bp = new Pen(UI.Line)) g.DrawRectangle(bp, 0, 0, Width - 1, Height - 1);
+        if (Rahmen) using (Pen bp = new Pen(UI.Line)) g.DrawRectangle(bp, 0, 0, Width - 1, Height - 1);
         if (rows.Count < 1) { using (Font f = new Font("Segoe UI", 9.75f)) TextRenderer.DrawText(g, Empty, f, ClientRectangle, UI.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak); return; }
         double tMax = rows[rows.Count - 1][0];
         double tMin = WindowSec > 0 ? Math.Max(0, tMax - WindowSec) : rows[0][0];
@@ -21228,6 +22235,9 @@ public class DbEntry
 public class ChangeEntry
 {
     public string FilePath = "", Computer = "", GeraetId = "", Zeit = "", Modul = "", Titel = "", Risiko = "", Art = "", Ziel = "", Vorher = "", Nachher = "", Status = "", Ergebnis = "", Gegenbefehl = "";
+    // ab v4.10: Schritt des Moduls (bündelt die Einträge einer Maßnahme) und Beginn des Laufs aus dem Kopf der Datei
+    public string Schritt = "", Lauf = "";
+    public string Schluessel { get { return FilePath + "*" + Id; } }
     public int Id;
     public bool Undoable { get { return Status == "aktiv" && String.Equals(Computer, Environment.MachineName, StringComparison.OrdinalIgnoreCase); } }
 
@@ -21237,7 +22247,10 @@ public class ChangeEntry
         return Convert.ToString(o, CultureInfo.InvariantCulture);
     }
 
-    public static List<ChangeEntry> Load(string root)
+    public static List<ChangeEntry> Load(string root) { return Load(root, null); }
+
+    // dateien (ab v4.10): je gültiger Protokolldatei Pfad, Computer und Beginn des Laufs, auch wenn sie keine Einträge hat
+    public static List<ChangeEntry> Load(string root, List<string[]> dateien)
     {
         List<ChangeEntry> list = new List<ChangeEntry>();
         if (String.IsNullOrEmpty(root) || !Directory.Exists(root)) return list;
@@ -21249,6 +22262,7 @@ public class ChangeEntry
             {
                 Dictionary<string, object> d = js.DeserializeObject(File.ReadAllText(f, Encoding.UTF8)) as Dictionary<string, object>;
                 if (d == null || S(d, "Format") != "Minibench-Aenderungen/1") continue;
+                if (dateien != null) dateien.Add(new string[] { f, S(d, "Computer"), S(d, "Lauf") });
                 object eo; if (!d.TryGetValue("Eintraege", out eo)) continue;
                 System.Collections.IEnumerable arr = eo as System.Collections.IEnumerable;
                 if (arr == null || eo is string) continue;
@@ -21258,7 +22272,7 @@ public class ChangeEntry
                     if (e == null) continue;
                     ChangeEntry c = new ChangeEntry(); c.FilePath = f; c.Computer = S(d, "Computer"); c.GeraetId = S(d, "GeraetId");
                     int id; int.TryParse(S(e, "Id"), out id); c.Id = id;
-                    c.Zeit = S(e, "Zeit"); c.Modul = S(e, "Modul"); c.Titel = S(e, "Titel"); c.Risiko = S(e, "Risiko"); c.Art = S(e, "Art"); c.Ziel = S(e, "Ziel");
+                    c.Zeit = S(e, "Zeit"); c.Modul = S(e, "Modul"); c.Schritt = S(e, "Schritt"); c.Lauf = S(d, "Lauf"); c.Titel = S(e, "Titel"); c.Risiko = S(e, "Risiko"); c.Art = S(e, "Art"); c.Ziel = S(e, "Ziel");
                     c.Vorher = S(e, "Vorher"); c.Nachher = S(e, "Nachher"); c.Status = S(e, "Status"); c.Ergebnis = S(e, "Ergebnis"); c.Gegenbefehl = S(e, "Gegenbefehl");
                     list.Add(c);
                 }
@@ -21267,6 +22281,116 @@ public class ChangeEntry
         }
         list.Sort(delegate(ChangeEntry a, ChangeEntry b) { int r = String.Compare(b.Zeit, a.Zeit, StringComparison.Ordinal); return r != 0 ? r : b.Id.CompareTo(a.Id); });
         return list;
+    }
+}
+
+// ab v4.10: Einträge einer Maßnahme (gleicher Schritt und Titel) innerhalb eines Laufs
+public class ChangeMassnahme
+{
+    public string Key = "", Titel = "", Risiko = "";
+    public List<ChangeEntry> Eintraege = new List<ChangeEntry>();
+
+    // "3 Registry-Werte", bei einem Eintrag dessen Ziel
+    public string Umfang
+    {
+        get
+        {
+            if (Eintraege.Count == 1) return Eintraege[0].Ziel;
+            string art = Eintraege[0].Art; foreach (ChangeEntry c in Eintraege) if (c.Art != art) { art = ""; break; }
+            string n = art == "Registry" ? "Registry-Werte" : art == "Dienststart" ? "Dienste" : (art == "Aufgabe" || art == "AufgabeNeu") ? "Aufgaben" : art == "App" ? "Apps" : art == "Softwarepaket" ? "Softwarepakete" : art == "Datei" ? "Dateien" : "Einträge";
+            return Eintraege.Count + " " + n;
+        }
+    }
+    // gemeinsamer Status oder "2 von 5 aktiv"
+    public string StatusText
+    {
+        get
+        {
+            string s = Eintraege[0].Status; int aktiv = 0; bool gleich = true;
+            foreach (ChangeEntry c in Eintraege) { if (c.Status != s) gleich = false; if (c.Status == "aktiv") aktiv++; }
+            return gleich ? s : aktiv + " von " + Eintraege.Count + " aktiv";
+        }
+    }
+    public bool Gemischt { get { foreach (ChangeEntry c in Eintraege) if (c.Status != Eintraege[0].Status) return true; return false; } }
+    public static string StatusStufe(string status) { string s = (status ?? "").ToLowerInvariant(); return s.EndsWith("aktiv") ? "ok" : s.Contains("fehl") ? "crit" : "skip"; }
+}
+
+// ab v4.10: ein Lauf des Änderungsprotokolls (eine Datei) mit seinen Maßnahmen
+public class ChangeLauf
+{
+    public string FilePath = "", Computer = "", Zeit = "";
+    public List<ChangeEntry> Eintraege = new List<ChangeEntry>();
+    public List<ChangeMassnahme> Massnahmen = new List<ChangeMassnahme>();
+    public bool DieserPc { get { return String.Equals(Computer, Environment.MachineName, StringComparison.OrdinalIgnoreCase); } }
+    public int Aktiv { get { int n = 0; foreach (ChangeEntry c in Eintraege) if (c.Status == "aktiv") n++; return n; } }
+    public string Module
+    {
+        get { List<string> m = new List<string>(); foreach (ChangeEntry c in Eintraege) if (c.Modul.Length > 0 && !m.Contains(c.Modul)) m.Add(c.Modul); return String.Join(", ", m.ToArray()); }
+    }
+    // "121 aktiv · 13 nur Hinweis" in der Reihenfolge aktiv, dann nach Häufigkeit
+    public string StatusText
+    {
+        get
+        {
+            Dictionary<string, int> z = new Dictionary<string, int>(); List<string> k = new List<string>();
+            foreach (ChangeEntry c in Eintraege) { if (!z.ContainsKey(c.Status)) { z[c.Status] = 0; k.Add(c.Status); } z[c.Status]++; }
+            k.Sort(delegate(string a, string b) { if (a == "aktiv") return b == "aktiv" ? 0 : -1; if (b == "aktiv") return 1; return z[b].CompareTo(z[a]); });
+            List<string> t = new List<string>(); foreach (string s in k) t.Add(z[s] + " " + s);
+            return String.Join("  \u00B7  ", t.ToArray());
+        }
+    }
+    public DateTime ZeitWert
+    {
+        get { DateTime t; return DateTime.TryParseExact(Zeit, new string[] { "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm" }, CultureInfo.InvariantCulture, DateTimeStyles.None, out t) ? t : DateTime.MinValue; }
+    }
+
+    // Läufe aus den Einträgen (neueste zuerst), Maßnahmen in der Reihenfolge des Laufs. dateien nennt auch Protokolle ohne
+    // Einträge (Pfad, Computer, Beginn): Sie erscheinen nicht in der Liste, zählen aber beim Aufräumen.
+    public static List<ChangeLauf> Gruppiere(List<ChangeEntry> eintraege, List<string[]> dateien)
+    {
+        Dictionary<string, ChangeLauf> nach = new Dictionary<string, ChangeLauf>(StringComparer.OrdinalIgnoreCase);
+        List<ChangeLauf> l = new List<ChangeLauf>();
+        if (dateien != null)
+            foreach (string[] d in dateien)
+            {
+                if (d == null || d.Length < 3 || nach.ContainsKey(d[0])) continue;
+                ChangeLauf n = new ChangeLauf(); n.FilePath = d[0]; n.Computer = d[1]; n.Zeit = d[2]; nach[d[0]] = n; l.Add(n);
+            }
+        foreach (ChangeEntry c in eintraege)
+        {
+            ChangeLauf n;
+            if (!nach.TryGetValue(c.FilePath, out n)) { n = new ChangeLauf(); n.FilePath = c.FilePath; n.Computer = c.Computer; n.Zeit = c.Lauf; nach[c.FilePath] = n; l.Add(n); }
+            n.Eintraege.Add(c);
+        }
+        foreach (ChangeLauf n in l)
+        {
+            n.Eintraege.Sort(delegate(ChangeEntry a, ChangeEntry b) { return a.Id.CompareTo(b.Id); });
+            if (n.Zeit.Length == 0 && n.Eintraege.Count > 0) n.Zeit = n.Eintraege[0].Zeit;
+            Dictionary<string, ChangeMassnahme> mk = new Dictionary<string, ChangeMassnahme>();
+            foreach (ChangeEntry c in n.Eintraege)
+            {
+                string k = c.Schritt + "\n" + c.Titel; ChangeMassnahme m;
+                if (!mk.TryGetValue(k, out m)) { m = new ChangeMassnahme(); m.Key = k; m.Titel = c.Titel; m.Risiko = c.Risiko; mk[k] = m; n.Massnahmen.Add(m); }
+                m.Eintraege.Add(c);
+            }
+        }
+        l.Sort(delegate(ChangeLauf a, ChangeLauf b) { int r = String.Compare(b.Zeit, a.Zeit, StringComparison.Ordinal); return r != 0 ? r : String.Compare(a.FilePath, b.FilePath, StringComparison.OrdinalIgnoreCase); });
+        return l;
+    }
+
+    // Aufräumen (wie Move-ChangeArchiv im Skript): erledigt = kein aktiver Eintrag und älter als tage (0 = jedes Alter);
+    // andere = alle Protokolle anderer PCs. Aktive Änderungen dieses PCs bleiben immer.
+    public static List<ChangeLauf> Aufzuraeumen(List<ChangeLauf> laeufe, bool erledigt, int tage, bool andere, DateTime jetzt)
+    {
+        List<ChangeLauf> r = new List<ChangeLauf>();
+        foreach (ChangeLauf n in laeufe)
+        {
+            bool weg = false;
+            if (andere && !n.DieserPc) weg = true;
+            if (erledigt && n.Aktiv == 0 && (tage <= 0 || (n.ZeitWert != DateTime.MinValue && (jetzt - n.ZeitWert).TotalDays > tage))) weg = true;
+            if (weg) r.Add(n);
+        }
+        return r;
     }
 }
 
@@ -22185,6 +23309,16 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.10", "15.11.2026", "Sensoren, Datenbank und Änderungen im Stil der übrigen Seiten, Protokoll aufräumen",
+            "\u2022 Seite Änderungen neu aufgebaut: Sie zeigt zuerst nur die Läufe dieses PCs, gebündelt nach Lauf und Maßnahme. Die einzelnen Werte (Ziel, vorher, nachher) stehen unter ihrer Maßnahme und entstehen erst beim Aufklappen. Ein Haken an einem Lauf oder einer Maßnahme wählt alle zurücknehmbaren Einträge darunter; die Auswahl steht in einem Band über der Liste mit \u201ERückgängig machen\u201C. \u201EAlle PCs\u201C zeigt zusätzlich die Protokolle anderer PCs, nur zur Ansicht.\r\n" +
+            "\u2022 Behoben: Die Seite Änderungen brauchte bei vielen Einträgen lange zum Öffnen. Sie legte für jeden Eintrag aller PCs eine Zeile mit Kontrollkästchen an (im Datenordner rund 1.050, davon einer von diesem PC) und zählte bei jeder Zeile alle Haken neu. Die neue Liste zeichnet nur, was sichtbar ist.\r\n" +
+            "\u2022 Neu, Änderungen: \u201EAufräumen \u2026\u201C verschiebt erledigte Läufe (ohne aktive Änderungen, älter als 30, 90 oder 180 Tage) und auf Wunsch die Protokolle anderer PCs nach Minibench-Daten\\Archiv\\Änderungen. Gelöscht wird nichts, aktive Änderungen dieses PCs bleiben immer. Protokolle anderer PCs mit aktiven Änderungen sind nicht vorgewählt: Auf dem jeweiligen PC lassen sie sich nur zurücknehmen, solange die Datei im Ordner Änderungen liegt.\r\n" +
+            "\u2022 Seite Sensoren live neu aufgebaut: oben sechs Kennzahlen (CPU-Temperatur, CPU-Takt, CPU-Leistung, GPU-Temperatur, GPU-Leistung, Lüfter) mit dem kleinsten und größten Wert seit dem Start, links Verlauf und alle Sensoren je Gerät, rechts Sensorwerkzeuge mit Zustand, Einstellungen als Schalter und die Aufzeichnung mit Dauer und Anzahl der Messzeilen. Fehlt ein Messwert, steht dort \u201Ekein Wert\u201C.\r\n" +
+            "\u2022 Seite Datenbank neu aufgebaut: Jedes Gerät steht mit Prozessor, Grafik und Arbeitsspeicher in einer Zeile, ältere Läufe klappen darunter auf. Rechts zeigt ein Detailbereich den markierten Lauf mit Punktzahl, dem gespeicherten Vergleich mit der Referenz, Hardware und Befunden; dort stehen die Aktionen, die bisher im Menü \u201EAktionen\u201C lagen. Angehakte Läufe erscheinen in einem Band mit \u201EIm Dashboard vergleichen\u201C. Sortieren, Doppelklick, F2, Eingabetaste und das Kontextmenü bleiben; nach Prozessor, Grafik und Arbeitsspeicher sortiert das Kontextmenü.\r\n" +
+            "\u2022 Nach \u201ERückgängig\u201C liest die Oberfläche den Zustand der Optimierung neu: Zurückgenommene Einstellungen sind sofort wieder wählbar (bisher blieb ihr Schalter bis zum nächsten Start als \u201Ebereits aktiv\u201C gesperrt).\r\n" +
+            "\u2022 Start: Die Versionshistorie der Seite Info und Versionen entsteht erst beim ersten Öffnen (beim Start bisher 110 bis 170 ms).\r\n" +
+            "\u2022 Behoben: Die Aufzeichnung der Sensoren nahm nach 50.000 Messzeilen stillschweigend nichts mehr auf. Die Karte Aufzeichnung meldet das jetzt.\r\n" +
+            "\u2022 Sensoren live, Datenbank und Änderungen ordnen sich unter 900 px Seitenbreite untereinander. Ereigniskanal, Datenbankformat, Protokollformat, Vorlagen und Geraete.json sind unverändert."),
         new Eintrag("4.09", "13.11.2026", "Lasttest und System-Umzug im Stil der übrigen Seiten, Schalter ohne Beschnitt",
             "\u2022 Seite Lasttest neu aufgebaut: links die Karte \u201EKomponenten\u201C mit je einer Zeile (Symbol, Beschreibung, gewählte Dauer, Schalter) und \u201EAlle an \u00B7 Alle aus\u201C. Dauer und Einstellungen stehen unter ihrer Komponente und nur, wenn sie eingeschaltet ist. Rechts die Abbruchschwellen und die Karte \u201ESensoren\u201C: Sie nennt, woher CPU-Temperatur, Takt, Leistung und Lüfter des Laufs kommen (PawnIO vorübergehend, installiert oder nicht verwendet). Der Seitenkopf nennt \u201E3 von 4 Komponenten\u201C und die Gesamtdauer.\r\n" +
             "\u2022 Seite System-Umzug neu aufgebaut: links Benutzer-Bibliotheken, System und Programme und Zusatzordner als Zeilen mit Schalter, rechts Zielmedium und Sicherung mit Fortschritt und Protokoll. Nach dem Schnell-Scan trägt jede Bibliothek ihren Ordner und ihre Größe; erkannte Profile stehen als Auswahlzeilen unter \u201EProfile und Konfigurationen\u201C, weitere Ordner von Laufwerk C: in einer eigenen Karte. Während der Sicherung ist die Auswahl gesperrt.\r\n" +

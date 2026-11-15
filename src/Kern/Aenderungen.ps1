@@ -309,4 +309,77 @@ function Invoke-ChangeUndo([string]$Spec) {
     }
     return [pscustomobject]@{ Rueckgaengig = $done; Probleme = $fail }
 }
+# Aufräumen (ab v4.10, Seite Änderungen): Protokolldateien samt ihrem Ordner mit Sicherungsdateien nach
+# Minibench-Daten\Archiv\Änderungen\<Zeit>\<PC> verschieben. Gelöscht wird nichts (Vorgabe 14).
+#   Erledigt:<Tage>  Läufe ohne aktiven Eintrag, älter als <Tage> (0 = jedes Alter), von allen PCs
+#   Andere           alle Protokolle anderer PCs, auch mit aktiven Einträgen (auf diesem PC nicht zurücknehmbar)
+# Protokolle dieses PCs mit aktiven Einträgen bleiben immer: Sonst ginge Rückgängig verloren, und der Start könnte
+# vorübergehende Änderungen (Restore-TemporaryChanges) nicht mehr zurücknehmen. Die Oberfläche rechnet dieselben Regeln
+# für die Anzeige (ChangeLauf.Aufzuraeumen).
+function Move-ChangeArchiv([string]$Spec, [string]$Root = (Get-ChangeRoot), [string]$DataDir = $script:DataDir, [string]$Computer = $env:COMPUTERNAME, [datetime]$Jetzt = (Get-Date)) {
+    $res = [pscustomobject]@{ Verschoben = 0; Eintraege = 0; Fehler = 0; Zeilen = (New-Object System.Collections.Generic.List[string]); Archiv = '' }
+    $erledigt = $false; $tage = 0; $andere = $false
+    foreach ($t in @(([string]$Spec) -split ';' | ForEach-Object { $_.Trim().Trim('"') } | Where-Object { $_ })) {
+        if ($t -match '^Erledigt(:(\d+))?$') { $erledigt = $true; $tage = [int]$Matches[2] }
+        elseif ($t -eq 'Andere') { $andere = $true }
+        else { $res.Fehler++; $res.Zeilen.Add(('Unbekannte Angabe: {0}' -f $t)) }
+    }
+    if (-not $Root -or -not $DataDir -or -not (Test-Path -LiteralPath $Root) -or (-not $erledigt -and -not $andere)) { $res.Zeilen.Add('Nichts zu verschieben.'); return $res }
+    $stempel = $Jetzt.ToString('yyyyMMdd_HHmmss')
+    $arch = Join-Path (Join-Path (Join-Path $DataDir 'Archiv') 'Änderungen') $stempel
+    $res.Archiv = $arch
+    $einzeln = New-Object System.Collections.Generic.List[string]
+    $ordner = @{}
+    foreach ($f in @(Get-ChildItem -LiteralPath $Root -Recurse -File -Filter '*.json' -ErrorAction SilentlyContinue)) {
+        if ($script:ChangeFile -and $f.FullName -eq $script:ChangeFile) { continue }
+        $j = Read-ChangeFile $f.FullName
+        if (-not $j) { continue }
+        $ein = @($j.Eintraege | Where-Object { $_ })
+        $aktiv = @($ein | Where-Object { [string]$_.Status -eq 'aktiv' }).Count
+        $dieser = ([string]$j.Computer -eq $Computer)
+        $zeit = $null; $zt = [string]$j.Lauf
+        if (-not $zt -and $ein.Count) { $zt = [string]$ein[0].Zeit }
+        $d = [datetime]::MinValue
+        foreach ($fmt in 'yyyy-MM-dd HH:mm:ss', 'yyyy-MM-dd HH:mm') {
+            if ([datetime]::TryParseExact($zt, $fmt, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$d)) { $zeit = $d; break }
+        }
+        $weg = $false
+        if ($andere -and -not $dieser) { $weg = $true }
+        if ($erledigt -and $aktiv -eq 0 -and ($tage -le 0 -or ($zeit -and ($Jetzt - $zeit).TotalDays -gt $tage))) { $weg = $true }
+        if (-not $weg -or ($dieser -and $aktiv -gt 0)) { continue }
+        $pc = Split-Path (Split-Path $f.FullName -Parent) -Leaf
+        $ziel = Join-Path $arch $pc
+        try {
+            New-Item -ItemType Directory -Path $ziel -Force -ErrorAction Stop | Out-Null
+            $sich = $f.FullName -replace '\.json$', ''
+            if (Test-Path -LiteralPath $sich -PathType Container) { Move-Item -LiteralPath $sich -Destination (Join-Path $ziel (Split-Path $sich -Leaf)) -ErrorAction Stop }
+            Move-Item -LiteralPath $f.FullName -Destination (Join-Path $ziel $f.Name) -ErrorAction Stop
+            $res.Verschoben++; $res.Eintraege += $ein.Count
+            $einzeln.Add(('{0}\{1}: {2} Einträge, davon {3} aktiv' -f $pc, $f.Name, $ein.Count, $aktiv))
+            $ordner[(Split-Path $f.FullName -Parent)] = $true
+        } catch { $res.Fehler++; $res.Zeilen.Add(('{0}\{1}: {2}' -f $pc, $f.Name, $_.Exception.Message)) }
+    }
+    # leere Ordner der PCs entfernen (enthalten keine Daten mehr)
+    foreach ($o in $ordner.Keys) {
+        try { if (-not @(Get-ChildItem -LiteralPath $o -Force -ErrorAction Stop).Count) { Remove-Item -LiteralPath $o -Force -ErrorAction Stop } } catch { }
+    }
+    if ($res.Verschoben) {
+        $res.Zeilen.Insert(0, ('{0} Protokolle mit {1} Einträgen nach Archiv\Änderungen\{2} verschoben. Gelöscht wurde nichts.' -f $res.Verschoben, $res.Eintraege, $stempel))
+        try {
+            $log = New-Object System.Text.StringBuilder
+            [void]$log.AppendLine(('{0:yyyy-MM-dd HH:mm} Änderungsprotokoll aufgeräumt v{1} ({2}), Datenordner {3}' -f $Jetzt, $ScriptVersion, $Spec, $DataDir))
+            foreach ($z in $einzeln) { [void]$log.AppendLine('  ' + $z) }
+            [IO.File]::AppendAllText((Join-Path (Join-Path $DataDir 'Archiv') 'Datenpflege.log'), $log.ToString(), (New-Object Text.UTF8Encoding($true)))
+        } catch { }
+    } elseif (-not $res.Fehler) { $res.Zeilen.Add('Nichts zu verschieben.') }
+    return $res
+}
+
+# Hilfsmodus der Oberfläche: -AenderungenAufraeumen "Erledigt:30;Andere", am Ende @@RESULT|verschoben|Fehler
+if ($AenderungenAufraeumen) {
+    $r = Move-ChangeArchiv ([string]$AenderungenAufraeumen)
+    foreach ($z in $r.Zeilen) { Write-Host $z }
+    Send-GuiEvent 'RESULT' $r.Verschoben $r.Fehler
+    exit $(if ($r.Fehler) { 1 } else { 0 })
+}
 #endregion

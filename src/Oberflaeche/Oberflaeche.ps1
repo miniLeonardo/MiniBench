@@ -90,6 +90,7 @@ if (-not $EventMode -and -not $ImportOrdner -and -not $Vergleich -and -not $Ruec
 #>> EINBINDEN Oberflaeche\DiagGui_Lauf.cs
 #>> EINBINDEN Oberflaeche\DiagGui_Ergebnis.cs
 #>> EINBINDEN Oberflaeche\Bewegung.cs
+#>> EINBINDEN Oberflaeche\Liste.cs
 #>> EINBINDEN Oberflaeche\DiagGui_Steuerelemente.cs
 #>> EINBINDEN Oberflaeche\DiagGui_Modelle.cs
 #>> EINBINDEN Oberflaeche\Start.cs

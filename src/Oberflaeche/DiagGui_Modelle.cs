@@ -192,6 +192,9 @@ public class DbEntry
 public class ChangeEntry
 {
     public string FilePath = "", Computer = "", GeraetId = "", Zeit = "", Modul = "", Titel = "", Risiko = "", Art = "", Ziel = "", Vorher = "", Nachher = "", Status = "", Ergebnis = "", Gegenbefehl = "";
+    // ab v4.10: Schritt des Moduls (bündelt die Einträge einer Maßnahme) und Beginn des Laufs aus dem Kopf der Datei
+    public string Schritt = "", Lauf = "";
+    public string Schluessel { get { return FilePath + "*" + Id; } }
     public int Id;
     public bool Undoable { get { return Status == "aktiv" && String.Equals(Computer, Environment.MachineName, StringComparison.OrdinalIgnoreCase); } }
 
@@ -201,7 +204,10 @@ public class ChangeEntry
         return Convert.ToString(o, CultureInfo.InvariantCulture);
     }
 
-    public static List<ChangeEntry> Load(string root)
+    public static List<ChangeEntry> Load(string root) { return Load(root, null); }
+
+    // dateien (ab v4.10): je gültiger Protokolldatei Pfad, Computer und Beginn des Laufs, auch wenn sie keine Einträge hat
+    public static List<ChangeEntry> Load(string root, List<string[]> dateien)
     {
         List<ChangeEntry> list = new List<ChangeEntry>();
         if (String.IsNullOrEmpty(root) || !Directory.Exists(root)) return list;
@@ -213,6 +219,7 @@ public class ChangeEntry
             {
                 Dictionary<string, object> d = js.DeserializeObject(File.ReadAllText(f, Encoding.UTF8)) as Dictionary<string, object>;
                 if (d == null || S(d, "Format") != "Minibench-Aenderungen/1") continue;
+                if (dateien != null) dateien.Add(new string[] { f, S(d, "Computer"), S(d, "Lauf") });
                 object eo; if (!d.TryGetValue("Eintraege", out eo)) continue;
                 System.Collections.IEnumerable arr = eo as System.Collections.IEnumerable;
                 if (arr == null || eo is string) continue;
@@ -222,7 +229,7 @@ public class ChangeEntry
                     if (e == null) continue;
                     ChangeEntry c = new ChangeEntry(); c.FilePath = f; c.Computer = S(d, "Computer"); c.GeraetId = S(d, "GeraetId");
                     int id; int.TryParse(S(e, "Id"), out id); c.Id = id;
-                    c.Zeit = S(e, "Zeit"); c.Modul = S(e, "Modul"); c.Titel = S(e, "Titel"); c.Risiko = S(e, "Risiko"); c.Art = S(e, "Art"); c.Ziel = S(e, "Ziel");
+                    c.Zeit = S(e, "Zeit"); c.Modul = S(e, "Modul"); c.Schritt = S(e, "Schritt"); c.Lauf = S(d, "Lauf"); c.Titel = S(e, "Titel"); c.Risiko = S(e, "Risiko"); c.Art = S(e, "Art"); c.Ziel = S(e, "Ziel");
                     c.Vorher = S(e, "Vorher"); c.Nachher = S(e, "Nachher"); c.Status = S(e, "Status"); c.Ergebnis = S(e, "Ergebnis"); c.Gegenbefehl = S(e, "Gegenbefehl");
                     list.Add(c);
                 }
@@ -231,6 +238,116 @@ public class ChangeEntry
         }
         list.Sort(delegate(ChangeEntry a, ChangeEntry b) { int r = String.Compare(b.Zeit, a.Zeit, StringComparison.Ordinal); return r != 0 ? r : b.Id.CompareTo(a.Id); });
         return list;
+    }
+}
+
+// ab v4.10: Einträge einer Maßnahme (gleicher Schritt und Titel) innerhalb eines Laufs
+public class ChangeMassnahme
+{
+    public string Key = "", Titel = "", Risiko = "";
+    public List<ChangeEntry> Eintraege = new List<ChangeEntry>();
+
+    // "3 Registry-Werte", bei einem Eintrag dessen Ziel
+    public string Umfang
+    {
+        get
+        {
+            if (Eintraege.Count == 1) return Eintraege[0].Ziel;
+            string art = Eintraege[0].Art; foreach (ChangeEntry c in Eintraege) if (c.Art != art) { art = ""; break; }
+            string n = art == "Registry" ? "Registry-Werte" : art == "Dienststart" ? "Dienste" : (art == "Aufgabe" || art == "AufgabeNeu") ? "Aufgaben" : art == "App" ? "Apps" : art == "Softwarepaket" ? "Softwarepakete" : art == "Datei" ? "Dateien" : "Einträge";
+            return Eintraege.Count + " " + n;
+        }
+    }
+    // gemeinsamer Status oder "2 von 5 aktiv"
+    public string StatusText
+    {
+        get
+        {
+            string s = Eintraege[0].Status; int aktiv = 0; bool gleich = true;
+            foreach (ChangeEntry c in Eintraege) { if (c.Status != s) gleich = false; if (c.Status == "aktiv") aktiv++; }
+            return gleich ? s : aktiv + " von " + Eintraege.Count + " aktiv";
+        }
+    }
+    public bool Gemischt { get { foreach (ChangeEntry c in Eintraege) if (c.Status != Eintraege[0].Status) return true; return false; } }
+    public static string StatusStufe(string status) { string s = (status ?? "").ToLowerInvariant(); return s.EndsWith("aktiv") ? "ok" : s.Contains("fehl") ? "crit" : "skip"; }
+}
+
+// ab v4.10: ein Lauf des Änderungsprotokolls (eine Datei) mit seinen Maßnahmen
+public class ChangeLauf
+{
+    public string FilePath = "", Computer = "", Zeit = "";
+    public List<ChangeEntry> Eintraege = new List<ChangeEntry>();
+    public List<ChangeMassnahme> Massnahmen = new List<ChangeMassnahme>();
+    public bool DieserPc { get { return String.Equals(Computer, Environment.MachineName, StringComparison.OrdinalIgnoreCase); } }
+    public int Aktiv { get { int n = 0; foreach (ChangeEntry c in Eintraege) if (c.Status == "aktiv") n++; return n; } }
+    public string Module
+    {
+        get { List<string> m = new List<string>(); foreach (ChangeEntry c in Eintraege) if (c.Modul.Length > 0 && !m.Contains(c.Modul)) m.Add(c.Modul); return String.Join(", ", m.ToArray()); }
+    }
+    // "121 aktiv · 13 nur Hinweis" in der Reihenfolge aktiv, dann nach Häufigkeit
+    public string StatusText
+    {
+        get
+        {
+            Dictionary<string, int> z = new Dictionary<string, int>(); List<string> k = new List<string>();
+            foreach (ChangeEntry c in Eintraege) { if (!z.ContainsKey(c.Status)) { z[c.Status] = 0; k.Add(c.Status); } z[c.Status]++; }
+            k.Sort(delegate(string a, string b) { if (a == "aktiv") return b == "aktiv" ? 0 : -1; if (b == "aktiv") return 1; return z[b].CompareTo(z[a]); });
+            List<string> t = new List<string>(); foreach (string s in k) t.Add(z[s] + " " + s);
+            return String.Join("  \u00B7  ", t.ToArray());
+        }
+    }
+    public DateTime ZeitWert
+    {
+        get { DateTime t; return DateTime.TryParseExact(Zeit, new string[] { "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm" }, CultureInfo.InvariantCulture, DateTimeStyles.None, out t) ? t : DateTime.MinValue; }
+    }
+
+    // Läufe aus den Einträgen (neueste zuerst), Maßnahmen in der Reihenfolge des Laufs. dateien nennt auch Protokolle ohne
+    // Einträge (Pfad, Computer, Beginn): Sie erscheinen nicht in der Liste, zählen aber beim Aufräumen.
+    public static List<ChangeLauf> Gruppiere(List<ChangeEntry> eintraege, List<string[]> dateien)
+    {
+        Dictionary<string, ChangeLauf> nach = new Dictionary<string, ChangeLauf>(StringComparer.OrdinalIgnoreCase);
+        List<ChangeLauf> l = new List<ChangeLauf>();
+        if (dateien != null)
+            foreach (string[] d in dateien)
+            {
+                if (d == null || d.Length < 3 || nach.ContainsKey(d[0])) continue;
+                ChangeLauf n = new ChangeLauf(); n.FilePath = d[0]; n.Computer = d[1]; n.Zeit = d[2]; nach[d[0]] = n; l.Add(n);
+            }
+        foreach (ChangeEntry c in eintraege)
+        {
+            ChangeLauf n;
+            if (!nach.TryGetValue(c.FilePath, out n)) { n = new ChangeLauf(); n.FilePath = c.FilePath; n.Computer = c.Computer; n.Zeit = c.Lauf; nach[c.FilePath] = n; l.Add(n); }
+            n.Eintraege.Add(c);
+        }
+        foreach (ChangeLauf n in l)
+        {
+            n.Eintraege.Sort(delegate(ChangeEntry a, ChangeEntry b) { return a.Id.CompareTo(b.Id); });
+            if (n.Zeit.Length == 0 && n.Eintraege.Count > 0) n.Zeit = n.Eintraege[0].Zeit;
+            Dictionary<string, ChangeMassnahme> mk = new Dictionary<string, ChangeMassnahme>();
+            foreach (ChangeEntry c in n.Eintraege)
+            {
+                string k = c.Schritt + "\n" + c.Titel; ChangeMassnahme m;
+                if (!mk.TryGetValue(k, out m)) { m = new ChangeMassnahme(); m.Key = k; m.Titel = c.Titel; m.Risiko = c.Risiko; mk[k] = m; n.Massnahmen.Add(m); }
+                m.Eintraege.Add(c);
+            }
+        }
+        l.Sort(delegate(ChangeLauf a, ChangeLauf b) { int r = String.Compare(b.Zeit, a.Zeit, StringComparison.Ordinal); return r != 0 ? r : String.Compare(a.FilePath, b.FilePath, StringComparison.OrdinalIgnoreCase); });
+        return l;
+    }
+
+    // Aufräumen (wie Move-ChangeArchiv im Skript): erledigt = kein aktiver Eintrag und älter als tage (0 = jedes Alter);
+    // andere = alle Protokolle anderer PCs. Aktive Änderungen dieses PCs bleiben immer.
+    public static List<ChangeLauf> Aufzuraeumen(List<ChangeLauf> laeufe, bool erledigt, int tage, bool andere, DateTime jetzt)
+    {
+        List<ChangeLauf> r = new List<ChangeLauf>();
+        foreach (ChangeLauf n in laeufe)
+        {
+            bool weg = false;
+            if (andere && !n.DieserPc) weg = true;
+            if (erledigt && n.Aktiv == 0 && (tage <= 0 || (n.ZeitWert != DateTime.MinValue && (jetzt - n.ZeitWert).TotalDays > tage))) weg = true;
+            if (weg) r.Add(n);
+        }
+        return r;
     }
 }
 

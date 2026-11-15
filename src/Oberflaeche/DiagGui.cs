@@ -96,7 +96,7 @@ public partial class DiagGui : Form
     static readonly int[] smartMinutes = new int[] { 30, 60, 90, 120, 180, 240, 360 };
     // Hilfswerkzeuge (PawnIO, smartmontools per winget): je Gerät entfernen, behalten oder jedes Mal fragen (Geraete.json)
     string deviceId = "";
-    ComboBox cmbKeep;
+    internal ComboBox cmbKeep;
     // GPU-Rendertest (ab v2.6): Auflösung und Anzeige, auf den Seiten Benchmark und Lasttest gleich eingestellt
     ComboBox cmbGpuRes, cmbGpuShow, cmbLGpuRes, cmbLGpuShow;
     bool syncGpu;
@@ -164,18 +164,16 @@ public partial class DiagGui : Form
     bool liveRunning, liveStopping;
     DateTime liveStopAt;
     Button btnLive, btnSensTools, btnSensSave;
-    ComboBox cmbDriver;
+    internal ComboBox cmbDriver;
     int psuWattage = 650;
     string psuRating = "80 PLUS Bronze";
-    Label lblSensTools, lblSensInfo;
+    Label lblSensInfo;
     SensorChart chartLive, chartRun;
-    ListView lvSens;
-    Dictionary<int, ListViewItem> sensItems = new Dictionary<int, ListViewItem>();
+    internal ZeilenListe lvSens;
     Dictionary<int, double[]> sensMinMax = new Dictionary<int, double[]>();
     Dictionary<int, string> sensUnit = new Dictionary<int, string>();
     List<string> sensNames = new List<string>();
     List<string> sensRows = new List<string>();
-    Dictionary<string, ListViewGroup> sensGroups = new Dictionary<string, ListViewGroup>();
     Label lblRunSens;
     // Reparatur
     string[] repKeys = new string[] {
@@ -209,7 +207,7 @@ public partial class DiagGui : Form
     CheckBox[] repChk;
     CheckBox chkRestorePoint;
     // Datenbank
-    ListView lvDb;
+    internal ZeilenListe lvDb;
     Label lblDbPath;
     // Modulverträge und Änderungsprotokoll
     Dictionary<string, string[]> modInfo = new Dictionary<string, string[]>();   // Name -> Titel, Kurz, Admin, Risiko, Neustart
@@ -222,8 +220,9 @@ public partial class DiagGui : Form
     Dictionary<string, GroupHeader> repCatToggle = new Dictionary<string, GroupHeader>();
     string changeDir = "";
     List<ChangeEntry> changes = new List<ChangeEntry>();
-    ListView lvChg;
-    Button btnUndo;
+    internal List<ChangeLauf> changeLaeufe = new List<ChangeLauf>();
+    internal ZeilenListe lvChg;
+    internal Button btnUndo;
     // Fuß
     Label lblSel;
     LinkLabel lnkAblage;
@@ -235,7 +234,7 @@ public partial class DiagGui : Form
     Label lblDbClean;
     Button btnDbClean;
     // ab v2.7: Seite Versionen (Verweis oben rechts im Kopf, keine eigene Schaltfläche in der Modulliste)
-    int versionPage = -1;
+    internal int versionPage = -1;
 
     // Hinweise beim Überfahren mit der Maus (ab v2.7): kurze Erklärung zu jedem Bedienelement
     ToolTip tip = NewTip();
@@ -491,13 +490,14 @@ public partial class DiagGui : Form
 
     // ab v4.07: Datenbank und Änderungsprotokoll werden gleichzeitig gelesen (zwei unabhängige Ordner mit JSON-Dateien),
     // beim Start schon ab dem Beginn des Konstruktors (StartDbVorladen), während Kopfzeile und Farbschema entstehen.
-    List<DbEntry> dbVor; List<ChangeEntry> changesVor; Thread dbVorThread, changesVorThread;
+    List<DbEntry> dbVor; List<ChangeEntry> changesVor; List<string[]> changeDateienVor; Thread dbVorThread, changesVorThread;
 
     void StartDbVorladen()
     {
         string d = dbDir, c = changeDir;
         dbVorThread = new Thread(delegate() { try { dbVor = DbEntry.Load(d); } catch { dbVor = null; } });
-        changesVorThread = new Thread(delegate() { try { changesVor = ChangeEntry.Load(c); } catch { changesVor = null; } });
+        List<string[]> cd = new List<string[]>(); changeDateienVor = cd;
+        changesVorThread = new Thread(delegate() { try { changesVor = ChangeEntry.Load(c, cd); } catch { changesVor = null; } });
         dbVorThread.IsBackground = true; changesVorThread.IsBackground = true;
         dbVorThread.Start(); changesVorThread.Start();
     }
@@ -509,7 +509,8 @@ public partial class DiagGui : Form
         try { changesVorThread.Join(); } catch { }
         db = dbVor ?? new List<DbEntry>();
         changes = changesVor ?? new List<ChangeEntry>();
-        dbVor = null; changesVor = null; dbVorThread = null; changesVorThread = null;
+        changeLaeufe = ChangeLauf.Gruppiere(changes, changesVor != null ? changeDateienVor : null);
+        dbVor = null; changesVor = null; changeDateienVor = null; dbVorThread = null; changesVorThread = null;
     }
 
     internal void ReloadDb()
@@ -798,6 +799,10 @@ public partial class DiagGui : Form
         Tip(btnSensSave, "Speichert alle Werte der Live-Ansicht als CSV unter Berichte\\Sensoren.");
         Tip(cmbDriver, "PawnIO ist der Treiber, den LibreHardwareMonitor für CPU-Temperatur, CPU-Takt, CPU-Leistung und Mainboard-Lüfter braucht. Standardmäßig aktiv für alle Messungen. Ein bereits installierter PawnIO bleibt immer unverändert.");
         Tip(cmbKeep, "Was nach dem Lauf mit PawnIO und smartmontools geschieht, die Leos Minibench installiert hat: nach dem Lauf entfernen (keine Reste) oder auf diesem PC behalten. Gespeichert je Gerät in Geraete.json.");
+        Tip(rowSensTreiber, "PawnIO ist der Treiber, den LibreHardwareMonitor für CPU-Temperatur, CPU-Takt, CPU-Leistung und Mainboard-Lüfter braucht. Standardmäßig aktiv für alle Messungen. Ein bereits installierter PawnIO bleibt immer unverändert.");
+        Tip(rowSensTreiber.Toggle, "PawnIO ist der Treiber, den LibreHardwareMonitor für CPU-Temperatur, CPU-Takt, CPU-Leistung und Mainboard-Lüfter braucht. Standardmäßig aktiv für alle Messungen. Ein bereits installierter PawnIO bleibt immer unverändert.");
+        Tip(rowSensBehalten, "Was nach dem Lauf mit PawnIO und smartmontools geschieht, die Leos Minibench installiert hat: nach dem Lauf entfernen (keine Reste) oder auf diesem PC behalten. Gespeichert je Gerät in Geraete.json.");
+        Tip(rowSensBehalten.Toggle, "Was nach dem Lauf mit PawnIO und smartmontools geschieht, die Leos Minibench installiert hat: nach dem Lauf entfernen (keine Reste) oder auf diesem PC behalten. Gespeichert je Gerät in Geraete.json.");
         // Vergleichsdatenbank, Änderungen, Fuß
         Tip(btnCompare, "Vergleicht die angehakten Systeme in einem HTML-Bericht (mindestens zwei).");
         Tip(btnDbClean, "Datenpflege: verschiebt nicht mehr vergleichbare Lasttests älterer Versionen, abgebrochene Läufe ohne Bericht und kurze Läufe (Funktionstest, Lasttest nach wenigen Sekunden beendet, Lauf ohne Messwert) sowie ungenutzte Teile von smartmontools nach Minibench-Daten\\Archiv. Gelöscht werden nur ältere Übersetzungen im Cache und Reste der Live-Ansicht; das Protokoll steht in Archiv\\Datenpflege.log.");
@@ -851,6 +856,7 @@ public partial class DiagGui : Form
         content.AutoScrollPosition = new Point(0, 0);
         for (int k = 0; k < pages.Count; k++) pages[k].Visible = (k == i);
         if (i == ergebnisPage) ErgebnisSeiteGezeigt();
+        if (i == versionPage) FuelleVersionen();
         // ab v4.0: Auf Werkzeugseiten (Tools bis Versionen) nur Ablaufzeile und Startknopf, ohne Vorlagen
         if (fo != null && foot != null) { bool modulSeite = i <= 5; if (fo.Visible != modulSeite) { fo.Visible = modulSeite; foot.Height = UI.S(modulSeite ? 76 : 62); } }
         if (i == 3) UpdateLoadExtras();

@@ -1,188 +1,31 @@
 ﻿// Vergleichsdatenbank und Systemvergleich (Teilklasse DiagGui)
 public partial class DiagGui
 {
-    class DbItemComparer : System.Collections.IComparer
+    // ab v4.10: Zeile der Datenbankliste. Gruppe = Zeile eines Geräts (steht für dessen neuesten Lauf), sonst ein
+    // älterer Lauf darunter. Bis v4.09 ein natives Listenfeld mit eigenen Gruppenköpfen (DbListView).
+    public class DbZeile : ListenZeile
     {
-        int col;
-        bool asc;
-        public DbItemComparer(int column, bool ascending) { col = column; asc = ascending; }
-        public int Column { get { return col; } }
-        public bool Ascending { get { return asc; } }
-
-        public int Compare(object x, object y)
-        {
-            ListViewItem itemX = x as ListViewItem;
-            ListViewItem itemY = y as ListViewItem;
-            if (itemX == null || itemY == null) return 0;
-            DbEntry dx = itemX.Tag as DbEntry;
-            DbEntry dy = itemY.Tag as DbEntry;
-            if (dx == null || dy == null) return 0;
-
-            int res = CompareDbEntries(dx, dy, col);
-            return asc ? res : -res;
-        }
+        public DbEntry E; public string Key = "", Name = ""; public bool Gruppe; public int Anzahl = 1;
     }
 
-    class DbListView : ListView
+    internal ListenSeite dbSeite;
+    internal DetailKarte dbDetail;
+    internal HashSet<string> dbHaken = new HashSet<string>();
+    internal LinkLabel lnkDbName, lnkDbRef, lnkDbBasis, lnkDbExport, lnkDbDelete;
+    Button btnDbFolder;
+    Label lblDbHint;
+    FlowLayoutPanel dbFuss;
+
+    static string DbKey(DbEntry e) { return e.IsReference ? "REF" : (String.IsNullOrEmpty(e.GeraetKey) ? "PC:" + (e.Computer ?? "").ToUpperInvariant() : e.GeraetKey); }
+
+    // markierte Läufe (Zeilen der Liste), in der Reihenfolge der Liste
+    internal List<DbEntry> DbMarkierte()
     {
-        [StructLayout(LayoutKind.Sequential)]
-        public struct LVGROUP
-        {
-            public uint cbSize;
-            public uint mask;
-            [MarshalAs(UnmanagedType.LPWStr)] public string pszHeader;
-            public int cchHeader;
-            [MarshalAs(UnmanagedType.LPWStr)] public string pszFooter;
-            public int cchFooter;
-            public int iGroupId;
-            public uint stateMask;
-            public uint state;
-            public uint uAlign;
-            [MarshalAs(UnmanagedType.LPWStr)] public string pszSubtitle;
-            public uint cchSubtitle;
-            [MarshalAs(UnmanagedType.LPWStr)] public string pszTask;
-            public uint cchTask;
-            [MarshalAs(UnmanagedType.LPWStr)] public string pszDescriptionTop;
-            public uint cchDescriptionTop;
-            [MarshalAs(UnmanagedType.LPWStr)] public string pszDescriptionBottom;
-            public uint cchDescriptionBottom;
-            public int iTitleImage;
-            public int iExtendedImage;
-            public int iFirstItem;
-            public uint cItems;
-            [MarshalAs(UnmanagedType.LPWStr)] public string pszSubsetTitle;
-            public uint cchSubsetTitle;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct RECT { public int left, top, right, bottom; }
-
-        public const int LVM_FIRST = 0x1000;
-        public const int LVM_SETGROUPINFO = LVM_FIRST + 147;
-        public const int LVM_GETGROUPRECT = LVM_FIRST + 98;
-        public const int LVM_GETGROUPSTATE = LVM_FIRST + 92;
-        public const uint LVGF_STATE = 0x00000004;
-        public const uint LVGS_COLLAPSED = 0x00000001;
-        public const uint LVGS_COLLAPSIBLE = 0x00000008;
-        public const int LVGGR_LABEL = 2;
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto)]
-        public static extern int SendMessage(IntPtr hWnd, int msg, int wParam, ref LVGROUP lParam);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto)]
-        public static extern int SendMessage(IntPtr hWnd, int msg, int wParam, ref RECT lParam);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto)]
-        public static extern int SendMessage(IntPtr hWnd, int msg, int wParam, int lParam);
-
-        static PropertyInfo groupPropId = typeof(ListViewGroup).GetProperty("ID", BindingFlags.Instance | BindingFlags.NonPublic);
-
-        public event EventHandler GroupStateChanged;
-
-        public DbListView()
-        {
-            DoubleBuffered = true;
-        }
-
-        public static int GetGroupId(ListViewGroup g)
-        {
-            if (g == null || groupPropId == null) return -1;
-            try { return (int)groupPropId.GetValue(g, null); } catch { return -1; }
-        }
-
-        public void SetGroupState(ListViewGroup g, bool collapsible, bool collapsed)
-        {
-            if (Environment.OSVersion.Platform != PlatformID.Win32NT) return;
-            if (!IsHandleCreated) { IntPtr h = Handle; }
-            int id = GetGroupId(g);
-            if (id < 0) return;
-            try
-            {
-                LVGROUP grp = new LVGROUP();
-                grp.cbSize = (uint)Marshal.SizeOf(typeof(LVGROUP));
-                grp.mask = LVGF_STATE;
-                grp.stateMask = LVGS_COLLAPSIBLE | LVGS_COLLAPSED;
-                uint state = 0;
-                if (collapsible) state |= LVGS_COLLAPSIBLE;
-                if (collapsed) state |= LVGS_COLLAPSED;
-                grp.state = state;
-                SendMessage(Handle, LVM_SETGROUPINFO, id, ref grp);
-            }
-            catch { }
-        }
-
-        public bool IsGroupCollapsed(ListViewGroup g)
-        {
-            if (Environment.OSVersion.Platform != PlatformID.Win32NT) return false;
-            if (!IsHandleCreated) return false;
-            int id = GetGroupId(g);
-            if (id < 0) return false;
-            try
-            {
-                int state = SendMessage(Handle, LVM_GETGROUPSTATE, id, (int)LVGS_COLLAPSED);
-                return (state & (int)LVGS_COLLAPSED) != 0;
-            }
-            catch { return false; }
-        }
-
-        protected override void OnMouseUp(MouseEventArgs e)
-        {
-            base.OnMouseUp(e);
-            if (GroupStateChanged != null) GroupStateChanged(this, EventArgs.Empty);
-        }
-
-        protected override void OnKeyUp(KeyEventArgs e)
-        {
-            base.OnKeyUp(e);
-            if (GroupStateChanged != null) GroupStateChanged(this, EventArgs.Empty);
-        }
-
-        protected override void WndProc(ref Message m)
-        {
-            base.WndProc(ref m);
-            // Repaint group headers in Dark Mode with high contrast
-            if (m.Msg == 0x000F && UI.IsDark && Groups.Count > 0 && Environment.OSVersion.Platform == PlatformID.Win32NT)
-            {
-                PaintGroupHeadersDark();
-            }
-        }
-
-        void PaintGroupHeadersDark()
-        {
-            try
-            {
-                Rectangle client = ClientRectangle;
-                using (Graphics g = Graphics.FromHwnd(Handle))
-                using (SolidBrush bgBrush = new SolidBrush(BackColor))
-                using (Font f = new Font("Segoe UI Semibold", 9.25f))
-                {
-                    foreach (ListViewGroup grp in Groups)
-                    {
-                        int id = GetGroupId(grp);
-                        if (id < 0) continue;
-                        RECT rc = new RECT();
-                        rc.top = LVGGR_LABEL;
-                        if (SendMessage(Handle, LVM_GETGROUPRECT, id, ref rc) != 0)
-                        {
-                            if (rc.right > rc.left && rc.bottom > rc.top)
-                            {
-                                if (rc.bottom <= client.Top || rc.top >= client.Bottom) continue;
-                                Rectangle r = new Rectangle(rc.left - 2, rc.top, (rc.right - rc.left) + 6, (rc.bottom - rc.top) + 2);
-                                r.Intersect(client);
-                                if (r.Width > 0 && r.Height > 0)
-                                {
-                                    g.FillRectangle(bgBrush, r);
-                                    Color textCol = (grp.Name == "REF") ? UI.Text : UI.Accent;
-                                    TextRenderer.DrawText(g, grp.Header, f, r, textCol, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            catch { }
-        }
+        List<DbEntry> l = new List<DbEntry>();
+        if (lvDb != null) foreach (ListenZeile z in lvDb.Zeilen) if (lvDb.Markiert.Contains(z)) { DbZeile d = z as DbZeile; if (d != null && d.E != null) l.Add(d.E); }
+        return l;
     }
+    DbZeile DbMarkierteZeile() { if (lvDb == null) return null; List<ListenZeile> m = lvDb.Markiert; return m.Count == 1 ? m[0] as DbZeile : null; }
 
     HashSet<string> expandedGroups = new HashSet<string>();
 
@@ -255,18 +98,19 @@ public partial class DiagGui
     int dbSortCol = -1;
     bool dbSortAsc = true;
     Button btnRename;
-    Button btnCompare, btnDashboard, btnVerlauf, btnOpenReport, btnExport, btnSetRef, btnToggleGroups, btnActions;
+    internal Button btnCompare, btnDashboard, btnVerlauf, btnOpenReport, btnExport, btnSetRef, btnToggleGroups;
 
-    void OnDbColumnClick(object sender, ColumnClickEventArgs e)
+    // Spalte: 0 System, 1 Datum, 2 Punkte, 3 CPU, 4 GPU, 5 RAM, 6 CPU multi, 7 RAM lesen, 8 Grafiktest, 9 Befunde
+    internal void OnDbColumnClick(int spalte)
     {
-        if (e.Column == dbSortCol)
+        if (spalte == dbSortCol)
         {
             dbSortAsc = !dbSortAsc;
         }
         else
         {
-            dbSortCol = e.Column;
-            dbSortAsc = (e.Column == 0 || e.Column == 3 || e.Column == 4 || e.Column == 5);
+            dbSortCol = spalte;
+            dbSortAsc = (spalte == 0 || spalte == 3 || spalte == 4 || spalte == 5);
         }
         FillDbList();
     }
@@ -314,12 +158,13 @@ public partial class DiagGui
     void RenameSelectedEntry()
     {
         DbEntry target = null;
-        ListViewItem lvi = null;
-        if (lvDb != null && lvDb.SelectedItems.Count == 1) { lvi = lvDb.SelectedItems[0]; target = (DbEntry)lvi.Tag; }
-        else if (lvDb != null && lvDb.CheckedItems.Count == 1) { lvi = lvDb.CheckedItems[0]; target = (DbEntry)lvi.Tag; }
+        DbZeile lvi = DbMarkierteZeile();
+        if (lvi != null) target = lvi.E;
+        else if (CheckedEntries().Count == 1) { target = CheckedEntries()[0]; foreach (ListenZeile z in lvDb.Zeilen) { DbZeile d = z as DbZeile; if (d != null && d.E == target) { lvi = d; break; } } }
         if (target == null || target.IsReference) return;
 
-        bool isMasterGroup = lvi != null && (lvi.Text.StartsWith("\u25B6 ") || lvi.Text.StartsWith("\u25BC "));
+        // Zeile eines Geräts mit mehreren Läufen: Der Name gilt für alle Läufe des Geräts
+        bool isMasterGroup = lvi != null && lvi.Gruppe && lvi.Anzahl > 1;
         List<string> pathsToRename = new List<string>();
         string currentName = "";
 
@@ -365,226 +210,486 @@ public partial class DiagGui
 
     Control BuildDbPage()
     {
-        Panel f = new Panel(); f.Dock = DockStyle.Fill; f.BackColor = UI.Panel;
-        FlowLayoutPanel top = Page("Datenbank", "Alle gespeicherten Läufe, nach Gerät gebündelt. Zum Vergleichen Systeme anhaken und \"Im Dashboard vergleichen\" wählen. Doppelklick öffnet den Bericht, ein Klick auf einen Spaltenkopf sortiert.", -1);
-        top.Dock = DockStyle.Top;
-        top.AutoSize = true;
-        lblDbPath = Lbl(NasAblage.AblageText(dataDir), 9f, false, UI.Muted); lblDbPath.Margin = new Padding(UI.S(4), 0, UI.S(4), UI.S(4)); top.Controls.Add(lblDbPath);
+        dbSeite = new ListenSeite("Datenbank", "Alle gespeicherten Läufe, nach Gerät gebündelt. Zum Vergleichen Läufe anhaken und \"Im Dashboard vergleichen\" wählen. Doppelklick öffnet den Bericht, ein Klick auf einen Spaltenkopf sortiert.", "Im Dashboard vergleichen");
+        listenSeiten.Add(dbSeite);
+        btnDashboard = dbSeite.BandKnopf;
+        btnDashboard.Click += delegate { OpenDashboard(); };
+        btnDashboard.Enabled = false;
+        Tip(btnDashboard, "Öffnet das interaktive HTML5-Dashboard für detaillierten System- und Benchmark-Vergleich der ausgewählten Läufe.");
+        dbSeite.BandVerweis.LinkClicked += delegate { dbHaken.Clear(); FillDbList(); };
+        Tip(dbSeite.BandVerweis, "Entfernt alle Haken.");
 
-        FlowLayoutPanel topTools = Row();
-        topTools.Margin = new Padding(UI.S(4), 0, UI.S(4), UI.S(8));
+        lblDbHint = Lbl("Graue Einträge enthalten keine Benchmark-Werte.", UI.SchriftHinweis, false, UI.Muted); lblDbHint.Margin = new Padding(0, UI.S(6), 0, 0);
+        dbSeite.Links.Controls.Add(lblDbHint);
+
         Button imp = UI.Secondary("Importieren …"); imp.Margin = new Padding(0); imp.Click += delegate { ImportRuns(); };
         Tip(imp, "Importiert Durchläufe aus .minibench-Paketen, .zip-Archiven, .json-Dateien oder Ausgabeordnern früherer Läufe in die Datenbank samt Bericht.");
         btnToggleGroups = UI.Secondary("Alle aufklappen"); btnToggleGroups.Margin = new Padding(UI.S(8), 0, 0, 0); btnToggleGroups.Click += delegate { ToggleAllGroups(); };
         Tip(btnToggleGroups, "Klappt alle Gerätegruppen in der Datenbank ein oder aus.");
         Button rel = UI.Secondary("Aktualisieren"); rel.Margin = new Padding(UI.S(8), 0, 0, 0); rel.Click += delegate { RefreshAndSync(); };
         Tip(rel, "Liest Datenbank und Referenz neu ein. Ist ein Netzlaufwerk eingerichtet und erreichbar, werden Berichte, Datenbank und Änderungsprotokolle vorher in beide Richtungen abgeglichen.");
-
         btnDbClean = UI.Secondary("Aufräumen …"); btnDbClean.Margin = new Padding(UI.S(8), 0, 0, 0); btnDbClean.Click += delegate { CleanData(); }; btnDbClean.Enabled = dataDir.Length > 0;
+        dbSeite.Rechts.Controls.Add(imp); dbSeite.Rechts.Controls.Add(btnToggleGroups); dbSeite.Rechts.Controls.Add(rel); dbSeite.Rechts.Controls.Add(btnDbClean);
 
-        topTools.Controls.Add(imp);
-        topTools.Controls.Add(btnToggleGroups);
-        topTools.Controls.Add(rel);
-        topTools.Controls.Add(btnDbClean);
-        top.Controls.Add(topTools);
+        // Fuß: Ablage und Meldung der Datenpflege
+        dbFuss = new FlowLayoutPanel(); dbFuss.FlowDirection = FlowDirection.TopDown; dbFuss.WrapContents = false; dbFuss.AutoSize = true; dbFuss.AutoSizeMode = AutoSizeMode.GrowAndShrink; dbFuss.BackColor = UI.Panel;
+        lblDbPath = Lbl(NasAblage.AblageText(dataDir), UI.SchriftHinweis, false, UI.Muted); lblDbPath.Margin = new Padding(0, 0, 0, 0); dbFuss.Controls.Add(lblDbPath);
+        lblDbClean = Lbl(DatenpflegeInfo, UI.SchriftHinweis, false, UI.Muted); lblDbClean.Visible = DatenpflegeInfo.Length > 0; lblDbClean.Margin = new Padding(0, UI.S(2), 0, 0); dbFuss.Controls.Add(lblDbClean);
+        dbSeite.Seite.Resize += delegate { int w = Math.Max(UI.S(200), dbSeite.Seite.ClientSize.Width); lblDbPath.MaximumSize = new Size(w, 0); lblDbClean.MaximumSize = new Size(w, 0); };
+        dbFuss.SizeChanged += delegate { dbSeite.Ordne(); };
 
-        FlowLayoutPanel bottom = new FlowLayoutPanel(); bottom.FlowDirection = FlowDirection.TopDown; bottom.WrapContents = false; bottom.AutoSize = true; bottom.BackColor = UI.Panel; bottom.Dock = DockStyle.Bottom;
-        Label hint = Lbl("Graue Einträge enthalten keine Benchmark-Werte.", UI.SchriftHinweis, false, UI.Muted); hint.Margin = new Padding(UI.S(4), UI.S(4), UI.S(4), 0); bottom.Controls.Add(hint);
-        FlowLayoutPanel b = Row(); b.Margin = new Padding(UI.S(4), UI.S(10), 0, 0);
-
-        btnDashboard = UI.Primary("Im Dashboard vergleichen"); btnDashboard.Margin = new Padding(0); btnDashboard.Padding = new Padding(UI.S(14), UI.S(3), UI.S(14), UI.S(3)); btnDashboard.Font = new Font("Segoe UI Semibold", 9.75f);
-        btnDashboard.Click += delegate { OpenDashboard(); };
-        btnDashboard.Enabled = false;
-        Tip(btnDashboard, "Öffnet das interaktive HTML5-Dashboard für detaillierten System- und Benchmark-Vergleich der ausgewählten Läufe.");
-
-        btnOpenReport = UI.Secondary("Bericht öffnen"); btnOpenReport.Margin = new Padding(UI.S(8), 0, 0, 0);
-        btnOpenReport.Click += delegate {
-            DbEntry target = null;
-            if (lvDb != null && lvDb.SelectedItems.Count > 0) target = (DbEntry)lvDb.SelectedItems[0].Tag;
-            if (target != null) OpenEntry(target);
-        };
-        btnOpenReport.Visible = false;
-        Tip(btnOpenReport, "Öffnet den vollständigen HTML-Diagnosebericht des markierten Systems.");
-
-        btnVerlauf = UI.Secondary("Verlauf"); btnVerlauf.Margin = new Padding(UI.S(8), 0, 0, 0);
-        btnVerlauf.Click += delegate { OpenDeviceHistory(); };
-        btnVerlauf.Visible = false;
-        Tip(btnVerlauf, "Öffnet das interaktive Dashboard im Verlaufsmodus für alle Läufe des markierten Geräts.");
-
-        // ab v4.03: Seltenes im Menü Aktionen, Löschen eingeschlossen. Die Knöpfe für einen Lauf erscheinen erst,
-        // wenn einer markiert ist (UpdateDbButtons); vorher standen fünf Knöpfe dauerhaft da, meist ausgegraut.
-        ContextMenu cmActions = new ContextMenu();
-        MenuItem maFolder = new MenuItem("Berichtsordner öffnen", delegate { DbEntry s = SelectedDbEntry(); if (s != null) OpenEntryFolder(s); });
-        MenuItem maRef = new MenuItem("Als Referenz festlegen (persistent)", delegate { SetSelectedAsReference(); });
-        MenuItem maBase = new MenuItem("Als Basis im Dashboard öffnen (temporär)", delegate { OpenDashboardWithBase(); });
-        MenuItem maRename = new MenuItem("Name ändern ...", delegate { RenameSelectedEntry(); });
-        MenuItem maExport = new MenuItem("Lauf exportieren ...", delegate { ExportSelected(); });
-        MenuItem maDelete = new MenuItem("Lauf löschen ...", delegate { DeleteSelected(); });
-        cmActions.MenuItems.AddRange(new MenuItem[] { maFolder, new MenuItem("-"), maRef, maBase, new MenuItem("-"), maRename, maExport, new MenuItem("-"), maDelete });
-        cmActions.Popup += delegate {
-            int selN = lvDb != null ? lvDb.SelectedItems.Count : 0; int chkN = CheckedEntries().Count;
-            maFolder.Enabled = maRef.Enabled = maBase.Enabled = maRename.Enabled = maExport.Enabled = selN == 1;
-            maDelete.Enabled = chkN > 0 || selN == 1;
-            maDelete.Text = chkN > 1 ? String.Format("Angehakte Läufe löschen ({0}) ...", chkN) : chkN == 1 ? "Angehakten Lauf löschen ..." : "Lauf löschen ...";
-        };
-
-        btnActions = UI.Secondary("Aktionen \u25BE"); btnActions.Margin = new Padding(UI.S(8), 0, 0, 0);
-        btnActions.Click += delegate { cmActions.Show(btnActions, new Point(0, btnActions.Height)); };
-        btnActions.Visible = false;
-        Tip(btnActions, "Für den markierten Lauf: Berichtsordner öffnen, als Referenz festlegen, Name ändern, exportieren oder löschen.");
-
-        btnSetRef = UI.Secondary("Als Referenz ..."); Tip(btnSetRef, "Legt das markierte System als dauerhafte Vergleichsreferenz fest.");
-        btnRename = UI.Secondary("Name ändern ..."); Tip(btnRename, "Ändert den Anzeigenamen des markierten Systems.");
-        btnExport = UI.Secondary("Lauf exportieren ..."); Tip(btnExport, "Exportiert den markierten Lauf als eigenständiges Paket.");
-        btnCompare = UI.Secondary("Vergleichen"); Tip(btnCompare, "Systeme vergleichen.");
-
-        b.Controls.Add(btnDashboard); b.Controls.Add(btnOpenReport); b.Controls.Add(btnVerlauf); b.Controls.Add(btnActions); bottom.Controls.Add(b);
-
-        lblDbClean = Lbl(DatenpflegeInfo, UI.SchriftHinweis, false, UI.Muted); lblDbClean.Visible = DatenpflegeInfo.Length > 0;
-        lblDbClean.Margin = new Padding(UI.S(4), UI.S(8), UI.S(4), 0); bottom.Controls.Add(lblDbClean);
-        bottom.Resize += delegate { lblDbClean.MaximumSize = new Size(Math.Max(UI.S(200), bottom.ClientSize.Width - UI.S(10)), 0); };
-
-        DbListView dlv = new DbListView();
-        dlv.GroupStateChanged += delegate { UpdateToggleGroupsButton(); };
-        lvDb = dlv; lvDb.View = View.Details; lvDb.FullRowSelect = true; lvDb.CheckBoxes = true; lvDb.Dock = DockStyle.Fill; lvDb.BorderStyle = BorderStyle.FixedSingle; lvDb.HideSelection = false; lvDb.ShowItemToolTips = true;
-        EnableDarkListView(lvDb);
-        string[] cols = new string[] { "System", "Datum", "Punkte", "CPU", "GPU", "RAM", "CPU multi", "RAM lesen", "Grafiktest", "Befunde" };
-        int[] w = new int[] { UI.S(140), UI.S(95), UI.S(65), UI.S(130), UI.S(120), UI.S(125), UI.S(80), UI.S(80), UI.S(80), UI.S(70) };
-        for (int i = 0; i < cols.Length; i++) lvDb.Columns.Add(cols[i], w[i]);
-        lvDb.Resize += delegate {
-            if (lvDb.Columns.Count < 10) return;
-            int clientW = lvDb.ClientSize.Width;
-            int fixedW = lvDb.Columns[1].Width + lvDb.Columns[2].Width + lvDb.Columns[5].Width +
-                         lvDb.Columns[6].Width + lvDb.Columns[7].Width + lvDb.Columns[8].Width + lvDb.Columns[9].Width;
-            int avail = clientW - fixedW - UI.S(4);
-            if (avail > UI.S(300))
-            {
-                int wSys = (int)(avail * 0.36);
-                int wCpu = (int)(avail * 0.34);
-                int wGpu = avail - wSys - wCpu;
-                lvDb.Columns[0].Width = Math.Max(UI.S(130), wSys);
-                lvDb.Columns[3].Width = Math.Max(UI.S(110), wCpu);
-                lvDb.Columns[4].Width = Math.Max(UI.S(100), wGpu);
-            }
-        };
-        lvDb.DoubleClick += delegate {
-            if (lvDb.SelectedItems.Count == 0) return;
-            ListViewItem selIt = lvDb.SelectedItems[0];
-            Point pt = lvDb.PointToClient(Cursor.Position);
-            ListViewHitTestInfo hit = lvDb.HitTest(pt);
-            if (hit.Item != null && (hit.Item.Text.StartsWith("\u25B6 ") || hit.Item.Text.StartsWith("\u25BC ")) && pt.X <= hit.Item.Bounds.Left + UI.S(45))
-            {
-                DbEntry target = hit.Item.Tag as DbEntry;
-                if (target != null)
-                {
-                    string k = target.IsReference ? "REF" : (String.IsNullOrEmpty(target.GeraetKey) ? "PC:" + (target.Computer ?? "").ToUpperInvariant() : target.GeraetKey);
-                    ToggleGroup(k);
-                    return;
-                }
-            }
-            OpenEntry((DbEntry)selIt.Tag);
-        };
-        lvDb.MouseClick += delegate(object sender, MouseEventArgs e) {
-            if (e.Button != MouseButtons.Left) return;
-            ListViewHitTestInfo hit = lvDb.HitTest(e.Location);
-            if (hit.Item != null && hit.Location != ListViewHitTestLocations.StateImage)
-            {
-                if ((hit.Item.Text.StartsWith("\u25B6 ") || hit.Item.Text.StartsWith("\u25BC ")) && e.X <= hit.Item.Bounds.Left + UI.S(45))
-                {
-                    DbEntry target = hit.Item.Tag as DbEntry;
-                    if (target != null)
-                    {
-                        string k = target.IsReference ? "REF" : (String.IsNullOrEmpty(target.GeraetKey) ? "PC:" + (target.Computer ?? "").ToUpperInvariant() : target.GeraetKey);
-                        ToggleGroup(k);
-                    }
-                }
-            }
-        };
+        lvDb = new ZeilenListe(); lvDb.Tipp = tip; lvDb.Zeichner = ZeichneDbZeile; lvDb.Mehrfach = true; lvDb.ZeilenHoehe = UI.S(44);
+        lvDb.Leer = "Noch keine Läufe gespeichert. Ein Lauf mit Benchmark legt den ersten Eintrag an; \"Importieren …\" holt frühere Läufe.";
+        lvDb.Spalten.Add(new ListenSpalte("System", 0, false, 0)); lvDb.Spalten.Add(new ListenSpalte("Zuletzt", UI.S(104), false, 1));
+        lvDb.Spalten.Add(new ListenSpalte("Punkte", UI.S(70), true, 2)); lvDb.Spalten.Add(new ListenSpalte("CPU multi", UI.S(80), true, 6));
+        lvDb.Spalten.Add(new ListenSpalte("RAM lesen", UI.S(88), true, 7)); lvDb.Spalten.Add(new ListenSpalte("Grafik", UI.S(82), true, 8));
+        lvDb.Spalten.Add(new ListenSpalte("    Befunde", UI.S(86), false, 9));
+        lvDb.Spalten[6].Hinweis = "Befunde des Laufs: kritisch / Warnungen / Hinweise";
+        lvDb.Spalten[5].Hinweis = "Bilder je Sekunde im Rendertest, sonst der Speicherdurchsatz der Grafikeinheit";
+        lvDb.SpalteGeklickt += OnDbColumnClick;
+        lvDb.HakenGeklickt += delegate(ListenZeile z) { DbZeile d = (DbZeile)z; if (d.E == null || String.IsNullOrEmpty(d.E.Path)) return; if (!dbHaken.Remove(d.E.Path)) dbHaken.Add(d.E.Path); FillDbList(); };
+        lvDb.AufklappGeklickt += delegate(ListenZeile z) { ToggleGroup(((DbZeile)z).Key); };
+        lvDb.Geoeffnet += delegate(ListenZeile z) { DbZeile d = (DbZeile)z; if (d.E != null) OpenEntry(d.E); };
+        lvDb.MarkierungGeaendert += delegate { UpdateDbButtons(); };
         lvDb.KeyDown += delegate(object sender, KeyEventArgs e) {
-            if ((e.KeyCode == Keys.Right || e.KeyCode == Keys.Left) && lvDb.SelectedItems.Count == 1)
-            {
-                ListViewItem it = lvDb.SelectedItems[0];
-                DbEntry target = it.Tag as DbEntry;
-                if (target != null)
-                {
-                    string k = target.IsReference ? "REF" : (String.IsNullOrEmpty(target.GeraetKey) ? "PC:" + (target.Computer ?? "").ToUpperInvariant() : target.GeraetKey);
-                    if (e.KeyCode == Keys.Right && it.Text.StartsWith("\u25B6 ")) { ToggleGroup(k); e.Handled = true; }
-                    else if (e.KeyCode == Keys.Left && it.Text.StartsWith("\u25BC ")) { ToggleGroup(k); e.Handled = true; }
-                }
-            }
-            else if (e.KeyCode == Keys.F2 && lvDb.SelectedItems.Count == 1)
-            {
-                RenameSelectedEntry();
-                e.Handled = true;
-            }
-            else if (e.KeyCode == Keys.Enter && lvDb.SelectedItems.Count > 0)
-            {
-                OpenEntry((DbEntry)lvDb.SelectedItems[0].Tag);
-                e.Handled = true;
-            }
+            if (e.KeyCode == Keys.F2 && lvDb.Markiert.Count == 1) { RenameSelectedEntry(); e.Handled = true; }
         };
-        lvDb.ItemChecked += delegate { UpdateDbButtons(); };
-        lvDb.SelectedIndexChanged += delegate { UpdateDbButtons(); };
-        lvDb.ColumnClick += OnDbColumnClick;
-        Tip(lvDb, "Datenbank aller gespeicherten Systeme. Ein Klick auf die Spaltenköpfe sortiert nach Datum, Gesamtwertung, CPU oder GPU.");
+        Tip(lvDb, "Datenbank aller gespeicherten Systeme. Ein Klick auf die Spaltenköpfe sortiert nach Datum, Gesamtwertung oder Messwert; nach CPU, GPU und RAM sortiert das Kontextmenü.");
 
         ContextMenu cm = new ContextMenu();
         MenuItem miDashboard = new MenuItem("Im Dashboard vergleichen", delegate { OpenDashboard(); });
         MenuItem miHistory = new MenuItem("Geräte-Verlauf im Dashboard öffnen", delegate { OpenDeviceHistory(); });
         MenuItem miSetRef = new MenuItem("Als Referenz festlegen (persistent)", delegate { SetSelectedAsReference(); });
         MenuItem miDashboardBase = new MenuItem("Als Basis im Dashboard öffnen (temporär)", delegate { OpenDashboardWithBase(); });
-        MenuItem miSep1 = new MenuItem("-");
         MenuItem miExpandAll = new MenuItem("Alle aufklappen", delegate { SetAllGroupsCollapsed(false); });
         MenuItem miCollapseAll = new MenuItem("Alle einklappen", delegate { SetAllGroupsCollapsed(true); });
-        MenuItem miSep3 = new MenuItem("-");
+        MenuItem miSort = new MenuItem("Sortieren nach");
+        miSort.MenuItems.Add(new MenuItem("Prozessor", delegate { OnDbColumnClick(3); }));
+        miSort.MenuItems.Add(new MenuItem("Grafik", delegate { OnDbColumnClick(4); }));
+        miSort.MenuItems.Add(new MenuItem("Arbeitsspeicher", delegate { OnDbColumnClick(5); }));
+        miSort.MenuItems.Add(new MenuItem("Datum, neueste zuerst", delegate { dbSortCol = -1; dbSortAsc = true; FillDbList(); }));
         MenuItem miRename = new MenuItem("Name ändern ...", delegate { RenameSelectedEntry(); });
-        MenuItem miOpen = new MenuItem("Bericht öffnen", delegate { if (lvDb.SelectedItems.Count > 0) OpenEntry((DbEntry)lvDb.SelectedItems[0].Tag); });
+        MenuItem miOpen = new MenuItem("Bericht öffnen", delegate { DbEntry s = SelectedDbEntry(); if (s != null) OpenEntry(s); });
         MenuItem miFolder = new MenuItem("Berichtsordner öffnen", delegate { DbEntry s = SelectedDbEntry(); if (s != null) OpenEntryFolder(s); });
         MenuItem miExport = new MenuItem("Lauf exportieren ...", delegate { ExportSelected(); });
-        MenuItem miSep2 = new MenuItem("-");
         MenuItem miDelete = new MenuItem("Aus Datenbank entfernen", delegate { DeleteSelected(); });
-        cm.MenuItems.Add(miDashboard);
-        cm.MenuItems.Add(miHistory);
-        cm.MenuItems.Add(miSetRef);
-        cm.MenuItems.Add(miDashboardBase);
-        cm.MenuItems.Add(miSep1);
-        cm.MenuItems.Add(miExpandAll);
-        cm.MenuItems.Add(miCollapseAll);
-        cm.MenuItems.Add(miSep3);
-        cm.MenuItems.Add(miRename);
-        cm.MenuItems.Add(miOpen);
-        cm.MenuItems.Add(miFolder);
-        cm.MenuItems.Add(miExport);
-        cm.MenuItems.Add(miSep2);
-        cm.MenuItems.Add(miDelete);
+        cm.MenuItems.AddRange(new MenuItem[] { miDashboard, miHistory, miSetRef, miDashboardBase, new MenuItem("-"), miExpandAll, miCollapseAll, miSort, new MenuItem("-"), miRename, miOpen, miFolder, miExport, new MenuItem("-"), miDelete });
         cm.Popup += delegate {
             List<string> expandable = GetExpandableKeys();
             miExpandAll.Enabled = expandable.Count > 0 && expandedGroups.Count < expandable.Count;
             miCollapseAll.Enabled = expandable.Count > 0 && expandedGroups.Count > 0;
-            int selN = lvDb.SelectedItems.Count;
-            int chkN = CheckedEntries().Count;
+            List<DbEntry> selL = DbMarkierte(), chkL = CheckedEntries();
+            int selN = selL.Count, chkN = chkL.Count;
             miDashboard.Enabled = chkN >= 1 || selN >= 1;
             miHistory.Enabled = (GetSelectedDeviceTarget() != null);
             miSetRef.Enabled = selN == 1 || (selN == 0 && chkN == 1);
             miDashboardBase.Enabled = selN == 1 || (selN == 0 && chkN == 1);
             DbEntry selTarget = null;
-            if (selN == 1) selTarget = lvDb.SelectedItems[0].Tag as DbEntry;
-            else if (chkN == 1) selTarget = lvDb.CheckedItems[0].Tag as DbEntry;
+            if (selN == 1) selTarget = selL[0];
+            else if (chkN == 1) selTarget = chkL[0];
             miRename.Enabled = (selTarget != null && !selTarget.IsReference && (selN == 1 || (selN == 0 && chkN == 1)));
             miOpen.Enabled = selN == 1; miFolder.Enabled = selN == 1;
             miExport.Enabled = selN == 1 || (selN == 0 && chkN == 1);
             miDelete.Enabled = chkN >= 1 || selN >= 1;
+            miDelete.Text = chkN > 1 ? String.Format("Angehakte Läufe entfernen ({0})", chkN) : "Aus Datenbank entfernen";
         };
         lvDb.ContextMenu = cm;
 
-        f.Controls.Add(lvDb);
-        f.Controls.Add(bottom);
-        f.Controls.Add(top);
-        top.SendToBack();
-        bottom.SendToBack();
+        // Detailbereich rechts: der markierte Lauf mit den Aktionen, die bis v4.09 im Menü "Aktionen" standen
+        dbDetail = new DetailKarte(); dbDetail.Zeichne = ZeichneDbDetail; dbDetail.AutoScroll = true; dbDetail.Padding = new Padding(0);
+        dbDetail.Scroll += delegate { dbDetail.Invalidate(); }; dbDetail.MouseWheel += delegate { dbDetail.Invalidate(); };
+        dbSeite.SeitenteilBreite = 320;
+        lnkDbName = KartenVerweis("Name ändern"); lnkDbName.Margin = new Padding(0); lnkDbName.LinkClicked += delegate { RenameSelectedEntry(); };
+        Tip(lnkDbName, "Ändert den Anzeigenamen des markierten Systems (F2). In der Zeile eines Geräts gilt der Name für alle seine Läufe.");
+        btnOpenReport = UI.Secondary("Bericht öffnen"); btnOpenReport.Margin = new Padding(0);
+        btnOpenReport.Click += delegate { DbEntry s = SelectedDbEntry(); if (s != null) OpenEntry(s); };
+        Tip(btnOpenReport, "Öffnet den vollständigen HTML-Diagnosebericht des markierten Systems.");
+        btnVerlauf = UI.Secondary("Verlauf"); btnVerlauf.Margin = new Padding(0);
+        btnVerlauf.Click += delegate { OpenDeviceHistory(); };
+        Tip(btnVerlauf, "Öffnet das interaktive Dashboard im Verlaufsmodus für alle Läufe des markierten Geräts.");
+        btnDbFolder = UI.Secondary("Ordner"); btnDbFolder.Margin = new Padding(0);
+        btnDbFolder.Click += delegate { DbEntry s = SelectedDbEntry(); if (s != null) OpenEntryFolder(s); };
+        Tip(btnDbFolder, "Öffnet den Berichtsordner des markierten Laufs im Explorer.");
+        lnkDbRef = KartenVerweis("Als Referenz festlegen (persistent)"); lnkDbRef.LinkClicked += delegate { SetSelectedAsReference(); };
+        Tip(lnkDbRef, "Legt das markierte System als dauerhafte Vergleichsreferenz (100 %) fest.");
+        lnkDbBasis = KartenVerweis("Als Basis im Dashboard öffnen (temporär)"); lnkDbBasis.LinkClicked += delegate { OpenDashboardWithBase(); };
+        Tip(lnkDbBasis, "Öffnet das Dashboard mit dem markierten Lauf als Vergleichsbasis, zusammen mit den angehakten Läufen. Die gespeicherte Referenz bleibt unverändert.");
+        lnkDbExport = KartenVerweis("Lauf exportieren …"); lnkDbExport.LinkClicked += delegate { ExportSelected(); };
+        Tip(lnkDbExport, "Exportiert den markierten Lauf als eigenständiges Paket.");
+        lnkDbDelete = KartenVerweis("Lauf entfernen …"); lnkDbDelete.LinkClicked += delegate { DeleteSelected(); };
+        Tip(lnkDbDelete, "Verschiebt den markierten Lauf oder die angehakten Läufe samt Berichtsordner ins Archiv des Datenordners (mit Rückfrage).");
+        foreach (LinkLabel l in new LinkLabel[] { lnkDbRef, lnkDbBasis, lnkDbExport, lnkDbDelete }) l.Margin = new Padding(0);
+        foreach (Button b in new Button[] { btnOpenReport, btnVerlauf, btnDbFolder }) b.Padding = new Padding(UI.S(6), UI.S(3), UI.S(6), UI.S(3));
+        foreach (Control c in new Control[] { lnkDbName, btnOpenReport, btnVerlauf, btnDbFolder, lnkDbRef, lnkDbBasis, lnkDbExport, lnkDbDelete }) dbDetail.Controls.Add(c);
+        dbDetail.Resize += delegate { OrdneDbDetail(); };
 
+        // unbenutzte Knöpfe früherer Versionen bleiben als Felder für die Hinweise bestehen
+        btnSetRef = UI.Secondary("Als Referenz ..."); Tip(btnSetRef, "Legt das markierte System als dauerhafte Vergleichsreferenz fest.");
+        btnRename = UI.Secondary("Name ändern ..."); Tip(btnRename, "Ändert den Anzeigenamen des markierten Systems.");
+        btnExport = UI.Secondary("Lauf exportieren ..."); Tip(btnExport, "Exportiert den markierten Lauf als eigenständiges Paket.");
+        btnCompare = UI.Secondary("Vergleichen");
+
+        dbSeite.Fuege(lvDb, dbDetail, dbFuss);
         FillDbList();
-        return f;
+        return dbSeite.Seite;
+    }
+
+    // Befunde "0 / 2 / 5" farbig: kritisch rot und Warnungen gelb, sobald es welche gibt
+    static void ZeichneBefunde(Graphics g, string befunde, Rectangle r, bool blass)
+    {
+        string[] t = (befunde ?? "").Split('/');
+        int k, w, h;
+        if (t.Length != 3 || !int.TryParse(t[0].Trim(), out k) || !int.TryParse(t[1].Trim(), out w) || !int.TryParse(t[2].Trim(), out h)) { ZeilenListe.Schreibe(g, befunde, ZeilenListe.FKlein, r, UI.Muted, false); return; }
+        int x = r.X;
+        string[] teile = new string[] { k.ToString(), "/", w.ToString(), "/", h.ToString() };
+        Color[] farbe = new Color[] { k > 0 && !blass ? UI.Crit : UI.Muted, UI.Muted, w > 0 && !blass ? UI.Warn : UI.Muted, UI.Muted, UI.Muted };
+        for (int i = 0; i < teile.Length; i++)
+        {
+            Font f = (i == 0 && k > 0) || (i == 2 && w > 0) ? ZeilenListe.FKopf : ZeilenListe.FKlein;
+            int tw = TextRenderer.MeasureText(g, teile[i], f, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix).Width;
+            TextRenderer.DrawText(g, teile[i], f, new Rectangle(x, r.Y, tw + UI.S(2), r.Height), farbe[i], TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
+            x += tw + UI.S(4);
+        }
+    }
+
+    static string DbHardware(DbEntry e)
+    {
+        List<string> t = new List<string>();
+        string c = DbEntry.CleanCpuName(e.Cpu); if (c.Length > 0) t.Add(c);
+        if (e.Gpu.Length > 0) t.Add(e.Gpu);
+        if (e.Ram.Length > 0) t.Add(e.Ram);
+        return String.Join("  ·  ", t.ToArray());
+    }
+
+    static string DbGrafikWert(DbEntry e) { return e.Get("GPU|REND") > 0 ? Num(e.Get("GPU|REND"), "N0") + " FPS" : (e.Get("GPU|VMB") > 0 ? Num(e.Get("GPU|VMB"), "N0") + " GB/s" : ""); }
+
+    void ZeichneDbZeile(Graphics g, ListenZeile zeile, Rectangle r, bool markiert)
+    {
+        DbZeile z = (DbZeile)zeile; DbEntry e = z.E; if (e == null) return;
+        Rectangle voll = new Rectangle(0, r.Y, r.Right, r.Height);
+        Color c = z.Blass ? UI.Muted : UI.Text;
+        Rectangle c0 = lvDb.Zelle(0, voll);
+        int grenze = c0.Right - UI.S(8);
+        if (z.Gruppe)
+        {
+            int halb = r.Height / 2;
+            string et = e.IsReference ? (z.Anzahl > 1 ? z.Anzahl + " Referenzen" : "Referenz") : (z.Anzahl > 1 ? z.Anzahl + " Läufe" : "");
+            int ew = ZeilenListe.EtikettBreite(et);
+            int nw = Math.Min(ZeilenListe.Breite(z.Name, ZeilenListe.FFett), Math.Max(UI.S(40), grenze - r.X - (ew > 0 ? ew + UI.S(8) : 0)));
+            Rectangle oben = new Rectangle(r.X, r.Y + UI.S(4), nw, halb - UI.S(2));
+            ZeilenListe.Schreibe(g, z.Name, ZeilenListe.FFett, oben, c, false);
+            if (ew > 0) ZeilenListe.Etikett(g, et, e.IsReference ? "akzent" : "skip", r.X + nw + UI.S(8), oben, 0);
+            ZeilenListe.Schreibe(g, DbHardware(e), ZeilenListe.FKlein, new Rectangle(r.X, r.Y + halb, grenze - r.X, halb - UI.S(4)), UI.Muted, false);
+        }
+        else ZeilenListe.Schreibe(g, z.Name, ZeilenListe.FText, new Rectangle(r.X, r.Y, grenze - r.X, r.Height), c, false);
+        Color wc = z.Gruppe ? c : UI.Muted;
+        ZeilenListe.Schreibe(g, ShortDate(e.Datum), ZeilenListe.FKlein, lvDb.Zelle(1, voll), wc, false);
+        ZeilenListe.Schreibe(g, e.OverallScore > 0 ? Num(e.OverallScore, "N0") : "", z.Gruppe ? ZeilenListe.FFett : ZeilenListe.FText, lvDb.Zelle(2, voll), c, true);
+        ZeilenListe.Schreibe(g, Num(e.Get("CPU|MT"), "N0"), ZeilenListe.FKlein, lvDb.Zelle(3, voll), wc, true);
+        ZeilenListe.Schreibe(g, Num(e.Get("RAM|Lesen"), "N1") + (e.Get("RAM|Lesen") > 0 ? " GB/s" : ""), ZeilenListe.FKlein, lvDb.Zelle(4, voll), wc, true);
+        ZeilenListe.Schreibe(g, DbGrafikWert(e), ZeilenListe.FKlein, lvDb.Zelle(5, voll), wc, true);
+        Rectangle cb = lvDb.Zelle(6, voll);
+        ZeichneBefunde(g, e.Befunde, new Rectangle(cb.X + UI.S(14), cb.Y, cb.Width - UI.S(14), cb.Height), z.Blass);
+    }
+
+    // Sichtbarkeit der Aktionen als eigener Zustand: Control.Visible ist falsch, solange die Seite im Hintergrund steht
+    // (Neuladen nach einem Lauf), und der Detailbereich ordnete sich dann ohne seine Knöpfe
+    internal Dictionary<Control, bool> dbSoll = new Dictionary<Control, bool>();
+    void DbZeige(Control c, bool an) { dbSoll[c] = an; if (c.Visible != an) c.Visible = an; }
+    internal bool DbSoll(Control c) { bool an; return dbSoll.TryGetValue(c, out an) && an; }
+
+    DbZeile NeueDbZeile(DbEntry e, string name, string key, bool gruppe, int anzahl)
+    {
+        DbZeile z = new DbZeile(); z.E = e; z.Tag = e; z.Name = name; z.Key = key; z.Gruppe = gruppe; z.Anzahl = anzahl; z.Art = gruppe ? "geraet" : "lauf";
+        z.Haken = dbHaken.Contains(e.Path) ? 1 : 0;
+        bool hasBench = e.HasBench || e.OverallScore > 0;
+        z.Blass = !hasBench;
+        z.Hinweis = WrapTip(e.DisplayName + (e.Disk.Length > 0 ? "\r\n" + e.Disk : "") + (hasBench ? "" : "\r\n(ohne Benchmark-Werte)"));
+        if (gruppe) { z.Hoehe = UI.S(44); z.Aufklappbar = anzahl > 1; z.Offen = expandedGroups.Contains(key); }
+        else { z.Hoehe = UI.S(28); z.Ebene = 1; z.Grund = 2; }
+        return z;
+    }
+
+    internal void FillDbList()
+    {
+        if (lvDb == null) return;
+
+        // Markierung über den Neuaufbau halten (Pfad und Art der Zeile)
+        List<string> selKeys = new List<string>();
+        foreach (ListenZeile z in lvDb.Markiert) { DbZeile d = z as DbZeile; if (d != null && d.E != null) selKeys.Add((d.Gruppe ? "G|" : "L|") + d.E.Path); }
+
+        Dictionary<string, List<DbEntry>> grpMap = new Dictionary<string, List<DbEntry>>();
+        List<string> orderedKeys = new List<string>();
+
+        foreach (DbEntry e in db)
+        {
+            string k = DbKey(e);
+            if (!grpMap.ContainsKey(k))
+            {
+                grpMap[k] = new List<DbEntry>();
+                if (k != "REF") orderedKeys.Add(k);
+            }
+            grpMap[k].Add(e);
+        }
+
+        foreach (KeyValuePair<string, List<DbEntry>> kv in grpMap)
+        {
+            kv.Value.Sort(delegate(DbEntry a, DbEntry b) {
+                return String.Compare(b.Datum, a.Datum, StringComparison.Ordinal);
+            });
+        }
+
+        orderedKeys.Sort(delegate(string k1, string k2) {
+            DbEntry e1 = grpMap[k1].Count > 0 ? grpMap[k1][0] : null;
+            DbEntry e2 = grpMap[k2].Count > 0 ? grpMap[k2][0] : null;
+            if (e1 == null && e2 == null) return 0;
+            if (e1 == null) return 1;
+            if (e2 == null) return -1;
+            int r = CompareDbEntries(e1, e2, dbSortCol >= 0 ? dbSortCol : 1);
+            if (dbSortCol < 0) return -r;
+            return dbSortAsc ? r : -r;
+        });
+
+        // ab v4.10 steht die Referenz oben (bis v4.09 am Ende der Liste)
+        if (grpMap.ContainsKey("REF")) orderedKeys.Insert(0, "REF");
+
+        lvDb.Zeilen.Clear();
+        int geraete = 0;
+        foreach (string k in orderedKeys)
+        {
+            List<DbEntry> entries = grpMap[k];
+            if (entries.Count == 0) continue;
+
+            if (k == "REF")
+            {
+                DbEntry refRep = null;
+                foreach (DbEntry re in entries)
+                {
+                    if (re.DisplayName.IndexOf("Median", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        refRep = re;
+                        break;
+                    }
+                }
+                if (refRep == null) refRep = entries[0];
+
+                if (entries.Count == 1) lvDb.Zeilen.Add(NeueDbZeile(entries[0], entries[0].DisplayName, k, true, 1));
+                else
+                {
+                    DbZeile kopf = NeueDbZeile(refRep, "Referenz-Systeme", k, true, entries.Count);
+                    lvDb.Zeilen.Add(kopf);
+                    if (kopf.Offen) foreach (DbEntry e in entries) lvDb.Zeilen.Add(NeueDbZeile(e, e.DisplayName, k, false, 1));
+                }
+            }
+            else
+            {
+                geraete++;
+                DbEntry newest = entries[0];
+                string devName = "";
+                foreach (DbEntry e in entries)
+                {
+                    if (!String.IsNullOrEmpty(e.Name))
+                    {
+                        devName = e.Name;
+                        break;
+                    }
+                }
+                if (String.IsNullOrEmpty(devName))
+                {
+                    devName = !String.IsNullOrEmpty(newest.DisplayName) ? newest.DisplayName : (!String.IsNullOrEmpty(newest.Computer) ? newest.Computer : "System");
+                }
+
+                DbZeile kopf = NeueDbZeile(newest, devName, k, true, entries.Count);
+                lvDb.Zeilen.Add(kopf);
+                // wie bisher steht die Zeile des Geräts für den neuesten Lauf, darunter folgen die älteren
+                if (kopf.Offen) for (int i = 1; i < entries.Count; i++) lvDb.Zeilen.Add(NeueDbZeile(entries[i], entries[i].DisplayName, k, false, 1));
+            }
+        }
+
+        // Haken gelten nur für sichtbare Zeilen (wie bisher): Beim Zuklappen eines Geräts entfallen die seiner älteren Läufe
+        HashSet<string> sichtbar = new HashSet<string>();
+        foreach (ListenZeile z in lvDb.Zeilen) sichtbar.Add(((DbZeile)z).E.Path);
+        dbHaken.IntersectWith(sichtbar);
+        lvDb.SortSpalte = dbSortCol < 0 ? 1 : dbSortCol; lvDb.SortAuf = dbSortCol < 0 ? false : dbSortAsc;
+        lvDb.Aktualisiere();
+        List<ListenZeile> wieder = new List<ListenZeile>();
+        foreach (ListenZeile z in lvDb.Zeilen) { DbZeile d = (DbZeile)z; if (selKeys.Contains((d.Gruppe ? "G|" : "L|") + d.E.Path)) wieder.Add(z); }
+        lvDb.MarkiereMehrere(wieder);
+
+        int laeufe = 0; foreach (DbEntry e in db) if (!e.IsReference) laeufe++;
+        SetText(dbSeite.Anzahl, Mehrzahl(geraete, "Gerät", "Geräte") + "  ·  " + Mehrzahl(laeufe, "Lauf", "Läufe"));
+        SetText(dbSeite.Unter, AblageKurz(dataDir));
+        UpdateToggleGroupsButton();
+        if (navDb != null) { navDb.Desc = db.Count + " Systeme, vergleichen und verwalten"; navDb.Invalidate(); }
+        UpdateDbButtons();
+    }
+
+    List<DbEntry> CheckedEntries()
+    {
+        List<DbEntry> l = new List<DbEntry>();
+        if (lvDb == null) return l;
+        // in der Reihenfolge der Liste; eine Zeile je Lauf
+        foreach (ListenZeile z in lvDb.Zeilen) { DbZeile d = z as DbZeile; if (d != null && d.E != null && dbHaken.Contains(d.E.Path) && !l.Contains(d.E)) l.Add(d.E); }
+        return l;
+    }
+
+    internal void UpdateDbButtons()
+    {
+        if (btnDashboard == null || dbSeite == null) return;
+        List<DbEntry> chk = CheckedEntries();
+        int chkN = chk.Count;
+        int selN = DbMarkierte().Count;
+
+        btnDashboard.Enabled = (chkN >= 1);
+        btnDashboard.Text = (chkN >= 1 ? String.Format("Im Dashboard vergleichen ({0})", chkN) : "Im Dashboard vergleichen");
+        List<string> namen = new List<string>(); foreach (DbEntry e in chk) if (!namen.Contains(e.DisplayName)) namen.Add(e.DisplayName);
+        SetText(dbSeite.BandText, chkN == 1 ? "1 Lauf angehakt" : chkN + " Läufe angehakt");
+        SetText(dbSeite.BandUnter, String.Join(", ", namen.ToArray()));
+        dbSeite.BandSichtbar = chkN >= 1;
+
+        // Aktionen des Detailbereichs: für genau einen markierten Lauf; Entfernen auch für angehakte Läufe
+        DbEntry sel = SelectedDbEntry();
+        foreach (Control c in new Control[] { btnOpenReport, btnDbFolder, lnkDbRef, lnkDbBasis, lnkDbExport }) DbZeige(c, selN == 1);
+        DbZeige(btnVerlauf, selN == 1 && GetSelectedDeviceTarget() != null);
+        DbZeige(lnkDbName, selN == 1 && sel != null && !sel.IsReference);
+        DbZeige(lnkDbDelete, selN == 1 || chkN > 0);
+        SetText(lnkDbDelete, chkN > 1 ? "Angehakte Läufe entfernen (" + chkN + ") …" : chkN == 1 ? "Angehakten Lauf entfernen …" : "Lauf entfernen …");
+        OrdneDbDetail();
+    }
+
+    internal DbEntry SelectedDbEntry() { List<DbEntry> m = DbMarkierte(); return m.Count == 1 ? m[0] : null; }
+
+    // ------------------------------------------------------------ Detailbereich
+    static readonly string[] dbGruppen = new string[] { "CPU", "GPU", "RAM", "Laufwerke" };
+
+    static string DbBefundText(DbEntry e)
+    {
+        if (e.NK >= 0 && e.NW >= 0 && e.NI >= 0) return e.NK + " kritisch  ·  " + Mehrzahl(e.NW, "Warnung", "Warnungen") + "  ·  " + Mehrzahl(e.NI, "Hinweis", "Hinweise");
+        string[] t = (e.Befunde ?? "").Split('/'); int k, w, h;
+        if (t.Length == 3 && int.TryParse(t[0].Trim(), out k) && int.TryParse(t[1].Trim(), out w) && int.TryParse(t[2].Trim(), out h)) return k + " kritisch  ·  " + Mehrzahl(w, "Warnung", "Warnungen") + "  ·  " + Mehrzahl(h, "Hinweis", "Hinweise");
+        return e.Befunde.Length > 0 ? e.Befunde : "nicht gespeichert";
+    }
+
+    // Zeichnet den Inhalt des Detailbereichs ab der Höhe oben (Bildlauf) und liefert die untere Kante; g == null misst nur
+    int DbDetailInhalt(Graphics g, int oben)
+    {
+        int x = UI.S(16), w = Math.Max(UI.S(120), dbDetail.ClientSize.Width - UI.S(32)), y = oben + UI.S(14);
+        List<DbEntry> m = DbMarkierte();
+        TextFormatFlags um = TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding;
+        if (m.Count != 1)
+        {
+            string t = m.Count == 0 ? "Einen Lauf markieren, um Einzelheiten und Aktionen zu sehen." : m.Count + " Läufe markiert. Zum Vergleichen anhaken oder das Kontextmenü nutzen.";
+            int th = TextRenderer.MeasureText(t, ZeilenListe.FText, new Size(w, int.MaxValue), um).Height;
+            if (g != null) TextRenderer.DrawText(g, t, ZeilenListe.FText, new Rectangle(x, y, w, th), UI.Muted, um);
+            return y + th + UI.S(12);
+        }
+        DbEntry e = m[0]; DbZeile z = DbMarkierteZeile();
+        using (Font fn = new Font("Segoe UI Semibold", 11.5f)) using (Font fp = new Font("Segoe UI", 18f, FontStyle.Bold))
+        {
+            string name = z != null && z.Gruppe ? z.Name : e.DisplayName;
+            int nh = fn.Height + UI.S(2);
+            if (g != null) ZeilenListe.Schreibe(g, name, fn, new Rectangle(x - UI.S(2), y, w - (DbSoll(lnkDbName) ? lnkDbName.PreferredSize.Width + UI.S(8) : 0), nh), UI.Text, false);
+            y += nh + UI.S(2);
+            string zeile = FormatRunDate(e.Datum) + (z != null && z.Gruppe && z.Anzahl > 1 && !e.IsReference ? "  ·  neuester von " + z.Anzahl + " Läufen" : "") + (e.Module.Length > 0 ? "\r\n" + e.Module : "");
+            Size zs = TextRenderer.MeasureText(zeile, ZeilenListe.FKlein, new Size(w, int.MaxValue), um);
+            int zh = Math.Min(zs.Height, ZeilenListe.FKlein.Height * 4 + UI.S(2));
+            if (g != null) TextRenderer.DrawText(g, zeile, ZeilenListe.FKlein, new Rectangle(x, y, w, zh), UI.Muted, um);
+            y += zh + UI.S(10);
+            if (e.OverallScore > 0)
+            {
+                string p = Num(e.OverallScore, "N0"); int ph = fp.Height;
+                if (g != null)
+                {
+                    int pw = TextRenderer.MeasureText(g, p, fp, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding).Width;
+                    TextRenderer.DrawText(g, p, fp, new Rectangle(x - UI.S(3), y, w, ph), UI.Accent, TextFormatFlags.Left | TextFormatFlags.NoPrefix);
+                    TextRenderer.DrawText(g, "Punkte", ZeilenListe.FKlein, new Rectangle(x + pw + UI.S(8), y + ph - ZeilenListe.FKlein.Height - UI.S(5), UI.S(80), ZeilenListe.FKlein.Height + 2), UI.Muted, TextFormatFlags.Left);
+                }
+                y += ph + UI.S(4);
+            }
+            else
+            {
+                if (g != null) TextRenderer.DrawText(g, "ohne Benchmark-Werte", ZeilenListe.FText, new Rectangle(x, y, w, UI.S(20)), UI.Muted, TextFormatFlags.Left);
+                y += UI.S(24);
+            }
+            // Vergleich mit der Referenz, wie ihn der Lauf gespeichert hat (ab v4.08)
+            if (e.HatVergleich && e.GruppenPct.Count > 0)
+            {
+                if (g != null) ZeilenListe.Schreibe(g, "gegen " + (e.RefName.Length > 0 ? e.RefName : "die Referenz des Laufs"), ZeilenListe.FKlein, new Rectangle(x, y, w, UI.S(18)), UI.Muted, false);
+                y += UI.S(20);
+                List<string> keys = new List<string>(); foreach (string k in dbGruppen) if (e.GruppenPct.ContainsKey(k)) keys.Add(k);
+                foreach (string k in e.GruppenPct.Keys) if (!keys.Contains(k)) keys.Add(k);
+                foreach (string k in keys)
+                {
+                    if (g != null)
+                    {
+                        double pct = e.GruppenPct[k]; int lw = UI.S(104), vw = UI.S(48), bh = UI.S(6);
+                        ZeilenListe.Schreibe(g, GroupName(k), ZeilenListe.FKlein, new Rectangle(x, y, lw, UI.S(20)), UI.Text, false);
+                        ZeilenListe.Schreibe(g, pct.ToString("0", CultureInfo.GetCultureInfo("de-DE")) + " %", ZeilenListe.FKlein, new Rectangle(x + w - vw, y, vw, UI.S(20)), UI.Text, true);
+                        Rectangle bar = new Rectangle(x + lw, y + (UI.S(20) - bh) / 2, Math.Max(UI.S(20), w - lw - vw - UI.S(6)), bh);
+                        // Balken bis 200 %, Marke bei 100 %
+                        using (SolidBrush bb = new SolidBrush(UI.Mix(UI.Panel, UI.Muted, 0.28))) g.FillRectangle(bb, bar);
+                        using (SolidBrush bf = new SolidBrush(pct >= 95 ? UI.Ok : pct >= 70 ? UI.Warn : UI.Crit)) g.FillRectangle(bf, bar.X, bar.Y, (int)(bar.Width * Math.Min(200.0, Math.Max(0.0, pct)) / 200.0), bar.Height);
+                        using (SolidBrush bm = new SolidBrush(UI.Text)) g.FillRectangle(bm, bar.X + bar.Width / 2, bar.Y - UI.S(2), Math.Max(1, UI.S(1)), bar.Height + UI.S(4));
+                    }
+                    y += UI.S(22);
+                }
+            }
+            else if (e.OverallScore > 0 && !e.IsReference)
+            {
+                string t = "Vergleich mit der Referenz: nicht gespeichert (Lauf vor Version 4.08 oder Import). Der Bericht nennt ihn.";
+                int th = TextRenderer.MeasureText(t, ZeilenListe.FKlein, new Size(w, int.MaxValue), um).Height;
+                if (g != null) TextRenderer.DrawText(g, t, ZeilenListe.FKlein, new Rectangle(x, y, w, th), UI.Muted, um);
+                y += th + UI.S(2);
+            }
+            y += UI.S(6);
+            if (g != null) using (Pen pl = new Pen(UI.Line)) g.DrawLine(pl, x, y, x + w, y);
+            y += UI.S(8);
+            string[] kn = new string[] { "Prozessor", "Grafik", "Speicher", "Laufwerke", "Befunde" };
+            string[] kw = new string[] { e.CpuDisplay, e.Gpu, e.Ram, e.Disk, e.IsReference ? "" : DbBefundText(e) };
+            int kl = UI.S(74);
+            for (int i = 0; i < kn.Length; i++)
+            {
+                if (kw[i].Length == 0) continue;
+                Size ws = TextRenderer.MeasureText(kw[i], ZeilenListe.FKlein, new Size(w - kl, int.MaxValue), um);
+                int wh = Math.Min(Math.Max(ws.Height, ZeilenListe.FKlein.Height), ZeilenListe.FKlein.Height * 3 + UI.S(2));
+                if (g != null)
+                {
+                    TextRenderer.DrawText(g, kn[i], ZeilenListe.FKlein, new Rectangle(x, y, kl, wh), UI.Muted, TextFormatFlags.Left | TextFormatFlags.NoPrefix);
+                    TextRenderer.DrawText(g, kw[i], ZeilenListe.FKlein, new Rectangle(x + kl, y, w - kl, wh), UI.Text, um);
+                }
+                y += wh + UI.S(4);
+            }
+        }
+        return y + UI.S(8);
+    }
+
+    void ZeichneDbDetail(Graphics g) { DbDetailInhalt(g, dbDetail.AutoScrollPosition.Y); }
+
+    // Knöpfe und Verweise unter dem gezeichneten Inhalt
+    internal void OrdneDbDetail()
+    {
+        if (dbDetail == null || lnkDbName == null) return;
+        // Lagen im Bildlauf: Kindelemente stehen um die Bildlaufposition versetzt
+        int ab = dbDetail.AutoScrollPosition.Y;
+        int x = UI.S(16), y = DbDetailInhalt(null, ab), w = Math.Max(UI.S(120), dbDetail.ClientSize.Width - UI.S(32));
+        lnkDbName.Location = new Point(dbDetail.ClientSize.Width - UI.S(16) - lnkDbName.PreferredSize.Width, ab + UI.S(18));
+        int bx = x, zeile = 0;
+        foreach (Button b in new Button[] { btnOpenReport, btnVerlauf, btnDbFolder })
+        {
+            if (!DbSoll(b)) continue;
+            Size s = b.GetPreferredSize(Size.Empty);
+            if (bx > x && bx + s.Width > x + w) { bx = x; y += zeile + UI.S(6); zeile = 0; }
+            b.Location = new Point(bx, y); bx += s.Width + UI.S(8); zeile = Math.Max(zeile, s.Height);
+        }
+        if (zeile > 0) y += zeile + UI.S(12);
+        foreach (LinkLabel l in new LinkLabel[] { lnkDbRef, lnkDbBasis, lnkDbExport, lnkDbDelete })
+        {
+            if (!DbSoll(l)) continue;
+            l.Location = new Point(x - UI.S(2), y); y += l.PreferredSize.Height + UI.S(6);
+        }
+        Size min = new Size(0, y - ab + UI.S(8));
+        if (dbDetail.AutoScrollMinSize != min) dbDetail.AutoScrollMinSize = min;
+        dbDetail.Invalidate();
     }
 
     static string ShortDate(string d)
@@ -662,210 +767,6 @@ public partial class DiagGui
         return res;
     }
 
-    ListViewItem CreateDbItem(DbEntry e, string systemText)
-    {
-        string gesamt = e.OverallScore > 0 ? Num(e.OverallScore, "N0") : "";
-        string gpu = e.Get("GPU|REND") > 0 ? Num(e.Get("GPU|REND"), "N0") + " FPS" : (e.Get("GPU|VMB") > 0 ? Num(e.Get("GPU|VMB"), "N0") + " GB/s" : "");
-        ListViewItem it = new ListViewItem(new string[] {
-            systemText,
-            ShortDate(e.Datum),
-            gesamt,
-            e.Cpu,
-            e.Gpu,
-            e.Ram,
-            Num(e.Get("CPU|MT"), "N0"),
-            Num(e.Get("RAM|Lesen"), "N1") + (e.Get("RAM|Lesen") > 0 ? " GB/s" : ""),
-            gpu,
-            e.Befunde
-        });
-        it.Tag = e;
-        bool hasBench = e.HasBench || e.OverallScore > 0;
-        it.ToolTipText = e.DisplayName + (e.Disk.Length > 0 ? "\r\n" + e.Disk : "") + (hasBench ? "" : "\r\n(ohne Benchmark-Werte)");
-        if (!hasBench) it.ForeColor = UI.Muted;
-        return it;
-    }
-
-    void FillDbList()
-    {
-        if (lvDb == null) return;
-
-        HashSet<string> checkedPaths = new HashSet<string>();
-        foreach (ListViewItem it in lvDb.CheckedItems)
-        {
-            DbEntry e = it.Tag as DbEntry;
-            if (e != null && !String.IsNullOrEmpty(e.Path)) checkedPaths.Add(e.Path);
-        }
-        string selectedPath = null;
-        if (lvDb.SelectedItems.Count > 0)
-        {
-            DbEntry sel = lvDb.SelectedItems[0].Tag as DbEntry;
-            if (sel != null && !String.IsNullOrEmpty(sel.Path)) selectedPath = sel.Path;
-        }
-
-        lvDb.BeginUpdate();
-        lvDb.ListViewItemSorter = null;
-        lvDb.Items.Clear();
-        lvDb.Groups.Clear();
-        lvDb.ShowGroups = false;
-
-        Dictionary<string, List<DbEntry>> grpMap = new Dictionary<string, List<DbEntry>>();
-        List<string> orderedKeys = new List<string>();
-
-        foreach (DbEntry e in db)
-        {
-            string k = e.IsReference ? "REF" : (String.IsNullOrEmpty(e.GeraetKey) ? "PC:" + (e.Computer ?? "").ToUpperInvariant() : e.GeraetKey);
-            if (!grpMap.ContainsKey(k))
-            {
-                grpMap[k] = new List<DbEntry>();
-                if (k != "REF") orderedKeys.Add(k);
-            }
-            grpMap[k].Add(e);
-        }
-
-        foreach (KeyValuePair<string, List<DbEntry>> kv in grpMap)
-        {
-            kv.Value.Sort(delegate(DbEntry a, DbEntry b) {
-                return String.Compare(b.Datum, a.Datum, StringComparison.Ordinal);
-            });
-        }
-
-        orderedKeys.Sort(delegate(string k1, string k2) {
-            DbEntry e1 = grpMap[k1].Count > 0 ? grpMap[k1][0] : null;
-            DbEntry e2 = grpMap[k2].Count > 0 ? grpMap[k2][0] : null;
-            if (e1 == null && e2 == null) return 0;
-            if (e1 == null) return 1;
-            if (e2 == null) return -1;
-            int r = CompareDbEntries(e1, e2, dbSortCol >= 0 ? dbSortCol : 1);
-            if (dbSortCol < 0) return -r;
-            return dbSortAsc ? r : -r;
-        });
-
-        if (grpMap.ContainsKey("REF")) orderedKeys.Add("REF");
-
-        foreach (string k in orderedKeys)
-        {
-            List<DbEntry> entries = grpMap[k];
-            if (entries.Count == 0) continue;
-
-            if (k == "REF")
-            {
-                DbEntry refRep = null;
-                foreach (DbEntry re in entries)
-                {
-                    if (re.DisplayName.IndexOf("Median", StringComparison.OrdinalIgnoreCase) >= 0)
-                    {
-                        refRep = re;
-                        break;
-                    }
-                }
-                if (refRep == null) refRep = entries[0];
-
-                if (entries.Count == 1)
-                {
-                    ListViewItem it = CreateDbItem(entries[0], "  " + entries[0].DisplayName);
-                    if (checkedPaths.Contains(entries[0].Path)) it.Checked = true;
-                    if (selectedPath == entries[0].Path) it.Selected = true;
-                    lvDb.Items.Add(it);
-                }
-                else
-                {
-                    bool expanded = expandedGroups.Contains("REF");
-                    string masterTitle = (expanded ? "\u25BC " : "\u25B6 ") + "Referenz-Systeme (" + entries.Count + ")";
-                    ListViewItem masterIt = CreateDbItem(refRep, masterTitle);
-                    if (checkedPaths.Contains(refRep.Path)) masterIt.Checked = true;
-                    if (selectedPath == refRep.Path) masterIt.Selected = true;
-                    lvDb.Items.Add(masterIt);
-
-                    if (expanded)
-                    {
-                        foreach (DbEntry e in entries)
-                        {
-                            ListViewItem childIt = CreateDbItem(e, "    " + e.DisplayName);
-                            if (checkedPaths.Contains(e.Path)) childIt.Checked = true;
-                            if (selectedPath == e.Path) childIt.Selected = true;
-                            lvDb.Items.Add(childIt);
-                        }
-                    }
-                }
-            }
-            else
-            {
-                DbEntry newest = entries[0];
-                string devName = "";
-                foreach (DbEntry e in entries)
-                {
-                    if (!String.IsNullOrEmpty(e.Name))
-                    {
-                        devName = e.Name;
-                        break;
-                    }
-                }
-                if (String.IsNullOrEmpty(devName))
-                {
-                    devName = !String.IsNullOrEmpty(newest.DisplayName) ? newest.DisplayName : (!String.IsNullOrEmpty(newest.Computer) ? newest.Computer : "System");
-                }
-
-                if (entries.Count == 1)
-                {
-                    ListViewItem it = CreateDbItem(newest, "  " + devName);
-                    if (checkedPaths.Contains(newest.Path)) it.Checked = true;
-                    if (selectedPath == newest.Path) it.Selected = true;
-                    lvDb.Items.Add(it);
-                }
-                else
-                {
-                    bool expanded = expandedGroups.Contains(k);
-                    string masterTitle = (expanded ? "\u25BC " : "\u25B6 ") + devName + " (" + entries.Count + ")";
-                    ListViewItem masterIt = CreateDbItem(newest, masterTitle);
-                    if (checkedPaths.Contains(newest.Path)) masterIt.Checked = true;
-                    if (selectedPath == newest.Path) masterIt.Selected = true;
-                    lvDb.Items.Add(masterIt);
-
-                    if (expanded)
-                    {
-                        for (int i = 1; i < entries.Count; i++)
-                        {
-                            DbEntry e = entries[i];
-                            ListViewItem childIt = CreateDbItem(e, "    " + e.DisplayName);
-                            if (checkedPaths.Contains(e.Path)) childIt.Checked = true;
-                            if (selectedPath == e.Path) childIt.Selected = true;
-                            lvDb.Items.Add(childIt);
-                        }
-                    }
-                }
-            }
-        }
-
-        lvDb.EndUpdate();
-        UpdateToggleGroupsButton();
-        if (navDb != null) { navDb.Desc = db.Count + " Systeme, vergleichen und verwalten"; navDb.Invalidate(); }
-        UpdateDbButtons();
-    }
-
-    List<DbEntry> CheckedEntries()
-    {
-        List<DbEntry> l = new List<DbEntry>();
-        if (lvDb != null) foreach (ListViewItem it in lvDb.CheckedItems) l.Add((DbEntry)it.Tag);
-        return l;
-    }
-
-    void UpdateDbButtons()
-    {
-        if (btnDashboard == null) return;
-        int chkN = CheckedEntries().Count;
-        int selN = (lvDb != null ? lvDb.SelectedItems.Count : 0);
-
-        btnDashboard.Enabled = (chkN >= 1);
-        btnDashboard.Text = (chkN >= 1 ? String.Format("Im Dashboard vergleichen ({0})", chkN) : "Im Dashboard vergleichen");
-
-        // Knöpfe für einen Lauf nur bei Markierung; Aktionen auch bei angehakten Läufen (Löschen)
-        if (btnOpenReport != null) btnOpenReport.Visible = (selN == 1);
-        if (btnVerlauf != null) btnVerlauf.Visible = (selN == 1 && GetSelectedDeviceTarget() != null);
-        if (btnActions != null) btnActions.Visible = (selN == 1 || chkN > 0);
-    }
-
-    DbEntry SelectedDbEntry() { return lvDb != null && lvDb.SelectedItems.Count == 1 ? lvDb.SelectedItems[0].Tag as DbEntry : null; }
-
     // Berichtsordner eines Laufs im Explorer (auch für Einträge mit altem UNC-Pfad, dann der gleichnamige Ordner im Datenordner)
     void OpenEntryFolder(DbEntry e)
     {
@@ -889,8 +790,8 @@ public partial class DiagGui
     void SetSelectedAsReference()
     {
         DbEntry target = null;
-        if (lvDb != null && lvDb.SelectedItems.Count > 0) target = (DbEntry)lvDb.SelectedItems[0].Tag;
-        else if (lvDb != null && lvDb.CheckedItems.Count == 1) target = (DbEntry)lvDb.CheckedItems[0].Tag;
+        if (DbMarkierte().Count > 0) target = DbMarkierte()[0];
+        else if (CheckedEntries().Count == 1) target = CheckedEntries()[0];
         if (target == null || !target.HasBench)
         {
             UI.Hinweis("Bitte wählen Sie ein System mit Benchmark-Werten aus.", "Referenz festlegen", this);
@@ -926,8 +827,8 @@ public partial class DiagGui
     void OpenDashboardWithBase()
     {
         DbEntry target = null;
-        if (lvDb != null && lvDb.SelectedItems.Count > 0) target = (DbEntry)lvDb.SelectedItems[0].Tag;
-        else if (lvDb != null && lvDb.CheckedItems.Count == 1) target = (DbEntry)lvDb.CheckedItems[0].Tag;
+        if (DbMarkierte().Count > 0) target = DbMarkierte()[0];
+        else if (CheckedEntries().Count == 1) target = CheckedEntries()[0];
         if (target == null) return;
 
         List<DbEntry> sel = CheckedEntries();
@@ -979,22 +880,9 @@ public partial class DiagGui
         List<DbEntry> targets = new List<DbEntry>();
         if (lvDb != null)
         {
-            if (lvDb.SelectedItems.Count > 0)
-            {
-                foreach (ListViewItem it in lvDb.SelectedItems)
-                {
-                    DbEntry e = it.Tag as DbEntry;
-                    if (e != null && !e.IsReference) targets.Add(e);
-                }
-            }
-            else if (lvDb.CheckedItems.Count > 0)
-            {
-                foreach (ListViewItem it in lvDb.CheckedItems)
-                {
-                    DbEntry e = it.Tag as DbEntry;
-                    if (e != null && !e.IsReference) targets.Add(e);
-                }
-            }
+            List<DbEntry> quelle = DbMarkierte();
+            if (quelle.Count == 0) quelle = CheckedEntries();
+            foreach (DbEntry e in quelle) if (e != null && !e.IsReference) targets.Add(e);
         }
         if (targets.Count == 0) return null;
         string firstKey = !String.IsNullOrEmpty(targets[0].GeraetKey) ? targets[0].GeraetKey : targets[0].Computer;
@@ -1045,10 +933,7 @@ public partial class DiagGui
         Cursor = Cursors.WaitCursor;
         List<string> lines = new List<string>(); string res = "";
         List<DbEntry> sel = CheckedEntries();
-        if (sel.Count == 0 && lvDb != null && lvDb.SelectedItems.Count > 0)
-        {
-            foreach (ListViewItem it in lvDb.SelectedItems) sel.Add((DbEntry)it.Tag);
-        }
+        if (sel.Count == 0) sel.AddRange(DbMarkierte());
         string args = "-Dashboard";
         if (sel.Count > 0)
         {
@@ -1073,11 +958,7 @@ public partial class DiagGui
     void DeleteSelected()
     {
         List<DbEntry> sel = CheckedEntries();
-        if (sel.Count == 0 && lvDb != null && lvDb.SelectedItems.Count == 1)
-        {
-            DbEntry e = lvDb.SelectedItems[0].Tag as DbEntry;
-            if (e != null) sel.Add(e);
-        }
+        if (sel.Count == 0 && DbMarkierte().Count == 1) sel.Add(DbMarkierte()[0]);
         if (sel.Count == 0) return;
         StringBuilder sb = new StringBuilder();
         foreach (DbEntry e in sel) sb.AppendLine("·  " + e.DisplayName + "  " + e.Datum);
@@ -1181,8 +1062,8 @@ public partial class DiagGui
     void ExportSelected()
     {
         DbEntry target = null;
-        if (lvDb != null && lvDb.SelectedItems.Count == 1) target = (DbEntry)lvDb.SelectedItems[0].Tag;
-        else if (lvDb != null && lvDb.CheckedItems.Count == 1) target = (DbEntry)lvDb.CheckedItems[0].Tag;
+        if (DbMarkierte().Count == 1) target = DbMarkierte()[0];
+        else if (CheckedEntries().Count == 1) target = CheckedEntries()[0];
         if (target == null) return;
 
         using (SaveFileDialog sfd = new SaveFileDialog())

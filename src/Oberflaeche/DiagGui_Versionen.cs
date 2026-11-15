@@ -15,8 +15,23 @@ public partial class DiagGui
             SaveUpdateCheckPreference(chkAutoUpdate.Checked);
         };
         top.Controls.Add(chkAutoUpdate);
-        RichTextBox rt = new RichTextBox(); rt.ReadOnly = true; rt.BorderStyle = BorderStyle.FixedSingle; rt.BackColor = UI.Panel; rt.ForeColor = UI.Text;
+        // ab v4.10: Die Versionshistorie (ein langes Textfeld, beim Start rund 100 bis 170 ms) entsteht erst beim ersten
+        // Öffnen der Seite (FuelleVersionen aus ShowPage)
+        RichTextBox rt = new RichTextBox(); rtVersionen = rt; rt.ReadOnly = true; rt.BorderStyle = BorderStyle.FixedSingle; rt.BackColor = UI.Panel; rt.ForeColor = UI.Text;
         rt.Dock = DockStyle.Fill; rt.DetectUrls = false; rt.ScrollBars = RichTextBoxScrollBars.Vertical; rt.Font = new Font("Segoe UI", 9.75f);
+        f.Controls.Add(rt);
+        f.Controls.Add(top);
+        top.SendToBack();
+        return f;
+    }
+
+    RichTextBox rtVersionen;
+    internal bool versionenGefuellt;
+    internal void FuelleVersionen()
+    {
+        if (versionenGefuellt || rtVersionen == null) return;
+        versionenGefuellt = true;
+        RichTextBox rt = rtVersionen;
         Font fh = new Font("Segoe UI Semibold", 11f), fd = new Font("Segoe UI", 9f), fb = new Font("Segoe UI", 9.75f);
         foreach (Versionshistorie.Eintrag e in Versionshistorie.Liste)
         {
@@ -28,9 +43,5 @@ public partial class DiagGui
             rt.AppendText(e.Text + "\r\n\r\n\r\n");
         }
         rt.SelectionStart = 0; rt.ScrollToCaret();
-        f.Controls.Add(rt);
-        f.Controls.Add(top);
-        top.SendToBack();
-        return f;
     }
 }

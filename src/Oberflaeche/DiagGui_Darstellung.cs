@@ -15,9 +15,6 @@ public partial class DiagGui
         try { SetPreferredAppMode(UI.IsDark ? 2 : 0); } catch { }
         if (content != null && content.IsHandleCreated) try { SetWindowTheme(content.Handle, subApp, null); } catch { }
         if (left != null && left.IsHandleCreated) try { SetWindowTheme(left.Handle, subApp, null); } catch { }
-        if (lvDb != null && lvDb.IsHandleCreated) try { SetWindowTheme(lvDb.Handle, subApp, null); } catch { }
-        if (lvSens != null && lvSens.IsHandleCreated) try { SetWindowTheme(lvSens.Handle, subApp, null); } catch { }
-        if (lvChg != null && lvChg.IsHandleCreated) try { SetWindowTheme(lvChg.Handle, subApp, null); } catch { }
         if (clbCompare != null && clbCompare.IsHandleCreated) try { SetWindowTheme(clbCompare.Handle, subApp, null); } catch { }
         if (txtLog != null && txtLog.IsHandleCreated) try { SetWindowTheme(txtLog.Handle, subApp, null); } catch { }
         ApplyNativeThemeRecursive(this, subApp);
@@ -126,6 +123,8 @@ public partial class DiagGui
             foreach (Label w in new Label[] { lblAkku, lblRestoreWarn }) if (w != null) { w.ForeColor = UI.Warn; w.BackColor = UI.WarnBg; }
             foreach (Panel b in modBanners) if (b != null) { b.BackColor = UI.InfoBg; foreach (Control k in b.Controls) { if (k is LinkLabel) ((LinkLabel)k).LinkColor = UI.Accent; else k.ForeColor = UI.Text; } }
             if (bandErg != null) { bandErg.BackColor = UI.AccentSoft; if (lblBandErg != null) lblBandErg.ForeColor = UI.Text; }
+            foreach (ListenSeite ls in listenSeiten) ls.Farben();
+            if (lblSensVoll != null) lblSensVoll.ForeColor = UI.Warn;
             // ab v4.08: Zeile zur Referenz und die aufgebaute Ergebnisseite tragen eigene Farben (Warnung, Urteil): neu setzen
             UpdateRefState(); FuelleLetztesErgebnis();
             if (erg != null && ergebnisAufbauten > 0 && !ergVeraltet) FuelleErgebnis();
@@ -191,7 +190,7 @@ public partial class DiagGui
             c.BackColor = UI.Bg;
             c.Invalidate();
         }
-        else if (c is SensorChart)
+        else if (c is SensorChart || c is ZeilenListe || c is KennzahlZeile)
         {
             c.BackColor = UI.Panel;
             c.Invalidate();

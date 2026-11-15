@@ -81,6 +81,9 @@ public partial class DiagGui
         // Elemente über die ganze Seitenbreite (Bänder, Auswahl des Umfangs)
         public readonly List<Control> Voll = new List<Control>();
         Label titel, einleitung;
+        // ab v4.10: Knopf ganz rechts im Kopf (Seite Sensoren live); Anzahl und Dauer rücken links daneben
+        Control kopfKnopf;
+        public void KopfKnopf(Control c) { kopfKnopf = c; Kopf.Controls.Add(c); c.SizeChanged += delegate { OrdneKopf(); }; OrdneKopf(); }
         public int Breite { get; private set; }
         public bool Zweispaltig { get; private set; }
 
@@ -134,8 +137,15 @@ public partial class DiagGui
             if (Breite <= 0) return;
             Size sa = Anzahl.GetPreferredSize(Size.Empty), sd = Dauer.GetPreferredSize(Size.Empty);
             Size ra = new Size(Math.Max(sa.Width, sd.Width), sa.Height + UI.S(1) + sd.Height);
-            Anzahl.Location = new Point(Math.Max(0, Breite - sa.Width), UI.S(4));
-            Dauer.Location = new Point(Math.Max(0, Breite - sd.Width), UI.S(4) + sa.Height + UI.S(1));
+            int rechts = Breite;
+            if (kopfKnopf != null)
+            {
+                Size sk = kopfKnopf.GetPreferredSize(Size.Empty);
+                kopfKnopf.Location = new Point(Math.Max(0, Breite - sk.Width), UI.S(4));
+                rechts = Breite - sk.Width - UI.S(UI.Abstand3); ra = new Size(ra.Width + sk.Width + UI.S(UI.Abstand3), Math.Max(ra.Height, sk.Height));
+            }
+            Anzahl.Location = new Point(Math.Max(0, rechts - sa.Width), UI.S(4));
+            Dauer.Location = new Point(Math.Max(0, rechts - sd.Width), UI.S(4) + sa.Height + UI.S(1));
             int ew = Math.Max(UI.S(240), Breite - ra.Width - UI.S(UI.Abstand5));
             int ty = titel.PreferredSize.Height + UI.S(UI.Abstand1);
             int eh = TextRenderer.MeasureText(einleitung.Text, einleitung.Font, new Size(ew, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height + UI.S(2);
@@ -168,12 +178,121 @@ public partial class DiagGui
         }
     }
 
+    // ab v4.10: Seite mit einer Liste, die den Rest der Höhe füllt und selbst rollt (Datenbank, Änderungen): Kopf mit Titel
+    // und Einleitung links und zwei Zeilen Zusammenfassung rechts, Leiste mit Bedienelementen links und Knöpfen rechts,
+    // Band für die angehakte Auswahl, darunter die Liste und wahlweise ein Seitenteil rechts (unter 900 px darunter).
+    public class ListenSeite
+    {
+        public readonly Panel Seite = new Panel();
+        public readonly Label Titel, Einleitung, Anzahl, Unter, BandText, BandUnter;
+        public readonly FlowLayoutPanel Links = new FlowLayoutPanel(), Rechts = new FlowLayoutPanel();
+        public readonly Panel Band = new Panel();
+        public readonly LinkLabel BandVerweis = new LinkLabel();
+        public readonly Button BandKnopf;
+        public Control Inhalt, Seitenteil, Fuss;
+        public int SeitenteilBreite = 300, SeitenteilHoehe = 250;
+        bool bandSichtbar;
+
+        public ListenSeite(string titel, string einleitung, string knopf)
+        {
+            Seite.Dock = DockStyle.Fill; Seite.BackColor = UI.Panel;
+            Titel = Lbl(titel, UI.SchriftTitel, true, UI.Text); Titel.Location = new Point(0, 0);
+            Einleitung = Lbl(einleitung, UI.SchriftText, false, UI.Muted); Einleitung.AutoSize = false;
+            Anzahl = Lbl("", 10.5f, true, UI.Text); Unter = Lbl("", UI.SchriftText, false, UI.Muted);
+            foreach (FlowLayoutPanel p in new FlowLayoutPanel[] { Links, Rechts }) { p.AutoSize = true; p.AutoSizeMode = AutoSizeMode.GrowAndShrink; p.WrapContents = false; p.BackColor = UI.Panel; p.Margin = new Padding(0); }
+            Band.BackColor = UI.AccentSoft; Band.Height = UI.S(44); Band.Visible = false;
+            BandText = Lbl("", UI.SchriftText, true, UI.Accent); BandText.Tag = "accent";
+            BandUnter = Lbl("", UI.SchriftText, false, UI.Text); BandUnter.AutoSize = false; BandUnter.AutoEllipsis = true; BandUnter.Height = UI.S(20);
+            BandVerweis.Text = "Auswahl aufheben"; BandVerweis.AutoSize = true; BandVerweis.Font = new Font("Segoe UI", UI.SchriftHinweis); BandVerweis.BackColor = Color.Transparent;
+            BandVerweis.LinkColor = UI.Accent; BandVerweis.ActiveLinkColor = UI.AccentHover; BandVerweis.LinkBehavior = LinkBehavior.HoverUnderline;
+            BandKnopf = UI.Primary(knopf); BandKnopf.Font = new Font("Segoe UI Semibold", 9.75f); BandKnopf.Padding = new Padding(UI.S(14), UI.S(3), UI.S(14), UI.S(3)); BandKnopf.Margin = new Padding(0);
+            Band.Controls.Add(BandText); Band.Controls.Add(BandUnter); Band.Controls.Add(BandVerweis); Band.Controls.Add(BandKnopf);
+            Band.Resize += delegate { OrdneBand(); }; BandKnopf.SizeChanged += delegate { OrdneBand(); }; BandText.TextChanged += delegate { OrdneBand(); };
+            Seite.Controls.Add(Titel); Seite.Controls.Add(Einleitung); Seite.Controls.Add(Anzahl); Seite.Controls.Add(Unter);
+            Seite.Controls.Add(Links); Seite.Controls.Add(Rechts); Seite.Controls.Add(Band);
+            Seite.Resize += delegate { Ordne(); };
+            Anzahl.TextChanged += delegate { Ordne(); }; Unter.TextChanged += delegate { Ordne(); };
+            Links.SizeChanged += delegate { Ordne(); }; Rechts.SizeChanged += delegate { Ordne(); };
+        }
+
+        public void Fuege(Control inhalt, Control seitenteil, Control fuss)
+        {
+            Inhalt = inhalt; Seitenteil = seitenteil; Fuss = fuss;
+            foreach (Control c in new Control[] { inhalt, seitenteil, fuss }) if (c != null) Seite.Controls.Add(c);
+            Ordne();
+        }
+
+        // eigener Zustand statt Band.Visible: Das ist falsch, solange die Seite nicht angezeigt wird
+        public bool BandSichtbar { get { return bandSichtbar; } set { if (bandSichtbar == value) return; bandSichtbar = value; Band.Visible = value; Ordne(); } }
+        public void Farben() { Band.BackColor = UI.AccentSoft; BandText.ForeColor = UI.Accent; BandUnter.ForeColor = UI.Text; BandVerweis.LinkColor = UI.Accent; }
+
+        void OrdneBand()
+        {
+            int h = Band.Height, x = UI.S(12);
+            Size st = BandText.GetPreferredSize(Size.Empty), sk = BandKnopf.GetPreferredSize(Size.Empty), sv = BandVerweis.GetPreferredSize(Size.Empty);
+            BandText.Location = new Point(x, (h - st.Height) / 2);
+            BandKnopf.Location = new Point(Band.Width - sk.Width - UI.S(8), (h - sk.Height) / 2);
+            BandVerweis.Location = new Point(BandKnopf.Left - sv.Width - UI.S(12), (h - sv.Height) / 2);
+            int ux = x + st.Width + UI.S(8);
+            BandUnter.SetBounds(ux, (h - BandUnter.Height) / 2, Math.Max(0, BandVerweis.Left - ux - UI.S(8)), BandUnter.Height);
+        }
+
+        bool ordnet;
+        public void Ordne()
+        {
+            if (ordnet) return;
+            int w = Seite.ClientSize.Width, h = Seite.ClientSize.Height;
+            if (w < UI.S(200) || h < UI.S(100)) return;
+            ordnet = true;
+            try
+            {
+                Size sa = Anzahl.GetPreferredSize(Size.Empty), su = Unter.GetPreferredSize(Size.Empty);
+                int rw = Math.Max(sa.Width, su.Width);
+                Anzahl.Location = new Point(w - sa.Width, UI.S(4)); Unter.Location = new Point(w - su.Width, UI.S(4) + sa.Height + UI.S(1));
+                int ew = Math.Max(UI.S(240), w - rw - UI.S(UI.Abstand5));
+                int ty = Titel.PreferredSize.Height + UI.S(UI.Abstand1);
+                int eh = TextRenderer.MeasureText(Einleitung.Text, Einleitung.Font, new Size(ew, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height + UI.S(2);
+                Einleitung.SetBounds(0, ty, ew, eh);
+                int y = Math.Max(ty + eh, UI.S(4) + sa.Height + UI.S(1) + su.Height) + UI.S(UI.Abstand3);
+                // Leiste: rechts die Knöpfe, links die Bedienelemente; passt beides nicht nebeneinander, die Knöpfe darunter
+                bool neben = Links.Width + Rechts.Width + UI.S(12) <= w;
+                int lh = Math.Max(Links.Height, neben ? Rechts.Height : 0);
+                Links.Location = new Point(0, y + (lh - Links.Height) / 2);
+                if (neben) Rechts.Location = new Point(w - Rechts.Width, y + (lh - Rechts.Height) / 2);
+                else { Rechts.Location = new Point(0, y + lh + UI.S(6)); lh += UI.S(6) + Rechts.Height; }
+                if (lh > 0) y += lh + UI.S(UI.Abstand3);
+                if (bandSichtbar) { Band.SetBounds(0, y, w, Band.Height); y += Band.Height + UI.S(UI.Abstand2); }
+                int unten = h;
+                if (Fuss != null)
+                {
+                    int fh = Fuss is Label ? TextRenderer.MeasureText(Fuss.Text.Length > 0 ? Fuss.Text : " ", Fuss.Font, new Size(w, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height + UI.S(2) : Fuss.Height;
+                    // nicht nach Fuss.Visible fragen: Das ist falsch, solange die Seite im Hintergrund steht
+                    Fuss.SetBounds(0, h - fh, w, fh); unten = h - fh - UI.S(6);
+                }
+                int rest = Math.Max(UI.S(120), unten - y);
+                if (Seitenteil == null) { if (Inhalt != null) Inhalt.SetBounds(0, y, w, rest); }
+                else if (ToolSpalten(w) >= 2)
+                {
+                    int sw = UI.S(SeitenteilBreite), gap = UI.S(UI.Abstand4);
+                    Inhalt.SetBounds(0, y, w - sw - gap, rest); Seitenteil.SetBounds(w - sw, y, sw, rest);
+                }
+                else
+                {
+                    int sh = Math.Min(UI.S(SeitenteilHoehe), rest / 2), gap = UI.S(UI.Abstand3);
+                    Inhalt.SetBounds(0, y, w, rest - sh - gap); Seitenteil.SetBounds(0, y + rest - sh, w, sh);
+                }
+            }
+            finally { ordnet = false; }
+        }
+    }
+    internal List<ListenSeite> listenSeiten = new List<ListenSeite>();
+
     // Ordnet die Modulseiten nach der Seitenbreite neu (Größe des Fensters, Wechsel der Seite)
     List<ModulSeite> modulSeiten = new List<ModulSeite>();
     void OrdneModulSeiten() { int w = SeitenBreite(); foreach (ModulSeite m in modulSeiten) m.Ordne(w); }
 
-    // Seiten mit diesem Rahmen: Diagnose, Benchmark, Lasttest und System-Umzug (Nummern wie in der Seitenleiste)
-    static bool IstModulSeite(int i) { return i == 1 || i == 2 || i == 3 || i == 8; }
+    // Seiten mit diesem Rahmen: Diagnose, Benchmark, Lasttest, Sensoren live (ab v4.10) und System-Umzug (Nummern wie in der Seitenleiste)
+    static bool IstModulSeite(int i) { return i == 1 || i == 2 || i == 3 || i == 7 || i == 8; }
 
     ModulSeite NeueModulSeite(FlowLayoutPanel f)
     {

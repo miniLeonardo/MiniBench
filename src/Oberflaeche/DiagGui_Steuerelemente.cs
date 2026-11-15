@@ -2814,6 +2814,10 @@ class SensorChart : Control
     public double CpuLimit = double.NaN, GpuLimit = double.NaN, TjMax = double.NaN;
     public string Empty = "Noch keine Messwerte.";
     static readonly Color CpuColor = Color.FromArgb(37, 99, 235), CoreColor = Color.FromArgb(125, 160, 245), GpuColor = Color.FromArgb(194, 65, 12), IGpuColor = Color.FromArgb(202, 138, 4);
+    // ab v4.10: Farben der Reihen für die Kennzahlen der Seite Sensoren live; Rahmen aus, wenn die Kurve in einer Karte steht
+    public static Color CpuFarbe { get { return CpuColor; } }
+    public static Color GpuFarbe { get { return GpuColor; } }
+    public bool Rahmen = true;
     struct Series { public int Col; public Color Color; public string Label; public bool Dash; public Series(int c, Color k, string l, bool d) { Col = c; Color = k; Label = l; Dash = d; } }
     public SensorChart()
     {
@@ -2860,7 +2864,7 @@ class SensorChart : Control
     {
         Graphics g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
         g.Clear(BackColor);
-        using (Pen bp = new Pen(UI.Line)) g.DrawRectangle(bp, 0, 0, Width - 1, Height - 1);
+        if (Rahmen) using (Pen bp = new Pen(UI.Line)) g.DrawRectangle(bp, 0, 0, Width - 1, Height - 1);
         if (rows.Count < 1) { using (Font f = new Font("Segoe UI", 9.75f)) TextRenderer.DrawText(g, Empty, f, ClientRectangle, UI.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak); return; }
         double tMax = rows[rows.Count - 1][0];
         double tMin = WindowSec > 0 ? Math.Max(0, tMax - WindowSec) : rows[0][0];

@@ -439,3 +439,87 @@ Describe 'Paketliste der Seite Tools' {
     }
 }
 
+Describe 'Protokoll aufräumen (Move-ChangeArchiv)' {
+    BeforeAll {
+        # Protokolldatei mit Einträgen im gegebenen Status; mit Sicherungsordner, wenn -Sicherung
+        function New-Protokoll([string]$DataDir, [string]$Pc, [string]$Datei, [string]$Lauf, [string[]]$Status, [switch]$Sicherung) {
+            $dir = Join-Path (Join-Path $DataDir 'Änderungen') $Pc
+            New-Item -ItemType Directory -Path $dir -Force | Out-Null
+            $i = 0
+            $ein = @($Status | ForEach-Object { $i++; [ordered]@{ Id = $i; Zeit = $Lauf; Modul = 'Optimierung'; Schritt = 'S'; Titel = 'T'; Risiko = 'Aendern'; Art = 'Registry'; Ziel = 'Z'; Vorher = '1'; Nachher = '0'; Status = $_; Ergebnis = '' } })
+            $log = [ordered]@{ Format = 'Minibench-Aenderungen/1'; Computer = $Pc; GeraetId = 'G-x'; Version = '4.10'; Lauf = $Lauf; Eintraege = $ein }
+            $p = Join-Path $dir $Datei
+            [IO.File]::WriteAllText($p, ($log | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+            if ($Sicherung) { $s = $p -replace '\.json$', ''; New-Item -ItemType Directory -Path $s -Force | Out-Null; Set-Content -LiteralPath (Join-Path $s 'plan.pow') -Value 'x' }
+            return $p
+        }
+        function New-Ordner {
+            $d = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path $d | Out-Null
+            Set-ModuleVar 'DataDir' $d
+            Set-ModuleVar 'ChangeFile' ''
+            return $d
+        }
+        $script:jetzt = [datetime]'2026-11-15 12:00:00'
+    }
+    It 'verschiebt erledigte Läufe ab dem gewählten Alter samt Sicherungsordner und löscht nichts' {
+        $d = New-Ordner
+        $alt = New-Protokoll $d 'HIER' '20260901_100000.json' '2026-09-01 10:00:00' @('rückgängig', 'nur Hinweis') -Sicherung
+        $neu = New-Protokoll $d 'HIER' '20261110_100000.json' '2026-11-10 10:00:00' @('rückgängig')
+        $r = MinibenchTest\Move-ChangeArchiv 'Erledigt:30' -Root (Join-Path $d 'Änderungen') -DataDir $d -Computer 'HIER' -Jetzt $script:jetzt
+        $r.Verschoben | Should -Be 1
+        $r.Eintraege | Should -Be 2
+        $r.Fehler | Should -Be 0
+        Test-Path -LiteralPath $alt | Should -BeFalse
+        Test-Path -LiteralPath $neu | Should -BeTrue
+        $ziel = Join-Path $r.Archiv 'HIER'
+        Test-Path -LiteralPath (Join-Path $ziel '20260901_100000.json') | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path (Join-Path $ziel '20260901_100000') 'plan.pow') | Should -BeTrue
+        $r.Archiv | Should -Match ([regex]::Escape([IO.Path]::Combine('Archiv', 'Änderungen')))
+        (Get-Content -LiteralPath (Join-Path (Join-Path $d 'Archiv') 'Datenpflege.log') -Raw -Encoding UTF8) | Should -Match 'Änderungsprotokoll aufgeräumt'
+    }
+    It 'lässt aktive Änderungen dieses PCs immer liegen, auch bei jedem Alter und mit Andere' {
+        $d = New-Ordner
+        $aktiv = New-Protokoll $d 'HIER' '20260101_100000.json' '2026-01-01 10:00:00' @('aktiv', 'rückgängig')
+        $r = MinibenchTest\Move-ChangeArchiv 'Erledigt:0;Andere' -Root (Join-Path $d 'Änderungen') -DataDir $d -Computer 'HIER' -Jetzt $script:jetzt
+        $r.Verschoben | Should -Be 0
+        Test-Path -LiteralPath $aktiv | Should -BeTrue
+        ($r.Zeilen -join ' ') | Should -Match 'Nichts zu verschieben'
+    }
+    It 'verschiebt Protokolle anderer PCs nur mit Andere, dann auch mit aktiven Einträgen, und räumt den leeren Ordner weg' {
+        $d = New-Ordner
+        $fremd = New-Protokoll $d 'FREMD' '20261101_100000.json' '2026-11-01 10:00:00' @('aktiv', 'aktiv', 'aktiv')
+        $hier = New-Protokoll $d 'HIER' '20261101_100000.json' '2026-11-01 10:00:00' @('aktiv')
+        $r1 = MinibenchTest\Move-ChangeArchiv 'Erledigt:0' -Root (Join-Path $d 'Änderungen') -DataDir $d -Computer 'HIER' -Jetzt $script:jetzt
+        $r1.Verschoben | Should -Be 0
+        $r2 = MinibenchTest\Move-ChangeArchiv 'Andere' -Root (Join-Path $d 'Änderungen') -DataDir $d -Computer 'hier' -Jetzt $script:jetzt
+        $r2.Verschoben | Should -Be 1
+        $r2.Eintraege | Should -Be 3
+        Test-Path -LiteralPath $fremd | Should -BeFalse
+        Test-Path -LiteralPath (Split-Path $fremd -Parent) | Should -BeFalse
+        Test-Path -LiteralPath $hier | Should -BeTrue
+    }
+    It 'zählt leere Protokolle als erledigt und lässt das Protokoll des laufenden Prozesses in Ruhe' {
+        $d = New-Ordner
+        $leer = New-Protokoll $d 'HIER' '20260801_080000.json' '2026-08-01 08:00:00' @()
+        $lauf = New-Protokoll $d 'HIER' '20260802_080000.json' '2026-08-02 08:00:00' @()
+        Set-ModuleVar 'ChangeFile' $lauf
+        $r = MinibenchTest\Move-ChangeArchiv 'Erledigt:30' -Root (Join-Path $d 'Änderungen') -DataDir $d -Computer 'HIER' -Jetzt $script:jetzt
+        $r.Verschoben | Should -Be 1
+        Test-Path -LiteralPath $leer | Should -BeFalse
+        Test-Path -LiteralPath $lauf | Should -BeTrue
+    }
+    It 'meldet unbekannte Angaben als Fehler und verschiebt ohne gültige Angabe nichts' {
+        $d = New-Ordner
+        $p = New-Protokoll $d 'FREMD' '20260101_100000.json' '2026-01-01 10:00:00' @('rückgängig')
+        $r = MinibenchTest\Move-ChangeArchiv 'Alles' -Root (Join-Path $d 'Änderungen') -DataDir $d -Computer 'HIER' -Jetzt $script:jetzt
+        $r.Fehler | Should -Be 1
+        $r.Verschoben | Should -Be 0
+        Test-Path -LiteralPath $p | Should -BeTrue
+    }
+    It 'ist als Hilfsmodus ohne Administratorrechte eingetragen und endet in seinem Kernteil' {
+        (Get-PartText 'Kern\Aenderungen.ps1') | Should -Match '(?s)if \(\$AenderungenAufraeumen\) \{.*?Send-GuiEvent ''RESULT''.*?exit '
+        (Get-PartText 'Kern\Adminrechte.ps1') | Should -Match '-not \$AenderungenAufraeumen'
+        (Get-GuiText) | Should -Match '-AenderungenAufraeumen '
+    }
+}

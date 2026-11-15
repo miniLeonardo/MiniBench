@@ -1,0 +1,164 @@
+﻿LEOS MINIBENCH 4.10: ÄNDERUNGEN
+===============================
+
+Auftrag vom 15.11.2026: Sensoren live und Datenbank stammen aus einer frühen Phase und sollen aussehen wie die übrigen
+Seiten, ohne dass Funktionen verloren gehen. Die Seite Änderungen lädt bei vielen Einträgen sehr lange und braucht
+einen Knopf zum Aufräumen. Entwürfe von Leonardo am 15.11.2026 bestätigt (Sensoren wie im Entwurf, Datenbank mit
+Detailbereich, Aufräumen ins Archiv). Zusätzlich gewählt: Sperre der Optimierung nach Rückgängig sofort aufheben, Seite
+Versionen erst beim ersten Öffnen aufbauen.
+Messabläufe, Berichte, Ereigniskanal, Datenbankformat, Format des Änderungsprotokolls, Vorlagen und Geraete.json sind
+unverändert.
+
+
+1. SEITE ÄNDERUNGEN
+  Befund                      Im Datenordner liegen 27 Protokolldateien von 16 PCs mit rund 1.050 Einträgen (ein Lauf der
+                              Optimierung schreibt 130 bis 250). Die Seite legte für jeden Eintrag eine Zeile mit
+                              Kontrollkästchen in einem Listenfeld an. Jede eingefügte Zeile meldete ihren Haken, und die
+                              Meldung zählte über CheckedChanges alle angehakten Zeilen neu: quadratischer Aufwand, sobald
+                              das Listenfeld sein Fenster hat, also beim ersten Öffnen der Seite und bei jedem Neuladen.
+                              Der Aufbau beim Start kostete laut Start.log nur 6 bis 17 ms. Abgeleitet aus dem Quelltext
+                              und Start.log, die Wartezeit selbst ist nicht unter Windows gemessen.
+  Jetzt                       Eigene Liste (ZeilenListe in Liste.cs), die nur zeichnet, was sichtbar ist, und kein
+                              Fensterelement je Zeile hat. Zuerst stehen nur die Läufe dieses PCs da, gebündelt nach Lauf
+                              (Datum, Module, Anzahl Maßnahmen und Einträge, Status) und Maßnahme (Titel, Umfang wie
+                              "3 Registry-Werte", Risiko, Status). Ziel, Vorher und Nachher stehen unter der Maßnahme und
+                              entstehen erst beim Aufklappen. Der neueste Lauf dieses PCs ist aufgeklappt; ab 15
+                              Maßnahmen zeigt ein Lauf die ersten 12 und "n weitere Maßnahmen anzeigen".
+  Haken                       An Eintrag, Maßnahme und Lauf. Maßnahme und Lauf wählen alle zurücknehmbaren Einträge
+                              darunter und zeigen "teilweise", wenn nur ein Teil gewählt ist. Gesperrt ist, was sich nicht
+                              zurücknehmen lässt (Hinweise, Zurückgenommenes, andere PCs).
+  Band                        Über der Liste, sobald etwas angehakt ist: Anzahl, Anzahl der Maßnahmen, "Auswahl aufheben"
+                              und "n Änderungen rückgängig machen". Die Rückfrage nennt ab 13 Einträgen die Maßnahmen
+                              statt jeder Zeile.
+  Andere PCs                  "Alle PCs" (oder die Zeile "Andere PCs … Anzeigen") zeigt auch deren Läufe, mit dem
+                              Rechnernamen, nur zur Ansicht.
+  Erhalten                    Aktualisieren, Protokollordner, Rückgängig mit Rückfrage und Meldung des Arbeitsprozesses,
+                              Frist je Softwarepaket, Hinweis beim Überfahren (Risiko, Art, Weg zurück, Ergebnis), Text
+                              des Eintrags in der Seitenleiste, Zähler der Startseite.
+  Sandbox                     Mit einer Kopie des echten Protokolls (8 Dateien, 1.027 Einträge): Seite öffnet in rund
+                              40 ms, Aufbau der Liste mit allen 342 Maßnahmen aufgeklappt unter Mono deutlich unter
+                              1,5 s (Selbsttest Aenderungen.Seite prüft die Grenze).
+
+
+2. PROTOKOLL AUFRÄUMEN
+  Knopf                       "Aufräumen …" auf der Seite Änderungen. Der Dialog nennt je Punkt Dateien und Einträge.
+  Erledigte Läufe             Läufe ohne aktiven Eintrag (nur Hinweise, Zurückgenommenes oder leer), von allen PCs, älter
+                              als 30, 90 oder 180 Tage oder jedes Alters. Vorgewählt mit 30 Tagen.
+  Andere PCs                  Alle Protokolle anderer PCs, auch mit aktiven Änderungen. Nicht vorgewählt (siehe Gefunden
+                              und behoben 1).
+  Immer geschützt             Protokolle dieses PCs mit aktiven Einträgen und das Protokoll des laufenden Prozesses.
+  Ziel                        Minibench-Daten\Archiv\Änderungen\<Zeit>\<PC>, samt dem gleichnamigen Ordner mit
+                              Sicherungsdateien. Gelöscht wird nichts (Vorgabe 14); zurücklegen von Hand. Eintrag in
+                              Archiv\Datenpflege.log. Leere Ordner eines PCs unter Änderungen entfallen.
+  Arbeitsprozess              Hilfsmodus -AenderungenAufraeumen "Erledigt:30;Andere" (Move-ChangeArchiv in
+                              Kern\Aenderungen.ps1), ohne Administratorrechte, Ergebnis @@RESULT|verschoben|Fehler.
+                              Oberfläche (ChangeLauf.Aufzuraeumen) und Skript rechnen dieselben Regeln.
+  Netzlaufwerk                Der Abgleich kennt den Stand des letzten Abgleichs: Fehlt eine Datei danach auf dem Stick,
+                              verschiebt er sie auf dem Netzlaufwerk ebenfalls ins Archiv. Ab 10 Dateien und der Hälfte
+                              des Bestands (oder ab 50) hält der Schutz vor Massenlöschung an und fragt nach. Am Abgleich
+                              wurde nichts geändert.
+  Gesperrt                    Während eines Laufs und während der Live-Ansicht (beide schreiben ins Protokoll).
+
+
+3. SEITE SENSOREN LIVE
+  Rahmen                      Wie Diagnose, Benchmark, Lasttest und System-Umzug (DiagGui_Modulseite.cs, Seite 7 in
+                              IstModulSeite). Im Kopf rechts "Live seit mm:ss" und die Anzahl der Sensoren, daneben der
+                              Knopf "Live-Ansicht starten" bzw. "beenden" (neu: ModulSeite.KopfKnopf).
+  Kennzahlen                  CPU-Temperatur, CPU-Takt (mit höchstem Kern), CPU-Leistung, GPU-Temperatur, GPU-Leistung,
+                              Lüfter. Die Werte sind die Leitwerte, die auch die Kurve bekommt (SENSLEAD), mit Min und
+                              Max seit dem Start. Ohne Messwert: "kein Wert".
+  Links                       Karte Verlauf (die bisherigen Kurven, ohne eigenen Rahmen) und Karte Alle Sensoren:
+                              Gruppen je Gerät zum Auf- und Zuklappen, Spalten Sensor, Art, Aktuell, Min, Max, Quelle,
+                              Grenzwerte grau, verworfene Werte als Etikett "unplausibel" mit dem Grund im Hinweis.
+  Rechts                      Sensorwerkzeuge (LibreHardwareMonitor und PawnIO je mit Zustand, "Sensorwerkzeuge holen"
+                              bzw. "Erneut holen", Etikett des Sensormodus), Einstellungen (zwei Schalter), Aufzeichnung
+                              (Dauer, Messzeilen, Sensoren, "Als CSV speichern").
+  Werte hinter den Schaltern  cmbDriver und cmbKeep bleiben als Werte bestehen und werden nicht angezeigt: Start eines
+                              Laufs, Live-Ansicht, Vorlagen, Geraete.json und die Seite Lasttest lesen sie wie bisher.
+  Statuszeile                 Die Meldungen des Arbeitsprozesses stehen unter den Kennzahlen.
+
+
+4. SEITE DATENBANK
+  Liste                       Eigene Liste statt des Listenfelds mit selbst gezeichneten Gruppenköpfen. Ein Gerät steht
+                              wie bisher für seinen neuesten Lauf, mit Prozessor, Grafik und Arbeitsspeicher als zweiter
+                              Zeile; ältere Läufe klappen darunter auf. Spalten Zuletzt, Punkte, CPU multi, RAM lesen,
+                              Grafik, Befunde (kritisch und Warnungen farbig ab 1). Die Referenz steht oben.
+  Detailbereich               Rechts, rund 320 px; unter 900 px Seitenbreite unter der Liste. Zeigt den markierten Lauf:
+                              Name, Datum, Module, Punktzahl, den gespeicherten Vergleich mit der Referenz (Prozent je
+                              Gruppe; bei Läufen vor 4.08 und Importen "nicht gespeichert"), Hardware, Befunde. Darunter
+                              Bericht öffnen, Verlauf, Ordner, Als Referenz festlegen, Als Basis im Dashboard öffnen,
+                              Lauf exportieren, Lauf entfernen, oben Name ändern. Rollt bei wenig Höhe.
+  Band                        Angehakte Läufe mit Namen, "Auswahl aufheben" und "Im Dashboard vergleichen (n)".
+  Erhalten                    Importieren, Alle aufklappen, Aktualisieren mit Abgleich, Aufräumen, Kontextmenü,
+                              Doppelklick und Eingabetaste (Bericht), F2 (Name), Pfeiltasten (auf- und zuklappen),
+                              Mehrfachmarkierung mit Strg und Umschalt, Sortieren über die Spaltenköpfe, Meldung der
+                              Datenpflege, Ablage (jetzt kurz im Kopf, vollständig unter der Liste).
+  Sortieren                   Prozessor, Grafik und Arbeitsspeicher haben keine eigene Spalte mehr: Danach sortiert
+                              "Sortieren nach" im Kontextmenü.
+  Menü Aktionen               Entfällt; seine Punkte stehen sichtbar im Detailbereich und weiter im Kontextmenü.
+
+
+5. OPTIMIERUNG NACH RÜCKGÄNGIG
+  Vorher                      Eine zurückgenommene Einstellung blieb bis zum nächsten Programmstart als "bereits aktiv"
+                              gesperrt.
+  Jetzt                       Nach "Rückgängig" startet die Zustandsprüfung der Optimierung neu; sie hebt die Sperre für
+                              alles auf, was nicht mehr aktiv ist.
+
+
+6. SEITE INFO UND VERSIONEN
+  Vorher                      Das lange Textfeld mit der Versionshistorie entstand beim Start (Start.log: 108 bis 172 ms).
+  Jetzt                       Kopf und Schalter für die Update-Prüfung entstehen beim Start, die Versionshistorie beim
+                              ersten Öffnen der Seite.
+
+
+7. TESTS
+  Selbsttest                  Sechs neue Fälle: Liste.Zeilen, Aenderungen.Buendelung, Aenderungen.Seite, Sensoren.Seite,
+                              Datenbank.Seite, Versionen.Spaeter.
+  Pester                      Aenderungen.Tests.ps1: sechs Fälle zu Move-ChangeArchiv (Alter, Sicherungsordner, aktive
+                              Änderungen dieses PCs, andere PCs, leere Protokolle, laufendes Protokoll, unbekannte Angabe,
+                              Eintrag als Hilfsmodus).
+
+
+GEFUNDEN UND BEHOBEN
+  1. Aufräumen anderer PCs    Der Entwurf wählte "Protokolle anderer PCs" vor, mit dem Satz "auf diesem PC ohnehin nicht
+                              zurücknehmbar". Der Datenordner liegt aber auf dem Stick: Steckt er wieder an jenem PC,
+                              sind dessen aktive Änderungen dort zurücknehmbar, solange die Datei im Ordner Änderungen
+                              liegt. Der Punkt ist deshalb nicht vorgewählt und sagt das; vorgewählt sind nur erledigte
+                              Läufe.
+  2. Aufzeichnung             Nach 50.000 Messzeilen nahm die Aufzeichnung der Sensoren stillschweigend nichts mehr auf.
+                              Die Karte Aufzeichnung meldet es jetzt; die Grenze selbst bleibt.
+  3. Sichtbarkeit             Der Detailbereich der Datenbank ordnete seine Knöpfe zuerst nach Control.Visible. Das ist
+                              falsch, solange die Seite im Hintergrund steht (Neuladen nach einem Lauf): Die Knöpfe wären
+                              danach nicht geordnet gewesen. Jetzt eigener Zustand (DbSoll), ebenso beim Fuß der
+                              Listenseiten. Fallstrick 9 aus Projektstand.md.
+  4. Kennzahlen               Min und Max der Kennzahlen kamen zuerst nur aus der letzten Zeile je Zeitgeber-Takt; jetzt
+                              aus jeder Zeile SENSLEAD.
+  5. Leere Protokolle         Protokolldateien ohne Einträge kennt die Oberfläche sonst nicht. Sie zählen beim Aufräumen
+                              als erledigt und stehen in den Zahlen des Dialogs (ChangeEntry.Load meldet sie mit).
+
+
+GRENZEN
+  Nicht unter Windows geprüft Alles ist in der Linux-Sandbox unter Mono entstanden und dort in Hell und Dunkel bei 100 %
+                              fotografiert, auch im schmalen Fenster. Unter Windows offen: die drei Seiten bei 100, 125
+                              und 150 %, Mausrad und Tastatur in den Listen, das Kontextmenü der Datenbank, die
+                              Bildlaufleiste des Detailbereichs im dunklen Schema, die Live-Ansicht mit echten Sensoren,
+                              ein Durchgang "Aufräumen" mit anschließendem Abgleich, die Wartezeit der Seite Änderungen
+                              (Ursache aus dem Quelltext abgeleitet, nicht gemessen).
+  Auslassung                  Unter Mono zeichnet TextRenderer bei abgeschnittenem Text keine drei Punkte; unter Windows
+                              sind sie zu erwarten (EndEllipsis).
+  Sortieren                   Nach Prozessor, Grafik und Arbeitsspeicher nur noch über das Kontextmenü.
+  Zurücklegen                 Archivierte Protokolle legt man von Hand zurück; einen Knopf dafür gibt es nicht.
+  Sandbox                     941 bestanden, 51 fehlgeschlagen, 81 übersprungen (4.09: 935, 51, 75). Die 51 brauchen Windows
+                              und sind Zeile für Zeile dieselben wie auf 4.09: Bericht 34, Datenbank 3, Diagnose 3, Lauf 4,
+                              Modulvertrag 3, Sensoren 4. Übersprungen sind in der Sandbox die Fälle des Selbsttests (dort
+                              ohne Anzeige); er läuft getrennt unter Mono mit Xvfb: 74 Fälle bestanden (4.09: 68).
+
+
+UMSTIEG
+  Nichts zu tun. Vorlagen, Geraete.json, Datenbank und Änderungsprotokoll bleiben, wie sie sind.
+
+
+QUELLEN
+  ListView.ItemChecked beim Einfügen und Anlegen des Fensters: https://learn.microsoft.com/dotnet/api/system.windows.forms.listview.itemchecked
+  TextRenderer.DrawText und TextFormatFlags.EndEllipsis: https://learn.microsoft.com/dotnet/api/system.windows.forms.textformatflags
+  ScrollableControl.AutoScrollMinSize: https://learn.microsoft.com/dotnet/api/system.windows.forms.scrollablecontrol.autoscrollminsize
