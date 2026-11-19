@@ -5,9 +5,14 @@ Seit 4.07 steht hier nur noch, was für die nächste Version gebraucht wird: Sta
 abgelehnte Vorschläge, Fallstricke. Was eine Version geändert hat, steht in CHANGELOG.md (kurz), in
 Doku\Versionshistorie.txt und in Doku\Änderungen_vX.Y.txt (ausführlich); es wird hier nicht wiederholt.
 
-## Stand: Version 4.11 (19.11.2026)
-Release-Commit "Release v4.11: Sicherheit und Rücknahme: Befunde der Gesamtprüfung behoben", von Claude unter Windows
-(ULB-PC10039) mit Bauen.cmd gebaut und getestet (erster Windows-Bau seit 4.0). Grundlage 05ca12f (Release v4.10).
+## Stand: Version 4.12 (19.11.2026)
+Release-Commit "Release v4.12: Praxistest 4.11: kürzere Läufe, PawnIO still, eigener Schritt für Windows.old", unter
+Windows (ULB-PC10039) mit Bauen.cmd gebaut. 4.11 (594bd08) wurde nie veröffentlicht; 4.12 baut darauf auf.
+
+Inhalt von 4.12 (Doku\Änderungen_v4.12.txt): Rückmeldungen aus dem ersten Praxistest. Wartung übernimmt DISM ScanHealth
+der Diagnose, ACPI-Thermalzonen mit 5 s Zeitlimit (erste WMI-Abfrage dauerte 102 s), PawnIO still und nur im Abschluss
+entfernt, neuer Wartungsschritt AltinstallationPapierkorb (Papierkorb, Windows.old, ESD-Dateien; Wunsch Leonardo: die
+Datenträgerbereinigung lässt sie aus, der eigene Schritt löscht sie nach Auswahl).
 
 Inhalt von 4.11 (Einzelheiten in Doku\Änderungen_v4.11.txt): Fehlerbehebungsversion nach der Gesamtprüfung vom
 19.11.2026. Alle Befunde der Stufen Dringend bis Messung behoben (PawnIO ohne Zustimmung, Wiederherstellungspunkt,
@@ -50,7 +55,7 @@ Neue Seite: eigene Datei DiagGui_<Name>.cs ohne using-Zeilen, in Oberflaeche.ps1
 (Get-GuiText in tests\Hilfen.ps1), nicht in einer bestimmten Datei.
 
 ## Versionen bisher (je eine Zeile, neueste zuerst)
-4.11 Sicherheit und Rücknahme: Befunde der Gesamtprüfung behoben. 4.10 Sensoren, Datenbank und Änderungen im Stil der übrigen Seiten (05ca12f).
+4.12 Praxistest 4.11: kürzere Läufe, PawnIO still, eigener Schritt für Windows.old. 4.11 Sicherheit und Rücknahme: Befunde der Gesamtprüfung behoben (594bd08, nicht veröffentlicht). 4.10 Sensoren, Datenbank und Änderungen im Stil der übrigen Seiten (05ca12f).
 4.09 Lasttest und System-Umzug im Stil der übrigen Seiten, Schalter ohne Beschnitt (34f5ef3).
 4.08 Ergebnis als Seite, Benchmark und Diagnose im Stil der übrigen Seiten (c9a16bb). 4.07 Eine Datei je Seite,
 kürzerer Start, Akzentfarbe, dezente Bewegung (ba3489b). 4.06 Update-Prüfung und Referenz
@@ -102,6 +107,8 @@ Weitere offene Befunde aus der Gesamtprüfung vom 19.11.2026: Doku\Pruefung_4.10
     und Änderungen, wählbares Zeitfenster der Kurven.
 15. 4.11 unter Windows von Hand bestätigen: siehe Grenzen in Doku\Änderungen_v4.11.txt (Hintergrundsperre, Update
    mit Fortschritt, Tastenkürzel, Computerschutz mit Administratorrechten, DDU holen).
+16. 4.12 von Hand bestätigen: Wartungsschritt AltinstallationPapierkorb auf einem PC mit Windows.old; Lauf mit Diagnose
+    (Integrität) und Wartung DismRestore ohne zweiten ScanHealth; keine Pause vor dem CPU-Benchmark.
 
 ## Abgelehnte Vorschläge (Entscheidung Leonardo, 10.11.2026): nicht umsetzen und nicht erneut vorschlagen
 GitHub Actions bzw. CI; Diagnosepaket (Logs als ZIP); Szenario-Kacheln auf der Startseite; Vorher-Nachher-Messung;
@@ -157,7 +164,10 @@ Schnelltest für Peripherie, sicheres Löschen, Testmatrix-Dateien.
     mit dem Stick. Aufräumen wählt solche Dateien deshalb nie von selbst.
 20. Die Sandbox-Fotos brauchen für Seiten mit laufender Live-Ansicht liveRunning = false vor dem Schließen, sonst wartet
     OnClosing vier Minuten auf den Arbeitsprozess.
+21. Die erste Abfrage einer WMI-Leistungsklasse (Win32_PerfFormatted*) kann minutenlang hängen, wenn WMI die Zählerliste
+    neu aufbaut. Neue Abfragen dieser Art mit Zeitlimit (Muster Get-ThermalZoneData, Get-StorageTempReadings) oder über PDH.
 
 ## Letzter Commit
-Release-Commit v4.11 (lokal von Bauen.cmd, Tag und Übertragung mit Veroeffentlichen.ps1). Vorgänger:
+Release-Commit v4.12 (lokal von Bauen.cmd, Tag und Übertragung mit Veroeffentlichen.ps1). Vorgänger:
+594bd08 Release v4.11: Sicherheit und Rücknahme: Befunde der Gesamtprüfung behoben (nicht veröffentlicht),
 05ca12f Release v4.10: Sensoren, Datenbank und Änderungen im Stil der übrigen Seiten, Protokoll aufräumen

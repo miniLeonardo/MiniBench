@@ -765,6 +765,8 @@ if ($script:Opt['Integritaet']) {
         try { $dr = Receive-Job $job -ErrorAction Stop; $dismState = [string]@($dr)[0].ImageHealthState } catch { Add-Line ('  DISM fehlgeschlagen: {0}' -f $_.Exception.Message) }
         Remove-Job $job -Force -ErrorAction SilentlyContinue
         if ($dismState) {
+            # ab v4.12: die Wartung desselben Laufs übernimmt den Zustand und spart den zweiten ScanHealth
+            $script:DiagDismState = $dismState
             Add-Line ('  Zustand: {0}' -f $dismState)
             Add-TestResult 'Komponentenspeicher (DISM)' $(if ($dismState -eq 'Healthy') { 'OK' } else { 'Warnung' }) $dismState
         }

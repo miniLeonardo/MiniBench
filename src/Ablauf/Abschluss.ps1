@@ -16,9 +16,11 @@ if ($GpuTypesLoaded) { try { [DiagGpu]::StopAll() } catch { } }
 
 # Sensoren schließen: entfernt einen vorübergehend installierten PawnIO-Treiber, bevor die Rückstandskontrolle prüft.
 # Kopfzeile und Protokoll nennen das (bis v4.02 stand währenddessen noch der letzte Abschnitt oben, z. B. "Optimierung: Ergebnis").
-Show-Overall 'Aufräumen: Sensoren beenden, vorübergehend installierte Treiber entfernen'
+# ab v4.12 ohne eigenen Hinweis auf den Treiber (Wunsch aus dem Praxistest); was entfernt wurde, steht im Bericht
+# unter Rückstandskontrolle und auf der Seite Änderungen
+Show-Overall 'Abschluss: Sensoren beenden'
 Write-Host ''
-Write-Host ('[{0}] >> Aufräumen: Sensoren und Hilfswerkzeuge' -f (Get-Date -Format 'HH:mm:ss')) -ForegroundColor Cyan
+Write-Host ('[{0}] >> Abschluss' -f (Get-Date -Format 'HH:mm:ss')) -ForegroundColor Cyan
 Close-SensorSession
 foreach ($t in @($script:SensorNotes | Select-Object -Unique)) { Add-Finding INFO 'Sensoren' $t }
 

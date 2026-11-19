@@ -145,8 +145,15 @@ function Get-WartungShaderCachePfade($User) {
 function Invoke-WartungSchritt([string]$k) {
     switch ($k) {
         'DismRestore' {
-            Write-Step 'DISM ScanHealth läuft (5 bis 20 Minuten) ...'
-            $scan = Invoke-DismJob 'ScanHealth' 600
+            # ab v4.12: Hat die Diagnose dieses Laufs ScanHealth schon ausgeführt, gilt ihr Ergebnis (bis v4.11 lief die
+            # Prüfung zweimal, 2 bis 20 Minuten doppelt)
+            if ($script:DiagDismState) {
+                $scan = [pscustomobject]@{ State = [string]$script:DiagDismState; Restart = $false; Error = '' }
+                Add-Line '  ScanHealth: Ergebnis aus der Diagnose dieses Laufs übernommen'
+            } else {
+                Write-Step 'DISM ScanHealth läuft (5 bis 20 Minuten) ...'
+                $scan = Invoke-DismJob 'ScanHealth' 600
+            }
             if ($scan.Error) { Add-Line ('  ScanHealth fehlgeschlagen: {0}' -f $scan.Error); Add-RepairResult $k 'Fehler' ('ScanHealth fehlgeschlagen: ' + $scan.Error); break }
             Add-Line ('  Zustand vor der Reparatur: {0}' -f $scan.State)
             if ($scan.State -eq 'Healthy') { Add-RepairResult $k 'OK' 'Komponentenspeicher intakt, keine Reparatur nötig'; break }
@@ -363,6 +370,20 @@ function Invoke-WartungSchritt([string]$k) {
             $freed = [math]::Max(0.0, $free1 - $free0)
             [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel ('Datenträgerbereinigung, {0} Kategorien ({1})' -f $keys.Count, $script:CleanmgrUmfang) -Nachher ('{0:N0} MB frei geworden' -f ($freed / 1MB)) -Gegenbefehl 'nicht umkehrbar' -NurHinweis)
             Add-RepairResult $k $(if ($r.TimedOut) { 'Warnung' } else { 'OK' }) ('Datenträgerbereinigung abgeschlossen, {0} freigegeben' -f (Format-Size $freed))
+        }
+        'AltinstallationPapierkorb' {
+            # ab v4.12: die drei Kategorien mit dem meisten Platz, getrennt von der Datenträgerbereinigung und nur nach Auswahl.
+            # Windows.old ist der Weg zurück zur vorigen Windows-Version; Downloads bleiben unberührt.
+            Write-Step 'Papierkorb, Windows.old und ESD-Installationsdateien werden gelöscht (cleanmgr /sagerun:4712) ...'
+            $keys = @(Get-CleanmgrKeys -Gross)
+            $old = Join-Path $env:SystemDrive 'Windows.old'
+            $hadOld = Test-Path -LiteralPath $old
+            if (-not $keys.Count) { Add-RepairResult $k 'Info' 'Die Kategorien Papierkorb, Windows.old und ESD-Installationsdateien gibt es auf diesem PC nicht'; break }
+            $c = Invoke-CleanmgrKategorien $keys 4712
+            $namen = @($keys | ForEach-Object { switch ([string]$_.PSChildName) { 'Recycle Bin' { 'Papierkorb' } 'Previous Installations' { 'Windows.old' } 'Windows ESD installation files' { 'ESD-Installationsdateien' } default { [string]$_.PSChildName } } })
+            [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel ('Datenträgerbereinigung: {0}' -f ($namen -join ', ')) -Nachher ('{0:N0} MB frei geworden' -f ($c.Frei / 1MB)) -Gegenbefehl 'nicht umkehrbar (Rückkehr zur vorigen Windows-Version nicht mehr möglich)' -NurHinweis)
+            $rest = $(if ($hadOld -and (Test-Path -LiteralPath $old)) { '; Windows.old ist noch vorhanden (Windows entfernt den Rest beim nächsten Neustart oder die Dateien sind gesperrt)' } else { '' })
+            Add-RepairResult $k $(if ($c.Ergebnis.TimedOut) { 'Warnung' } else { 'OK' }) ('{0} gelöscht, {1} freigegeben{2}' -f ($namen -join ', '), (Format-Size $c.Frei), $rest)
         }
         'Leistungszaehler' {
             Write-Step 'Leistungszähler werden neu aufgebaut (lodctr /r) ...'

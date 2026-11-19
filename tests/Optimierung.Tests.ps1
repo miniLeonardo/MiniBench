@@ -372,6 +372,7 @@ function Repair-Volume { param($DriveLetter, [switch]$Scan, [switch]$SpotFix) }
             Set-ModuleVar 'RepairLog' ([System.Collections.Generic.List[object]]::new())
             Set-ModuleVar 'RestartNeeded' ([System.Collections.Generic.List[string]]::new())
             Set-ModuleVar 'RestorePointNo' ''
+            Set-ModuleVar 'DiagDismState' $null
             Set-ModuleVar 'ToolIssues' (New-Object System.Collections.Generic.List[string])
             return $dir
         }
@@ -456,6 +457,26 @@ function Repair-Volume { param($DriveLetter, [switch]$Scan, [switch]$SpotFix) }
             Should -Invoke -ModuleName MinibenchTest New-ItemProperty -Times 4 -Exactly
             Should -Invoke -ModuleName MinibenchTest New-ItemProperty -Times 0 -Exactly -ParameterFilter { $LiteralPath -match 'Recycle Bin|Previous Installations|ESD|DownloadsFolder' }
             @(Get-Eintraege | Where-Object { $_.Schritt -eq 'Datentraegerbereinigung' })[0].Ziel | Should -Match 'Papierkorb'
+        }
+        # ab v4.12: eigener Wartungsschritt für die drei großen Kategorien, nur nach Auswahl
+        It 'AltinstallationPapierkorb setzt StateFlags nur für Papierkorb, Windows.old und ESD-Dateien' {
+            [void](New-WartungRun)
+            Mock -ModuleName MinibenchTest Get-Volume { [pscustomobject]@{ SizeRemaining = 1GB } }
+            $g = @(MinibenchTest\Get-CleanmgrKeys -Gross | ForEach-Object { $_.PSChildName })
+            $g | Should -Be @('Recycle Bin', 'Previous Installations', 'Windows ESD installation files')
+            MinibenchTest\Invoke-WartungSchritt 'AltinstallationPapierkorb'
+            Should -Invoke -ModuleName MinibenchTest New-ItemProperty -Times 3 -Exactly
+            Should -Invoke -ModuleName MinibenchTest New-ItemProperty -Times 3 -Exactly -ParameterFilter { $Name -eq 'StateFlags4712' -and $LiteralPath -match 'Recycle Bin|Previous Installations|ESD' }
+            Should -Invoke -ModuleName MinibenchTest Remove-ItemProperty -Times 3 -Exactly
+            Should -Invoke -ModuleName MinibenchTest Invoke-External -Times 1 -Exactly -ParameterFilter { $Arguments -eq '/sagerun:4712' }
+            $e = @(Get-Eintraege | Where-Object { $_.Schritt -eq 'AltinstallationPapierkorb' })[0]
+            $e.Ziel | Should -Match 'Papierkorb, Windows\.old, ESD-Installationsdateien'
+            $e.Gegenbefehl | Should -Match 'nicht umkehrbar'
+            (Get-ModuleVar 'RepairLog')[0].Ergebnis | Should -Be 'OK'
+        }
+        It 'AltinstallationPapierkorb ist im Vertrag nicht vorausgewählt und nicht üblich' {
+            $s = @((MinibenchTest\Get-ModuleContract 'Wartung').Schritte | Where-Object { $_.Key -eq 'AltinstallationPapierkorb' })[0]
+            $s.Vorauswahl | Should -BeFalse; $s.Ueblich | Should -BeFalse; $s.Gruppe | Should -Be 'Bereinigung und Speicherplatz'
         }
         It 'die geplante Aufgabe schließt dieselben Kategorien aus' {
             $t = @(MinibenchTest\Get-OptMaintenanceTasks | Where-Object { $_.Name -eq 'Datenträgerbereinigung' })[0]
@@ -601,6 +622,23 @@ function Repair-Volume { param($DriveLetter, [switch]$Scan, [switch]$SpotFix) }
             MinibenchTest\Invoke-WartungSchritt 'DismRestore'
             MinibenchTest\Invoke-WartungSchritt 'Sfc'
             foreach ($k in 'DismRestore', 'Sfc') { @(Get-Eintraege | Where-Object { $_.Schritt -eq $k })[0].Gegenbefehl | Should -Match 'kein Wiederherstellungspunkt' -Because $k }
+        }
+        # ab v4.12: ScanHealth lief bis v4.11 in Diagnose und Wartung desselben Laufs zweimal
+        It 'DISM: übernimmt den ScanHealth-Zustand der Diagnose dieses Laufs' {
+            [void](New-WartungRun)
+            Mock -ModuleName MinibenchTest Invoke-DismJob { [pscustomobject]@{ State = 'Healthy'; Restart = $false; Error = '' } }
+            Set-ModuleVar 'DiagDismState' 'Healthy'
+            MinibenchTest\Invoke-WartungSchritt 'DismRestore'
+            Should -Invoke -ModuleName MinibenchTest Invoke-DismJob -Times 0 -Exactly
+            (Get-ModuleVar 'RepairLog')[0].Details | Should -Match 'intakt'
+            [void](New-WartungRun)
+            Set-ModuleVar 'DiagDismState' 'Repairable'
+            MinibenchTest\Invoke-WartungSchritt 'DismRestore'
+            Should -Invoke -ModuleName MinibenchTest Invoke-DismJob -Times 1 -Exactly -ParameterFilter { $Mode -eq 'RestoreHealth' }
+            Should -Invoke -ModuleName MinibenchTest Invoke-DismJob -Times 0 -Exactly -ParameterFilter { $Mode -eq 'ScanHealth' }
+            [void](New-WartungRun)
+            MinibenchTest\Invoke-WartungSchritt 'DismRestore'
+            Should -Invoke -ModuleName MinibenchTest Invoke-DismJob -Times 1 -Exactly -ParameterFilter { $Mode -eq 'ScanHealth' }
         }
         It 'ShaderCache und Absturzabbilder: Profil des angemeldeten Benutzers, von AMD nur die Cache-Ordner' {
             [void](New-WartungRun)

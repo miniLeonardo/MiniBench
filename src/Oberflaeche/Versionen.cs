@@ -11,6 +11,11 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.12", "19.11.2026", "Praxistest 4.11: kürzere Läufe, PawnIO still, eigener Schritt für Windows.old",
+            "• Neu, Wartung: „Papierkorb, Windows.old und ESD-Dateien löschen“ als eigener Schritt (nicht vorausgewählt, nicht umkehrbar). Die Datenträgerbereinigung bleibt ohne diese drei Kategorien.\r\n" +
+            "• Kürzer: Hat die Diagnose den Komponentenspeicher geprüft, übernimmt die Wartung das Ergebnis, statt DISM ScanHealth ein zweites Mal auszuführen (2 bis 20 Minuten).\r\n" +
+            "• Behoben: Vor dem CPU-Benchmark stand der Lauf bis zu zwei Minuten bei „Hintergrundlast wird geprüft“. Ursache war die erste WMI-Abfrage der ACPI-Thermalzonen (gemessen 102 s, danach 20 ms). Sie hat jetzt ein Zeitlimit von 5 Sekunden.\r\n" +
+            "• PawnIO: Installation und Entfernung laufen ohne Anzeige und lassen sich nicht mehr durch „Überspringen“ unterbrechen. Entfernt wird nur im Abschluss. Ein Treiberrest eines abgebrochenen Laufs wird weiterverwendet und erst am Ende entfernt, statt zu Beginn deinstalliert und sofort wieder installiert zu werden."),
         new Eintrag("4.11", "19.11.2026", "Sicherheit und Rücknahme: Befunde der Gesamtprüfung behoben",
             "• Behoben: PawnIO wurde auch installiert, wenn der Treiber auf „nein“ stand (Arbeitsprozesse laufen immer mit Administratorrechten). Jetzt nur noch mit Zustimmung.\r\n" +
             "• Behoben, Wartung: „Alte Wiederherstellungspunkte löschen“ löschte auch den Punkt, den der Lauf eben angelegt hatte. Die alten Punkte gehen jetzt vor dem neuen; die Nummer zählt nur, wenn der Punkt mit dieser Beschreibung wirklich da ist.\r\n" +

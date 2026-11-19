@@ -73,8 +73,9 @@ try { Invoke-CrashAnalysis } catch { Write-Warning ('Absturzanalyse des letzten 
 # Hilfswerkzeuge: Wahl dieses Laufs (Parameter oder je Gerät gespeichert)
 Write-Host ('  Hilfswerkzeuge : {0}' -f $(if ((Get-ToolKeep) -eq 'behalten') { 'auf diesem PC behalten' } else { 'nach dem Lauf entfernen' }))
 # früher behaltene smartmontools werden erst am Laufende in Abschluss.ps1 deinstalliert, falls nicht mehr gewünscht
-# PawnIO-Treiber eines abgebrochenen Laufs entfernen (Markierung im Laufzeitordner)
-Remove-PawnIoLeftover
+# PawnIO-Treiber eines abgebrochenen Laufs entfernen (Markierung im Laufzeitordner); braucht dieser Lauf ihn, bleibt er
+# bis zum Abschluss (ab v4.12)
+Remove-PawnIoLeftover -Uebernehmen:$SensorTreiber
 # vorübergehende Einstellungen eines abgebrochenen Laufs zurücknehmen (GPU-Wahl für winsat.exe)
 try {
     $tmpUndo = Restore-TemporaryChanges

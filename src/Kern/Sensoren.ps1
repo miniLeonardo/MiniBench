@@ -201,7 +201,8 @@ function Install-PawnIoTemporary {
     if (-not $marker) { return [pscustomobject]@{ Ok = $false; Text = 'PawnIO nicht installiert: kein Datenordner für die Markierung' } }
     try { New-Item -ItemType Directory -Path (Split-Path $marker -Parent) -Force -ErrorAction Stop | Out-Null; [IO.File]::WriteAllText($marker, ('PawnIO {0} installiert von Leos Minibench {1} am {2:yyyy-MM-dd HH:mm:ss}' -f $script:PawnIoPin.Version, $ScriptVersion, (Get-Date))) }
     catch { return [pscustomobject]@{ Ok = $false; Text = ('PawnIO nicht installiert: Markierung ließ sich nicht schreiben ({0})' -f $_.Exception.Message) } }
-    $r = Invoke-External -File $setup -Arguments '-install -silent' -TimeoutSec 180 -Progress 'PawnIO-Treiber wird vorübergehend installiert'
+    # ab v4.12 ohne Fortschrittsanzeige und ohne Abbruch durch "Überspringen": Ein halb installierter Treiber wäre schlimmer
+    $r = Invoke-External -File $setup -Arguments '-install -silent' -TimeoutSec 180 -OhneUeberspringen
     $st = Get-PawnIoState
     if (-not $st.Installiert) {
         if ($marker) { Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue }
@@ -236,7 +237,8 @@ function Uninstall-PawnIo {
     # v3.84 bis v4.01 hängten InnoSetup- und NSIS-Schalter an (/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /S): Das Setup
     # zeigte "Unknown argument: /VERYSILENT", brach mit Rückgabecode 87 ab und der Treiber blieb installiert.
     $uninstArgs = '-uninstall -silent'
-    $r = Invoke-External -File $file -Arguments $uninstArgs -TimeoutSec 180 -Progress 'PawnIO-Treiber wird entfernt'
+    # ab v4.12 still (ohne Fortschrittsanzeige, Wunsch aus dem Praxistest) und ohne Abbruch durch "Überspringen"
+    $r = Invoke-External -File $file -Arguments $uninstArgs -TimeoutSec 180 -OhneUeberspringen
     $st = Get-PawnIoState
     if ($st.Installiert) { return [pscustomobject]@{ Ok = $false; Text = ('PawnIO ist noch installiert (Rückgabecode {0}). Von Hand entfernen: "{1}" -uninstall' -f $r.ExitCode, $file) } }
     if ($hasMarker) { Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue }
@@ -247,12 +249,19 @@ function Uninstall-PawnIo {
     return [pscustomobject]@{ Ok = $true; Text = $t }
 }
 
-# Beim Start: Treiberreste eines abgebrochenen Laufs entfernen
-function Remove-PawnIoLeftover {
+# Beim Start: Treiberreste eines abgebrochenen Laufs entfernen.
+# -Uebernehmen (ab v4.12): Braucht dieser Lauf den Treiber ohnehin (-SensorTreiber), bleibt er bis zum Laufende und wird
+# erst im Abschluss entfernt. Bis v4.11 deinstallierte der Start ihn und die Diagnose installierte ihn gleich wieder.
+function Remove-PawnIoLeftover([switch]$Uebernehmen) {
     $marker = Get-PawnIoMarker
     if (-not $marker -or -not (Test-Path -LiteralPath $marker)) { return }
     $vor = 'Ein früherer Lauf hat den PawnIO-Treiber nicht entfernt (Lauf abgebrochen oder Entfernen fehlgeschlagen): {0}.'
     if ((Get-ToolKeep) -eq 'behalten') { $k = Save-PawnIoKept; if ($k) { $script:SensorNotes.Add(($vor -f $k.Text)) }; return }
+    if ($Uebernehmen -and (Get-PawnIoState).Installiert) {
+        $script:PawnIoByUs = $true; $script:PawnIoInstalledRun = $true
+        $script:SensorNotes.Add(($vor -f 'dieser Lauf verwendet ihn und entfernt ihn am Ende'))
+        return
+    }
     $u = Uninstall-PawnIo
     if ($u) { $script:SensorNotes.Add(($vor -f $u.Text)) }
 }
@@ -281,7 +290,7 @@ function Open-SensorSession([switch]$Treiber, [switch]$OhneDatentraeger) {
     if ($script:Sens) { return $script:Sens }
     $s = [pscustomobject]@{ Lhm = $false; LhmVersion = ''; LhmFehler = ''; LhmGrund = ''; LhmLief = $false; Treiber = 'nicht verwendet'; TreiberOk = $false; NvSmi = (Find-NvidiaSmi); Quellen = @(); Hinweise = New-Object System.Collections.Generic.List[string]; Geoeffnet = Get-Date; StorageCache = @(); StorageZeit = [datetime]::MinValue; GpuLimits = @{}; StorageTimeout = $false; LhmVerzoegert = $false }
     $script:Sens = $s
-    Remove-PawnIoLeftover
+    Remove-PawnIoLeftover -Uebernehmen:$Treiber
     $tools = Get-SensorToolState
     if (Test-IsArm64) {
         $s.LhmGrund = 'ARM64'
@@ -294,7 +303,12 @@ function Open-SensorSession([switch]$Treiber, [switch]$OhneDatentraeger) {
         else { $s.LhmGrund = 'unvollstaendig'; $s.Hinweise.Add(('LibreHardwareMonitor unvollständig oder nicht freigegeben ({0}): nur Ersatzwerte' -f ($tools.Fehlend -join ', '))) }
     } else {
         $pw = Get-PawnIoState
-        if ($pw.Installiert -and (Test-ToolRemoveKept) -and (Test-KeptPawnIo $pw)) {
+        $mk = Get-PawnIoMarker
+        if ($pw.Installiert -and $script:PawnIoByUs -and $mk -and (Test-Path -LiteralPath $mk)) {
+            # ab v4.12: Rest eines früheren Laufs übernommen (Remove-PawnIoLeftover -Uebernehmen) oder in diesem Lauf installiert
+            $s.Treiber = ('PawnIO {0} vorübergehend installiert' -f $pw.Version); $s.TreiberOk = $true
+        }
+        elseif ($pw.Installiert -and (Test-ToolRemoveKept) -and (Test-KeptPawnIo $pw)) {
             # früher auf Wunsch behalten, jetzt soll er gehen: am Laufende wie einen eigenen Treiber entfernen
             $script:PawnIoByUs = $true
             $s.Treiber = ('PawnIO {0} (von Leos Minibench behalten, wird am Ende entfernt)' -f $pw.Version); $s.TreiberOk = $true
@@ -666,7 +680,7 @@ function Get-NvidiaPowerLimits([string]$Path) {
 
 function Get-AcpiReadings {
     $res = @()
-    foreach ($z in @(Get-CimInstance Win32_PerfFormattedData_Counters_ThermalZoneInformation -ErrorAction SilentlyContinue)) {
+    foreach ($z in @(Get-ThermalZoneData)) {
         $v = $null
         if ($z.HighPrecisionTemperature) { $v = $z.HighPrecisionTemperature / 10 - 273.15 } elseif ($z.Temperature) { $v = $z.Temperature - 273.15 }
         if ($null -eq $v -or $v -le 0 -or $v -ge 130) { continue }

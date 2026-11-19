@@ -52,6 +52,9 @@ $script:OptNpiExePins = [ordered]@{
 # Windows.old (Rückkehr zur vorigen Windows-Version) und ESD-Installationsdateien (Zurücksetzen des PCs)
 $script:CleanmgrAusgeschlossen = @('DownloadsFolder', 'Recycle Bin', 'Previous Installations', 'Windows ESD installation files')
 $script:CleanmgrUmfang = 'alle Kategorien außer Downloads, Papierkorb, Windows.old und ESD-Installationsdateien'
+# ab v4.12: Papierkorb, Windows.old und ESD-Installationsdateien als eigener Wartungsschritt (AltinstallationPapierkorb),
+# nur wenn er ausdrücklich gewählt ist. Downloads löscht keiner der beiden Schritte.
+$script:CleanmgrGross = @('Recycle Bin', 'Previous Installations', 'Windows ESD installation files')
 $script:OptDduDir = 'LeosMinibench-DDU'
 $script:OptTaskFolder = '\Leos Minibench\'
 
@@ -649,10 +652,24 @@ function Clear-OptFolder([string]$Path) {
     return $freed
 }
 
-# ab v4.11: Kategorien der Datenträgerbereinigung (Registry VolumeCaches) ohne die ausgeschlossenen
-function Get-CleanmgrKeys {
+# ab v4.11: Kategorien der Datenträgerbereinigung (Registry VolumeCaches) ohne die ausgeschlossenen.
+# -Gross (ab v4.12): nur Papierkorb, Windows.old und ESD-Installationsdateien
+function Get-CleanmgrKeys([switch]$Gross) {
     $root = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches'
+    if ($Gross) { return @(Get-ChildItem -LiteralPath $root -ErrorAction SilentlyContinue | Where-Object { $script:CleanmgrGross -contains [string]$_.PSChildName }) }
     return @(Get-ChildItem -LiteralPath $root -ErrorAction SilentlyContinue | Where-Object { $script:CleanmgrAusgeschlossen -notcontains [string]$_.PSChildName })
+}
+
+# Datenträgerbereinigung mit den angegebenen Kategorien (StateFlags nur für diesen Aufruf); Rückgabe: Ergebnis von
+# cleanmgr und frei gewordene Bytes auf dem Systemlaufwerk
+function Invoke-CleanmgrKategorien($Keys, [int]$Nummer = 4711) {
+    $flag = 'StateFlags{0:D4}' -f $Nummer
+    foreach ($kObj in @($Keys)) { try { New-ItemProperty -LiteralPath $kObj.PSPath -Name $flag -Value 2 -PropertyType DWord -Force -ErrorAction Stop | Out-Null } catch { } }
+    $free0 = [double](Get-Volume -DriveLetter $env:SystemDrive.Substring(0, 1) -ErrorAction SilentlyContinue).SizeRemaining
+    try { $r = Invoke-External -File (Join-Path $env:windir 'System32\cleanmgr.exe') -Arguments ('/sagerun:{0}' -f $Nummer) -TimeoutSec 3600 -Progress 'Datenträgerbereinigung läuft' -ExpectedSec 600 }
+    finally { foreach ($kObj in @($Keys)) { try { Remove-ItemProperty -LiteralPath $kObj.PSPath -Name $flag -ErrorAction Stop } catch { } } }
+    $free1 = [double](Get-Volume -DriveLetter $env:SystemDrive.Substring(0, 1) -ErrorAction SilentlyContinue).SizeRemaining
+    return [pscustomobject]@{ Ergebnis = $r; Frei = [math]::Max(0.0, $free1 - $free0) }
 }
 
 # ab v4.11: Wiederherstellungspunkte prüfen. Der Punkt eines Laufs zählt nur, wenn Windows ihn wirklich angelegt hat

@@ -58,6 +58,9 @@
         @{ Key = 'Datentraegerbereinigung'; Typ = 'Massnahme'; Risiko = 'Eingriff'; Neustart = 'nie'; Rueckgaengig = 'keins'; Minuten = 10; Vorauswahl = $false; Ueblich = $true; Gruppe = 'Bereinigung und Speicherplatz'
            Titel = 'Datenträgerbereinigung'
            Text  = 'Datenträgerbereinigung (cleanmgr ohne Downloads, Papierkorb, Windows.old und ESD-Installationsdateien)' }
+        @{ Key = 'AltinstallationPapierkorb'; Typ = 'Massnahme'; Risiko = 'Eingriff'; Neustart = 'nie'; Rueckgaengig = 'keins'; Minuten = 10; Vorauswahl = $false; Ueblich = $false; Gruppe = 'Bereinigung und Speicherplatz'
+           Titel = 'Papierkorb, Windows.old und ESD-Dateien löschen'
+           Text  = 'Papierkorb leeren, Windows.old und ESD-Installationsdateien löschen (meist der größte Platzgewinn, nicht umkehrbar)' }
         @{ Key = 'Leistungszaehler'; Typ = 'Massnahme'; Risiko = 'Eingriff'; Neustart = 'nie'; Rueckgaengig = 'keins'; Minuten = 1; Vorauswahl = $false; Ueblich = $false; Gruppe = 'Dienste, Geräte und Energie'
            Titel = 'Leistungszähler neu aufbauen'
            Text  = 'Leistungszähler aus der Sicherung neu aufbauen (lodctr /r)' }

@@ -66,8 +66,9 @@ function Add-Finding { param([string]$Level, [string]$Area, [string]$Text) $scri
 function Write-Checkpoint { param([string]$Kind, [string]$Text) }
 function Add-ChangeRecord { param([string]$Modul, [string]$Schritt, [string]$Titel, [string]$Risiko, [string]$Art, [string]$Ziel, [string]$Vorher = '', [string]$Nachher = '', $Daten = $null, [string]$Gegenbefehl = '', [switch]$NurHinweis)
     $script:TestChanges += [pscustomobject]@{ Titel = $Titel; Risiko = $Risiko; NurHinweis = [bool]$NurHinweis } }
-function Invoke-External { param([string]$File, [string]$Arguments = '', [int]$TimeoutSec = 600, $Encoding = $null, [string]$Progress = '', [int]$ExpectedSec = 0) [pscustomobject]@{ ExitCode = 0; Output = ''; Error = ''; TimedOut = $false } }
+function Invoke-External { param([string]$File, [string]$Arguments = '', [int]$TimeoutSec = 600, $Encoding = $null, [string]$Progress = '', [int]$ExpectedSec = 0, [switch]$OhneUeberspringen) [pscustomobject]@{ ExitCode = 0; Output = ''; Error = ''; TimedOut = $false } }
 function Get-CpuSample { [pscustomobject]@{ Last = 5; Leistung = 100; MaxLeistung = 100; MaxFreq = 100; MHz = 3600; MaxMHz = 3600; Temp = $null } }
+function Get-ThermalZoneData { @() }
 $script:TestChanges = @()
 '@
     function New-DataDir {
@@ -669,6 +670,32 @@ Describe 'PawnIO nur vorübergehend' {
         (Get-ModuleVar 'SensorNotes') -join ' ' | Should -Match 'abgebrochen'
         Test-Path (MinibenchTest\Get-PawnIoMarker) | Should -BeFalse
     }
+    # ab v4.12: bis v4.11 deinstallierte der Start den Rest und die Diagnose installierte ihn gleich wieder
+    It 'ein Rest wird übernommen, wenn der Lauf den Treiber braucht, und erst am Ende entfernt' {
+        [void](MinibenchTest\Install-PawnIoTemporary)
+        Set-ModuleVar 'PawnIoByUs' $false
+        $script:Calls = @()
+        MinibenchTest\Remove-PawnIoLeftover -Uebernehmen
+        @($script:Calls).Count | Should -Be 0
+        $script:Reg | Should -Not -BeNullOrEmpty
+        Get-ModuleVar 'PawnIoByUs' | Should -BeTrue
+        Test-Path (MinibenchTest\Get-PawnIoMarker) | Should -BeTrue
+        (MinibenchTest\Uninstall-PawnIo).Ok | Should -BeTrue
+        $script:Reg | Should -BeNullOrEmpty
+        @($script:Calls).Count | Should -Be 1
+    }
+    It 'Installation und Entfernung laufen ohne Anzeige und lassen sich nicht überspringen' {
+        $script:Opts = @()
+        Mock -ModuleName MinibenchTest Invoke-External {
+            $script:Opts += [pscustomobject]@{ Progress = $Progress; Ohne = [bool]$OhneUeberspringen }
+            if ($Arguments -like '-install*') { $script:Reg = [pscustomobject]@{ Version = '2.2.0.0'; Ort = 'C:\Program Files\PawnIO'; Deinstallation = '' } } else { $script:Reg = $null }
+            [pscustomobject]@{ ExitCode = 0; Output = ''; Error = ''; TimedOut = $false }
+        }
+        [void](MinibenchTest\Install-PawnIoTemporary)
+        [void](MinibenchTest\Uninstall-PawnIo)
+        $script:Opts.Count | Should -Be 2
+        foreach ($o in $script:Opts) { $o.Progress | Should -BeNullOrEmpty; $o.Ohne | Should -BeTrue }
+    }
     It 'ohne Markierung entfernt der Start nichts' {
         $script:Reg = [pscustomobject]@{ Version = '2.2.0.0'; Ort = 'C:\x'; Deinstallation = '' }
         MinibenchTest\Remove-PawnIoLeftover
@@ -1185,5 +1212,32 @@ Describe 'Geschätzter Gesamtsystemverbrauch und Effizienz' {
         $prof.Effizienz.CpuMT_PerWatt | Should -BeNullOrEmpty
         $prof.Effizienz.Gpu_PerWatt | Should -BeNullOrEmpty
         $prof.Effizienz.System_PerWatt | Should -BeNullOrEmpty
+    }
+}
+
+# ab v4.12: Die erste WMI-Abfrage der Thermalzonen dauerte auf einem Notebook 102 s (Neuaufbau der WMI-Zählerliste)
+Describe 'ACPI-Thermalzonen mit Zeitlimit' {
+    BeforeAll {
+        Import-MinibenchTestModule -Parts 'Kern\Werkzeuge.ps1' -Functions 'Get-ThermalZoneData' -Setup @'
+function Write-Checkpoint { param([string]$Kind, [string]$Text) }
+'@
+    }
+    It 'fragt nach "aus" nicht mehr nach' {
+        Mock -ModuleName MinibenchTest Get-CimInstance { @([pscustomobject]@{ Name = 'TZ0'; HighPrecisionTemperature = 3231 }) }
+        Set-ModuleVar 'ThermalZoneStatus' 'aus'
+        @(MinibenchTest\Get-ThermalZoneData).Count | Should -Be 0
+        Should -Invoke -ModuleName MinibenchTest Get-CimInstance -Times 0 -Exactly
+    }
+    It 'fragt nach "ok" direkt ab' {
+        Mock -ModuleName MinibenchTest Get-CimInstance { @([pscustomobject]@{ Name = 'TZ0'; HighPrecisionTemperature = 3231 }) }
+        Set-ModuleVar 'ThermalZoneStatus' 'ok'
+        @(MinibenchTest\Get-ThermalZoneData).Count | Should -Be 1
+        Should -Invoke -ModuleName MinibenchTest Get-CimInstance -Times 1 -Exactly
+    }
+    It 'die erste Abfrage läuft mit Zeitlimit in einem eigenen Runspace' {
+        $t = Get-PartText 'Kern\Grundgeruest.ps1'
+        $t | Should -Match 'AsyncWaitHandle\.WaitOne'
+        $t | Should -Match 'function Get-CpuSample \{\s+\$tz = @\(Get-ThermalZoneData\)'
+        (Get-PartText 'Kern\Sensoren.ps1') | Should -Not -Match 'Get-CimInstance Win32_PerfFormattedData_Counters_ThermalZoneInformation'
     }
 }

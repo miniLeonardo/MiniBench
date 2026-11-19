@@ -249,7 +249,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
 }
 #endregion
 
-$ScriptVersion = '4.11'
+$ScriptVersion = '4.12'
 $AppName       = 'Leos Minibench'
 # Eingebettete Referenzprofile für Leos Minibench (v3.0)
 $script:EmbeddedReferences = @{
@@ -3159,6 +3159,9 @@ $script:ModuleContracts = @(
         @{ Key = 'Datentraegerbereinigung'; Typ = 'Massnahme'; Risiko = 'Eingriff'; Neustart = 'nie'; Rueckgaengig = 'keins'; Minuten = 10; Vorauswahl = $false; Ueblich = $true; Gruppe = 'Bereinigung und Speicherplatz'
            Titel = 'Datenträgerbereinigung'
            Text  = 'Datenträgerbereinigung (cleanmgr ohne Downloads, Papierkorb, Windows.old und ESD-Installationsdateien)' }
+        @{ Key = 'AltinstallationPapierkorb'; Typ = 'Massnahme'; Risiko = 'Eingriff'; Neustart = 'nie'; Rueckgaengig = 'keins'; Minuten = 10; Vorauswahl = $false; Ueblich = $false; Gruppe = 'Bereinigung und Speicherplatz'
+           Titel = 'Papierkorb, Windows.old und ESD-Dateien löschen'
+           Text  = 'Papierkorb leeren, Windows.old und ESD-Installationsdateien löschen (meist der größte Platzgewinn, nicht umkehrbar)' }
         @{ Key = 'Leistungszaehler'; Typ = 'Massnahme'; Risiko = 'Eingriff'; Neustart = 'nie'; Rueckgaengig = 'keins'; Minuten = 1; Vorauswahl = $false; Ueblich = $false; Gruppe = 'Dienste, Geräte und Energie'
            Titel = 'Leistungszähler neu aufbauen'
            Text  = 'Leistungszähler aus der Sicherung neu aufbauen (lodctr /r)' }
@@ -5599,6 +5602,9 @@ $script:OptNpiExePins = [ordered]@{
 # Windows.old (Rückkehr zur vorigen Windows-Version) und ESD-Installationsdateien (Zurücksetzen des PCs)
 $script:CleanmgrAusgeschlossen = @('DownloadsFolder', 'Recycle Bin', 'Previous Installations', 'Windows ESD installation files')
 $script:CleanmgrUmfang = 'alle Kategorien außer Downloads, Papierkorb, Windows.old und ESD-Installationsdateien'
+# ab v4.12: Papierkorb, Windows.old und ESD-Installationsdateien als eigener Wartungsschritt (AltinstallationPapierkorb),
+# nur wenn er ausdrücklich gewählt ist. Downloads löscht keiner der beiden Schritte.
+$script:CleanmgrGross = @('Recycle Bin', 'Previous Installations', 'Windows ESD installation files')
 $script:OptDduDir = 'LeosMinibench-DDU'
 $script:OptTaskFolder = '\Leos Minibench\'
 
@@ -6196,10 +6202,24 @@ function Clear-OptFolder([string]$Path) {
     return $freed
 }
 
-# ab v4.11: Kategorien der Datenträgerbereinigung (Registry VolumeCaches) ohne die ausgeschlossenen
-function Get-CleanmgrKeys {
+# ab v4.11: Kategorien der Datenträgerbereinigung (Registry VolumeCaches) ohne die ausgeschlossenen.
+# -Gross (ab v4.12): nur Papierkorb, Windows.old und ESD-Installationsdateien
+function Get-CleanmgrKeys([switch]$Gross) {
     $root = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches'
+    if ($Gross) { return @(Get-ChildItem -LiteralPath $root -ErrorAction SilentlyContinue | Where-Object { $script:CleanmgrGross -contains [string]$_.PSChildName }) }
     return @(Get-ChildItem -LiteralPath $root -ErrorAction SilentlyContinue | Where-Object { $script:CleanmgrAusgeschlossen -notcontains [string]$_.PSChildName })
+}
+
+# Datenträgerbereinigung mit den angegebenen Kategorien (StateFlags nur für diesen Aufruf); Rückgabe: Ergebnis von
+# cleanmgr und frei gewordene Bytes auf dem Systemlaufwerk
+function Invoke-CleanmgrKategorien($Keys, [int]$Nummer = 4711) {
+    $flag = 'StateFlags{0:D4}' -f $Nummer
+    foreach ($kObj in @($Keys)) { try { New-ItemProperty -LiteralPath $kObj.PSPath -Name $flag -Value 2 -PropertyType DWord -Force -ErrorAction Stop | Out-Null } catch { } }
+    $free0 = [double](Get-Volume -DriveLetter $env:SystemDrive.Substring(0, 1) -ErrorAction SilentlyContinue).SizeRemaining
+    try { $r = Invoke-External -File (Join-Path $env:windir 'System32\cleanmgr.exe') -Arguments ('/sagerun:{0}' -f $Nummer) -TimeoutSec 3600 -Progress 'Datenträgerbereinigung läuft' -ExpectedSec 600 }
+    finally { foreach ($kObj in @($Keys)) { try { Remove-ItemProperty -LiteralPath $kObj.PSPath -Name $flag -ErrorAction Stop } catch { } } }
+    $free1 = [double](Get-Volume -DriveLetter $env:SystemDrive.Substring(0, 1) -ErrorAction SilentlyContinue).SizeRemaining
+    return [pscustomobject]@{ Ergebnis = $r; Frei = [math]::Max(0.0, $free1 - $free0) }
 }
 
 # ab v4.11: Wiederherstellungspunkte prüfen. Der Punkt eines Laufs zählt nur, wenn Windows ihn wirklich angelegt hat
@@ -6861,7 +6881,7 @@ public partial class DiagGui : Form
     // Reparatur
     string[] repKeys = new string[] {
         "DismRestore", "Sfc", "Komponentenbereinigung", "Dateisystem", "WindowsUpdate", "Netzwerk", "Temp", "WMI", "Zeit", "Druck",
-        "Geraete", "Schnellstart", "Energieplaene", "Datentraegerbereinigung", "Leistungszaehler", "Leerlaufaufgaben", "ShaderCache", "UpdateDownloads", "Absturzabbilder", "Prefetch",
+        "Geraete", "Schnellstart", "Energieplaene", "Datentraegerbereinigung", "AltinstallationPapierkorb", "Leistungszaehler", "Leerlaufaufgaben", "ShaderCache", "UpdateDownloads", "Absturzabbilder", "Prefetch",
         "PaketCache", "Wiederherstellungspunkte" };
     string[] repText = new string[] {
         "Komponentenspeicher prüfen und reparieren (DISM ScanHealth, bei Bedarf RestoreHealth)",
@@ -6878,6 +6898,7 @@ public partial class DiagGui : Form
         "Schnellstart deaktivieren (hilft bei Abstürzen nach dem Einschalten)",
         "Energiesparpläne auf Standard zurücksetzen (eigene Pläne werden vorher gesichert)",
         "Datenträgerbereinigung (cleanmgr ohne Downloads, Papierkorb, Windows.old und ESD-Installationsdateien)",
+        "Papierkorb leeren, Windows.old und ESD-Installationsdateien löschen (meist der größte Platzgewinn, nicht umkehrbar)",
         "Leistungszähler aus der Sicherung neu aufbauen (lodctr /r)",
         "Aufgeschobene Windows-Wartungsaufgaben starten (ProcessIdleTasks)",
         "DirectX-, OpenGL-, Intel- und AMD-Shader-Caches leeren",
@@ -6886,7 +6907,7 @@ public partial class DiagGui : Form
         "Prefetch-Ordner leeren (Windows baut die Daten danach neu auf)",
         "Paket-Cache von Installationsprogrammen leeren (Package Cache)",
         "Alte Schattenkopien auf dem Systemlaufwerk löschen" };
-    int[] repMinutes = new int[] { 20, 12, 15, 5, 2, 1, 3, 2, 1, 1, 1, 1, 1, 10, 1, 1, 1, 1, 1, 1, 1, 1 };
+    int[] repMinutes = new int[] { 20, 12, 15, 5, 2, 1, 3, 2, 1, 1, 1, 1, 1, 10, 10, 1, 1, 1, 1, 1, 1, 1, 1 };
     CheckBox[] repChk;
     CheckBox chkRestorePoint;
     // Datenbank
@@ -12001,7 +12022,7 @@ public partial class DiagGui
         {
             string k = repKeys[i];
             if (k == "DismRestore" || k == "Sfc" || k == "Komponentenbereinigung" || k == "Dateisystem") return "Systemdateien und Komponentenspeicher";
-            if (k == "Temp" || k == "Datentraegerbereinigung" || k == "UpdateDownloads" || k == "ShaderCache" || k == "Prefetch" || k == "PaketCache" || k == "Absturzabbilder" || k == "Wiederherstellungspunkte") return "Bereinigung und Speicherplatz";
+            if (k == "Temp" || k == "Datentraegerbereinigung" || k == "AltinstallationPapierkorb" || k == "UpdateDownloads" || k == "ShaderCache" || k == "Prefetch" || k == "PaketCache" || k == "Absturzabbilder" || k == "Wiederherstellungspunkte") return "Bereinigung und Speicherplatz";
             if (k == "WindowsUpdate" || k == "Netzwerk" || k == "Zeit") return "Windows Update, Netzwerk und Zeit";
             if (k == "WMI" || k == "Leistungszaehler" || k == "Leerlaufaufgaben" || k == "Druck" || k == "Geraete" || k == "Schnellstart" || k == "Energieplaene") return "Dienste, Geräte und Energie";
         }
@@ -14238,7 +14259,8 @@ public partial class DiagGui
         string ok = RunHelperPumped("-SensorAufraeumen", out lines, 300);
         string t = lines.Count > 0 ? String.Join(" ", lines.ToArray()) : "PawnIO-Treiber: keine Rückmeldung";
         if (lblSensInfo != null) lblSensInfo.Text = t;
-        if (running || done) { lblCounter.Text = ok == "1" ? "PawnIO-Treiber wieder entfernt" : "PawnIO-Treiber noch installiert"; }
+        // ab v4.12: das Entfernen läuft still; nur ein Fehlschlag erscheint auf der Laufseite
+        if ((running || done) && ok != "1") lblCounter.Text = "PawnIO-Treiber noch installiert";
         if (ok != "1" && txtLog != null)
         {
             try { txtLog.AppendText("\r\n[Sensoren] Warnung: PawnIO-Treiber konnte nicht entfernt werden: " + t + "\r\n"); } catch { }
@@ -23833,6 +23855,11 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.12", "19.11.2026", "Praxistest 4.11: kürzere Läufe, PawnIO still, eigener Schritt für Windows.old",
+            "• Neu, Wartung: „Papierkorb, Windows.old und ESD-Dateien löschen“ als eigener Schritt (nicht vorausgewählt, nicht umkehrbar). Die Datenträgerbereinigung bleibt ohne diese drei Kategorien.\r\n" +
+            "• Kürzer: Hat die Diagnose den Komponentenspeicher geprüft, übernimmt die Wartung das Ergebnis, statt DISM ScanHealth ein zweites Mal auszuführen (2 bis 20 Minuten).\r\n" +
+            "• Behoben: Vor dem CPU-Benchmark stand der Lauf bis zu zwei Minuten bei „Hintergrundlast wird geprüft“. Ursache war die erste WMI-Abfrage der ACPI-Thermalzonen (gemessen 102 s, danach 20 ms). Sie hat jetzt ein Zeitlimit von 5 Sekunden.\r\n" +
+            "• PawnIO: Installation und Entfernung laufen ohne Anzeige und lassen sich nicht mehr durch „Überspringen“ unterbrechen. Entfernt wird nur im Abschluss. Ein Treiberrest eines abgebrochenen Laufs wird weiterverwendet und erst am Ende entfernt, statt zu Beginn deinstalliert und sofort wieder installiert zu werden."),
         new Eintrag("4.11", "19.11.2026", "Sicherheit und Rücknahme: Befunde der Gesamtprüfung behoben",
             "• Behoben: PawnIO wurde auch installiert, wenn der Treiber auf „nein“ stand (Arbeitsprozesse laufen immer mit Administratorrechten). Jetzt nur noch mit Zustimmung.\r\n" +
             "• Behoben, Wartung: „Alte Wiederherstellungspunkte löschen“ löschte auch den Punkt, den der Lauf eben angelegt hatte. Die alten Punkte gehen jetzt vor dem neuen; die Nummer zählt nur, wenn der Punkt mit dieser Beschreibung wirklich da ist.\r\n" +
@@ -24617,8 +24644,36 @@ function Get-Median($Values) {
 
 # CPU-Messpunkt: Takt wie im Task-Manager (Nenntakt x % Prozessorleistung / 100), Last, Frequenzgrenze, ACPI-Temperatur.
 # Bevorzugt über PDH (DiagPdh, Mittel seit dem letzten Aufruf wie im Task-Manager), sonst über die WMI-Leistungsdaten.
+# ACPI-Thermalzonen (WMI-Leistungsklasse) mit Zeitlimit. Ab v4.12: Die erste Abfrage einer WMI-Leistungsklasse kann
+# minutenlang dauern, wenn WMI seine Zählerliste neu aufbaut (gemessen 102 s auf einem Notebook nach DISM und sfc;
+# danach 20 ms). Bis v4.11 stand der Lauf deshalb vor dem CPU-Benchmark fast zwei Minuten bei "Hintergrundlast wird
+# geprüft". Die erste Abfrage läuft in einem eigenen Runspace; antwortet sie nicht oder gibt es keine Zone, fragt der
+# Lauf nicht mehr nach.
+$script:ThermalZoneStatus = ''
+function Get-ThermalZoneData([int]$TimeoutSec = 5) {
+    if ($script:ThermalZoneStatus -eq 'aus') { return @() }
+    if ($script:ThermalZoneStatus -eq 'ok') { return @(Get-CimInstance Win32_PerfFormattedData_Counters_ThermalZoneInformation -ErrorAction SilentlyContinue) }
+    $raw = @(); $ps = $null
+    try {
+        $ps = [powershell]::Create()
+        [void]$ps.AddScript('@(Get-CimInstance Win32_PerfFormattedData_Counters_ThermalZoneInformation -ErrorAction SilentlyContinue)')
+        $h = $ps.BeginInvoke()
+        if ($h.AsyncWaitHandle.WaitOne([math]::Max(1, $TimeoutSec) * 1000)) {
+            $raw = @($ps.EndInvoke($h) | Where-Object { $_ })
+            $script:ThermalZoneStatus = $(if ($raw.Count) { 'ok' } else { 'aus' })
+        } else {
+            try { [void]$ps.BeginStop($null, $null) } catch { }
+            $ps = $null   # nicht freigeben: Dispose würde auf die hängende Abfrage warten
+            $script:ThermalZoneStatus = 'aus'
+            try { Write-Checkpoint 'INFO' ('ACPI-Thermalzonen antworten nicht innerhalb von {0} Sekunden, in diesem Lauf abgeschaltet' -f $TimeoutSec) } catch { }
+        }
+    } catch { $raw = @() }
+    finally { if ($ps) { try { $ps.Dispose() } catch { } } }
+    return $raw
+}
+
 function Get-CpuSample {
-    $tz = @(Get-CimInstance Win32_PerfFormattedData_Counters_ThermalZoneInformation -ErrorAction SilentlyContinue)
+    $tz = @(Get-ThermalZoneData)
     $temp = $null
     if ($tz.Count) {
         $vals = $tz | ForEach-Object { if ($_.HighPrecisionTemperature) { $_.HighPrecisionTemperature / 10 - 273.15 } elseif ($_.Temperature) { $_.Temperature - 273.15 } } | Where-Object { $_ -gt 0 -and $_ -lt 130 }
@@ -37872,7 +37927,8 @@ function Install-PawnIoTemporary {
     if (-not $marker) { return [pscustomobject]@{ Ok = $false; Text = 'PawnIO nicht installiert: kein Datenordner für die Markierung' } }
     try { New-Item -ItemType Directory -Path (Split-Path $marker -Parent) -Force -ErrorAction Stop | Out-Null; [IO.File]::WriteAllText($marker, ('PawnIO {0} installiert von Leos Minibench {1} am {2:yyyy-MM-dd HH:mm:ss}' -f $script:PawnIoPin.Version, $ScriptVersion, (Get-Date))) }
     catch { return [pscustomobject]@{ Ok = $false; Text = ('PawnIO nicht installiert: Markierung ließ sich nicht schreiben ({0})' -f $_.Exception.Message) } }
-    $r = Invoke-External -File $setup -Arguments '-install -silent' -TimeoutSec 180 -Progress 'PawnIO-Treiber wird vorübergehend installiert'
+    # ab v4.12 ohne Fortschrittsanzeige und ohne Abbruch durch "Überspringen": Ein halb installierter Treiber wäre schlimmer
+    $r = Invoke-External -File $setup -Arguments '-install -silent' -TimeoutSec 180 -OhneUeberspringen
     $st = Get-PawnIoState
     if (-not $st.Installiert) {
         if ($marker) { Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue }
@@ -37907,7 +37963,8 @@ function Uninstall-PawnIo {
     # v3.84 bis v4.01 hängten InnoSetup- und NSIS-Schalter an (/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /S): Das Setup
     # zeigte "Unknown argument: /VERYSILENT", brach mit Rückgabecode 87 ab und der Treiber blieb installiert.
     $uninstArgs = '-uninstall -silent'
-    $r = Invoke-External -File $file -Arguments $uninstArgs -TimeoutSec 180 -Progress 'PawnIO-Treiber wird entfernt'
+    # ab v4.12 still (ohne Fortschrittsanzeige, Wunsch aus dem Praxistest) und ohne Abbruch durch "Überspringen"
+    $r = Invoke-External -File $file -Arguments $uninstArgs -TimeoutSec 180 -OhneUeberspringen
     $st = Get-PawnIoState
     if ($st.Installiert) { return [pscustomobject]@{ Ok = $false; Text = ('PawnIO ist noch installiert (Rückgabecode {0}). Von Hand entfernen: "{1}" -uninstall' -f $r.ExitCode, $file) } }
     if ($hasMarker) { Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue }
@@ -37918,12 +37975,19 @@ function Uninstall-PawnIo {
     return [pscustomobject]@{ Ok = $true; Text = $t }
 }
 
-# Beim Start: Treiberreste eines abgebrochenen Laufs entfernen
-function Remove-PawnIoLeftover {
+# Beim Start: Treiberreste eines abgebrochenen Laufs entfernen.
+# -Uebernehmen (ab v4.12): Braucht dieser Lauf den Treiber ohnehin (-SensorTreiber), bleibt er bis zum Laufende und wird
+# erst im Abschluss entfernt. Bis v4.11 deinstallierte der Start ihn und die Diagnose installierte ihn gleich wieder.
+function Remove-PawnIoLeftover([switch]$Uebernehmen) {
     $marker = Get-PawnIoMarker
     if (-not $marker -or -not (Test-Path -LiteralPath $marker)) { return }
     $vor = 'Ein früherer Lauf hat den PawnIO-Treiber nicht entfernt (Lauf abgebrochen oder Entfernen fehlgeschlagen): {0}.'
     if ((Get-ToolKeep) -eq 'behalten') { $k = Save-PawnIoKept; if ($k) { $script:SensorNotes.Add(($vor -f $k.Text)) }; return }
+    if ($Uebernehmen -and (Get-PawnIoState).Installiert) {
+        $script:PawnIoByUs = $true; $script:PawnIoInstalledRun = $true
+        $script:SensorNotes.Add(($vor -f 'dieser Lauf verwendet ihn und entfernt ihn am Ende'))
+        return
+    }
     $u = Uninstall-PawnIo
     if ($u) { $script:SensorNotes.Add(($vor -f $u.Text)) }
 }
@@ -37952,7 +38016,7 @@ function Open-SensorSession([switch]$Treiber, [switch]$OhneDatentraeger) {
     if ($script:Sens) { return $script:Sens }
     $s = [pscustomobject]@{ Lhm = $false; LhmVersion = ''; LhmFehler = ''; LhmGrund = ''; LhmLief = $false; Treiber = 'nicht verwendet'; TreiberOk = $false; NvSmi = (Find-NvidiaSmi); Quellen = @(); Hinweise = New-Object System.Collections.Generic.List[string]; Geoeffnet = Get-Date; StorageCache = @(); StorageZeit = [datetime]::MinValue; GpuLimits = @{}; StorageTimeout = $false; LhmVerzoegert = $false }
     $script:Sens = $s
-    Remove-PawnIoLeftover
+    Remove-PawnIoLeftover -Uebernehmen:$Treiber
     $tools = Get-SensorToolState
     if (Test-IsArm64) {
         $s.LhmGrund = 'ARM64'
@@ -37965,7 +38029,12 @@ function Open-SensorSession([switch]$Treiber, [switch]$OhneDatentraeger) {
         else { $s.LhmGrund = 'unvollstaendig'; $s.Hinweise.Add(('LibreHardwareMonitor unvollständig oder nicht freigegeben ({0}): nur Ersatzwerte' -f ($tools.Fehlend -join ', '))) }
     } else {
         $pw = Get-PawnIoState
-        if ($pw.Installiert -and (Test-ToolRemoveKept) -and (Test-KeptPawnIo $pw)) {
+        $mk = Get-PawnIoMarker
+        if ($pw.Installiert -and $script:PawnIoByUs -and $mk -and (Test-Path -LiteralPath $mk)) {
+            # ab v4.12: Rest eines früheren Laufs übernommen (Remove-PawnIoLeftover -Uebernehmen) oder in diesem Lauf installiert
+            $s.Treiber = ('PawnIO {0} vorübergehend installiert' -f $pw.Version); $s.TreiberOk = $true
+        }
+        elseif ($pw.Installiert -and (Test-ToolRemoveKept) -and (Test-KeptPawnIo $pw)) {
             # früher auf Wunsch behalten, jetzt soll er gehen: am Laufende wie einen eigenen Treiber entfernen
             $script:PawnIoByUs = $true
             $s.Treiber = ('PawnIO {0} (von Leos Minibench behalten, wird am Ende entfernt)' -f $pw.Version); $s.TreiberOk = $true
@@ -38337,7 +38406,7 @@ function Get-NvidiaPowerLimits([string]$Path) {
 
 function Get-AcpiReadings {
     $res = @()
-    foreach ($z in @(Get-CimInstance Win32_PerfFormattedData_Counters_ThermalZoneInformation -ErrorAction SilentlyContinue)) {
+    foreach ($z in @(Get-ThermalZoneData)) {
         $v = $null
         if ($z.HighPrecisionTemperature) { $v = $z.HighPrecisionTemperature / 10 - 273.15 } elseif ($z.Temperature) { $v = $z.Temperature - 273.15 }
         if ($null -eq $v -or $v -le 0 -or $v -ge 130) { continue }
@@ -40607,8 +40676,9 @@ try { Invoke-CrashAnalysis } catch { Write-Warning ('Absturzanalyse des letzten 
 # Hilfswerkzeuge: Wahl dieses Laufs (Parameter oder je Gerät gespeichert)
 Write-Host ('  Hilfswerkzeuge : {0}' -f $(if ((Get-ToolKeep) -eq 'behalten') { 'auf diesem PC behalten' } else { 'nach dem Lauf entfernen' }))
 # früher behaltene smartmontools werden erst am Laufende in Abschluss.ps1 deinstalliert, falls nicht mehr gewünscht
-# PawnIO-Treiber eines abgebrochenen Laufs entfernen (Markierung im Laufzeitordner)
-Remove-PawnIoLeftover
+# PawnIO-Treiber eines abgebrochenen Laufs entfernen (Markierung im Laufzeitordner); braucht dieser Lauf ihn, bleibt er
+# bis zum Abschluss (ab v4.12)
+Remove-PawnIoLeftover -Uebernehmen:$SensorTreiber
 # vorübergehende Einstellungen eines abgebrochenen Laufs zurücknehmen (GPU-Wahl für winsat.exe)
 try {
     $tmpUndo = Restore-TemporaryChanges
@@ -41440,6 +41510,8 @@ if ($script:Opt['Integritaet']) {
         try { $dr = Receive-Job $job -ErrorAction Stop; $dismState = [string]@($dr)[0].ImageHealthState } catch { Add-Line ('  DISM fehlgeschlagen: {0}' -f $_.Exception.Message) }
         Remove-Job $job -Force -ErrorAction SilentlyContinue
         if ($dismState) {
+            # ab v4.12: die Wartung desselben Laufs übernimmt den Zustand und spart den zweiten ScanHealth
+            $script:DiagDismState = $dismState
             Add-Line ('  Zustand: {0}' -f $dismState)
             Add-TestResult 'Komponentenspeicher (DISM)' $(if ($dismState -eq 'Healthy') { 'OK' } else { 'Warnung' }) $dismState
         }
@@ -43280,8 +43352,15 @@ function Get-WartungShaderCachePfade($User) {
 function Invoke-WartungSchritt([string]$k) {
     switch ($k) {
         'DismRestore' {
-            Write-Step 'DISM ScanHealth läuft (5 bis 20 Minuten) ...'
-            $scan = Invoke-DismJob 'ScanHealth' 600
+            # ab v4.12: Hat die Diagnose dieses Laufs ScanHealth schon ausgeführt, gilt ihr Ergebnis (bis v4.11 lief die
+            # Prüfung zweimal, 2 bis 20 Minuten doppelt)
+            if ($script:DiagDismState) {
+                $scan = [pscustomobject]@{ State = [string]$script:DiagDismState; Restart = $false; Error = '' }
+                Add-Line '  ScanHealth: Ergebnis aus der Diagnose dieses Laufs übernommen'
+            } else {
+                Write-Step 'DISM ScanHealth läuft (5 bis 20 Minuten) ...'
+                $scan = Invoke-DismJob 'ScanHealth' 600
+            }
             if ($scan.Error) { Add-Line ('  ScanHealth fehlgeschlagen: {0}' -f $scan.Error); Add-RepairResult $k 'Fehler' ('ScanHealth fehlgeschlagen: ' + $scan.Error); break }
             Add-Line ('  Zustand vor der Reparatur: {0}' -f $scan.State)
             if ($scan.State -eq 'Healthy') { Add-RepairResult $k 'OK' 'Komponentenspeicher intakt, keine Reparatur nötig'; break }
@@ -43498,6 +43577,20 @@ function Invoke-WartungSchritt([string]$k) {
             $freed = [math]::Max(0.0, $free1 - $free0)
             [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel ('Datenträgerbereinigung, {0} Kategorien ({1})' -f $keys.Count, $script:CleanmgrUmfang) -Nachher ('{0:N0} MB frei geworden' -f ($freed / 1MB)) -Gegenbefehl 'nicht umkehrbar' -NurHinweis)
             Add-RepairResult $k $(if ($r.TimedOut) { 'Warnung' } else { 'OK' }) ('Datenträgerbereinigung abgeschlossen, {0} freigegeben' -f (Format-Size $freed))
+        }
+        'AltinstallationPapierkorb' {
+            # ab v4.12: die drei Kategorien mit dem meisten Platz, getrennt von der Datenträgerbereinigung und nur nach Auswahl.
+            # Windows.old ist der Weg zurück zur vorigen Windows-Version; Downloads bleiben unberührt.
+            Write-Step 'Papierkorb, Windows.old und ESD-Installationsdateien werden gelöscht (cleanmgr /sagerun:4712) ...'
+            $keys = @(Get-CleanmgrKeys -Gross)
+            $old = Join-Path $env:SystemDrive 'Windows.old'
+            $hadOld = Test-Path -LiteralPath $old
+            if (-not $keys.Count) { Add-RepairResult $k 'Info' 'Die Kategorien Papierkorb, Windows.old und ESD-Installationsdateien gibt es auf diesem PC nicht'; break }
+            $c = Invoke-CleanmgrKategorien $keys 4712
+            $namen = @($keys | ForEach-Object { switch ([string]$_.PSChildName) { 'Recycle Bin' { 'Papierkorb' } 'Previous Installations' { 'Windows.old' } 'Windows ESD installation files' { 'ESD-Installationsdateien' } default { [string]$_.PSChildName } } })
+            [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel ('Datenträgerbereinigung: {0}' -f ($namen -join ', ')) -Nachher ('{0:N0} MB frei geworden' -f ($c.Frei / 1MB)) -Gegenbefehl 'nicht umkehrbar (Rückkehr zur vorigen Windows-Version nicht mehr möglich)' -NurHinweis)
+            $rest = $(if ($hadOld -and (Test-Path -LiteralPath $old)) { '; Windows.old ist noch vorhanden (Windows entfernt den Rest beim nächsten Neustart oder die Dateien sind gesperrt)' } else { '' })
+            Add-RepairResult $k $(if ($c.Ergebnis.TimedOut) { 'Warnung' } else { 'OK' }) ('{0} gelöscht, {1} freigegeben{2}' -f ($namen -join ', '), (Format-Size $c.Frei), $rest)
         }
         'Leistungszaehler' {
             Write-Step 'Leistungszähler werden neu aufgebaut (lodctr /r) ...'
@@ -43768,9 +43861,11 @@ if ($GpuTypesLoaded) { try { [DiagGpu]::StopAll() } catch { } }
 
 # Sensoren schließen: entfernt einen vorübergehend installierten PawnIO-Treiber, bevor die Rückstandskontrolle prüft.
 # Kopfzeile und Protokoll nennen das (bis v4.02 stand währenddessen noch der letzte Abschnitt oben, z. B. "Optimierung: Ergebnis").
-Show-Overall 'Aufräumen: Sensoren beenden, vorübergehend installierte Treiber entfernen'
+# ab v4.12 ohne eigenen Hinweis auf den Treiber (Wunsch aus dem Praxistest); was entfernt wurde, steht im Bericht
+# unter Rückstandskontrolle und auf der Seite Änderungen
+Show-Overall 'Abschluss: Sensoren beenden'
 Write-Host ''
-Write-Host ('[{0}] >> Aufräumen: Sensoren und Hilfswerkzeuge' -f (Get-Date -Format 'HH:mm:ss')) -ForegroundColor Cyan
+Write-Host ('[{0}] >> Abschluss' -f (Get-Date -Format 'HH:mm:ss')) -ForegroundColor Cyan
 Close-SensorSession
 foreach ($t in @($script:SensorNotes | Select-Object -Unique)) { Add-Finding INFO 'Sensoren' $t }
 

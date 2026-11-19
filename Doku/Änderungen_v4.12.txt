@@ -1,0 +1,74 @@
+﻿LEOS MINIBENCH 4.12: ÄNDERUNGEN
+===============================
+
+Auftrag vom 19.11.2026 nach dem ersten Praxistest mit 4.11 (ULB-PC10039, Diagnose vollständig, Benchmark und Wartung
+mit DISM, sfc und Temp): Laufzeit prüfen und verkürzen, PawnIO darf den Lauf nicht stören und wird still am Ende
+entfernt, Papierkorb, Windows.old und ESD-Installationsdateien als eigener Wartungsschritt. Ereigniskanal,
+Datenbankformat, Format des Änderungsprotokolls, Vorlagen und Geraete.json sind unverändert.
+
+
+1. LAUFZEIT DES PRAXISTESTS
+  Befund                      Lauf von 15:02 bis 16:01 (abgebrochen). Die Zeit lag in den gewählten Prüfungen, nicht
+                              in einer Änderung von 4.11: Dateisystem-Onlinescan 3:17, DISM ScanHealth 3:37, sfc
+                              /verifyonly 1:52, Defender-Schnellscan 6:39, powercfg /energy und DxDiag 3:54, danach in
+                              der Wartung erneut ScanHealth 2:04 und RestoreHealth 26:42 bis zum Abbruch. Die
+                              Voreinstellungen hat 4.11 nicht geändert. Der Benchmark lief im Akkubetrieb, daher die
+                              niedrigen Werte.
+  Doppelter ScanHealth        Diagnose (Integrität) und Wartung (DismRestore) führten ScanHealth im selben Lauf je
+                              einmal aus. Die Diagnose merkt sich den Zustand ($script:DiagDismState), die Wartung
+                              übernimmt ihn und startet nur noch RestoreHealth, wenn der Speicher reparierbar ist.
+  Pause vor dem Benchmark     Zwischen "Benchmark: Prozessor" und dem Beginn der Messung lagen 1:53. Ursache: die erste
+                              Abfrage von Win32_PerfFormattedData_Counters_ThermalZoneInformation in Get-CpuSample.
+                              Nachgemessen auf demselben PC: erste Abfrage 102 s (0 Zonen), danach 20 ms. WMI baut
+                              dabei seine Liste der Leistungszähler neu auf. Neu: Get-ThermalZoneData (Kern\
+                              Grundgeruest.ps1) fragt das erste Mal in einem eigenen Runspace mit 5 Sekunden Zeitlimit;
+                              ohne Antwort oder ohne Zone fragt der Lauf nicht mehr nach. Get-CpuSample und
+                              Get-AcpiReadings nutzen die Funktion.
+  RestoreHealth               Bleibt unverändert: Die Dauer hängt am Download über Windows Update. Der Knopf "Diesen
+                              Schritt überspringen" beendet nur diesen Schritt, der Lauf schreibt danach seinen Bericht.
+
+
+2. PAWNIO
+  Still                       Install-PawnIoTemporary und Uninstall-PawnIo rufen das Setup ohne Fortschrittsanzeige
+                              und mit -OhneUeberspringen auf: Ein "Überspringen" während der Installation oder
+                              Entfernung beendet das Setup nicht mehr mittendrin. Der Abschluss zeigt "Abschluss:
+                              Sensoren beenden" statt "vorübergehend installierte Treiber entfernen"; nach einem
+                              Abbruch meldet die Laufseite nur noch einen Fehlschlag beim Entfernen.
+  Nur am Ende                 Im Hauptlauf entfernt nur Close-SensorSession im Abschluss den Treiber. Neu: Findet der
+                              Start einen Rest eines abgebrochenen Laufs (Markierung PawnIO_<PC>.txt) und braucht der
+                              Lauf den Treiber (-SensorTreiber), übernimmt Remove-PawnIoLeftover -Uebernehmen ihn. Bis
+                              4.11 wurde er zu Beginn deinstalliert und von der Diagnose sofort wieder installiert.
+  Fenster                     Setup und Deinstallation laufen mit CreateNoWindow und -silent; ein Fenster des Setups
+                              konnte im Lauf nicht nachgewiesen werden. Die Live-Ansicht ist während eines Laufs
+                              gesperrt, ihr Aufräumen kann den Treiber eines laufenden Laufs also nicht entfernen.
+
+
+3. WARTUNG: PAPIERKORB, WINDOWS.OLD UND ESD-DATEIEN
+  Neuer Schritt               AltinstallationPapierkorb in Wartung\Vertrag.psd1, Gruppe Bereinigung und Speicherplatz,
+                              Risiko Eingriff, nicht umkehrbar, nicht vorausgewählt und nicht "üblich". Er setzt
+                              StateFlags4712 nur für Recycle Bin, Previous Installations und Windows ESD installation
+                              files, startet cleanmgr /sagerun:4712 und nimmt die Markierungen danach wieder heraus
+                              (Invoke-CleanmgrKategorien). Im Änderungsprotokoll steht ein Hinweis mit den gelöschten
+                              Kategorien und dem frei gewordenen Platz.
+  Datenträgerbereinigung      Unverändert seit 4.11: alle Kategorien außer Downloads, Papierkorb, Windows.old und
+                              ESD-Dateien. Die geplante Aufgabe der Optimierung und der Optimierungsschritt ebenso.
+
+
+GEFUNDEN UND BEHOBEN
+  Der Testersatz für Invoke-External in Sensoren.Tests.ps1 und Werkzeuge.Tests.ps1 kannte -OhneUeberspringen nicht;
+  ergänzt, sonst wären die PawnIO-Tests an der Parameterbindung gescheitert.
+
+
+GRENZEN
+  Das Zeitlimit verhindert die Wartezeit nur bei den Thermalzonen. Eine hängende WMI-Abfrage läuft im Hintergrund weiter,
+  bis WMI fertig ist; andere WMI-Leistungsklassen werden im Lauf nur genutzt, wenn PDH ausfällt.
+  Der neue Wartungsschritt ist mit Attrappen getestet; das Löschen von Windows.old auf einem echten PC steht aus.
+
+
+UMSTIEG
+  Nichts zu tun. Vorlagen mit Wartungsauswahl laden wie bisher; der neue Schritt ist dort aus.
+
+
+QUELLEN
+  Checkpoint.log und Protokoll_ohne_Bericht.txt des Laufs ULB-PC10039_20261119_1502; Messung der WMI-Abfrage auf
+  demselben PC am 19.11.2026.

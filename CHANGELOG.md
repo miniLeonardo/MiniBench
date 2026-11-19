@@ -2,6 +2,20 @@
 
 Alle wesentlichen Änderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v4.12 (19.11.2026)
+
+Rückmeldungen aus dem ersten Praxistest mit 4.11.
+
+### Neu
+* **Wartung „Papierkorb, Windows.old und ESD-Dateien löschen“:** eigener Schritt für die drei Kategorien mit dem meisten Platz, nicht vorausgewählt und nicht umkehrbar. Die Datenträgerbereinigung lässt sie weiter aus.
+
+### Verbessert
+* **Laufzeit:** Die Wartung übernimmt den DISM-ScanHealth-Zustand der Diagnose desselben Laufs, statt ScanHealth zu wiederholen.
+* **PawnIO:** Installation und Entfernung ohne Anzeige und ohne Abbruch durch „Überspringen“, Entfernung nur im Abschluss; ein Rest eines abgebrochenen Laufs wird weiterverwendet statt deinstalliert und neu installiert.
+
+### Behoben
+* **Pause vor dem CPU-Benchmark:** Die erste WMI-Abfrage der ACPI-Thermalzonen dauerte auf einem Notebook 102 s. Sie läuft jetzt mit 5 Sekunden Zeitlimit; ohne Antwort oder ohne Zone fragt der Lauf nicht mehr nach.
+
 ## v4.11 (19.11.2026)
 
 Fehlerbehebungsversion nach der Gesamtprüfung vom 19.11.2026 (Doku\Pruefung_4.10.md). Keine neuen Funktionen.

@@ -178,7 +178,7 @@ public partial class DiagGui : Form
     // Reparatur
     string[] repKeys = new string[] {
         "DismRestore", "Sfc", "Komponentenbereinigung", "Dateisystem", "WindowsUpdate", "Netzwerk", "Temp", "WMI", "Zeit", "Druck",
-        "Geraete", "Schnellstart", "Energieplaene", "Datentraegerbereinigung", "Leistungszaehler", "Leerlaufaufgaben", "ShaderCache", "UpdateDownloads", "Absturzabbilder", "Prefetch",
+        "Geraete", "Schnellstart", "Energieplaene", "Datentraegerbereinigung", "AltinstallationPapierkorb", "Leistungszaehler", "Leerlaufaufgaben", "ShaderCache", "UpdateDownloads", "Absturzabbilder", "Prefetch",
         "PaketCache", "Wiederherstellungspunkte" };
     string[] repText = new string[] {
         "Komponentenspeicher prüfen und reparieren (DISM ScanHealth, bei Bedarf RestoreHealth)",
@@ -195,6 +195,7 @@ public partial class DiagGui : Form
         "Schnellstart deaktivieren (hilft bei Abstürzen nach dem Einschalten)",
         "Energiesparpläne auf Standard zurücksetzen (eigene Pläne werden vorher gesichert)",
         "Datenträgerbereinigung (cleanmgr ohne Downloads, Papierkorb, Windows.old und ESD-Installationsdateien)",
+        "Papierkorb leeren, Windows.old und ESD-Installationsdateien löschen (meist der größte Platzgewinn, nicht umkehrbar)",
         "Leistungszähler aus der Sicherung neu aufbauen (lodctr /r)",
         "Aufgeschobene Windows-Wartungsaufgaben starten (ProcessIdleTasks)",
         "DirectX-, OpenGL-, Intel- und AMD-Shader-Caches leeren",
@@ -203,7 +204,7 @@ public partial class DiagGui : Form
         "Prefetch-Ordner leeren (Windows baut die Daten danach neu auf)",
         "Paket-Cache von Installationsprogrammen leeren (Package Cache)",
         "Alte Schattenkopien auf dem Systemlaufwerk löschen" };
-    int[] repMinutes = new int[] { 20, 12, 15, 5, 2, 1, 3, 2, 1, 1, 1, 1, 1, 10, 1, 1, 1, 1, 1, 1, 1, 1 };
+    int[] repMinutes = new int[] { 20, 12, 15, 5, 2, 1, 3, 2, 1, 1, 1, 1, 1, 10, 10, 1, 1, 1, 1, 1, 1, 1, 1 };
     CheckBox[] repChk;
     CheckBox chkRestorePoint;
     // Datenbank

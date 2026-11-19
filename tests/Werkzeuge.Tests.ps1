@@ -96,7 +96,7 @@ Describe 'Übergang von 2.1' {
 Describe 'smartmontools entfernen' {
     BeforeAll {
         Import-MinibenchTestModule -Parts 'Kern\Werkzeuge.ps1', 'Kern\Smartmontools.ps1' -Setup @'
-function Invoke-External { param([string]$File, [string]$Arguments = '', [int]$TimeoutSec = 600, $Encoding = $null, [string]$Progress = '', [int]$ExpectedSec = 0) [pscustomobject]@{ ExitCode = 0; Output = ''; Error = ''; TimedOut = $false } }
+function Invoke-External { param([string]$File, [string]$Arguments = '', [int]$TimeoutSec = 600, $Encoding = $null, [string]$Progress = '', [int]$ExpectedSec = 0, [switch]$OhneUeberspringen) [pscustomobject]@{ ExitCode = 0; Output = ''; Error = ''; TimedOut = $false } }
 '@
     }
     BeforeEach {

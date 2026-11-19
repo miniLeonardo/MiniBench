@@ -15,7 +15,7 @@ public partial class DiagGui
         {
             string k = repKeys[i];
             if (k == "DismRestore" || k == "Sfc" || k == "Komponentenbereinigung" || k == "Dateisystem") return "Systemdateien und Komponentenspeicher";
-            if (k == "Temp" || k == "Datentraegerbereinigung" || k == "UpdateDownloads" || k == "ShaderCache" || k == "Prefetch" || k == "PaketCache" || k == "Absturzabbilder" || k == "Wiederherstellungspunkte") return "Bereinigung und Speicherplatz";
+            if (k == "Temp" || k == "Datentraegerbereinigung" || k == "AltinstallationPapierkorb" || k == "UpdateDownloads" || k == "ShaderCache" || k == "Prefetch" || k == "PaketCache" || k == "Absturzabbilder" || k == "Wiederherstellungspunkte") return "Bereinigung und Speicherplatz";
             if (k == "WindowsUpdate" || k == "Netzwerk" || k == "Zeit") return "Windows Update, Netzwerk und Zeit";
             if (k == "WMI" || k == "Leistungszaehler" || k == "Leerlaufaufgaben" || k == "Druck" || k == "Geraete" || k == "Schnellstart" || k == "Energieplaene") return "Dienste, Geräte und Energie";
         }

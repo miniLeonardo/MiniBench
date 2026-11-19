@@ -312,8 +312,36 @@ function Get-Median($Values) {
 
 # CPU-Messpunkt: Takt wie im Task-Manager (Nenntakt x % Prozessorleistung / 100), Last, Frequenzgrenze, ACPI-Temperatur.
 # Bevorzugt über PDH (DiagPdh, Mittel seit dem letzten Aufruf wie im Task-Manager), sonst über die WMI-Leistungsdaten.
+# ACPI-Thermalzonen (WMI-Leistungsklasse) mit Zeitlimit. Ab v4.12: Die erste Abfrage einer WMI-Leistungsklasse kann
+# minutenlang dauern, wenn WMI seine Zählerliste neu aufbaut (gemessen 102 s auf einem Notebook nach DISM und sfc;
+# danach 20 ms). Bis v4.11 stand der Lauf deshalb vor dem CPU-Benchmark fast zwei Minuten bei "Hintergrundlast wird
+# geprüft". Die erste Abfrage läuft in einem eigenen Runspace; antwortet sie nicht oder gibt es keine Zone, fragt der
+# Lauf nicht mehr nach.
+$script:ThermalZoneStatus = ''
+function Get-ThermalZoneData([int]$TimeoutSec = 5) {
+    if ($script:ThermalZoneStatus -eq 'aus') { return @() }
+    if ($script:ThermalZoneStatus -eq 'ok') { return @(Get-CimInstance Win32_PerfFormattedData_Counters_ThermalZoneInformation -ErrorAction SilentlyContinue) }
+    $raw = @(); $ps = $null
+    try {
+        $ps = [powershell]::Create()
+        [void]$ps.AddScript('@(Get-CimInstance Win32_PerfFormattedData_Counters_ThermalZoneInformation -ErrorAction SilentlyContinue)')
+        $h = $ps.BeginInvoke()
+        if ($h.AsyncWaitHandle.WaitOne([math]::Max(1, $TimeoutSec) * 1000)) {
+            $raw = @($ps.EndInvoke($h) | Where-Object { $_ })
+            $script:ThermalZoneStatus = $(if ($raw.Count) { 'ok' } else { 'aus' })
+        } else {
+            try { [void]$ps.BeginStop($null, $null) } catch { }
+            $ps = $null   # nicht freigeben: Dispose würde auf die hängende Abfrage warten
+            $script:ThermalZoneStatus = 'aus'
+            try { Write-Checkpoint 'INFO' ('ACPI-Thermalzonen antworten nicht innerhalb von {0} Sekunden, in diesem Lauf abgeschaltet' -f $TimeoutSec) } catch { }
+        }
+    } catch { $raw = @() }
+    finally { if ($ps) { try { $ps.Dispose() } catch { } } }
+    return $raw
+}
+
 function Get-CpuSample {
-    $tz = @(Get-CimInstance Win32_PerfFormattedData_Counters_ThermalZoneInformation -ErrorAction SilentlyContinue)
+    $tz = @(Get-ThermalZoneData)
     $temp = $null
     if ($tz.Count) {
         $vals = $tz | ForEach-Object { if ($_.HighPrecisionTemperature) { $_.HighPrecisionTemperature / 10 - 273.15 } elseif ($_.Temperature) { $_.Temperature - 273.15 } } | Where-Object { $_ -gt 0 -and $_ -lt 130 }

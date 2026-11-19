@@ -507,7 +507,8 @@ public partial class DiagGui
         string ok = RunHelperPumped("-SensorAufraeumen", out lines, 300);
         string t = lines.Count > 0 ? String.Join(" ", lines.ToArray()) : "PawnIO-Treiber: keine Rückmeldung";
         if (lblSensInfo != null) lblSensInfo.Text = t;
-        if (running || done) { lblCounter.Text = ok == "1" ? "PawnIO-Treiber wieder entfernt" : "PawnIO-Treiber noch installiert"; }
+        // ab v4.12: das Entfernen läuft still; nur ein Fehlschlag erscheint auf der Laufseite
+        if ((running || done) && ok != "1") lblCounter.Text = "PawnIO-Treiber noch installiert";
         if (ok != "1" && txtLog != null)
         {
             try { txtLog.AppendText("\r\n[Sensoren] Warnung: PawnIO-Treiber konnte nicht entfernt werden: " + t + "\r\n"); } catch { }
