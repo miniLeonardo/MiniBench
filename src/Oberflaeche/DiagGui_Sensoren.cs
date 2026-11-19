@@ -34,8 +34,9 @@ public partial class DiagGui
         lhmAutoFetchAttempted = true;
         try
         {
+            // ab v4.11 mit Frist und ohne das Fenster einzufrieren (Download von GitHub)
             List<string> lines;
-            RunHelper("-SensorWerkzeugeHolen", out lines);
+            RunHelperPumped("-SensorWerkzeugeHolen", out lines, 300);
             UpdateSensTools();
         }
         catch { }
@@ -402,9 +403,10 @@ public partial class DiagGui
         MessageBox.Show(this, lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Keine Rückmeldung vom Arbeitsprozess.", "Sensorwerkzeuge", MessageBoxButtons.OK, res == "1" ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
     }
 
-    void StartLive()
+    internal void StartLive()
     {
         if (running) return;
+        if (HintergrundBelegt("Die Live-Ansicht")) return;
         TryAutoFetchSensorTools();
         bool drv = cmbDriver == null || cmbDriver.SelectedIndex == 0;
         try { Directory.CreateDirectory(cpDir); File.Delete(Path.Combine(cpDir, "sensor.stop")); } catch { }
@@ -512,24 +514,12 @@ public partial class DiagGui
         }
     }
 
-    string RunHelper(string args, out List<string> lines)
-    {
-        lines = new List<string>();
-        ProcessStartInfo psi = new ProcessStartInfo(psExe, "-NoProfile -ExecutionPolicy Bypass -File \"" + script + "\" -EventMode " + args + " -DatenDir \"" + dataDir.TrimEnd('\\') + "\"");
-        psi.UseShellExecute = false; psi.CreateNoWindow = true; psi.RedirectStandardOutput = true; psi.StandardOutputEncoding = new UTF8Encoding(false);
-        string result = "";
-        using (Process p = Process.Start(psi))
-        {
-            string all = p.StandardOutput.ReadToEnd(); p.WaitForExit(120000);
-            foreach (string line in all.Split('\n'))
-            {
-                string l = line.TrimEnd('\r');
-                if (l.StartsWith("@@LOG|")) { string[] x = l.Split(new char[] { '|' }, 3); if (x.Length == 3 && x[2].Trim().Length > 0) lines.Add(x[2].Trim()); }
-                else if (l.StartsWith("@@RESULT|")) result = l.Substring(9);
-            }
-        }
-        return result;
-    }
+    // Arbeitsprozess für eine kurze Aufgabe (Dashboard, Datenpflege, Import, Export), höchstens 10 Minuten.
+    // Bis v4.10 las RunHelper die Ausgabe mit ReadToEnd vor WaitForExit(120000): Die Frist griff nie, und das Fenster
+    // fror ein, solange der Arbeitsprozess lief. Ab v4.11 liest RunHelperPumped asynchron, beendet den Prozess nach
+    // der Frist und zeichnet das Fenster weiter (gesperrt, bis der Arbeitsprozess fertig ist).
+    public const int RunHelperFristSek = 600;
+    string RunHelper(string args, out List<string> lines) { return RunHelperPumped(args, out lines, RunHelperFristSek); }
 
     // Wie RunHelper, aber ohne die Oberfläche einzufrieren (Downloads, Treiber entfernen)
     string RunHelperPumped(string args, out List<string> lines, int timeoutSec) { return RunHelperPumped(args, out lines, timeoutSec, null); }

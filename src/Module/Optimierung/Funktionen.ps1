@@ -19,15 +19,39 @@ $script:OptLog = [System.Collections.Generic.List[object]]::new()
 $script:OptMetricsBefore = $null
 $script:OptMetricsAfter = $null
 $script:OptRestart = [System.Collections.Generic.List[string]]::new()
-# Display Driver Uninstaller (Wagnardsoft): Offizielle Bezugsquelle (wagnardsoft.com) oder winget (Wagnardsoft.DisplayDriverUninstaller)
-$script:OptDduZip = @{
-    Url      = 'https://www.wagnardsoft.com'
-    WingetId = 'Wagnardsoft.DisplayDriverUninstaller'
-    Quelle   = 'wagnardsoft.com / winget: Wagnardsoft.DisplayDriverUninstaller'
-    Lizenz   = 'Freeware (Wagnardsoft)'
+# ab v4.11: Werkzeuge nur mit fester Version und fester SHA-256 (Vorgabe 5), wie LibreHardwareMonitor in Kern\Sensoren.ps1.
+# Ein Download wird nur bei passender Prüfsumme angenommen; eine im Tools-Ordner vorgefundene oder von Hand abgelegte
+# Datei nur, wenn ihre SHA-256 in der Liste der bekannten Programmdateien steht. Eine neue Version braucht neue Einträge.
+# Display Driver Uninstaller (Wagnardsoft, MIT): portables 7-Zip-Selbstentpackarchiv von wagnardsoft.com. Die Prüfsumme
+# des Setups derselben Version (DDU v18.1.5.3_setup.exe) stimmt mit dem winget-Manifest Wagnardsoft.DisplayDriverUninstaller
+# 18.1.5.3 überein (1e854c00…); das portable Archiv liegt im selben Download-Verzeichnis.
+$script:OptDduPin = @{
+    Version = '18.1.5.3'
+    Url     = 'https://www.wagnardsoft.com/DDU/download/DDU%20v18.1.5.3.exe'
+    SHA256  = 'f5923e10115f410e0481c0194153a4c961dde9378d2456acd753de9581f80128'
+    Quelle  = 'wagnardsoft.com, DDU v18.1.5.3 (portables Archiv DDU v18.1.5.3.exe)'
+    Lizenz  = 'MIT (Wagnardsoft)'
 }
-$script:OptNpiZip = @{ Url = 'https://github.com/Orbmu2k/nvidiaProfileInspector/releases/latest/download/nvidiaProfileInspector.zip'
-    Quelle = 'github.com/Orbmu2k/nvidiaProfileInspector, neueste Version'; Lizenz = 'MIT' }
+# Bekannte Programmdateien von DDU (SHA-256 -> Version)
+$script:OptDduExePins = [ordered]@{
+    'd9f66e3e873f42daf71a249922c7897a9d0a81b7b6a85a36efe272ce981de0e3' = '18.1.5.3'
+}
+$script:OptDduExeNames = @('Display Driver Uninstaller.exe', 'DisplayDriverUninstaller.exe')
+# NVIDIA Profile Inspector (Orbmu2k, MIT): GitHub-Release v3.0.2.3 vom 13.10.2026; SHA-256 des Archivs = digest im Release
+$script:OptNpiPin = @{
+    Version = '3.0.2.3'
+    Url     = 'https://github.com/Orbmu2k/nvidiaProfileInspector/releases/download/v3.0.2.3/nvidiaProfileInspector.zip'
+    SHA256  = 'e2d12f0956377efd0021bf5b1f63e5b05ecd6732a311274db679dbe598ad4e61'
+    Quelle  = 'github.com/Orbmu2k/nvidiaProfileInspector, Release v3.0.2.3 (nvidiaProfileInspector.zip)'
+    Lizenz  = 'MIT'
+}
+$script:OptNpiExePins = [ordered]@{
+    '355e491aa6c9956bed62204533e6b2fd750d4283d118713826f724ea6bc5cd9d' = '3.0.2.3'
+}
+# ab v4.11: Kategorien der Datenträgerbereinigung, die nie gewählt werden: Downloads (Nutzerdaten), Papierkorb,
+# Windows.old (Rückkehr zur vorigen Windows-Version) und ESD-Installationsdateien (Zurücksetzen des PCs)
+$script:CleanmgrAusgeschlossen = @('DownloadsFolder', 'Recycle Bin', 'Previous Installations', 'Windows ESD installation files')
+$script:CleanmgrUmfang = 'alle Kategorien außer Downloads, Papierkorb, Windows.old und ESD-Installationsdateien'
 $script:OptDduDir = 'LeosMinibench-DDU'
 $script:OptTaskFolder = '\Leos Minibench\'
 
@@ -231,7 +255,7 @@ function Format-OptAction($A) {
                 'DnsCache' { return 'ipconfig /flushdns, Clear-BCCache' }
                 'Leistungszaehler' { return 'lodctr /r' }
                 'Komponentenspeicher' { return 'DISM /AnalyzeComponentStore, /StartComponentCleanup, /SPSuperseded' }
-                'Datentraegerbereinigung' { return 'cleanmgr /sagerun mit allen Kategorien außer Downloads' }
+                'Datentraegerbereinigung' { return ('cleanmgr /sagerun, {0}' -f $script:CleanmgrUmfang) }
                 'Leerlaufaufgaben' { return 'rundll32 advapi32.dll,ProcessIdleTasks' }
                 'Wiederherstellungspunkte' { return 'vssadmin delete shadows /for=<Systemlaufwerk> /all' }
                 'Ddu' { return 'bcdedit safeboot minimal, RunOnce: DDU -silent -cleanallgpus ... -restart' }
@@ -583,14 +607,13 @@ function Invoke-OptSpecial($Entry, $A, $Env, [switch]$Pruefen) {
         }
         'Datentraegerbereinigung' {
             if ($Pruefen) { return (New-OptResult 'unklar') }
-            $root = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches'
-            $keys = @(Get-ChildItem -LiteralPath $root -ErrorAction SilentlyContinue | Where-Object { $_.PSChildName -ne 'DownloadsFolder' })
+            $keys = @(Get-CleanmgrKeys)
             foreach ($k in $keys) { try { New-ItemProperty -LiteralPath $k.PSPath -Name 'StateFlags4711' -Value 2 -PropertyType DWord -Force -ErrorAction Stop | Out-Null } catch { } }
             $free0 = Get-OptFreeBytes
             $r = Invoke-External -File (Join-Path $env:windir 'System32\cleanmgr.exe') -Arguments '/sagerun:4711' -TimeoutSec 3600 -Progress 'Datenträgerbereinigung läuft' -ExpectedSec 600
             foreach ($k in $keys) { try { Remove-ItemProperty -LiteralPath $k.PSPath -Name 'StateFlags4711' -ErrorAction Stop } catch { } }
             $freed = [math]::Max(0.0, (Get-OptFreeBytes) - $free0)
-            [void](Add-ChangeRecord -Modul $mod -Schritt $step -Titel $ttl -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel ('Datenträgerbereinigung, {0} Kategorien' -f $keys.Count) -Nachher ('{0:N0} MB frei geworden' -f ($freed / 1MB)) -Gegenbefehl 'nicht umkehrbar' -NurHinweis)
+            [void](Add-ChangeRecord -Modul $mod -Schritt $step -Titel $ttl -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel ('Datenträgerbereinigung, {0} Kategorien ({1})' -f $keys.Count, $script:CleanmgrUmfang) -Nachher ('{0:N0} MB frei geworden' -f ($freed / 1MB)) -Gegenbefehl 'nicht umkehrbar' -NurHinweis)
             return (New-OptResult $(if ($r.TimedOut) { 'Fehler' } else { 'geaendert' }) ('{0:N0} MB frei geworden{1}' -f ($freed / 1MB), $(if ($r.TimedOut) { ', nach einer Stunde abgebrochen' } else { '' })) 1)
         }
         'Leerlaufaufgaben' {
@@ -626,10 +649,29 @@ function Clear-OptFolder([string]$Path) {
     return $freed
 }
 
+# ab v4.11: Kategorien der Datenträgerbereinigung (Registry VolumeCaches) ohne die ausgeschlossenen
+function Get-CleanmgrKeys {
+    $root = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches'
+    return @(Get-ChildItem -LiteralPath $root -ErrorAction SilentlyContinue | Where-Object { $script:CleanmgrAusgeschlossen -notcontains [string]$_.PSChildName })
+}
+
+# ab v4.11: Wiederherstellungspunkte prüfen. Der Punkt eines Laufs zählt nur, wenn Windows ihn wirklich angelegt hat
+# (Checkpoint-Computer legt innerhalb der Sperrfrist ohne Fehler keinen an) und er noch existiert.
+function Get-RestorePointByDescription([string]$Beschreibung) {
+    try { return (@(Get-ComputerRestorePoint -ErrorAction Stop | Where-Object { [string]$_.Description -eq $Beschreibung } | Sort-Object { [int64]$_.SequenceNumber } -Descending) | Select-Object -First 1) } catch { return $null }
+}
+# $true = vorhanden, $false = sicher nicht vorhanden (Abfrage erfolgreich, Nummer fehlt), $null = nicht prüfbar
+function Test-RestorePointPresent([string]$Nummer) {
+    if (-not $Nummer) { return $false }
+    try { $all = @(Get-ComputerRestorePoint -ErrorAction Stop) } catch { return $null }
+    return [bool]@($all | Where-Object { [string]$_.SequenceNumber -eq $Nummer }).Count
+}
+
 # Wartungsaufgaben (Sophia CleanupTask, SoftwareDistributionTask, TempTask) ohne Skriptdateien: PowerShell-Befehl als
 # -EncodedCommand in der Aufgabe selbst, Ausführung als SYSTEM
 function Get-OptMaintenanceTasks {
-    $clean = 'Get-ChildItem ''HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches'' | Where-Object { $_.PSChildName -ne ''DownloadsFolder'' } | ForEach-Object { New-ItemProperty -LiteralPath $_.PSPath -Name StateFlags1337 -Value 2 -PropertyType DWord -Force | Out-Null }; Start-Process -FilePath "$env:windir\System32\cleanmgr.exe" -ArgumentList ''/sagerun:1337'' -Wait; Get-ChildItem ''HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches'' | ForEach-Object { Remove-ItemProperty -LiteralPath $_.PSPath -Name StateFlags1337 -ErrorAction SilentlyContinue }'
+    $aus = (@($script:CleanmgrAusgeschlossen | ForEach-Object { "'{0}'" -f $_ }) -join ', ')
+    $clean = 'Get-ChildItem ''HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches'' | Where-Object { @(' + $aus + ') -notcontains $_.PSChildName } | ForEach-Object { New-ItemProperty -LiteralPath $_.PSPath -Name StateFlags1337 -Value 2 -PropertyType DWord -Force | Out-Null }; Start-Process -FilePath "$env:windir\System32\cleanmgr.exe" -ArgumentList ''/sagerun:1337'' -Wait; Get-ChildItem ''HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches'' | ForEach-Object { Remove-ItemProperty -LiteralPath $_.PSPath -Name StateFlags1337 -ErrorAction SilentlyContinue }'
     $sd = '$lim = (Get-Date).AddDays(-7); Get-ChildItem "$env:windir\SoftwareDistribution\Download" -Recurse -Force -File -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -lt $lim } | Remove-Item -Force -ErrorAction SilentlyContinue'
     $tmp = '$lim = (Get-Date).AddDays(-1); $d = @("$env:windir\Temp"); Get-ChildItem ''HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList'' | ForEach-Object { $p = [Environment]::ExpandEnvironmentVariables([string](Get-ItemProperty -LiteralPath $_.PSPath).ProfileImagePath); if ($p -and (Test-Path (Join-Path $p ''AppData\Local\Temp''))) { $d += (Join-Path $p ''AppData\Local\Temp'') } }; foreach ($x in $d) { Get-ChildItem -LiteralPath $x -Recurse -Force -File -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -lt $lim } | Remove-Item -Force -ErrorAction SilentlyContinue }'
     return @(
@@ -666,43 +708,85 @@ function Invoke-OptOneDrive($Entry, $Env, [switch]$Pruefen) {
 }
 
 # ---------- Werkzeuge: DDU und NVIDIA Profile Inspector ----------
+# ab v4.11: Version einer Programmdatei laut fester Liste (SHA-256 -> Version), sonst ''
+function Get-OptPinnedVersion([string]$Path, $Pins) {
+    $h = Get-FileSha256 $Path
+    if ($h -and $Pins -and $Pins.Contains($h)) { return [string]$Pins[$h] }
+    return ''
+}
+function Find-OptDduExe([string]$Dir) {
+    if (-not $Dir -or -not (Test-Path -LiteralPath $Dir)) { return '' }
+    foreach ($n in $script:OptDduExeNames) {
+        $f = @(Get-ChildItem -LiteralPath $Dir -Recurse -File -Filter $n -ErrorAction SilentlyContinue | Select-Object -First 1)
+        if ($f.Count) { return [string]$f[0].FullName }
+    }
+    return ''
+}
+function Add-OptToolIssue([string]$Text) { if ($null -eq $script:ToolIssues) { $script:ToolIssues = New-Object System.Collections.Generic.List[string] }; $script:ToolIssues.Add($Text) }
+function Get-OptHashKurz([string]$Path) { $h = Get-FileSha256 $Path; if ($h) { return ($h.Substring(0, 12) + '…') } else { return '(nicht lesbar)' } }
+
+# DDU-Programm im Tools-Ordner: nur mit Eintrag im Manifest und bekannter Prüfsumme. Ein von Hand abgelegter Ordner
+# Tools\DDU oder ein DDU.zip wird übernommen, wenn die Programmdatei in $script:OptDduExePins steht.
 function Get-OptDduExe {
     $t = Get-ToolsDir
     if (-not $t) { return $null }
     $p = Get-VerifiedTool 'DDU' $t
-    if ($p) { return $p }
-    # DDU.zip von Hand in den Tools-Ordner gelegt: Prüfsumme wie beim Holen, dann auspacken und aufnehmen
-    foreach ($z in @((Join-Path $t 'DDU.zip'), (Join-Path $t 'DDU\DDU.zip'))) { if (Test-Path -LiteralPath $z) { $r = Install-OptDduFromZip $z; if ($r.Ok) { return (Get-VerifiedTool 'DDU' $t) } } }
+    if ($p) {
+        if (Get-OptPinnedVersion $p $script:OptDduExePins) { return $p }
+        Add-OptToolIssue (('DDU abgelehnt: {0} hat eine unbekannte Prüfsumme ({1}). Freigegeben ist nur DDU {2} von wagnardsoft.com.' -f $p, (Get-OptHashKurz $p), $script:OptDduPin.Version))
+        return $null
+    }
+    $dir = Join-Path $t 'DDU'
+    if (Find-OptDduExe $dir) {
+        $r = Install-OptDduFromDir $dir
+        if ($r.Ok) { return (Get-VerifiedTool 'DDU' $t) }
+        Add-OptToolIssue ($r.Text)
+    }
+    foreach ($z in @((Join-Path $t 'DDU.zip'), (Join-Path $t 'DDU\DDU.zip'))) {
+        if (Test-Path -LiteralPath $z) { $r = Install-OptDduFromZip $z; if ($r.Ok) { return (Get-VerifiedTool 'DDU' $t) }; Add-OptToolIssue ($r.Text) }
+    }
     return $null
+}
+# Ordner mit ausgepacktem DDU übernehmen: Programmdatei suchen, Prüfsumme gegen die Liste, nach Tools\DDU kopieren
+function Install-OptDduFromDir([string]$Src) {
+    $t = Get-ToolsDir
+    $exe = Find-OptDduExe $Src
+    if (-not $exe) { return [pscustomobject]@{ Ok = $false; Text = 'Display Driver Uninstaller.exe fehlt im Archiv.' } }
+    $ver = Get-OptPinnedVersion $exe $script:OptDduExePins
+    if (-not $ver) { return [pscustomobject]@{ Ok = $false; Text = ('DDU abgelehnt: Die Programmdatei hat eine unbekannte Prüfsumme ({0}). Freigegeben ist nur DDU {1} von wagnardsoft.com; eine andere Version braucht einen Eintrag in der Liste der bekannten Prüfsummen.' -f (Get-OptHashKurz $exe), $script:OptDduPin.Version) } }
+    $dest = Join-Path $t 'DDU'
+    $srcDir = Split-Path $exe -Parent
+    New-Item -ItemType Directory -Path $dest -Force -ErrorAction Stop | Out-Null
+    if ([IO.Path]::GetFullPath($srcDir).TrimEnd('\') -ne [IO.Path]::GetFullPath($dest).TrimEnd('\')) {
+        Copy-Item -Path (Join-Path $srcDir '*') -Destination $dest -Recurse -Force -ErrorAction Stop
+    }
+    $final = Join-Path $dest (Split-Path $exe -Leaf)
+    Get-ChildItem -LiteralPath $dest -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { if (Get-Command Unblock-File -ErrorAction SilentlyContinue) { Unblock-File -LiteralPath $_.FullName -ErrorAction SilentlyContinue } }
+    [void](Register-Tool -Name 'DDU' -Path $final -Lizenz $script:OptDduPin.Lizenz -Quelle $script:OptDduPin.Quelle -Herkunft ('DDU {0}, Prüfsumme aus der festen Liste bestätigt' -f $ver) -ToolsDir $t)
+    return [pscustomobject]@{ Ok = $true; Text = ('Display Driver Uninstaller {0} übernommen ({1}).' -f $ver, $dest) }
 }
 function Install-OptDduFromZip([string]$Zip) {
     $t = Get-ToolsDir
-    $h = Get-FileSha256 $Zip
-    $dest = Join-Path $t 'DDU'
-    New-Item -ItemType Directory -Path $dest -Force -ErrorAction Stop | Out-Null
-    $tmp = Join-Path $dest ('_entpacken_' + [guid]::NewGuid().ToString('N').Substring(0, 6))
+    $tmp = Join-Path $t ('_entpacken_' + [guid]::NewGuid().ToString('N').Substring(0, 6))
     try {
         Expand-Archive -LiteralPath $Zip -DestinationPath $tmp -Force -ErrorAction Stop
-        $src = Join-Path $tmp 'DDU'
-        if (-not (Test-Path -LiteralPath $src)) { $src = $tmp }
-        Copy-Item -Path (Join-Path $src '*') -Destination $dest -Recurse -Force -ErrorAction Stop
+        return (Install-OptDduFromDir $tmp)
     } finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
-    $exe = Join-Path $dest 'DisplayDriverUninstaller.exe'
-    if (-not (Test-Path -LiteralPath $exe)) { return [pscustomobject]@{ Ok = $false; Text = 'DisplayDriverUninstaller.exe fehlt im Archiv.' } }
-    Get-ChildItem -LiteralPath $dest -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { if (Get-Command Unblock-File -ErrorAction SilentlyContinue) { Unblock-File -LiteralPath $_.FullName -ErrorAction SilentlyContinue } }
-    [void](Register-Tool -Name 'DDU' -Path $exe -Lizenz $script:OptDduZip.Lizenz -Quelle $script:OptDduZip.Quelle -Herkunft ('Offizielles DDU-Paket ({0}…) auf {1} ausgepackt' -f $h.Substring(0, 12), $env:COMPUTERNAME) -ToolsDir $t)
-    return [pscustomobject]@{ Ok = $true; Text = ('Display Driver Uninstaller übernommen ({0}).' -f $dest) }
 }
+# NVIDIA Profile Inspector im Tools-Ordner: nur mit bekannter Prüfsumme (auch eine vorgefundene Datei)
 function Get-OptNpiExe {
     $t = Get-ToolsDir
     if (-not $t) { return $null }
     $p = Get-VerifiedTool 'NvidiaProfileInspector' $t
-    if ($p) { return $p }
+    if ($p -and (Get-OptPinnedVersion $p $script:OptNpiExePins)) { return $p }
     $exe = Join-Path $t 'NvidiaProfileInspector\nvidiaProfileInspector.exe'
-    $m = Read-ToolManifest $t
-    if ((Test-Path -LiteralPath $exe) -and -not @($m.Werkzeuge | Where-Object { $_.Name -eq 'NvidiaProfileInspector' }).Count) {
-        [void](Register-Tool -Name 'NvidiaProfileInspector' -Path $exe -Lizenz $script:OptNpiZip.Lizenz -Quelle $script:OptNpiZip.Quelle -Herkunft 'im Tools-Ordner vorgefunden, Prüfsumme beim ersten Fund festgehalten' -ToolsDir $t)
-        return (Get-VerifiedTool 'NvidiaProfileInspector' $t)
+    if (Test-Path -LiteralPath $exe) {
+        $ver = Get-OptPinnedVersion $exe $script:OptNpiExePins
+        if ($ver) {
+            [void](Register-Tool -Name 'NvidiaProfileInspector' -Path $exe -Lizenz $script:OptNpiPin.Lizenz -Quelle $script:OptNpiPin.Quelle -Herkunft ('Version {0}, Prüfsumme aus der festen Liste bestätigt' -f $ver) -ToolsDir $t)
+            return (Get-VerifiedTool 'NvidiaProfileInspector' $t)
+        }
+        Add-OptToolIssue (('NVIDIA Profile Inspector abgelehnt: {0} hat eine unbekannte Prüfsumme ({1}). Freigegeben ist nur Version {2} von GitHub.' -f $exe, (Get-OptHashKurz $exe), $script:OptNpiPin.Version))
     }
     return $null
 }
@@ -713,45 +797,46 @@ function Install-OptTools {
     $work = Join-Path (Join-Path $script:DataDir 'Laufzeit') ('Download-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
     try {
         New-Item -ItemType Directory -Path $work -Force -ErrorAction Stop | Out-Null
-        if (Get-VerifiedTool 'DDU' $t) { $log.Add('Display Driver Uninstaller liegt bereits im Tools-Ordner.') }
+        if (Get-OptDduExe) { $log.Add('Display Driver Uninstaller liegt bereits im Tools-Ordner.') }
         else {
+            # ab v4.11: nur das portable Archiv der festen Version von wagnardsoft.com, Prüfsumme vor dem Entpacken
             try {
-                $installed = $false
-                foreach ($z in @((Join-Path $t 'DDU.zip'), (Join-Path $t 'DDU\DDU.zip'), (Join-Path $work 'DDU.zip'))) {
-                    if (Test-Path -LiteralPath $z) {
-                        $r = Install-OptDduFromZip $z
-                        $log.Add($r.Text)
-                        if ($r.Ok) { $installed = $true; break }
-                    }
-                }
-                if (-not $installed -and (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
-                    $wgOut = & winget.exe download --id Wagnardsoft.DisplayDriverUninstaller --download-directory $work --accept-source-agreements --accept-package-agreements 2>&1
-                    $foundZip = @(Get-ChildItem -LiteralPath $work -Filter '*.zip' -Recurse -File -ErrorAction SilentlyContinue) | Select-Object -First 1
-                    if ($foundZip) {
-                        $r = Install-OptDduFromZip $foundZip.FullName
-                        $log.Add($r.Text)
-                        if ($r.Ok) { $installed = $true }
-                    }
-                }
-                if (-not $installed) {
-                    $log.Add('Display Driver Uninstaller: Bitte von der offiziellen Herstellerseite https://www.wagnardsoft.com oder via winget beziehen und in Minibench-Daten\Tools\DDU ablegen.')
-                }
+                $sfx = Join-Path $work 'DDU.exe'
+                Save-WebFile $script:OptDduPin.Url $sfx
+                $h = Get-FileSha256 $sfx
+                if ($h -ne $script:OptDduPin.SHA256) { throw ('Das DDU-Archiv hat eine unerwartete Prüfsumme ({0}), nichts übernommen.' -f (Get-OptHashKurz $sfx)) }
+                $ex = Join-Path $work 'ddu'
+                New-Item -ItemType Directory -Path $ex -Force -ErrorAction Stop | Out-Null
+                # 7-Zip-Selbstentpacker: -o Zielordner, -y ohne Rückfrage
+                $r = Invoke-External -File $sfx -Arguments ('-o"{0}" -y' -f $ex) -TimeoutSec 300 -Progress 'DDU wird entpackt' -ExpectedSec 10
+                if ($r.TimedOut) { throw 'Entpacken nach fünf Minuten abgebrochen.' }
+                $i = Install-OptDduFromDir $ex
+                $log.Add($i.Text)
+                if (-not $i.Ok) { $ok = $false }
+            } catch {
+                $ok = $false
+                $log.Add(('DDU: {0}' -f $_.Exception.Message))
+                $log.Add(('Von Hand: DDU {0} (portabel) von wagnardsoft.com entpacken und als Minibench-Daten\Tools\DDU ablegen; übernommen wird es nur mit der hinterlegten Prüfsumme.' -f $script:OptDduPin.Version))
             }
-            catch { $ok = $false; $log.Add(('DDU: {0}' -f $_.Exception.Message)) }
         }
         if (Get-OptNpiExe) { $log.Add('NVIDIA Profile Inspector liegt bereits im Tools-Ordner.') }
         else {
             try {
-                $z = Join-Path $work 'npi.zip'; Save-WebFile $script:OptNpiZip.Url $z
+                $z = Join-Path $work 'npi.zip'; Save-WebFile $script:OptNpiPin.Url $z
+                $h = Get-FileSha256 $z
+                if ($h -ne $script:OptNpiPin.SHA256) { throw ('nvidiaProfileInspector.zip hat eine unerwartete Prüfsumme ({0}), nichts übernommen.' -f (Get-OptHashKurz $z)) }
+                $ex = Join-Path $work 'npi'
+                Expand-Archive -LiteralPath $z -DestinationPath $ex -Force -ErrorAction Stop
+                $exe = @(Get-ChildItem -LiteralPath $ex -Recurse -Filter 'nvidiaProfileInspector.exe' -ErrorAction SilentlyContinue | Select-Object -First 1)
+                if (-not $exe.Count) { throw 'nvidiaProfileInspector.exe fehlt im Archiv.' }
+                $ver = Get-OptPinnedVersion $exe[0].FullName $script:OptNpiExePins
+                if (-not $ver) { throw ('nvidiaProfileInspector.exe hat eine unbekannte Prüfsumme ({0}), nichts übernommen.' -f (Get-OptHashKurz $exe[0].FullName)) }
                 $dest = Join-Path $t 'NvidiaProfileInspector'
                 New-Item -ItemType Directory -Path $dest -Force -ErrorAction Stop | Out-Null
-                Expand-Archive -LiteralPath $z -DestinationPath $dest -Force -ErrorAction Stop
-                $exe = @(Get-ChildItem -LiteralPath $dest -Recurse -Filter 'nvidiaProfileInspector.exe' -ErrorAction SilentlyContinue | Select-Object -First 1)
-                if (-not $exe.Count) { throw 'nvidiaProfileInspector.exe fehlt im Archiv.' }
-                if ($exe[0].DirectoryName -ne $dest) { Copy-Item -Path (Join-Path $exe[0].DirectoryName '*') -Destination $dest -Recurse -Force }
+                Copy-Item -Path (Join-Path $exe[0].DirectoryName '*') -Destination $dest -Recurse -Force -ErrorAction Stop
                 Get-ChildItem -LiteralPath $dest -Recurse -File | ForEach-Object { if (Get-Command Unblock-File -ErrorAction SilentlyContinue) { Unblock-File -LiteralPath $_.FullName -ErrorAction SilentlyContinue } }
-                [void](Register-Tool -Name 'NvidiaProfileInspector' -Path (Join-Path $dest 'nvidiaProfileInspector.exe') -Lizenz $script:OptNpiZip.Lizenz -Quelle $script:OptNpiZip.Quelle -Herkunft ('von GitHub geholt auf {0}, Prüfsumme beim Holen festgehalten' -f $env:COMPUTERNAME) -ToolsDir $t)
-                $log.Add(('NVIDIA Profile Inspector übernommen ({0}).' -f $dest))
+                [void](Register-Tool -Name 'NvidiaProfileInspector' -Path (Join-Path $dest 'nvidiaProfileInspector.exe') -Lizenz $script:OptNpiPin.Lizenz -Quelle $script:OptNpiPin.Quelle -Herkunft ('Version {0} von GitHub geholt, Prüfsumme aus der festen Liste bestätigt' -f $ver) -ToolsDir $t)
+                $log.Add(('NVIDIA Profile Inspector {0} übernommen ({1}).' -f $ver, $dest))
             } catch { $ok = $false; $log.Add(('NVIDIA Profile Inspector: {0}' -f $_.Exception.Message)) }
         }
     } finally { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue }
@@ -765,7 +850,7 @@ function Invoke-OptDdu($Entry, $Env, [switch]$Pruefen) {
     if ($Pruefen) { return (New-OptResult 'unklar' $(if (Get-OptDduExe) { 'DDU bereit' } else { 'DDU fehlt im Tools-Ordner' })) }
     if ($Env.Neustart) { return (New-OptResult 'Fehler' 'Ein Neustart steht aus (Updates). Erst neu starten, dann DDU vorbereiten.') }
     $exe = Get-OptDduExe
-    if (-not $exe) { return (New-OptResult 'Fehler' 'Display Driver Uninstaller fehlt im Tools-Ordner (Seite Optimierung: Werkzeuge holen).') }
+    if (-not $exe) { return (New-OptResult 'Fehler' ('Display Driver Uninstaller fehlt im Tools-Ordner oder hat keine bekannte Prüfsumme (Seite Optimierung: Werkzeuge holen; freigegeben ist DDU {0}).' -f $script:OptDduPin.Version)) }
     $mod = 'Optimierung'; $step = $Entry.Id; $ttl = $Entry.Titel
     $local = Join-Path (Join-Path $env:windir 'Temp') $script:OptDduDir
     Remove-Item -LiteralPath $local -Recurse -Force -ErrorAction SilentlyContinue
@@ -776,7 +861,7 @@ function Invoke-OptDdu($Entry, $Env, [switch]$Pruefen) {
     $r = Invoke-External -File 'bcdedit.exe' -Arguments '/set {current} safeboot minimal' -TimeoutSec 60
     if ($r.ExitCode -ne 0) { Remove-Item -LiteralPath $local -Recurse -Force -ErrorAction SilentlyContinue; return (New-OptResult 'Fehler' ('bcdedit meldet {0}: {1}' -f $r.ExitCode, ($r.Output + $r.Error).Trim())) }
     $ro = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce'
-    $ddu = '"{0}" -silent -removemonitors -removephysx -removegfe -removenvbroadcast -cleanallgpus -removenvcp -removeintelcp -removeamdcp -removeamddirs -restart' -f (Join-Path $local 'DisplayDriverUninstaller.exe')
+    $ddu = '"{0}" -silent -removemonitors -removephysx -removegfe -removenvbroadcast -cleanallgpus -removenvcp -removeintelcp -removeamdcp -removeamddirs -restart' -f (Join-Path $local (Split-Path $exe -Leaf))
     $vals = [ordered]@{
         '*!LeosMinibench1_NormalStart' = 'cmd.exe /c "bcdedit /deletevalue {current} safeboot"'
         '*LeosMinibench2_Hinweis'      = 'cmd.exe /c start "" powershell.exe -NoExit -Command "Write-Host ''Leos Minibench: DDU entfernt die Grafiktreiber. Bitte warten (bis 10 Minuten), der PC startet danach neu.''"'
@@ -801,7 +886,7 @@ function Test-OptMaintenanceTasksPresent {
 function Invoke-OptNvidiaProfile($Entry, $Env, [switch]$Pruefen) {
     $exe = Get-OptNpiExe
     if ($Pruefen) { return (New-OptResult 'unklar' $(if ($exe) { 'NVIDIA Profile Inspector bereit' } else { 'NVIDIA Profile Inspector fehlt im Tools-Ordner' })) }
-    if (-not $exe) { return (New-OptResult 'Fehler' 'nvidiaProfileInspector.exe fehlt im Tools-Ordner (Seite Optimierung: Werkzeuge holen).') }
+    if (-not $exe) { return (New-OptResult 'Fehler' ('nvidiaProfileInspector.exe fehlt im Tools-Ordner oder hat keine bekannte Prüfsumme (Seite Optimierung: Werkzeuge holen; freigegeben ist Version {0}).' -f $script:OptNpiPin.Version)) }
     $dir = $(if ($RawDir -and (Test-Path -LiteralPath $RawDir)) { $RawDir } else { [IO.Path]::GetTempPath() })
     $nip = Join-Path $dir 'LeosMinibench-NvidiaProfil.nip'
     [IO.File]::WriteAllText($nip, $script:OptNip, (New-Object Text.UTF8Encoding($true)))

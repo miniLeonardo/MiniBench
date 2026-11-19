@@ -938,8 +938,9 @@ if ($script:Opt['Netzwerk']) {
 if ($script:Opt['RamTest']) {
     Invoke-Section 'Test: Arbeitsspeicher (Mustertest)' -Skippable {
         if (-not $TypesLoaded) { Add-Line '  Übersprungen: C#-Testroutinen nicht verfügbar (Constrained Language Mode / AppLocker).'; return }
-        $os = Get-CimCached Win32_OperatingSystem | Select-Object -First 1
-        $free = [long]$os.FreePhysicalMemory * 1KB
+        # ab v4.11: freier RAM frisch abgefragt (nicht der Stand vom Laufbeginn)
+        $free = Get-FreeRamBytes
+        if ($free -le 0) { Add-Line '  Übersprungen: freier Arbeitsspeicher nicht abfragbar.'; return }
         $rawTarget = [long]($free * $RamTestPercent / 100)
         if (-not [Environment]::Is64BitProcess) { $rawTarget = [math]::Min($rawTarget, 1024MB) }
         $target = [long]([math]::Floor([double]$rawTarget / 256MB) * 256MB)
@@ -1018,6 +1019,9 @@ Invoke-Section 'Energie' -Skippable {
         if ($pProf.Volllast -and $pProf.Volllast.Verfuegbar) {
             Add-Line ('  Volllast (Peak)   : {0}' -f $pProf.Volllast.AufschluesselungKurz)
         }
+        # ab v4.11 (Vorgabe 11): Stufen ohne eigenen Messwert benennen statt schätzen
+        $ohne = @(@(@('Leerlauf', $pProf.Leerlauf), @('Teillast', $pProf.Teillast), @('Gaming', $pProf.Gaming)) | Where-Object { $_[1] -and -not $_[1].Verfuegbar } | ForEach-Object { $_[0] })
+        if ($ohne.Count) { Add-Line ('  Nicht gemessen    : {0}' -f ($ohne -join ', ')) }
     }
 }
 

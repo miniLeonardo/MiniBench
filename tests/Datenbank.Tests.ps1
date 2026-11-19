@@ -9,7 +9,7 @@ BeforeAll {
         -Functions 'Read-JsonFile', 'ConvertTo-ValueTable', 'Get-DbEntries', 'Get-DbLatest', 'Get-SafeName', 'Save-DbEntry', 'Get-CurrentRefValues', 'Import-BenchReference', 'Get-Median', 'Add-Line',
                    'Test-WritableDir', 'Resolve-DataDir', 'Test-IsNetworkPath', 'Initialize-DbDir',
                    'Test-EntryIsNotebook', 'Test-DbEntryIsBattery', 'Update-BenchReferenceMedians',
-                   'Import-LegacyFolder', 'Import-SingleRunItem', 'Import-ArchiveRun', 'Import-JsonRun', 'Import-LegacyRun', 'Import-RunFromDirWithJson', 'Get-DbDeviceRuns' `
+                   'Import-LegacyFolder', 'Import-SingleRunItem', 'Import-ArchiveRun', 'Import-JsonRun', 'Import-LegacyRun', 'Import-RunFromDirWithJson', 'Get-DbDeviceRuns', 'Get-AblageName', 'Get-FreierName' `
         -Setup @'
 $script:DbFormat = 'PC-Diagnose-DB/2'
 $script:Report = New-Object System.Text.StringBuilder
@@ -236,6 +236,23 @@ Describe 'Verlaufs-Abfragefunktion (Get-DbDeviceRuns)' {
         @(Get-ChildItem (Join-Path $dataDir 'Archiv') -Filter 'Referenz_Median_vor_4.06_*.json').Count | Should -Be 1
         ($res.Zeilen -join ' ') | Should -Match 'Archiv'
     }
+    # ab v4.11 (Befund F3): Get-DbEntries reicht Sensoren und Lasttest durch, bis v4.10 entstanden nie Lasttest-Mediane
+    It 'Median aktualisieren schreibt Lasttest-Mediane aus Sensoren.Last und aus älteren Lasttest-Feldern' {
+        $db = New-TestDir 'db_last'
+        [IO.File]::WriteAllText((Join-Path $db 'A_20261101_100000.json'), '{"Format":"PC-Diagnose-DB/2","Name":"A","Computer":"A","Datum":"2026-11-01 10:00","System":"Gigabyte B650","Werte":{"CPU|ST":3000},"Sensoren":{"Last":{"CpuTempMax":70,"CpuWMax":80,"TaktAbfall":2}}}')
+        [IO.File]::WriteAllText((Join-Path $db 'B_20261102_100000.json'), '{"Format":"PC-Diagnose-DB/2","Name":"B","Computer":"B","Datum":"2026-11-02 10:00","System":"MSI B550","Werte":{"CPU|ST":3200},"Sensoren":{"Last":{"CpuTempMax":80,"CpuWMax":100,"TaktAbfall":4}}}')
+        [IO.File]::WriteAllText((Join-Path $db 'C_20261103_100000.json'), '{"Format":"PC-Diagnose-DB/2","Name":"C","Computer":"C","Datum":"2026-11-03 10:00","System":"ASRock X570","Werte":{"CPU|ST":3100},"Lasttest":{"CpuTempMax":90,"CpuWMax":120}}')
+        Set-ModuleVar 'DbDir' $db
+        $e = @(MinibenchTest\Get-DbEntries | Where-Object { $_.Computer -eq 'A' })
+        $e[0].Sensoren.Last.CpuTempMax | Should -Be 70
+        @(MinibenchTest\Get-DbEntries | Where-Object { $_.Computer -eq 'C' })[0].Lasttest.CpuWMax | Should -Be 120
+        $dataDir = New-TestDir 'data'
+        [void](MinibenchTest\Update-BenchReferenceMedians -DataDir $dataDir)
+        $j = Read-DatenpflegeJson (Join-Path $dataDir 'Referenz_Desktop.json')
+        $j.Lasttest.CpuTempMax | Should -Be 80
+        $j.Lasttest.CpuWMax | Should -Be 100
+        $j.Lasttest.TaktAbfall | Should -Be 3
+    }
     It 'Median enthält nur gemessene Lasttestwerte (keine Ersatzwerte)' {
         $db = New-TestDir 'db1'
         [IO.File]::WriteAllText((Join-Path $db 'A_20261101_100000.json'), '{"Format":"PC-Diagnose-DB/2","Name":"A","Computer":"A","Datum":"2026-11-01 10:00","System":"Gigabyte B650","Werte":{"CPU|ST":3000}}')
@@ -330,6 +347,32 @@ Describe 'Schreiben im Format 2' {
         $null = New-Db
         & (Get-Module MinibenchTest) { $script:KeineDatenbank = $true; try { Save-DbEntry -Sorted @() -NK 0 -NW 0 -NI 0 } finally { $script:KeineDatenbank = $false } } | Should -BeNullOrEmpty
     }
+    # ab v4.11 (Befund A9): Buildnummer und BIOS-Version als optionale Felder aus den Angaben des Laufs
+    It 'schreibt Hardware.WinBuild und Hardware.BiosVersion, wenn der Lauf sie kennt, sonst fehlen sie' {
+        $null = New-Db
+        Set-Device 'G-44444444444444444444'
+        Mock -ModuleName MinibenchTest Get-CimInstance { }
+        & (Get-Module MinibenchTest) {
+            $script:Facts['Betriebssystem'] = 'Microsoft Windows 11 Pro 24H2 (Build 26100.4351)'
+            $script:Facts['BIOS/UEFI'] = 'F.32 vom 14.03.2025'
+        }
+        try {
+            $f = & (Get-Module MinibenchTest) { Save-DbEntry -Sorted @() -NK 0 -NW 0 -NI 0 }
+            $j = Get-Content $f -Raw -Encoding UTF8 | ConvertFrom-Json
+            $j.Format | Should -Be 'PC-Diagnose-DB/2'
+            $j.Hardware.WinBuild | Should -Be '26100'
+            $j.Hardware.WinBuild | Should -BeOfType [string]
+            $j.Hardware.BiosVersion | Should -Be 'F.32'
+            Start-Sleep -Milliseconds 1100
+            & (Get-Module MinibenchTest) { $script:Facts['Betriebssystem'] = 'Windows 11'; $script:Facts.Remove('BIOS/UEFI') }
+            $f2 = & (Get-Module MinibenchTest) { Save-DbEntry -Sorted @() -NK 0 -NW 0 -NI 0 }
+            $j2 = Get-Content $f2 -Raw -Encoding UTF8 | ConvertFrom-Json
+            $j2.Hardware.PSObject.Properties.Name | Should -Not -Contain 'WinBuild'
+            $j2.Hardware.PSObject.Properties.Name | Should -Not -Contain 'BiosVersion'
+        } finally {
+            & (Get-Module MinibenchTest) { $script:Facts['Betriebssystem'] = 'Windows 11'; $script:Facts.Remove('BIOS/UEFI') }
+        }
+    }
 }
 
 Describe 'Referenzsysteme und eingebettete Referenzen' {
@@ -396,13 +439,25 @@ Describe 'Referenzsysteme und eingebettete Referenzen' {
         MinibenchTest\Initialize-DbDir
         @(Get-ChildItem -LiteralPath $d -Filter '*.json').Count | Should -Be 1
     }
-    It 'ohne gespeicherte Referenz gilt Desktop-Median als Standard' {
+    # ab v4.11: Bauform als Attrappe, bis v4.10 hing der Test an der echten Bauform und scheiterte auf Notebooks
+    It 'ohne gespeicherte Referenz gilt auf einem Desktop-PC der Desktop-Median als Standard' {
+        Mock -ModuleName MinibenchTest Test-IsNotebookSystem { $false }
         Set-ModuleVar 'DataDir' ''
         Set-ModuleVar 'DbDir' (New-TestDir 'leer')
         $ref = MinibenchTest\Get-SavedReference
         $ref | Should -Not -BeNullOrEmpty
         $ref.Name | Should -Match 'Median Desktop-PCs'
         $ref.Quelle | Should -Match 'Eingebettet'
+        $ref.Werte.Count | Should -BeGreaterThan 0
+    }
+    It 'ohne gespeicherte Referenz gilt auf einem Notebook die eingebettete Notebook-Referenz' {
+        Mock -ModuleName MinibenchTest Test-IsNotebookSystem { $true }
+        Set-ModuleVar 'DataDir' ''
+        Set-ModuleVar 'DbDir' (New-TestDir 'leer')
+        $ref = MinibenchTest\Get-SavedReference
+        $ref | Should -Not -BeNullOrEmpty
+        $ref.Name | Should -Match 'Notebook'
+        $ref.Quelle | Should -Be 'Eingebettet (Notebook_Standard.json)'
         $ref.Werte.Count | Should -BeGreaterThan 0
     }
     It 'die Oberfläche (JavaScriptSerializer) liest alle Referenzdateien' {
@@ -861,6 +916,39 @@ Describe 'Lauf importieren und Verknüpfung (.minibench, .zip, .json, Ordner)' {
 
         $msg2 = MinibenchTest\Import-SingleRunItem $pkg
         $msg2 | Should -Match 'bereits in der Datenbank'
+    }
+    # ab v4.11 (Befund A6): Ordnername aus der fremden Datenbank.json bereinigt, Ziel nur unterhalb von Berichte,
+    # vorhandene Ordner werden nicht überschrieben
+    It 'Import mit Ordner "Berichte\.." schreibt nichts in den Datenordner, sondern in einen eigenen Berichtsordner' {
+        $env = New-ImportTestEnv
+        [IO.File]::WriteAllText((Join-Path $env.Root 'Netzwerk.json'), '{"Pfad":"\\\\nas\\echt"}')
+        $src = New-TestDir 'boese'
+        [IO.File]::WriteAllText((Join-Path $src 'Netzwerk.json'), '{"Pfad":"\\\\angreifer\\x"}')
+        [IO.File]::WriteAllText((Join-Path $src 'Diagnosebericht.html'), '<html>x</html>')
+        $dbJson = Join-Path $src 'Datenbank.json'
+        [IO.File]::WriteAllText($dbJson, (@{ Format = 'PC-Diagnose-DB/2'; Name = 'X'; Computer = 'BOESE'; Datum = '2026-10-11 09:30'; Ordner = 'Berichte\..'; Werte = @{ 'CPU|MT' = 1 } } | ConvertTo-Json))
+        $msg = MinibenchTest\Import-RunFromDirWithJson -SourceDir $src -DbJsonPath $dbJson
+        $msg | Should -Match 'erfolgreich importiert'
+        [IO.File]::ReadAllText((Join-Path $env.Root 'Netzwerk.json')) | Should -Match 'nas'
+        $ordner = @(Get-ChildItem -LiteralPath $env.RepDir -Directory)
+        $ordner.Count | Should -Be 1
+        $ordner[0].Name | Should -Be 'BOESE_20261011_093000'
+        Join-Path $ordner[0].FullName 'Diagnosebericht.html' | Should -Exist
+        (Get-Content -LiteralPath (Join-Path $env.DbDir 'BOESE_20261011_093000.json') -Raw -Encoding UTF8 | ConvertFrom-Json).Ordner | Should -Be 'Berichte\BOESE_20261011_093000'
+    }
+    It 'Import bereinigt Ordnernamen und wählt bei vorhandenem Ordner einen freien Namen' {
+        $env = New-ImportTestEnv
+        $vorhanden = Join-Path $env.RepDir 'PC_A'
+        New-Item -ItemType Directory -Path $vorhanden | Out-Null
+        [IO.File]::WriteAllText((Join-Path $vorhanden 'Diagnosebericht.html'), 'alt')
+        $src = New-TestDir 'neu'
+        [IO.File]::WriteAllText((Join-Path $src 'Diagnosebericht.html'), 'neu')
+        $dbJson = Join-Path $src 'Datenbank.json'
+        [IO.File]::WriteAllText($dbJson, (@{ Format = 'PC-Diagnose-DB/2'; Name = 'A'; Computer = 'PC-A'; Datum = '2026-10-12 08:00'; Ordner = '..\..\PC A'; Werte = @{ 'CPU|MT' = 1 } } | ConvertTo-Json))
+        MinibenchTest\Import-RunFromDirWithJson -SourceDir $src -DbJsonPath $dbJson | Should -Match 'erfolgreich importiert'
+        [IO.File]::ReadAllText((Join-Path $vorhanden 'Diagnosebericht.html')) | Should -Be 'alt'
+        [IO.File]::ReadAllText((Join-Path (Join-Path $env.RepDir 'PC_A_2') 'Diagnosebericht.html')) | Should -Be 'neu'
+        @(Get-ChildItem -LiteralPath $env.Root -Directory | ForEach-Object { $_.Name } | Sort-Object) | Should -Be @('Berichte', 'Datenbank')
     }
     It 'Import-SingleRunItem importiert einen Ordner mit Diagnosebericht.txt' {
         $env = New-ImportTestEnv

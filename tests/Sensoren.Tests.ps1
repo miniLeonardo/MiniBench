@@ -709,6 +709,31 @@ Describe 'PawnIO nur vorübergehend' {
         MinibenchTest\Close-SensorSession
         @($script:Calls).Count | Should -Be 0
     }
+    # ab v4.11: Administratorrechte genügen nicht mehr (bis v4.10 "$Treiber -or $isAdmin", Arbeitsprozesse laufen als Administrator)
+    It 'Sitzung mit Administratorrechten, aber ohne -SensorTreiber installiert PawnIO nicht; mit -SensorTreiber schon' {
+        Mock -ModuleName MinibenchTest Install-PawnIoTemporary { [pscustomobject]@{ Ok = $true; Text = 'PawnIO vorübergehend installiert' } }
+        Mock -ModuleName MinibenchTest Remove-PawnIoLeftover { }
+        Mock -ModuleName MinibenchTest Test-IsArm64 { $false }
+        $altTypen = Get-ModuleVar 'SensorTypesLoaded'
+        Set-ModuleVar 'isAdmin' $true
+        Set-ModuleVar 'SensorTypesLoaded' $true
+        try {
+            foreach ($mitTreiber in $false, $true) {
+                Set-ModuleVar 'Sens' $null
+                # das Öffnen der (hier nicht übersetzten) Bibliothek darf scheitern, entschieden ist vorher
+                try { [void](MinibenchTest\Open-SensorSession -Treiber:$mitTreiber) } catch { }
+                $s = Get-ModuleVar 'Sens'
+                if ($mitTreiber) { $s.Treiber | Should -Match 'vorübergehend installiert' }
+                else { $s.Treiber | Should -Match '^ohne PawnIO' }
+            }
+        } finally {
+            Set-ModuleVar 'SensorTypesLoaded' $altTypen
+            Set-ModuleVar 'isAdmin' $false
+            Set-ModuleVar 'Sens' $null
+        }
+        Should -Invoke -ModuleName MinibenchTest Install-PawnIoTemporary -Times 1 -Exactly
+        @($script:Calls).Count | Should -Be 0
+    }
 }
 
 Describe 'Unplausible Sensorwerte zählen' {
@@ -1115,7 +1140,8 @@ Describe 'Geschätzter Gesamtsystemverbrauch und Effizienz' {
             }
             Laufwerke = @('NVMe 1 TB', 'SSD 2 TB')
             Sensoren  = [pscustomobject]@{
-                Leerlauf = [pscustomobject]@{ CpuW = 20.0 }
+                # ab v4.11 (Vorgabe 11): Leerlauf nur mit gemessener GPU-Leerlaufleistung
+                Leerlauf = [pscustomobject]@{ CpuW = 20.0; GpuW = 15.0 }
                 Last     = [pscustomobject]@{ CpuWMax = 120.0; GpuWMax = 200.0 }
             }
             Werte     = [ordered]@{
@@ -1127,7 +1153,9 @@ Describe 'Geschätzter Gesamtsystemverbrauch und Effizienz' {
         $prof.IsNotebook | Should -BeFalse
         $prof.Leerlauf.Verfuegbar | Should -BeTrue
         $prof.Volllast.Verfuegbar | Should -BeTrue
-        $prof.Teillast.Verfuegbar | Should -BeTrue
+        # ab v4.11: Teillast hat keinen eigenen Messwert
+        $prof.Teillast.Verfuegbar | Should -BeFalse
+        $prof.Teillast.Text | Should -Be 'nicht gemessen'
 
         $prof.Effizienz.CpuMT_PerWatt | Should -Be 100.0
         $prof.Effizienz.Gpu_PerWatt | Should -Be 0.9

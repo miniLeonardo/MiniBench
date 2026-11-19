@@ -580,8 +580,69 @@ public partial class DiagGui
         catch { }
     }
 
-    void OnClosing(object sender, FormClosingEventArgs e)
+    // ab v4.11: Hintergrundarbeit außerhalb eines Laufs (Sicherung für den System-Umzug, winget-Installation, Herunterladen
+    // eines Updates). Bis v4.10 liefen sie ohne Zustand: Ein Benchmark konnte parallel starten (Vorgabe 7), und Schließen
+    // ließ den Arbeitsprozess unsichtbar weiterlaufen. Jetzt starten Lauf und Live-Ansicht nicht, solange eine läuft, und
+    // Schließen fragt nach und beendet sie. Es gibt höchstens eine zur Zeit.
+    internal class HintergrundArbeit
     {
+        public readonly string Beschreibung;
+        public volatile bool Abgebrochen;
+        public MethodInvoker Abbrechen;
+        readonly object sperre = new object();
+        Process prozess;
+        public Process Prozess { get { lock (sperre) return prozess; } set { lock (sperre) prozess = value; } }
+        public HintergrundArbeit(string beschreibung) { Beschreibung = beschreibung ?? ""; }
+    }
+    internal HintergrundArbeit hintergrund;
+    // Schließen hat die Hintergrundarbeit beendet: Abschlussmeldungen entfallen
+    bool hintergrundGeschlossen;
+
+    // Warum jetzt nichts Neues starten darf; leer, wenn keine Hintergrundarbeit läuft
+    internal string HintergrundSperre(string vorhaben)
+    {
+        HintergrundArbeit h = hintergrund;
+        if (h == null) return "";
+        return h.Beschreibung + " läuft noch. " + vorhaben + " startet erst danach, damit nichts parallel zu anderer Last läuft.";
+    }
+
+    // Meldet die laufende Hintergrundarbeit und liefert true, wenn das Vorhaben warten muss
+    internal bool HintergrundBelegt(string vorhaben)
+    {
+        string s = HintergrundSperre(vorhaben);
+        if (s.Length == 0) return false;
+        UI.Hinweis(s, "Leos Minibench", this);
+        return true;
+    }
+
+    // Belegt den Zustand; null, wenn schon eine Hintergrundarbeit läuft (Aufrufer prüft vorher mit HintergrundBelegt)
+    internal HintergrundArbeit HintergrundBeginnen(string beschreibung)
+    {
+        if (hintergrund != null) return null;
+        hintergrund = new HintergrundArbeit(beschreibung);
+        return hintergrund;
+    }
+
+    internal void HintergrundEnde(HintergrundArbeit h) { if (h != null && hintergrund == h) hintergrund = null; }
+
+    // Bricht die laufende Hintergrundarbeit ab: Abbruch der Aufgabe (z. B. Download) und Arbeitsprozess samt Kindern beenden
+    internal void HintergrundBeenden()
+    {
+        HintergrundArbeit h = hintergrund;
+        if (h == null) return;
+        h.Abgebrochen = true;
+        if (h.Abbrechen != null) { try { h.Abbrechen(); } catch { } }
+        KillProc(h.Prozess);
+    }
+
+    internal void OnClosing(object sender, FormClosingEventArgs e)
+    {
+        if (hintergrund != null)
+        {
+            if (!UI.Ask(hintergrund.Beschreibung + " läuft noch. Abbrechen und schließen?", "Leos Minibench", this)) { e.Cancel = true; return; }
+            HintergrundBeenden();
+            hintergrund = null; hintergrundGeschlossen = true;
+        }
         // Live-Ansicht sauber beenden, damit ein vorübergehend installierter Treiber entfernt wird
         if (liveRunning) StopLiveAndWait();
         StopSoftwareStateCheck();

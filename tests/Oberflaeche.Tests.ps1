@@ -100,6 +100,12 @@ Describe 'Selbsttest der Oberfläche' {
         @{ Fall = 'Sensoren.Seite' }
         @{ Fall = 'Datenbank.Seite' }
         @{ Fall = 'Versionen.Spaeter' }
+        @{ Fall = 'Hintergrund.Sperre' }
+        @{ Fall = 'Update.Pruefsumme' }
+        @{ Fall = 'Tastenkuerzel' }
+        @{ Fall = 'Ergebnis.Dauer' }
+        @{ Fall = 'Startseite.Neuaufbau' }
+        @{ Fall = 'Aenderungen.Geraet' }
     ) {
         Assert-GuiSelbsttest $Fall
     }
@@ -154,6 +160,21 @@ Describe 'Verträge zwischen Oberfläche und Arbeitsprozess' {
         $script:Gui | Should -Match 'MedianErgebnisText\(res, lines\)'
         (Get-RepoText 'Veroeffentlichen.ps1') | Should -Match 'release upload \$tag \$exe \$shaFile'
         (Get-RepoText 'Veroeffentlichen.ps1') | Should -Match '''release'', ''create'', \$tag, \$exe, \$shaFile'
+    }
+    It 'Hintergrundarbeit, Hilfsprozesse und Download blockieren die Oberfläche nicht (ab v4.11)' {
+        # Verhalten prüft der Selbsttest (Hintergrund.Sperre, Update.Pruefsumme); hier die Verdrahtung
+        foreach ($d in 'Umzug', 'Tools') {
+            $t = Get-SrcText ('Oberflaeche/DiagGui_' + $d + '.cs')
+            $t | Should -Match 'HintergrundBeginnen\(' -Because "DiagGui_$d.cs startet einen Arbeitsprozess im Hintergrund"
+            $t | Should -Match 'arbeit\.Prozess = p;'
+            $t | Should -Match 'HintergrundEnde\(arbeit\)'
+        }
+        (Get-SrcText 'Oberflaeche/DiagGui_Umzug.cs') | Should -Not -Match 'p\.WaitForExit\(\);'
+        $script:Gui | Should -Not -Match 'StandardOutput\.ReadToEnd\(\); p\.WaitForExit\(\d+\)'
+        $script:Gui | Should -Not -Match '\.DownloadFile\('
+        $script:Gui | Should -Match '\.DownloadFileAsync\('
+        (Get-SrcText 'Oberflaeche/DiagGui.cs') | Should -Not -Match 'override void OnKeyDown'
+        (Get-SrcText 'Oberflaeche/DiagGui.cs') | Should -Match 'override bool ProcessCmdKey'
     }
     It 'Seite Tools ohne Abschnitt Netzlaufwerk und mit den neuen Werkzeugen (ab v4.05)' {
         $seiten = Get-GuiText

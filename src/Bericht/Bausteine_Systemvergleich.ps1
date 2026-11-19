@@ -395,43 +395,40 @@ function Get-DeviceRunComparison {
 
     # 1. Inventar-Änderungen ermitteln
     $diffs = [System.Collections.Generic.List[object]]::new()
-    $curBios = $(if ($script:Facts -and $script:Facts.Contains('BIOS/UEFI')) { [string]$script:Facts['BIOS/UEFI'] } else { '' })
-    $prevBios = $(if ($prev.Hardware -and $prev.Hardware.BiosVersion) { [string]$prev.Hardware.BiosVersion } elseif ($prev.Hardware -and $prev.Hardware.BIOS) { [string]$prev.Hardware.BIOS } else { '' })
-    if ($curBios -and $prevBios) {
-        $cBVer = if ($curBios -match '([A-Za-z0-9._-]+)\s+vom') { $matches[1] } else { $curBios }
-        $pBVer = if ($prevBios -match '([A-Za-z0-9._-]+)\s+vom') { $matches[1] } else { $prevBios }
-        if ($cBVer -ne $pBVer) {
-            $diffs.Add([pscustomobject]@{ Item = 'BIOS'; Old = $pBVer; New = $cBVer; Text = ('BIOS: {0} &rarr; <b>{1}</b>' -f $pBVer, $cBVer) })
-        }
+    # ab v4.11: Unterschiede nur zwischen echten Angaben beider Läufe (Hardware.WinBuild und Hardware.BiosVersion aus der
+    # Datenbank); fehlt eine Seite, wird nichts gemeldet. Alte und neue Werte sind maskiert (Vorgabe 12).
+    $mkDiff = {
+        param([string]$Item, [string]$Label, [string]$Old, [string]$New, [string]$Prefix = '')
+        $diffs.Add([pscustomobject]@{ Item = $Item; Old = $Old; New = $New
+            Text = ('{0}: {1}{2} &rarr; <b>{1}{3}</b>' -f (ConvertTo-HtmlText $Label), (ConvertTo-HtmlText $Prefix), (ConvertTo-HtmlText $Old), (ConvertTo-HtmlText $New)) })
     }
+    $curBios = $(if ($script:Facts -and $script:Facts.Contains('BIOS/UEFI')) { ([string]$script:Facts['BIOS/UEFI']).Trim() } else { '' })
+    $cBVer = $(if ($curBios -match '^(.+?)\s+vom\s') { $Matches[1].Trim() } else { $curBios })
+    $pBVer = ''
+    if ($prev.Hardware -and $prev.Hardware.BiosVersion) { $pBVer = ([string]$prev.Hardware.BiosVersion).Trim() }
+    elseif ($prev.Hardware -and $prev.Hardware.BIOS) { $pB = ([string]$prev.Hardware.BIOS).Trim(); $pBVer = $(if ($pB -match '^(.+?)\s+vom\s') { $Matches[1].Trim() } else { $pB }) }
+    if ($cBVer -and $pBVer -and $cBVer -ne $pBVer) { & $mkDiff 'BIOS' 'BIOS' $pBVer $cBVer }
 
     $curDrv = $(if ($script:Facts -and $script:Facts.Contains('Grafik')) { [string]$script:Facts['Grafik'] } else { '' })
     $prevDrv = $(if ($prev.Hardware -and $prev.Hardware.GpuDriver) { [string]$prev.Hardware.GpuDriver } elseif ($prev.Hardware -and $prev.Hardware.GrafikTreiber) { [string]$prev.Hardware.GrafikTreiber } else { '' })
     if ($curDrv -and $prevDrv) {
         $cDrvVer = if ($curDrv -match '(\d{2,3}\.\d{2})') { $matches[1] } else { $curDrv }
         $pDrvVer = if ($prevDrv -match '(\d{2,3}\.\d{2})') { $matches[1] } else { $prevDrv }
-        if ($cDrvVer -ne $pDrvVer) {
-            $diffs.Add([pscustomobject]@{ Item = 'Grafiktreiber'; Old = $pDrvVer; New = $cDrvVer; Text = ('Grafiktreiber: {0} &rarr; <b>{1}</b>' -f $pDrvVer, $cDrvVer) })
-        }
+        if ($cDrvVer -ne $pDrvVer) { & $mkDiff 'Grafiktreiber' 'Grafiktreiber' $pDrvVer $cDrvVer }
     }
 
+    # Windows-Build: nur Buildnummern vergleichen, nie den Systemnamen ($prev.System) als Ersatz
     $curOs = $(if ($script:Facts -and $script:Facts.Contains('Betriebssystem')) { [string]$script:Facts['Betriebssystem'] } else { '' })
-    $prevOs = $(if ($prev.Hardware -and $prev.Hardware.WinBuild) { [string]$prev.Hardware.WinBuild } elseif ($prev.System) { [string]$prev.System } else { '' })
-    if ($curOs -and $prevOs) {
-        $cBuild = if ($curOs -match 'Build\s+(\d+)') { $matches[1] } else { '' }
-        $pBuild = if ($prevOs -match '(\d{5})') { $matches[1] } else { $prevOs }
-        if ($cBuild -and $pBuild -and $cBuild -ne $pBuild) {
-            $diffs.Add([pscustomobject]@{ Item = 'Windows-Build'; Old = $pBuild; New = $cBuild; Text = ('Windows: Build {0} &rarr; <b>Build {1}</b>' -f $pBuild, $cBuild) })
-        }
-    }
-
+    $cBuild = $(if ($curOs -match 'Build\s+(\d{4,6})') { $Matches[1] } else { '' })
+    $pBuild = $(if ($prev.Hardware -and ([string]$prev.Hardware.WinBuild) -match '^\s*(\d{4,6})') { $Matches[1] } else { '' })
+    if ($cBuild -and $pBuild -and $cBuild -ne $pBuild) { & $mkDiff 'Windows-Build' 'Windows' $pBuild $cBuild 'Build ' }
     $curRam = $(if ($script:Facts -and $script:Facts.Contains('Arbeitsspeicher')) { [string]$script:Facts['Arbeitsspeicher'] } else { '' })
     $prevRam = $(if ($prev.Hardware -and $prev.Hardware.RAM) { [string]$prev.Hardware.RAM } else { '' })
     if ($curRam -and $prevRam) {
         $cSpd = if ($curRam -match '(\d{4,5}\s*MT/s)') { $matches[1] } else { '' }
         $pSpd = if ($prevRam -match '(\d{4,5}\s*MT/s)') { $matches[1] } else { '' }
         if ($cSpd -and $pSpd -and $cSpd -ne $pSpd) {
-            $diffs.Add([pscustomobject]@{ Item = 'RAM-Takt'; Old = $pSpd; New = $cSpd; Text = ('RAM: {0} &rarr; <b>{1}</b>' -f $pSpd, $cSpd) })
+            & $mkDiff 'RAM-Takt' 'RAM' $pSpd $cSpd
         }
     }
 

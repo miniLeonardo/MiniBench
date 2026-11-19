@@ -249,7 +249,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
 }
 #endregion
 
-$ScriptVersion = '4.10'
+$ScriptVersion = '4.11'
 $AppName       = 'Leos Minibench'
 # Eingebettete Referenzprofile für Leos Minibench (v3.0)
 $script:EmbeddedReferences = @{
@@ -390,200 +390,6 @@ $script:EmbeddedReferences = @{
                            "Fehler":  ""
                        }
                    ]
-}
-'@
-    'Desktop_HighEnd_RX6800.json' = @'
-{
-    "Format":  "PC-Diagnose-DB/2",
-    "Name":  "Referenz: Desktop High-End (Ryzen 7600X, RX 6800)",
-    "Computer":  "Referenz-Desktop-HighEnd-RX6800",
-    "Geraet":  {
-                   "Id":  "REF-REFERENZ-DESKTOP-HIGHEND-RX6800",
-                   "Guete":  "hoch",
-                   "Quellen":  [
-                                   "Referenzsystem"
-                               ]
-               },
-    "Datum":  "2026-10-01 12:00",
-    "Version":  "2.95",
-    "Quelle":  "Referenz",
-    "Module":  "Benchmark",
-    "Messdauer":  "normal",
-    "System":  "Desktop High-End (AMD B650)",
-    "Hardware":  {
-                     "CPU":  "AMD Ryzen 5 7600X",
-                     "Kerne":  6,
-                     "Threads":  12,
-                     "RAM":  "32 GB DDR5-6000",
-                     "GPU":  "Radeon RX 6800",
-                     "IGPU":  null,
-                     "GPUGemessen":  "AMD Radeon RX 6800",
-                     "Datentraeger":  "NVMe PCIe 4.0 SSD 1TB; NVMe PCIe 3.0 SSD 1TB; SATA SSD 1TB",
-                     "Betriebssystem":  "Microsoft Windows 11",
-                     "Mainboard":  "AMD B650 Mainboard",
-                     "WindowsInstalliert":  null
-                 },
-    "Werte":  {
-                  "DISK|NVMe4|SW":  2779,
-                  "RAM|Lesen":  61.9,
-                  "CPU|MT":  38883,
-                  "DISK|NVMe4|R8":  119846,
-                  "DISK|SATA-SSD|SW":  524,
-                  "DISK|NVMe4|SR":  6551,
-                  "RAM|Kopieren":  24.1,
-                  "GPU|REND":  133.3,
-                  "GPU|REND1":  121,
-                  "DISK|SATA-SSD|R8":  73138,
-                  "DISK|SATA-SSD|R1":  11337,
-                  "DISK|NVMe3|R8":  109080,
-                  "DISK|SATA-SSD|SR":  558,
-                  "CPU|AES":  1429,
-                  "DISK|NVMe3|W1":  58294,
-                  "GPU|RPKT":  12285,
-                  "GPU|VMB":  296.1,
-                  "GPU|DWM":  17440,
-                  "DISK|NVMe3|R1":  14090,
-                  "DISK|NVMe3|SW":  2910,
-                  "CPU|ST":  3092,
-                  "DISK|NVMe4|R1":  14178,
-                  "DISK|SATA-SSD|W1":  29740,
-                  "DISK|NVMe3|SR":  3114,
-                  "RAM|Latenz":  80.6,
-                  "RAM|Schreiben":  31.3,
-                  "DISK|NVMe4|W1":  52665,
-                  "CPU|SHA":  2535,
-                  "CPU|DEFL":  296
-              },
-    "Messwerte":  {
-                      "CPU|AMD Ryzen 5 7600X 6-Core Processor|ST":  3092,
-                      "CPU|AMD Ryzen 5 7600X 6-Core Processor|MT":  38883,
-                      "CPU|AMD Ryzen 5 7600X 6-Core Processor|AES":  1429,
-                      "CPU|AMD Ryzen 5 7600X 6-Core Processor|SHA":  2535,
-                      "CPU|AMD Ryzen 5 7600X 6-Core Processor|DEFL":  296,
-                      "RAM|32GB|6000|Lesen":  61.9,
-                      "RAM|32GB|6000|Schreiben":  31.3,
-                      "RAM|32GB|6000|Kopieren":  24.1,
-                      "RAM|32GB|6000|Latenz":  80.6,
-                      "GPU|AMD Radeon RX 6800|VMB":  296.1,
-                      "GPU|AMD Radeon RX 6800|DWM":  17440,
-                      "GPU|AMD Radeon RX 6800|REND|1280x720":  133.3,
-                      "GPU|AMD Radeon RX 6800|REND1|1280x720":  121,
-                      "GPU|AMD Radeon RX 6800|RPKT":  12285,
-                      "DISK|203791800341|SanDisk SDSSDH3 1T02|SR":  554,
-                      "DISK|203791800341|SanDisk SDSSDH3 1T02|SW":  514,
-                      "DISK|203791800341|SanDisk SDSSDH3 1T02|R1":  10433,
-                      "DISK|203791800341|SanDisk SDSSDH3 1T02|R8":  70639,
-                      "DISK|203791800341|SanDisk SDSSDH3 1T02|W1":  29362,
-                      "DISK|S4X6NF0MC07136F|Samsung SSD 860 EVO 1TB|SR":  563,
-                      "DISK|S4X6NF0MC07136F|Samsung SSD 860 EVO 1TB|SW":  533,
-                      "DISK|S4X6NF0MC07136F|Samsung SSD 860 EVO 1TB|R1":  12241,
-                      "DISK|S4X6NF0MC07136F|Samsung SSD 860 EVO 1TB|R8":  75637,
-                      "DISK|S4X6NF0MC07136F|Samsung SSD 860 EVO 1TB|W1":  30117,
-                      "DISK|0025_38B6_31A3_2B45.|SAMSUNG MZVL21T0HCLR-00B00|SR":  6551,
-                      "DISK|0025_38B6_31A3_2B45.|SAMSUNG MZVL21T0HCLR-00B00|SW":  2779,
-                      "DISK|0025_38B6_31A3_2B45.|SAMSUNG MZVL21T0HCLR-00B00|R1":  14178,
-                      "DISK|0025_38B6_31A3_2B45.|SAMSUNG MZVL21T0HCLR-00B00|R8":  119846,
-                      "DISK|0025_38B6_31A3_2B45.|SAMSUNG MZVL21T0HCLR-00B00|W1":  52665,
-                      "DISK|0000_0006_2303_2570_CAF2_5B03_FF00_024E.|Lexar SSD NM620 1TB|SR":  2805,
-                      "DISK|0000_0006_2303_2570_CAF2_5B03_FF00_024E.|Lexar SSD NM620 1TB|SW":  2908,
-                      "DISK|0000_0006_2303_2570_CAF2_5B03_FF00_024E.|Lexar SSD NM620 1TB|R1":  16504,
-                      "DISK|0000_0006_2303_2570_CAF2_5B03_FF00_024E.|Lexar SSD NM620 1TB|R8":  124476,
-                      "DISK|0000_0006_2303_2570_CAF2_5B03_FF00_024E.|Lexar SSD NM620 1TB|W1":  48673,
-                      "DISK|E823_8FA6_BF53_0001_001B_444A_463E_D685.|WDS100T3X0C-00SJG0|SR":  3422,
-                      "DISK|E823_8FA6_BF53_0001_001B_444A_463E_D685.|WDS100T3X0C-00SJG0|SW":  2912,
-                      "DISK|E823_8FA6_BF53_0001_001B_444A_463E_D685.|WDS100T3X0C-00SJG0|R1":  11676,
-                      "DISK|E823_8FA6_BF53_0001_001B_444A_463E_D685.|WDS100T3X0C-00SJG0|R8":  93685,
-                      "DISK|E823_8FA6_BF53_0001_001B_444A_463E_D685.|WDS100T3X0C-00SJG0|W1":  67914,
-                      "WINSAT|CPU":  9.3,
-                      "WINSAT|RAM":  9.3,
-                      "WINSAT|DISK":  9.35,
-                      "WINSAT|GFX":  9.9
-                  },
-    "Ordner":  "",
-    "Laufwerke":  [
-                      {
-                          "Laufwerk":  "SanDisk SDSSDH3 1T02",
-                          "Klasse":  "SATA-SSD",
-                          "SR":  554,
-                          "SW":  514,
-                          "R1":  10433,
-                          "R8":  70639,
-                          "W1":  29362
-                      },
-                      {
-                          "Laufwerk":  "Samsung SSD 860 EVO 1TB",
-                          "Klasse":  "SATA-SSD",
-                          "SR":  563,
-                          "SW":  533,
-                          "R1":  12241,
-                          "R8":  75637,
-                          "W1":  30117
-                      },
-                      {
-                          "Laufwerk":  "SAMSUNG MZVL21T0HCLR-00B00",
-                          "Klasse":  "NVMe PCIe 4.0 x4",
-                          "SR":  6551,
-                          "SW":  2779,
-                          "R1":  14178,
-                          "R8":  119846,
-                          "W1":  52665
-                      },
-                      {
-                          "Laufwerk":  "Lexar SSD NM620 1TB",
-                          "Klasse":  "NVMe PCIe 3.0 x4",
-                          "SR":  2805,
-                          "SW":  2908,
-                          "R1":  16504,
-                          "R8":  124476,
-                          "W1":  48673
-                      },
-                      {
-                          "Laufwerk":  "WDS100T3X0C-00SJG0",
-                          "Klasse":  "NVMe PCIe 3.0 x4",
-                          "SR":  3422,
-                          "SW":  2912,
-                          "R1":  11676,
-                          "R8":  93685,
-                          "W1":  67914
-                      }
-                  ],
-    "Befunde":  {
-                    "Kritisch":  0,
-                    "Warnungen":  0,
-                    "Hinweise":  0,
-                    "Liste":  [
-
-                              ]
-                },
-    "Lasttest":  {
-                     "CpuTempMax":  75,
-                     "GpuTempMax":  68,
-                     "CpuWMax":  85,
-                     "GpuWMax":  215,
-                     "Drosselung":  "keine",
-                     "Taktstabilitaet":  98.0,
-                     "TaktAbfall":  2.0
-                 },
-    "Rendertest":  [
-                       {
-                           "Grafik":  "AMD Radeon RX 6800",
-                           "Art":  "dGPU",
-                           "Aufloesung":  "1280x720",
-                           "Fps":  133.3,
-                           "Low1":  121,
-                           "Punkte":  12285,
-                           "Bildfehler":  0,
-                           "Treiberreset":  false,
-                           "Fehler":  ""
-                       }
-                   ],
-    "Schreibzugriffe":  null,
-    "Ablauf":  "normal",
-    "Sensoren":  {
-
-                 },
-    "Optimierung":  null,
-    "Akku":  null
 }
 '@
     'Desktop_HighEnd.json' = @'
@@ -854,6 +660,200 @@ $script:EmbeddedReferences = @{
                                        "PsuWattage":  650,
                                        "PsuRating":  "80 PLUS Bronze"
                                    }
+                 },
+    "Optimierung":  null,
+    "Akku":  null
+}
+'@
+    'Desktop_HighEnd_RX6800.json' = @'
+{
+    "Format":  "PC-Diagnose-DB/2",
+    "Name":  "Referenz: Desktop High-End (Ryzen 7600X, RX 6800)",
+    "Computer":  "Referenz-Desktop-HighEnd-RX6800",
+    "Geraet":  {
+                   "Id":  "REF-REFERENZ-DESKTOP-HIGHEND-RX6800",
+                   "Guete":  "hoch",
+                   "Quellen":  [
+                                   "Referenzsystem"
+                               ]
+               },
+    "Datum":  "2026-10-01 12:00",
+    "Version":  "2.95",
+    "Quelle":  "Referenz",
+    "Module":  "Benchmark",
+    "Messdauer":  "normal",
+    "System":  "Desktop High-End (AMD B650)",
+    "Hardware":  {
+                     "CPU":  "AMD Ryzen 5 7600X",
+                     "Kerne":  6,
+                     "Threads":  12,
+                     "RAM":  "32 GB DDR5-6000",
+                     "GPU":  "Radeon RX 6800",
+                     "IGPU":  null,
+                     "GPUGemessen":  "AMD Radeon RX 6800",
+                     "Datentraeger":  "NVMe PCIe 4.0 SSD 1TB; NVMe PCIe 3.0 SSD 1TB; SATA SSD 1TB",
+                     "Betriebssystem":  "Microsoft Windows 11",
+                     "Mainboard":  "AMD B650 Mainboard",
+                     "WindowsInstalliert":  null
+                 },
+    "Werte":  {
+                  "DISK|NVMe4|SW":  2779,
+                  "RAM|Lesen":  61.9,
+                  "CPU|MT":  38883,
+                  "DISK|NVMe4|R8":  119846,
+                  "DISK|SATA-SSD|SW":  524,
+                  "DISK|NVMe4|SR":  6551,
+                  "RAM|Kopieren":  24.1,
+                  "GPU|REND":  133.3,
+                  "GPU|REND1":  121,
+                  "DISK|SATA-SSD|R8":  73138,
+                  "DISK|SATA-SSD|R1":  11337,
+                  "DISK|NVMe3|R8":  109080,
+                  "DISK|SATA-SSD|SR":  558,
+                  "CPU|AES":  1429,
+                  "DISK|NVMe3|W1":  58294,
+                  "GPU|RPKT":  12285,
+                  "GPU|VMB":  296.1,
+                  "GPU|DWM":  17440,
+                  "DISK|NVMe3|R1":  14090,
+                  "DISK|NVMe3|SW":  2910,
+                  "CPU|ST":  3092,
+                  "DISK|NVMe4|R1":  14178,
+                  "DISK|SATA-SSD|W1":  29740,
+                  "DISK|NVMe3|SR":  3114,
+                  "RAM|Latenz":  80.6,
+                  "RAM|Schreiben":  31.3,
+                  "DISK|NVMe4|W1":  52665,
+                  "CPU|SHA":  2535,
+                  "CPU|DEFL":  296
+              },
+    "Messwerte":  {
+                      "CPU|AMD Ryzen 5 7600X 6-Core Processor|ST":  3092,
+                      "CPU|AMD Ryzen 5 7600X 6-Core Processor|MT":  38883,
+                      "CPU|AMD Ryzen 5 7600X 6-Core Processor|AES":  1429,
+                      "CPU|AMD Ryzen 5 7600X 6-Core Processor|SHA":  2535,
+                      "CPU|AMD Ryzen 5 7600X 6-Core Processor|DEFL":  296,
+                      "RAM|32GB|6000|Lesen":  61.9,
+                      "RAM|32GB|6000|Schreiben":  31.3,
+                      "RAM|32GB|6000|Kopieren":  24.1,
+                      "RAM|32GB|6000|Latenz":  80.6,
+                      "GPU|AMD Radeon RX 6800|VMB":  296.1,
+                      "GPU|AMD Radeon RX 6800|DWM":  17440,
+                      "GPU|AMD Radeon RX 6800|REND|1280x720":  133.3,
+                      "GPU|AMD Radeon RX 6800|REND1|1280x720":  121,
+                      "GPU|AMD Radeon RX 6800|RPKT":  12285,
+                      "DISK|203791800341|SanDisk SDSSDH3 1T02|SR":  554,
+                      "DISK|203791800341|SanDisk SDSSDH3 1T02|SW":  514,
+                      "DISK|203791800341|SanDisk SDSSDH3 1T02|R1":  10433,
+                      "DISK|203791800341|SanDisk SDSSDH3 1T02|R8":  70639,
+                      "DISK|203791800341|SanDisk SDSSDH3 1T02|W1":  29362,
+                      "DISK|S4X6NF0MC07136F|Samsung SSD 860 EVO 1TB|SR":  563,
+                      "DISK|S4X6NF0MC07136F|Samsung SSD 860 EVO 1TB|SW":  533,
+                      "DISK|S4X6NF0MC07136F|Samsung SSD 860 EVO 1TB|R1":  12241,
+                      "DISK|S4X6NF0MC07136F|Samsung SSD 860 EVO 1TB|R8":  75637,
+                      "DISK|S4X6NF0MC07136F|Samsung SSD 860 EVO 1TB|W1":  30117,
+                      "DISK|0025_38B6_31A3_2B45.|SAMSUNG MZVL21T0HCLR-00B00|SR":  6551,
+                      "DISK|0025_38B6_31A3_2B45.|SAMSUNG MZVL21T0HCLR-00B00|SW":  2779,
+                      "DISK|0025_38B6_31A3_2B45.|SAMSUNG MZVL21T0HCLR-00B00|R1":  14178,
+                      "DISK|0025_38B6_31A3_2B45.|SAMSUNG MZVL21T0HCLR-00B00|R8":  119846,
+                      "DISK|0025_38B6_31A3_2B45.|SAMSUNG MZVL21T0HCLR-00B00|W1":  52665,
+                      "DISK|0000_0006_2303_2570_CAF2_5B03_FF00_024E.|Lexar SSD NM620 1TB|SR":  2805,
+                      "DISK|0000_0006_2303_2570_CAF2_5B03_FF00_024E.|Lexar SSD NM620 1TB|SW":  2908,
+                      "DISK|0000_0006_2303_2570_CAF2_5B03_FF00_024E.|Lexar SSD NM620 1TB|R1":  16504,
+                      "DISK|0000_0006_2303_2570_CAF2_5B03_FF00_024E.|Lexar SSD NM620 1TB|R8":  124476,
+                      "DISK|0000_0006_2303_2570_CAF2_5B03_FF00_024E.|Lexar SSD NM620 1TB|W1":  48673,
+                      "DISK|E823_8FA6_BF53_0001_001B_444A_463E_D685.|WDS100T3X0C-00SJG0|SR":  3422,
+                      "DISK|E823_8FA6_BF53_0001_001B_444A_463E_D685.|WDS100T3X0C-00SJG0|SW":  2912,
+                      "DISK|E823_8FA6_BF53_0001_001B_444A_463E_D685.|WDS100T3X0C-00SJG0|R1":  11676,
+                      "DISK|E823_8FA6_BF53_0001_001B_444A_463E_D685.|WDS100T3X0C-00SJG0|R8":  93685,
+                      "DISK|E823_8FA6_BF53_0001_001B_444A_463E_D685.|WDS100T3X0C-00SJG0|W1":  67914,
+                      "WINSAT|CPU":  9.3,
+                      "WINSAT|RAM":  9.3,
+                      "WINSAT|DISK":  9.35,
+                      "WINSAT|GFX":  9.9
+                  },
+    "Ordner":  "",
+    "Laufwerke":  [
+                      {
+                          "Laufwerk":  "SanDisk SDSSDH3 1T02",
+                          "Klasse":  "SATA-SSD",
+                          "SR":  554,
+                          "SW":  514,
+                          "R1":  10433,
+                          "R8":  70639,
+                          "W1":  29362
+                      },
+                      {
+                          "Laufwerk":  "Samsung SSD 860 EVO 1TB",
+                          "Klasse":  "SATA-SSD",
+                          "SR":  563,
+                          "SW":  533,
+                          "R1":  12241,
+                          "R8":  75637,
+                          "W1":  30117
+                      },
+                      {
+                          "Laufwerk":  "SAMSUNG MZVL21T0HCLR-00B00",
+                          "Klasse":  "NVMe PCIe 4.0 x4",
+                          "SR":  6551,
+                          "SW":  2779,
+                          "R1":  14178,
+                          "R8":  119846,
+                          "W1":  52665
+                      },
+                      {
+                          "Laufwerk":  "Lexar SSD NM620 1TB",
+                          "Klasse":  "NVMe PCIe 3.0 x4",
+                          "SR":  2805,
+                          "SW":  2908,
+                          "R1":  16504,
+                          "R8":  124476,
+                          "W1":  48673
+                      },
+                      {
+                          "Laufwerk":  "WDS100T3X0C-00SJG0",
+                          "Klasse":  "NVMe PCIe 3.0 x4",
+                          "SR":  3422,
+                          "SW":  2912,
+                          "R1":  11676,
+                          "R8":  93685,
+                          "W1":  67914
+                      }
+                  ],
+    "Befunde":  {
+                    "Kritisch":  0,
+                    "Warnungen":  0,
+                    "Hinweise":  0,
+                    "Liste":  [
+
+                              ]
+                },
+    "Lasttest":  {
+                     "CpuTempMax":  75,
+                     "GpuTempMax":  68,
+                     "CpuWMax":  85,
+                     "GpuWMax":  215,
+                     "Drosselung":  "keine",
+                     "Taktstabilitaet":  98.0,
+                     "TaktAbfall":  2.0
+                 },
+    "Rendertest":  [
+                       {
+                           "Grafik":  "AMD Radeon RX 6800",
+                           "Art":  "dGPU",
+                           "Aufloesung":  "1280x720",
+                           "Fps":  133.3,
+                           "Low1":  121,
+                           "Punkte":  12285,
+                           "Bildfehler":  0,
+                           "Treiberreset":  false,
+                           "Fehler":  ""
+                       }
+                   ],
+    "Schreibzugriffe":  null,
+    "Ablauf":  "normal",
+    "Sensoren":  {
+
                  },
     "Optimierung":  null,
     "Akku":  null
@@ -3157,8 +3157,8 @@ $script:ModuleContracts = @(
            Titel = 'Energiesparpläne zurücksetzen'
            Text  = 'Energiesparpläne auf Standard zurücksetzen (eigene Pläne werden vorher gesichert)' }
         @{ Key = 'Datentraegerbereinigung'; Typ = 'Massnahme'; Risiko = 'Eingriff'; Neustart = 'nie'; Rueckgaengig = 'keins'; Minuten = 10; Vorauswahl = $false; Ueblich = $true; Gruppe = 'Bereinigung und Speicherplatz'
-           Titel = 'Datenträgerbereinigung mit allen Kategorien'
-           Text  = 'Datenträgerbereinigung (cleanmgr mit allen Kategorien außer Downloads)' }
+           Titel = 'Datenträgerbereinigung'
+           Text  = 'Datenträgerbereinigung (cleanmgr ohne Downloads, Papierkorb, Windows.old und ESD-Installationsdateien)' }
         @{ Key = 'Leistungszaehler'; Typ = 'Massnahme'; Risiko = 'Eingriff'; Neustart = 'nie'; Rueckgaengig = 'keins'; Minuten = 1; Vorauswahl = $false; Ueblich = $false; Gruppe = 'Dienste, Geräte und Energie'
            Titel = 'Leistungszähler neu aufbauen'
            Text  = 'Leistungszähler aus der Sicherung neu aufbauen (lodctr /r)' }
@@ -3493,6 +3493,9 @@ function Get-DbDeviceRuns {
 # Eingriffe ohne automatisches Rückgängig erscheinen ebenfalls, mit dem Weg zurück als Hinweis (z. B. Wiederherstellungspunkt).
 #
 # Status eines Eintrags: aktiv (rückgängig machbar), rückgängig, übersprungen (Wert inzwischen anders), fehlgeschlagen, nur Hinweis
+# ab v4.11: Ein fehlgeschlagenes Rückgängig lässt den Eintrag aktiv (Fehler in Ergebnis, Zähler Fehlversuche), damit ein
+# neuer Versuch möglich ist. "fehlgeschlagen" aus älteren Versionen gilt ebenso als offen (Test-ChangeOffen).
+# Zuordnung zum Gerät über die GeraetId des Protokolls, der Computername nur für Protokolle ohne GeraetId (Test-ChangeLogDiesesGeraet).
 $script:ChangeFormat = 'Minibench-Aenderungen/1'
 $script:ChangeFile   = ''
 $script:ChangeLog    = $null
@@ -3571,15 +3574,122 @@ function ConvertTo-RegValue($Value, [string]$Type) {
     }
 }
 
+# ab v4.11: Set-RegValueState vermerkt in $script:RegNeueSchluessel die Schlüssel, die es selbst anlegen musste (oberster
+# zuerst). Set-RegistryValueLogged übernimmt sie ins Protokoll, Rückgängig entfernt sie wieder, wenn sie danach leer sind.
+# Bewusst keine Rückgabe: Aufrufer im Modul Optimierung rufen Set-RegValueState ohne Zuweisung auf.
+$script:RegNeueSchluessel = @()
 function Set-RegValueState([string]$Path, [string]$Name, $Value, [string]$Type) {
-    if (-not (Test-Path -LiteralPath $Path)) { New-Item -Path $Path -Force -ErrorAction Stop | Out-Null }
+    $neu = New-Object System.Collections.Generic.List[string]
+    if (-not (Test-Path -LiteralPath $Path)) {
+        $p = $Path
+        while ($p -and -not (Test-Path -LiteralPath $p)) {
+            $neu.Insert(0, $p)
+            $oben = Split-Path $p -Parent
+            if (-not $oben -or $oben -eq $p) { break }
+            $p = $oben
+        }
+        New-Item -Path $Path -Force -ErrorAction Stop | Out-Null
+    }
+    $script:RegNeueSchluessel = @($neu)
     Set-ItemProperty -LiteralPath $Path -Name $Name -Value (ConvertTo-RegValue $Value $Type) -Type $Type -ErrorAction Stop
 }
 
 function Remove-RegValue([string]$Path, [string]$Name) { Remove-ItemProperty -LiteralPath $Path -Name $Name -ErrorAction Stop }
 
+# ab v4.11: Schlüssel nur entfernen, wenn er weder Werte noch Unterschlüssel hat. Rückgabe: $true, wenn entfernt.
+function Remove-RegKeyIfEmpty([string]$Path) {
+    try { $k = Get-Item -LiteralPath $Path -ErrorAction Stop } catch { return $false }
+    if (@($k.GetValueNames()).Count -or $k.SubKeyCount) { return $false }
+    Remove-Item -LiteralPath $Path -ErrorAction Stop
+    return $true
+}
+
+# Selbst angelegte Schlüssel von unten nach oben entfernen, solange sie leer sind. Rückgabe: Zahl der entfernten Schlüssel.
+function Remove-NeueRegSchluessel($Pfade) {
+    $liste = @(@($Pfade) | Where-Object { $_ } | ForEach-Object { [string]$_ })
+    $n = 0
+    for ($i = $liste.Count - 1; $i -ge 0; $i--) {
+        if (-not (Remove-RegKeyIfEmpty $liste[$i])) { break }
+        $n++
+    }
+    return $n
+}
+
 function Get-ServiceStartType([string]$Name) { $s = Get-Service -Name $Name -ErrorAction Stop; return [string]$s.StartType }
 function Set-ServiceStartType([string]$Name, [string]$StartType) { Set-Service -Name $Name -StartupType $StartType -ErrorAction Stop }
+
+# ab v4.11: verzögerter Autostart. Get-Service kennt ihn unter PowerShell 5.1 nicht (StartType "Automatic"), er steht im
+# Dienstschlüssel als DelayedAutostart = 1. Gesetzt wird er über sc.exe, damit die Dienststeuerung ihn sofort übernimmt.
+function Get-ServiceDelayedAutostart([string]$Name) {
+    try { $v = (Get-ItemProperty -LiteralPath ('HKLM:\SYSTEM\CurrentControlSet\Services\' + $Name) -Name DelayedAutostart -ErrorAction Stop).DelayedAutostart } catch { return $false }
+    return ([int]$v -eq 1)
+}
+function Set-ServiceDelayedAutostart([string]$Name) {
+    $sc = $(if ($env:SystemRoot) { Join-Path $env:SystemRoot 'System32\sc.exe' } else { 'sc.exe' })
+    $r = Invoke-External -File $sc -Arguments ('config "{0}" start= delayed-auto' -f $Name) -TimeoutSec 30
+    if ($r.ExitCode -ne 0) { throw ('sc.exe config {0} start= delayed-auto meldet {1}' -f $Name, $r.ExitCode) }
+}
+
+# ab v4.11: Computerschutz (Systemwiederherstellung) je Laufwerk lesen und schalten.
+# Gelesen wird HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SPP\Clients, Wert {09F7EDC5-294E-4180-AF6A-FB0E6A0E9513}:
+# Dort führt Windows die geschützten Volumes je Laufwerk ("...:(C%3A)"), genau das ändern Enable-/Disable-ComputerRestore.
+# Das ist je Laufwerk eindeutig und schnell, ohne vssadmin (Textausgabe je Sprache) oder WMI. RPSessionInterval gilt nur für
+# alle Laufwerke zusammen (0 = überall aus) und dient als Ersatz, wenn SPP\Clients nicht lesbar ist; Get-ComputerRestorePoint
+# zeigt nur, ob Punkte existieren. Eine Richtlinie DisableSR = 1 schaltet ihn ab, Einschalten scheitert dann.
+$script:SrSchluessel = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore'
+$script:SppClients   = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SPP\Clients'
+$script:SppSrId      = '{09F7EDC5-294E-4180-AF6A-FB0E6A0E9513}'
+function Get-ComputerschutzQuellen {
+    $q = [pscustomobject]@{ Richtlinie = $false; SppLesbar = $false; Spp = @(); Intervall = $null }
+    try { if ([int](Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore' -Name DisableSR -ErrorAction Stop).DisableSR -eq 1) { $q.Richtlinie = $true } } catch { }
+    try { $q.Intervall = [int](Get-ItemProperty -LiteralPath $script:SrSchluessel -Name RPSessionInterval -ErrorAction Stop).RPSessionInterval } catch { }
+    try {
+        $k = Get-Item -LiteralPath $script:SppClients -ErrorAction Stop
+        $q.Spp = @(@($k.GetValue($script:SppSrId, $null)) | Where-Object { $_ } | ForEach-Object { [string]$_ })
+        $q.SppLesbar = $true
+    } catch [System.Management.Automation.ItemNotFoundException] { $q.SppLesbar = $true } catch { }
+    return $q
+}
+# Zustand aus den Quellen: an, aus oder unbekannt
+function Get-ComputerschutzStatus([string]$Laufwerk = ($env:SystemDrive + '\'), $Quellen = $null) {
+    if (-not $Quellen) { $Quellen = Get-ComputerschutzQuellen }
+    if ($Quellen.Richtlinie) { return 'aus' }
+    $bst = ([string]$Laufwerk).Trim().TrimEnd('\', ':')
+    if ($Quellen.SppLesbar -and $bst) {
+        $muster = '\(' + [regex]::Escape($bst) + '%3A\)'
+        if (@($Quellen.Spp | Where-Object { $_ -match $muster }).Count) { return 'an' }
+        return 'aus'
+    }
+    if ($null -ne $Quellen.Intervall -and [int]$Quellen.Intervall -eq 0) { return 'aus' }
+    return 'unbekannt'
+}
+function Set-ComputerschutzZustand([string]$Laufwerk, [bool]$An) {
+    if ($An) { Enable-ComputerRestore -Drive $Laufwerk -ErrorAction Stop } else { Disable-ComputerRestore -Drive $Laufwerk -ErrorAction Stop }
+}
+
+# Computerschutz einschalten, nur wenn er aus war, mit Eintrag im Änderungsprotokoll (Risiko Ändern, Gegenbefehl
+# Disable-ComputerRestore). Ist der Vorher-Zustand nicht lesbar, wird eingeschaltet und nur ein Hinweis protokolliert:
+# Ein automatisches Ausschalten könnte sonst einen vorher schon aktiven Schutz samt Wiederherstellungspunkten löschen.
+# Rückgabe: $true, wenn der Schutz danach an ist.
+function Enable-ComputerschutzMitProtokoll {
+    param([string]$Laufwerk = "$env:SystemDrive\", [string]$Modul = 'Wartung')
+    if (-not $Laufwerk.EndsWith('\')) { $Laufwerk += '\' }
+    $vorher = Get-ComputerschutzStatus $Laufwerk
+    if ($vorher -eq 'an') { return $true }
+    try { Set-ComputerschutzZustand $Laufwerk $true } catch { Write-Warning ('Computerschutz für {0} ließ sich nicht einschalten: {1}' -f $Laufwerk, $_.Exception.Message); return $false }
+    $nachher = Get-ComputerschutzStatus $Laufwerk
+    if ($nachher -eq 'aus') { return $false }
+    $titel = ('Computerschutz für {0} eingeschaltet' -f $Laufwerk)
+    $gegen = ('Disable-ComputerRestore -Drive "{0}" (löscht die Wiederherstellungspunkte dieses Laufwerks)' -f $Laufwerk)
+    if ($vorher -eq 'aus') {
+        [void](Add-ChangeRecord -Modul $Modul -Schritt 'Computerschutz' -Titel $titel -Risiko 'Aendern' -Art 'Computerschutz' -Ziel ('Computerschutz {0}' -f $Laufwerk) `
+            -Vorher 'aus' -Nachher 'an' -Daten ([ordered]@{ Laufwerk = $Laufwerk }) -Gegenbefehl $gegen)
+    } else {
+        [void](Add-ChangeRecord -Modul $Modul -Schritt 'Computerschutz' -Titel $titel -Risiko 'Aendern' -Art 'Computerschutz' -Ziel ('Computerschutz {0}' -f $Laufwerk) `
+            -Vorher 'nicht lesbar' -Nachher 'an' -Daten ([ordered]@{ Laufwerk = $Laufwerk }) -Gegenbefehl ('Nur wenn er vorher aus war: ' + $gegen) -NurHinweis)
+    }
+    return $true
+}
 
 function Invoke-PowerCfg([string]$Arguments) { return (Invoke-External -File 'powercfg.exe' -Arguments $Arguments -TimeoutSec 60) }
 
@@ -3609,8 +3719,12 @@ function Set-RegistryValueLogged {
     param([string]$Path, [string]$Name, $Value, [string]$Type = 'DWord', [string]$Modul, [string]$Schritt, [string]$Titel)
     $before = Get-RegValueState $Path $Name
     if ($before.Vorhanden -and $before.Typ -eq $Type -and (Get-ValueText $before.Wert) -eq (Get-ValueText (ConvertTo-RegValue $Value $Type))) { return $null }
+    $script:RegNeueSchluessel = @()
     Set-RegValueState $Path $Name $Value $Type
+    $neu = @($script:RegNeueSchluessel | Where-Object { $_ })
     $daten = [ordered]@{ Pfad = $Path; Name = $Name; VorherVorhanden = [bool]$before.Vorhanden; VorherWert = $before.Wert; VorherTyp = $before.Typ; NachherWert = (ConvertTo-RegValue $Value $Type); NachherTyp = $Type }
+    # ab v4.11: selbst angelegte Schlüssel (oberster zuerst), Rückgängig entfernt sie, wenn sie danach leer sind
+    if ($neu.Count) { $daten['NeueSchluessel'] = $neu }
     $gegen = $(if ($before.Vorhanden) { 'Set-ItemProperty -LiteralPath ''{0}'' -Name {1} -Value {2} -Type {3}' -f $Path, $Name, (Get-ValueText $before.Wert), $before.Typ } else { 'Remove-ItemProperty -LiteralPath ''{0}'' -Name {1}' -f $Path, $Name })
     return (Add-ChangeRecord -Modul $Modul -Schritt $Schritt -Titel $Titel -Risiko 'Aendern' -Art 'Registry' -Ziel ('{0}\{1}' -f $Path, $Name) `
         -Vorher (Get-ValueText $before.Wert) -Nachher (Get-ValueText $Value) -Daten $daten -Gegenbefehl $gegen)
@@ -3620,12 +3734,18 @@ function Set-ServiceStartTypeLogged {
     param([string]$Name, [string]$StartType, [string]$Modul, [string]$Schritt, [string]$Titel)
     $before = Get-ServiceStartType $Name
     if ($before -eq $StartType) { return $null }
+    # ab v4.11: verzögerten Start mitsichern (Get-Service meldet ihn als "Automatic")
+    $verz = $false
+    if ($before -eq 'Automatic') { $verz = [bool](Get-ServiceDelayedAutostart $Name) }
     Set-ServiceStartType $Name $StartType
+    $vorherText = $(if ($verz) { 'Automatic (verzögert)' } else { $before })
+    $gegen = $(if ($verz) { 'sc.exe config {0} start= delayed-auto' -f $Name } else { 'Set-Service {0} -StartupType {1}' -f $Name, $before })
     return (Add-ChangeRecord -Modul $Modul -Schritt $Schritt -Titel $Titel -Risiko 'Aendern' -Art 'Dienststart' -Ziel ('Dienst {0}, Starttyp' -f $Name) `
-        -Vorher $before -Nachher $StartType -Daten ([ordered]@{ Dienst = $Name; Vorher = $before; Nachher = $StartType }) -Gegenbefehl ('Set-Service {0} -StartupType {1}' -f $Name, $before))
+        -Vorher $vorherText -Nachher $StartType -Daten ([ordered]@{ Dienst = $Name; Vorher = $before; Nachher = $StartType; VorherVerzoegert = $verz }) -Gegenbefehl $gegen)
 }
 
-# Alle Energiepläne sichern, bevor sie zurückgesetzt werden. Rückgängig stellt fehlende eigene Pläne und den aktiven Plan wieder her.
+# Alle Energiepläne sichern, bevor sie zurückgesetzt werden. Rückgängig spielt jeden gesicherten Plan wieder ein (ab v4.11
+# auch noch vorhandene Pläne mit gleicher GUID, deren Einstellungen das Zurücksetzen verändert hat) und setzt den aktiven Plan.
 function Backup-PowerSchemesLogged {
     param([string]$Modul, [string]$Schritt, [string]$Titel)
     if (-not $script:ChangeLog) { Start-ChangeLog }
@@ -3646,7 +3766,7 @@ function Backup-PowerSchemesLogged {
     $activeName = $(if ($active.Count) { $active[0].Name } else { '' })
     return (Add-ChangeRecord -Modul $Modul -Schritt $Schritt -Titel $Titel -Risiko 'Aendern' -Art 'Energieplaene' -Ziel 'Energiesparpläne' `
         -Vorher ('{0} Pläne, aktiv: {1}' -f $saved.Count, $activeName) -Nachher 'Windows-Standardpläne' `
-        -Daten ([ordered]@{ AktivVorher = $activeGuid; Sicherungen = $saved }) -Gegenbefehl ('powercfg /import <Datei> <GUID>, danach powercfg /setactive {0}' -f $activeGuid))
+        -Daten ([ordered]@{ AktivVorher = $activeGuid; Sicherungen = $saved }) -Gegenbefehl ('je Plan powercfg /delete <GUID> (falls vorhanden) und powercfg /import <Datei> <GUID>, danach powercfg /setactive {0}' -f $activeGuid))
 }
 
 # Eine Änderung dieses Laufs sofort zurücknehmen (vorübergehende Einstellung für eine Messung). Rückgabe: Status und Text.
@@ -3655,10 +3775,35 @@ function Undo-ChangeNow($Record) {
     $e = @($script:ChangeLog.Eintraege | Where-Object { [int]$_.Id -eq [int]$Record.Id }) | Select-Object -First 1
     if (-not $e) { return $null }
     try { $res = Undo-ChangeRecord $e (Get-ChangeFilesDir) } catch { $res = [pscustomobject]@{ Status = 'fehlgeschlagen'; Text = $_.Exception.Message } }
-    $e.Status = $res.Status
-    $e.Ergebnis = ('{0}: {1} (direkt nach der Messung)' -f (Get-Date).ToString('yyyy-MM-dd HH:mm', [Globalization.CultureInfo]::InvariantCulture), $res.Text)
+    Set-ChangeUndoErgebnis $e $res ' (direkt nach der Messung)'
     try { Save-ChangeFile $script:ChangeFile $script:ChangeLog } catch { }
     return $res
+}
+
+# ab v4.11: Noch zurücknehmbar? "aktiv" und "fehlgeschlagen" (Status älterer Versionen nach gescheitertem Rückgängig)
+function Test-ChangeOffen($Entry) { return (@('aktiv', 'fehlgeschlagen') -contains [string]$Entry.Status) }
+
+# ab v4.11: Stammt ein Protokoll von diesem Gerät? Über die GeraetId, der Computername nur, wenn das Protokoll (oder
+# dieses Gerät) keine GeraetId hat. So bleibt die Zuordnung nach dem Umbenennen des PCs erhalten.
+function Test-ChangeLogDiesesGeraet($Log, [string]$GeraetId, [string]$Computer = $env:COMPUTERNAME) {
+    if ([string]$Log.GeraetId -and $GeraetId) { return ([string]$Log.GeraetId -eq $GeraetId) }
+    return ([string]$Log.Computer -eq $Computer)
+}
+function Get-ChangeGeraetId { try { return [string](Get-DeviceIdentity).Id } catch { return '' } }
+
+# Ergebnis eines Rückgängig in den Eintrag schreiben. ab v4.11: Fehlschlag lässt den Eintrag aktiv (neuer Versuch möglich).
+function Set-ChangeUndoErgebnis($Entry, $Res, [string]$Zusatz = '') {
+    $zeit = (Get-Date).ToString('yyyy-MM-dd HH:mm', [Globalization.CultureInfo]::InvariantCulture)
+    if ([string]$Res.Status -eq 'fehlgeschlagen') {
+        $n = 1
+        if ($Entry.PSObject.Properties['Fehlversuche']) { $n = [int]$Entry.Fehlversuche + 1 }
+        $Entry | Add-Member -NotePropertyName Fehlversuche -NotePropertyValue $n -Force
+        $Entry.Status = 'aktiv'
+        $Entry.Ergebnis = ('{0}: Rückgängig fehlgeschlagen ({1}. Versuch), bleibt aktiv für einen neuen Versuch: {2}{3}' -f $zeit, $n, $Res.Text, $Zusatz)
+    } else {
+        $Entry.Status = $Res.Status
+        $Entry.Ergebnis = ('{0}: {1}{2}' -f $zeit, $Res.Text, $Zusatz)
+    }
 }
 
 # ---------- Rückgängig ----------
@@ -3673,30 +3818,86 @@ function Undo-ChangeRecord($Record, [string]$FilesDir) {
             }
             if ($d.VorherVorhanden) { Set-RegValueState $d.Pfad $d.Name $d.VorherWert $d.VorherTyp; return [pscustomobject]@{ Status = 'rückgängig'; Text = ('{0} wieder auf {1}' -f $d.Name, (Get-ValueText $d.VorherWert)) } }
             Remove-RegValue $d.Pfad $d.Name
-            return [pscustomobject]@{ Status = 'rückgängig'; Text = ('{0} entfernt (war vorher nicht vorhanden)' -f $d.Name) }
+            $txt = ('{0} entfernt (war vorher nicht vorhanden)' -f $d.Name)
+            # ab v4.11: selbst angelegte Schlüssel wieder entfernen, wenn sie leer sind
+            if (@($d.NeueSchluessel | Where-Object { $_ }).Count) {
+                $n = 0
+                try { $n = Remove-NeueRegSchluessel $d.NeueSchluessel } catch { $txt += ('; angelegter Schlüssel nicht entfernbar: {0}' -f $_.Exception.Message) }
+                if ($n) { $txt += ('; {0} angelegte(r) Schlüssel entfernt' -f $n) }
+            }
+            return [pscustomobject]@{ Status = 'rückgängig'; Text = $txt }
         }
         'Dienststart' {
             $now = Get-ServiceStartType $d.Dienst
+            # ab v4.11: neuer Versuch, nachdem der Starttyp schon zurückgesetzt war, aber sc.exe für den verzögerten Start scheiterte
+            if ($d.VorherVerzoegert -eq $true -and $now -eq [string]$d.Vorher -and $now -ne [string]$d.Nachher) {
+                if (-not (Get-ServiceDelayedAutostart $d.Dienst)) { Set-ServiceDelayedAutostart $d.Dienst }
+                return [pscustomobject]@{ Status = 'rückgängig'; Text = ('Starttyp von {0} wieder Automatic (verzögert)' -f $d.Dienst) }
+            }
             if ($now -ne [string]$d.Nachher) { return [pscustomobject]@{ Status = 'übersprungen'; Text = ('Starttyp ist inzwischen {0}, nicht {1}; nichts verändert.' -f $now, $d.Nachher) } }
             Set-ServiceStartType $d.Dienst ([string]$d.Vorher)
+            # ab v4.11: verzögerten Start wiederherstellen (Einträge älterer Versionen haben das Feld nicht)
+            if ($d.VorherVerzoegert -eq $true) {
+                Set-ServiceDelayedAutostart $d.Dienst
+                return [pscustomobject]@{ Status = 'rückgängig'; Text = ('Starttyp von {0} wieder Automatic (verzögert)' -f $d.Dienst) }
+            }
             return [pscustomobject]@{ Status = 'rückgängig'; Text = ('Starttyp von {0} wieder {1}' -f $d.Dienst, $d.Vorher) }
         }
         'Energieplaene' {
-            $present = @(Get-PowerSchemes | ForEach-Object { $_.Guid })
+            # ab v4.11: auch Pläne, deren GUID noch existiert (z. B. Standardpläne nach powercfg -restoredefaultschemes), aus der
+            # Sicherung neu einspielen: powercfg /import kann keinen vorhandenen Plan überschreiben, daher vorher den aktuellen
+            # Stand sichern, den Plan löschen (ist er aktiv, erst einen anderen aktivieren) und mit derselben GUID importieren.
+            # Scheitert der Import, kommt der gesicherte aktuelle Stand zurück, der Plan geht also nie verloren.
+            $schemes = @(Get-PowerSchemes)
+            $present = @($schemes | ForEach-Object { $_.Guid })
+            $aktivJetzt = [string](@($schemes | Where-Object { $_.Aktiv } | ForEach-Object { $_.Guid }) | Select-Object -First 1)
+            $aktivAnfang = $aktivJetzt
             $msgs = @(); $bad = 0
             foreach ($s in @($d.Sicherungen)) {
-                if ($present -contains [string]$s.Guid) { continue }
+                $g = ([string]$s.Guid).ToLowerInvariant()
                 $f = Join-Path $FilesDir ([string]$s.Datei)
                 if (-not (Test-Path -LiteralPath $f)) { $msgs += ('Sicherung von {0} fehlt' -f $s.Name); $bad++; continue }
-                $r = Invoke-PowerCfg ('/import "{0}" {1}' -f $f, $s.Guid)
+                if ($present -contains $g) {
+                    if ($aktivJetzt -eq $g) {
+                        $ausweich = [string](@($present | Where-Object { $_ -ne $g }) | Select-Object -First 1)
+                        if (-not $ausweich) { $msgs += ('{0} ist der einzige Plan und aktiv, Einstellungen nicht ersetzbar' -f $s.Name); $bad++; continue }
+                        $r = Invoke-PowerCfg ('/setactive {0}' -f $ausweich)
+                        if ($r.ExitCode -ne 0) { $msgs += ('{0}: anderer Plan nicht aktivierbar (Code {1})' -f $s.Name, $r.ExitCode); $bad++; continue }
+                        $aktivJetzt = $ausweich
+                    }
+                    $zwischen = Join-Path $FilesDir ('Energieplan_{0}_vor_Ruecknahme.pow' -f $g)
+                    $r = Invoke-PowerCfg ('/export "{0}" {1}' -f $zwischen, $g)
+                    if ($r.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $zwischen)) { $msgs += ('{0}: aktueller Stand nicht sicherbar (Code {1}), nichts verändert' -f $s.Name, $r.ExitCode); $bad++; continue }
+                    $r = Invoke-PowerCfg ('/delete {0}' -f $g)
+                    if ($r.ExitCode -ne 0) { $msgs += ('{0} nicht ersetzbar (powercfg /delete, Code {1})' -f $s.Name, $r.ExitCode); $bad++; continue }
+                    $r = Invoke-PowerCfg ('/import "{0}" {1}' -f $f, $g)
+                    if ($r.ExitCode -eq 0) {
+                        $msgs += ('Einstellungen von {0} wiederhergestellt' -f $s.Name)
+                        Remove-Item -LiteralPath $zwischen -Force -ErrorAction SilentlyContinue
+                    } else {
+                        $r2 = Invoke-PowerCfg ('/import "{0}" {1}' -f $zwischen, $g)
+                        $msgs += ('{0} nicht importierbar (Code {1}), {2}' -f $s.Name, $r.ExitCode, $(if ($r2.ExitCode -eq 0) { 'Stand vor der Rücknahme wieder eingespielt' } else { 'Plan fehlt jetzt, Sicherungen: ' + $f + ', ' + $zwischen }))
+                        $bad++
+                    }
+                    continue
+                }
+                $r = Invoke-PowerCfg ('/import "{0}" {1}' -f $f, $g)
                 if ($r.ExitCode -eq 0) { $msgs += ('{0} wiederhergestellt' -f $s.Name) } else { $msgs += ('{0} nicht importierbar (Code {1})' -f $s.Name, $r.ExitCode); $bad++ }
             }
-            if ($d.AktivVorher) {
-                $r = Invoke-PowerCfg ('/setactive {0}' -f $d.AktivVorher)
-                if ($r.ExitCode -eq 0) { $msgs += 'vorher aktiver Plan wieder aktiv' } else { $msgs += ('aktiver Plan nicht setzbar (Code {0})' -f $r.ExitCode); $bad++ }
+            $ziel = $(if ($d.AktivVorher) { [string]$d.AktivVorher } elseif ($aktivJetzt -ne $aktivAnfang) { $aktivAnfang } else { '' })
+            if ($ziel) {
+                $r = Invoke-PowerCfg ('/setactive {0}' -f $ziel)
+                if ($r.ExitCode -eq 0) { $msgs += $(if ($d.AktivVorher) { 'vorher aktiver Plan wieder aktiv' } else { 'aktiver Plan wieder gesetzt' }) } else { $msgs += ('aktiver Plan nicht setzbar (Code {0})' -f $r.ExitCode); $bad++ }
             }
-            $msgs += 'Einstellungen der Windows-Standardpläne bleiben auf Standard'
             return [pscustomobject]@{ Status = $(if ($bad) { 'fehlgeschlagen' } else { 'rückgängig' }); Text = ($msgs -join '; ') }
+        }
+        'Computerschutz' {
+            # ab v4.11: Enable-ComputerschutzMitProtokoll
+            $lw = [string]$d.Laufwerk
+            $now = Get-ComputerschutzStatus $lw
+            if ($now -eq 'aus') { return [pscustomobject]@{ Status = 'übersprungen'; Text = ('Computerschutz für {0} ist bereits aus; nichts verändert.' -f $lw) } }
+            Set-ComputerschutzZustand $lw $false
+            return [pscustomobject]@{ Status = 'rückgängig'; Text = ('Computerschutz für {0} wieder aus (Wiederherstellungspunkte dieses Laufwerks gelöscht)' -f $lw) }
         }
     }
     # ab v3.53: Softwarepakete der Seite Tools (winget uninstall, nur wenn noch installiert)
@@ -3712,11 +3913,14 @@ function New-RestorePointLogged([string]$Modul, [string]$Beschreibung) {
     $rk = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore'
     $old = $null; try { $old = (Get-ItemProperty $rk -Name SystemRestorePointCreationFrequency -ErrorAction Stop).SystemRestorePointCreationFrequency } catch { }
     try {
-        try { Enable-ComputerRestore -Drive ($env:SystemDrive + '\') -ErrorAction Stop } catch { }
+        # ab v4.11: nur einschalten, wenn er aus war, und dann mit Eintrag und Gegenbefehl im Änderungsprotokoll (Vorgabe 3)
+        try { [void](Enable-ComputerschutzMitProtokoll -Laufwerk ($env:SystemDrive + '\') -Modul $Modul) } catch { }
         if (-not (Test-Path $rk)) { New-Item -Path $rk -Force | Out-Null }
         Set-ItemProperty -Path $rk -Name SystemRestorePointCreationFrequency -Value 0 -Type DWord -ErrorAction SilentlyContinue
         Checkpoint-Computer -Description $Beschreibung -RestorePointType MODIFY_SETTINGS -ErrorAction Stop
-        $rp = Get-ComputerRestorePoint -ErrorAction SilentlyContinue | Sort-Object SequenceNumber -Descending | Select-Object -First 1
+        # ab v4.11: nur der Punkt mit genau dieser Beschreibung zählt; bis v4.10 der neueste, auch wenn Windows wegen der
+        # Sperrfrist keinen neuen angelegt hatte (dann stand eine fremde Nummer im Protokoll)
+        $rp = @(Get-ComputerRestorePoint -ErrorAction SilentlyContinue) | Where-Object { [string]$_.Description -eq $Beschreibung } | Sort-Object SequenceNumber -Descending | Select-Object -First 1
         $no = $(if ($rp) { [string]$rp.SequenceNumber } else { '' })
         $txt = $(if ($rp) { 'angelegt: {0} (Nr. {1})' -f $rp.Description, $rp.SequenceNumber } else { 'angelegt' })
         [void](Add-ChangeRecord -Modul $Modul -Schritt 'Wiederherstellungspunkt' -Titel ('Wiederherstellungspunkt vor dem Modul {0}' -f $Modul) -Risiko 'Lesen' -Art 'Wiederherstellungspunkt' `
@@ -3735,15 +3939,16 @@ function New-RestorePointLogged([string]$Modul, [string]$Beschreibung) {
 $script:TemporarySteps = @('GpuWahl')
 function Restore-TemporaryChanges {
     $root = Get-ChangeRoot
-    if (-not $root) { return $null }
-    $dir = Join-Path $root (Get-SafeName $env:COMPUTERNAME)
-    if (-not (Test-Path -LiteralPath $dir)) { return $null }
+    if (-not $root -or -not (Test-Path -LiteralPath $root)) { return $null }
+    # ab v4.11: alle Ordner durchsuchen und über die GeraetId zuordnen; bis v4.10 nur der Ordner des Computernamens,
+    # nach einem Umbenennen des PCs blieben vorübergehende Änderungen stehen
+    $gid = Get-ChangeGeraetId
     $spec = @()
-    foreach ($f in @(Get-ChildItem -LiteralPath $dir -File -Filter '*.json' -ErrorAction SilentlyContinue)) {
+    foreach ($f in @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter '*.json' -ErrorAction SilentlyContinue)) {
         if ($script:ChangeFile -and $f.FullName -eq $script:ChangeFile) { continue }
         $j = Read-ChangeFile $f.FullName
-        if (-not $j) { continue }
-        foreach ($e in @($j.Eintraege)) { if ([string]$e.Status -eq 'aktiv' -and $script:TemporarySteps -contains [string]$e.Schritt) { $spec += ('{0}*{1}' -f $f.FullName, [int]$e.Id) } }
+        if (-not $j -or -not (Test-ChangeLogDiesesGeraet $j $gid)) { continue }
+        foreach ($e in @($j.Eintraege)) { if ((Test-ChangeOffen $e) -and $script:TemporarySteps -contains [string]$e.Schritt) { $spec += ('{0}*{1}' -f $f.FullName, [int]$e.Id) } }
     }
     if (-not $spec.Count) { return $null }
     return (Invoke-ChangeUndo ($spec -join ';'))
@@ -3774,22 +3979,21 @@ function Invoke-ChangeUndo([string]$Spec) {
         if (-not $byFile.Contains($p[0])) { $byFile[$p[0]] = New-Object System.Collections.Generic.List[int] }
         $byFile[$p[0]].Add([int]$p[1])
     }
-    $dev = Get-DeviceIdentity
+    $gid = Get-ChangeGeraetId
     $done = 0; $fail = 0
     foreach ($file in $byFile.Keys) {
         $root = Get-ChangeRoot
         if (-not $root -or -not ([IO.Path]::GetFullPath($file)).StartsWith([IO.Path]::GetFullPath($root), [StringComparison]::OrdinalIgnoreCase)) { Write-Host ('{0} liegt nicht im Änderungsprotokoll des Datenordners.' -f $file); $fail++; continue }
         $j = Read-ChangeFile $file
         if (-not $j) { Write-Host ('{0} ist kein lesbares Änderungsprotokoll.' -f $file); $fail++; continue }
-        $same = $(if ([string]$j.GeraetId) { [string]$j.GeraetId -eq $dev.Id } else { [string]$j.Computer -eq $env:COMPUTERNAME })
+        $same = Test-ChangeLogDiesesGeraet $j $gid
         if (-not $same) { Write-Host ('{0}: Die Änderungen stammen von {1}, nicht von diesem Gerät. Rückgängig nur dort möglich.' -f (Split-Path $file -Leaf), $j.Computer); $fail++; continue }
         $filesDir = $file -replace '\.json$', ''
         # neueste zuerst, damit aufeinander aufbauende Änderungen in umgekehrter Reihenfolge zurückgenommen werden
         foreach ($e in @($j.Eintraege | Where-Object { $byFile[$file] -contains [int]$_.Id } | Sort-Object { [int]$_.Id } -Descending)) {
-            if ([string]$e.Status -ne 'aktiv') { Write-Host ('{0}: Status {1}, nichts zu tun.' -f $e.Titel, $e.Status); continue }
+            if (-not (Test-ChangeOffen $e)) { Write-Host ('{0}: Status {1}, nichts zu tun.' -f $e.Titel, $e.Status); continue }
             try { $res = Undo-ChangeRecord $e $filesDir } catch { $res = [pscustomobject]@{ Status = 'fehlgeschlagen'; Text = $_.Exception.Message } }
-            $e.Status = $res.Status
-            $e.Ergebnis = ('{0}: {1}' -f (Get-Date).ToString('yyyy-MM-dd HH:mm', [Globalization.CultureInfo]::InvariantCulture), $res.Text)
+            Set-ChangeUndoErgebnis $e $res
             Write-Host ('{0} ({1}): {2}, {3}' -f $e.Titel, $e.Ziel, $res.Status, $res.Text)
             if ($res.Status -eq 'rückgängig') { $done++ } else { $fail++ }
         }
@@ -3804,7 +4008,9 @@ function Invoke-ChangeUndo([string]$Spec) {
 # Protokolle dieses PCs mit aktiven Einträgen bleiben immer: Sonst ginge Rückgängig verloren, und der Start könnte
 # vorübergehende Änderungen (Restore-TemporaryChanges) nicht mehr zurücknehmen. Die Oberfläche rechnet dieselben Regeln
 # für die Anzeige (ChangeLauf.Aufzuraeumen).
-function Move-ChangeArchiv([string]$Spec, [string]$Root = (Get-ChangeRoot), [string]$DataDir = $script:DataDir, [string]$Computer = $env:COMPUTERNAME, [datetime]$Jetzt = (Get-Date)) {
+# ab v4.11: "dieser PC" heißt gleiche GeraetId (Name nur bei Protokollen ohne GeraetId, Test-ChangeLogDiesesGeraet), und
+# "aktiv" schließt "fehlgeschlagen" älterer Versionen ein (Test-ChangeOffen): Beides gilt als noch zurücknehmbar.
+function Move-ChangeArchiv([string]$Spec, [string]$Root = (Get-ChangeRoot), [string]$DataDir = $script:DataDir, [string]$Computer = $env:COMPUTERNAME, [datetime]$Jetzt = (Get-Date), [string]$GeraetId = (Get-ChangeGeraetId)) {
     $res = [pscustomobject]@{ Verschoben = 0; Eintraege = 0; Fehler = 0; Zeilen = (New-Object System.Collections.Generic.List[string]); Archiv = '' }
     $erledigt = $false; $tage = 0; $andere = $false
     foreach ($t in @(([string]$Spec) -split ';' | ForEach-Object { $_.Trim().Trim('"') } | Where-Object { $_ })) {
@@ -3823,8 +4029,8 @@ function Move-ChangeArchiv([string]$Spec, [string]$Root = (Get-ChangeRoot), [str
         $j = Read-ChangeFile $f.FullName
         if (-not $j) { continue }
         $ein = @($j.Eintraege | Where-Object { $_ })
-        $aktiv = @($ein | Where-Object { [string]$_.Status -eq 'aktiv' }).Count
-        $dieser = ([string]$j.Computer -eq $Computer)
+        $aktiv = @($ein | Where-Object { Test-ChangeOffen $_ }).Count
+        $dieser = Test-ChangeLogDiesesGeraet $j $GeraetId $Computer
         $zeit = $null; $zt = [string]$j.Lauf
         if (-not $zt -and $ein.Count) { $zt = [string]$ein[0].Zeit }
         $d = [datetime]::MinValue
@@ -5360,15 +5566,39 @@ $script:OptLog = [System.Collections.Generic.List[object]]::new()
 $script:OptMetricsBefore = $null
 $script:OptMetricsAfter = $null
 $script:OptRestart = [System.Collections.Generic.List[string]]::new()
-# Display Driver Uninstaller (Wagnardsoft): Offizielle Bezugsquelle (wagnardsoft.com) oder winget (Wagnardsoft.DisplayDriverUninstaller)
-$script:OptDduZip = @{
-    Url      = 'https://www.wagnardsoft.com'
-    WingetId = 'Wagnardsoft.DisplayDriverUninstaller'
-    Quelle   = 'wagnardsoft.com / winget: Wagnardsoft.DisplayDriverUninstaller'
-    Lizenz   = 'Freeware (Wagnardsoft)'
+# ab v4.11: Werkzeuge nur mit fester Version und fester SHA-256 (Vorgabe 5), wie LibreHardwareMonitor in Kern\Sensoren.ps1.
+# Ein Download wird nur bei passender Prüfsumme angenommen; eine im Tools-Ordner vorgefundene oder von Hand abgelegte
+# Datei nur, wenn ihre SHA-256 in der Liste der bekannten Programmdateien steht. Eine neue Version braucht neue Einträge.
+# Display Driver Uninstaller (Wagnardsoft, MIT): portables 7-Zip-Selbstentpackarchiv von wagnardsoft.com. Die Prüfsumme
+# des Setups derselben Version (DDU v18.1.5.3_setup.exe) stimmt mit dem winget-Manifest Wagnardsoft.DisplayDriverUninstaller
+# 18.1.5.3 überein (1e854c00…); das portable Archiv liegt im selben Download-Verzeichnis.
+$script:OptDduPin = @{
+    Version = '18.1.5.3'
+    Url     = 'https://www.wagnardsoft.com/DDU/download/DDU%20v18.1.5.3.exe'
+    SHA256  = 'f5923e10115f410e0481c0194153a4c961dde9378d2456acd753de9581f80128'
+    Quelle  = 'wagnardsoft.com, DDU v18.1.5.3 (portables Archiv DDU v18.1.5.3.exe)'
+    Lizenz  = 'MIT (Wagnardsoft)'
 }
-$script:OptNpiZip = @{ Url = 'https://github.com/Orbmu2k/nvidiaProfileInspector/releases/latest/download/nvidiaProfileInspector.zip'
-    Quelle = 'github.com/Orbmu2k/nvidiaProfileInspector, neueste Version'; Lizenz = 'MIT' }
+# Bekannte Programmdateien von DDU (SHA-256 -> Version)
+$script:OptDduExePins = [ordered]@{
+    'd9f66e3e873f42daf71a249922c7897a9d0a81b7b6a85a36efe272ce981de0e3' = '18.1.5.3'
+}
+$script:OptDduExeNames = @('Display Driver Uninstaller.exe', 'DisplayDriverUninstaller.exe')
+# NVIDIA Profile Inspector (Orbmu2k, MIT): GitHub-Release v3.0.2.3 vom 13.10.2026; SHA-256 des Archivs = digest im Release
+$script:OptNpiPin = @{
+    Version = '3.0.2.3'
+    Url     = 'https://github.com/Orbmu2k/nvidiaProfileInspector/releases/download/v3.0.2.3/nvidiaProfileInspector.zip'
+    SHA256  = 'e2d12f0956377efd0021bf5b1f63e5b05ecd6732a311274db679dbe598ad4e61'
+    Quelle  = 'github.com/Orbmu2k/nvidiaProfileInspector, Release v3.0.2.3 (nvidiaProfileInspector.zip)'
+    Lizenz  = 'MIT'
+}
+$script:OptNpiExePins = [ordered]@{
+    '355e491aa6c9956bed62204533e6b2fd750d4283d118713826f724ea6bc5cd9d' = '3.0.2.3'
+}
+# ab v4.11: Kategorien der Datenträgerbereinigung, die nie gewählt werden: Downloads (Nutzerdaten), Papierkorb,
+# Windows.old (Rückkehr zur vorigen Windows-Version) und ESD-Installationsdateien (Zurücksetzen des PCs)
+$script:CleanmgrAusgeschlossen = @('DownloadsFolder', 'Recycle Bin', 'Previous Installations', 'Windows ESD installation files')
+$script:CleanmgrUmfang = 'alle Kategorien außer Downloads, Papierkorb, Windows.old und ESD-Installationsdateien'
 $script:OptDduDir = 'LeosMinibench-DDU'
 $script:OptTaskFolder = '\Leos Minibench\'
 
@@ -5572,7 +5802,7 @@ function Format-OptAction($A) {
                 'DnsCache' { return 'ipconfig /flushdns, Clear-BCCache' }
                 'Leistungszaehler' { return 'lodctr /r' }
                 'Komponentenspeicher' { return 'DISM /AnalyzeComponentStore, /StartComponentCleanup, /SPSuperseded' }
-                'Datentraegerbereinigung' { return 'cleanmgr /sagerun mit allen Kategorien außer Downloads' }
+                'Datentraegerbereinigung' { return ('cleanmgr /sagerun, {0}' -f $script:CleanmgrUmfang) }
                 'Leerlaufaufgaben' { return 'rundll32 advapi32.dll,ProcessIdleTasks' }
                 'Wiederherstellungspunkte' { return 'vssadmin delete shadows /for=<Systemlaufwerk> /all' }
                 'Ddu' { return 'bcdedit safeboot minimal, RunOnce: DDU -silent -cleanallgpus ... -restart' }
@@ -5924,14 +6154,13 @@ function Invoke-OptSpecial($Entry, $A, $Env, [switch]$Pruefen) {
         }
         'Datentraegerbereinigung' {
             if ($Pruefen) { return (New-OptResult 'unklar') }
-            $root = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches'
-            $keys = @(Get-ChildItem -LiteralPath $root -ErrorAction SilentlyContinue | Where-Object { $_.PSChildName -ne 'DownloadsFolder' })
+            $keys = @(Get-CleanmgrKeys)
             foreach ($k in $keys) { try { New-ItemProperty -LiteralPath $k.PSPath -Name 'StateFlags4711' -Value 2 -PropertyType DWord -Force -ErrorAction Stop | Out-Null } catch { } }
             $free0 = Get-OptFreeBytes
             $r = Invoke-External -File (Join-Path $env:windir 'System32\cleanmgr.exe') -Arguments '/sagerun:4711' -TimeoutSec 3600 -Progress 'Datenträgerbereinigung läuft' -ExpectedSec 600
             foreach ($k in $keys) { try { Remove-ItemProperty -LiteralPath $k.PSPath -Name 'StateFlags4711' -ErrorAction Stop } catch { } }
             $freed = [math]::Max(0.0, (Get-OptFreeBytes) - $free0)
-            [void](Add-ChangeRecord -Modul $mod -Schritt $step -Titel $ttl -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel ('Datenträgerbereinigung, {0} Kategorien' -f $keys.Count) -Nachher ('{0:N0} MB frei geworden' -f ($freed / 1MB)) -Gegenbefehl 'nicht umkehrbar' -NurHinweis)
+            [void](Add-ChangeRecord -Modul $mod -Schritt $step -Titel $ttl -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel ('Datenträgerbereinigung, {0} Kategorien ({1})' -f $keys.Count, $script:CleanmgrUmfang) -Nachher ('{0:N0} MB frei geworden' -f ($freed / 1MB)) -Gegenbefehl 'nicht umkehrbar' -NurHinweis)
             return (New-OptResult $(if ($r.TimedOut) { 'Fehler' } else { 'geaendert' }) ('{0:N0} MB frei geworden{1}' -f ($freed / 1MB), $(if ($r.TimedOut) { ', nach einer Stunde abgebrochen' } else { '' })) 1)
         }
         'Leerlaufaufgaben' {
@@ -5967,10 +6196,29 @@ function Clear-OptFolder([string]$Path) {
     return $freed
 }
 
+# ab v4.11: Kategorien der Datenträgerbereinigung (Registry VolumeCaches) ohne die ausgeschlossenen
+function Get-CleanmgrKeys {
+    $root = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches'
+    return @(Get-ChildItem -LiteralPath $root -ErrorAction SilentlyContinue | Where-Object { $script:CleanmgrAusgeschlossen -notcontains [string]$_.PSChildName })
+}
+
+# ab v4.11: Wiederherstellungspunkte prüfen. Der Punkt eines Laufs zählt nur, wenn Windows ihn wirklich angelegt hat
+# (Checkpoint-Computer legt innerhalb der Sperrfrist ohne Fehler keinen an) und er noch existiert.
+function Get-RestorePointByDescription([string]$Beschreibung) {
+    try { return (@(Get-ComputerRestorePoint -ErrorAction Stop | Where-Object { [string]$_.Description -eq $Beschreibung } | Sort-Object { [int64]$_.SequenceNumber } -Descending) | Select-Object -First 1) } catch { return $null }
+}
+# $true = vorhanden, $false = sicher nicht vorhanden (Abfrage erfolgreich, Nummer fehlt), $null = nicht prüfbar
+function Test-RestorePointPresent([string]$Nummer) {
+    if (-not $Nummer) { return $false }
+    try { $all = @(Get-ComputerRestorePoint -ErrorAction Stop) } catch { return $null }
+    return [bool]@($all | Where-Object { [string]$_.SequenceNumber -eq $Nummer }).Count
+}
+
 # Wartungsaufgaben (Sophia CleanupTask, SoftwareDistributionTask, TempTask) ohne Skriptdateien: PowerShell-Befehl als
 # -EncodedCommand in der Aufgabe selbst, Ausführung als SYSTEM
 function Get-OptMaintenanceTasks {
-    $clean = 'Get-ChildItem ''HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches'' | Where-Object { $_.PSChildName -ne ''DownloadsFolder'' } | ForEach-Object { New-ItemProperty -LiteralPath $_.PSPath -Name StateFlags1337 -Value 2 -PropertyType DWord -Force | Out-Null }; Start-Process -FilePath "$env:windir\System32\cleanmgr.exe" -ArgumentList ''/sagerun:1337'' -Wait; Get-ChildItem ''HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches'' | ForEach-Object { Remove-ItemProperty -LiteralPath $_.PSPath -Name StateFlags1337 -ErrorAction SilentlyContinue }'
+    $aus = (@($script:CleanmgrAusgeschlossen | ForEach-Object { "'{0}'" -f $_ }) -join ', ')
+    $clean = 'Get-ChildItem ''HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches'' | Where-Object { @(' + $aus + ') -notcontains $_.PSChildName } | ForEach-Object { New-ItemProperty -LiteralPath $_.PSPath -Name StateFlags1337 -Value 2 -PropertyType DWord -Force | Out-Null }; Start-Process -FilePath "$env:windir\System32\cleanmgr.exe" -ArgumentList ''/sagerun:1337'' -Wait; Get-ChildItem ''HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches'' | ForEach-Object { Remove-ItemProperty -LiteralPath $_.PSPath -Name StateFlags1337 -ErrorAction SilentlyContinue }'
     $sd = '$lim = (Get-Date).AddDays(-7); Get-ChildItem "$env:windir\SoftwareDistribution\Download" -Recurse -Force -File -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -lt $lim } | Remove-Item -Force -ErrorAction SilentlyContinue'
     $tmp = '$lim = (Get-Date).AddDays(-1); $d = @("$env:windir\Temp"); Get-ChildItem ''HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList'' | ForEach-Object { $p = [Environment]::ExpandEnvironmentVariables([string](Get-ItemProperty -LiteralPath $_.PSPath).ProfileImagePath); if ($p -and (Test-Path (Join-Path $p ''AppData\Local\Temp''))) { $d += (Join-Path $p ''AppData\Local\Temp'') } }; foreach ($x in $d) { Get-ChildItem -LiteralPath $x -Recurse -Force -File -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -lt $lim } | Remove-Item -Force -ErrorAction SilentlyContinue }'
     return @(
@@ -6007,43 +6255,85 @@ function Invoke-OptOneDrive($Entry, $Env, [switch]$Pruefen) {
 }
 
 # ---------- Werkzeuge: DDU und NVIDIA Profile Inspector ----------
+# ab v4.11: Version einer Programmdatei laut fester Liste (SHA-256 -> Version), sonst ''
+function Get-OptPinnedVersion([string]$Path, $Pins) {
+    $h = Get-FileSha256 $Path
+    if ($h -and $Pins -and $Pins.Contains($h)) { return [string]$Pins[$h] }
+    return ''
+}
+function Find-OptDduExe([string]$Dir) {
+    if (-not $Dir -or -not (Test-Path -LiteralPath $Dir)) { return '' }
+    foreach ($n in $script:OptDduExeNames) {
+        $f = @(Get-ChildItem -LiteralPath $Dir -Recurse -File -Filter $n -ErrorAction SilentlyContinue | Select-Object -First 1)
+        if ($f.Count) { return [string]$f[0].FullName }
+    }
+    return ''
+}
+function Add-OptToolIssue([string]$Text) { if ($null -eq $script:ToolIssues) { $script:ToolIssues = New-Object System.Collections.Generic.List[string] }; $script:ToolIssues.Add($Text) }
+function Get-OptHashKurz([string]$Path) { $h = Get-FileSha256 $Path; if ($h) { return ($h.Substring(0, 12) + '…') } else { return '(nicht lesbar)' } }
+
+# DDU-Programm im Tools-Ordner: nur mit Eintrag im Manifest und bekannter Prüfsumme. Ein von Hand abgelegter Ordner
+# Tools\DDU oder ein DDU.zip wird übernommen, wenn die Programmdatei in $script:OptDduExePins steht.
 function Get-OptDduExe {
     $t = Get-ToolsDir
     if (-not $t) { return $null }
     $p = Get-VerifiedTool 'DDU' $t
-    if ($p) { return $p }
-    # DDU.zip von Hand in den Tools-Ordner gelegt: Prüfsumme wie beim Holen, dann auspacken und aufnehmen
-    foreach ($z in @((Join-Path $t 'DDU.zip'), (Join-Path $t 'DDU\DDU.zip'))) { if (Test-Path -LiteralPath $z) { $r = Install-OptDduFromZip $z; if ($r.Ok) { return (Get-VerifiedTool 'DDU' $t) } } }
+    if ($p) {
+        if (Get-OptPinnedVersion $p $script:OptDduExePins) { return $p }
+        Add-OptToolIssue (('DDU abgelehnt: {0} hat eine unbekannte Prüfsumme ({1}). Freigegeben ist nur DDU {2} von wagnardsoft.com.' -f $p, (Get-OptHashKurz $p), $script:OptDduPin.Version))
+        return $null
+    }
+    $dir = Join-Path $t 'DDU'
+    if (Find-OptDduExe $dir) {
+        $r = Install-OptDduFromDir $dir
+        if ($r.Ok) { return (Get-VerifiedTool 'DDU' $t) }
+        Add-OptToolIssue ($r.Text)
+    }
+    foreach ($z in @((Join-Path $t 'DDU.zip'), (Join-Path $t 'DDU\DDU.zip'))) {
+        if (Test-Path -LiteralPath $z) { $r = Install-OptDduFromZip $z; if ($r.Ok) { return (Get-VerifiedTool 'DDU' $t) }; Add-OptToolIssue ($r.Text) }
+    }
     return $null
+}
+# Ordner mit ausgepacktem DDU übernehmen: Programmdatei suchen, Prüfsumme gegen die Liste, nach Tools\DDU kopieren
+function Install-OptDduFromDir([string]$Src) {
+    $t = Get-ToolsDir
+    $exe = Find-OptDduExe $Src
+    if (-not $exe) { return [pscustomobject]@{ Ok = $false; Text = 'Display Driver Uninstaller.exe fehlt im Archiv.' } }
+    $ver = Get-OptPinnedVersion $exe $script:OptDduExePins
+    if (-not $ver) { return [pscustomobject]@{ Ok = $false; Text = ('DDU abgelehnt: Die Programmdatei hat eine unbekannte Prüfsumme ({0}). Freigegeben ist nur DDU {1} von wagnardsoft.com; eine andere Version braucht einen Eintrag in der Liste der bekannten Prüfsummen.' -f (Get-OptHashKurz $exe), $script:OptDduPin.Version) } }
+    $dest = Join-Path $t 'DDU'
+    $srcDir = Split-Path $exe -Parent
+    New-Item -ItemType Directory -Path $dest -Force -ErrorAction Stop | Out-Null
+    if ([IO.Path]::GetFullPath($srcDir).TrimEnd('\') -ne [IO.Path]::GetFullPath($dest).TrimEnd('\')) {
+        Copy-Item -Path (Join-Path $srcDir '*') -Destination $dest -Recurse -Force -ErrorAction Stop
+    }
+    $final = Join-Path $dest (Split-Path $exe -Leaf)
+    Get-ChildItem -LiteralPath $dest -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { if (Get-Command Unblock-File -ErrorAction SilentlyContinue) { Unblock-File -LiteralPath $_.FullName -ErrorAction SilentlyContinue } }
+    [void](Register-Tool -Name 'DDU' -Path $final -Lizenz $script:OptDduPin.Lizenz -Quelle $script:OptDduPin.Quelle -Herkunft ('DDU {0}, Prüfsumme aus der festen Liste bestätigt' -f $ver) -ToolsDir $t)
+    return [pscustomobject]@{ Ok = $true; Text = ('Display Driver Uninstaller {0} übernommen ({1}).' -f $ver, $dest) }
 }
 function Install-OptDduFromZip([string]$Zip) {
     $t = Get-ToolsDir
-    $h = Get-FileSha256 $Zip
-    $dest = Join-Path $t 'DDU'
-    New-Item -ItemType Directory -Path $dest -Force -ErrorAction Stop | Out-Null
-    $tmp = Join-Path $dest ('_entpacken_' + [guid]::NewGuid().ToString('N').Substring(0, 6))
+    $tmp = Join-Path $t ('_entpacken_' + [guid]::NewGuid().ToString('N').Substring(0, 6))
     try {
         Expand-Archive -LiteralPath $Zip -DestinationPath $tmp -Force -ErrorAction Stop
-        $src = Join-Path $tmp 'DDU'
-        if (-not (Test-Path -LiteralPath $src)) { $src = $tmp }
-        Copy-Item -Path (Join-Path $src '*') -Destination $dest -Recurse -Force -ErrorAction Stop
+        return (Install-OptDduFromDir $tmp)
     } finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
-    $exe = Join-Path $dest 'DisplayDriverUninstaller.exe'
-    if (-not (Test-Path -LiteralPath $exe)) { return [pscustomobject]@{ Ok = $false; Text = 'DisplayDriverUninstaller.exe fehlt im Archiv.' } }
-    Get-ChildItem -LiteralPath $dest -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { if (Get-Command Unblock-File -ErrorAction SilentlyContinue) { Unblock-File -LiteralPath $_.FullName -ErrorAction SilentlyContinue } }
-    [void](Register-Tool -Name 'DDU' -Path $exe -Lizenz $script:OptDduZip.Lizenz -Quelle $script:OptDduZip.Quelle -Herkunft ('Offizielles DDU-Paket ({0}…) auf {1} ausgepackt' -f $h.Substring(0, 12), $env:COMPUTERNAME) -ToolsDir $t)
-    return [pscustomobject]@{ Ok = $true; Text = ('Display Driver Uninstaller übernommen ({0}).' -f $dest) }
 }
+# NVIDIA Profile Inspector im Tools-Ordner: nur mit bekannter Prüfsumme (auch eine vorgefundene Datei)
 function Get-OptNpiExe {
     $t = Get-ToolsDir
     if (-not $t) { return $null }
     $p = Get-VerifiedTool 'NvidiaProfileInspector' $t
-    if ($p) { return $p }
+    if ($p -and (Get-OptPinnedVersion $p $script:OptNpiExePins)) { return $p }
     $exe = Join-Path $t 'NvidiaProfileInspector\nvidiaProfileInspector.exe'
-    $m = Read-ToolManifest $t
-    if ((Test-Path -LiteralPath $exe) -and -not @($m.Werkzeuge | Where-Object { $_.Name -eq 'NvidiaProfileInspector' }).Count) {
-        [void](Register-Tool -Name 'NvidiaProfileInspector' -Path $exe -Lizenz $script:OptNpiZip.Lizenz -Quelle $script:OptNpiZip.Quelle -Herkunft 'im Tools-Ordner vorgefunden, Prüfsumme beim ersten Fund festgehalten' -ToolsDir $t)
-        return (Get-VerifiedTool 'NvidiaProfileInspector' $t)
+    if (Test-Path -LiteralPath $exe) {
+        $ver = Get-OptPinnedVersion $exe $script:OptNpiExePins
+        if ($ver) {
+            [void](Register-Tool -Name 'NvidiaProfileInspector' -Path $exe -Lizenz $script:OptNpiPin.Lizenz -Quelle $script:OptNpiPin.Quelle -Herkunft ('Version {0}, Prüfsumme aus der festen Liste bestätigt' -f $ver) -ToolsDir $t)
+            return (Get-VerifiedTool 'NvidiaProfileInspector' $t)
+        }
+        Add-OptToolIssue (('NVIDIA Profile Inspector abgelehnt: {0} hat eine unbekannte Prüfsumme ({1}). Freigegeben ist nur Version {2} von GitHub.' -f $exe, (Get-OptHashKurz $exe), $script:OptNpiPin.Version))
     }
     return $null
 }
@@ -6054,45 +6344,46 @@ function Install-OptTools {
     $work = Join-Path (Join-Path $script:DataDir 'Laufzeit') ('Download-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
     try {
         New-Item -ItemType Directory -Path $work -Force -ErrorAction Stop | Out-Null
-        if (Get-VerifiedTool 'DDU' $t) { $log.Add('Display Driver Uninstaller liegt bereits im Tools-Ordner.') }
+        if (Get-OptDduExe) { $log.Add('Display Driver Uninstaller liegt bereits im Tools-Ordner.') }
         else {
+            # ab v4.11: nur das portable Archiv der festen Version von wagnardsoft.com, Prüfsumme vor dem Entpacken
             try {
-                $installed = $false
-                foreach ($z in @((Join-Path $t 'DDU.zip'), (Join-Path $t 'DDU\DDU.zip'), (Join-Path $work 'DDU.zip'))) {
-                    if (Test-Path -LiteralPath $z) {
-                        $r = Install-OptDduFromZip $z
-                        $log.Add($r.Text)
-                        if ($r.Ok) { $installed = $true; break }
-                    }
-                }
-                if (-not $installed -and (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
-                    $wgOut = & winget.exe download --id Wagnardsoft.DisplayDriverUninstaller --download-directory $work --accept-source-agreements --accept-package-agreements 2>&1
-                    $foundZip = @(Get-ChildItem -LiteralPath $work -Filter '*.zip' -Recurse -File -ErrorAction SilentlyContinue) | Select-Object -First 1
-                    if ($foundZip) {
-                        $r = Install-OptDduFromZip $foundZip.FullName
-                        $log.Add($r.Text)
-                        if ($r.Ok) { $installed = $true }
-                    }
-                }
-                if (-not $installed) {
-                    $log.Add('Display Driver Uninstaller: Bitte von der offiziellen Herstellerseite https://www.wagnardsoft.com oder via winget beziehen und in Minibench-Daten\Tools\DDU ablegen.')
-                }
+                $sfx = Join-Path $work 'DDU.exe'
+                Save-WebFile $script:OptDduPin.Url $sfx
+                $h = Get-FileSha256 $sfx
+                if ($h -ne $script:OptDduPin.SHA256) { throw ('Das DDU-Archiv hat eine unerwartete Prüfsumme ({0}), nichts übernommen.' -f (Get-OptHashKurz $sfx)) }
+                $ex = Join-Path $work 'ddu'
+                New-Item -ItemType Directory -Path $ex -Force -ErrorAction Stop | Out-Null
+                # 7-Zip-Selbstentpacker: -o Zielordner, -y ohne Rückfrage
+                $r = Invoke-External -File $sfx -Arguments ('-o"{0}" -y' -f $ex) -TimeoutSec 300 -Progress 'DDU wird entpackt' -ExpectedSec 10
+                if ($r.TimedOut) { throw 'Entpacken nach fünf Minuten abgebrochen.' }
+                $i = Install-OptDduFromDir $ex
+                $log.Add($i.Text)
+                if (-not $i.Ok) { $ok = $false }
+            } catch {
+                $ok = $false
+                $log.Add(('DDU: {0}' -f $_.Exception.Message))
+                $log.Add(('Von Hand: DDU {0} (portabel) von wagnardsoft.com entpacken und als Minibench-Daten\Tools\DDU ablegen; übernommen wird es nur mit der hinterlegten Prüfsumme.' -f $script:OptDduPin.Version))
             }
-            catch { $ok = $false; $log.Add(('DDU: {0}' -f $_.Exception.Message)) }
         }
         if (Get-OptNpiExe) { $log.Add('NVIDIA Profile Inspector liegt bereits im Tools-Ordner.') }
         else {
             try {
-                $z = Join-Path $work 'npi.zip'; Save-WebFile $script:OptNpiZip.Url $z
+                $z = Join-Path $work 'npi.zip'; Save-WebFile $script:OptNpiPin.Url $z
+                $h = Get-FileSha256 $z
+                if ($h -ne $script:OptNpiPin.SHA256) { throw ('nvidiaProfileInspector.zip hat eine unerwartete Prüfsumme ({0}), nichts übernommen.' -f (Get-OptHashKurz $z)) }
+                $ex = Join-Path $work 'npi'
+                Expand-Archive -LiteralPath $z -DestinationPath $ex -Force -ErrorAction Stop
+                $exe = @(Get-ChildItem -LiteralPath $ex -Recurse -Filter 'nvidiaProfileInspector.exe' -ErrorAction SilentlyContinue | Select-Object -First 1)
+                if (-not $exe.Count) { throw 'nvidiaProfileInspector.exe fehlt im Archiv.' }
+                $ver = Get-OptPinnedVersion $exe[0].FullName $script:OptNpiExePins
+                if (-not $ver) { throw ('nvidiaProfileInspector.exe hat eine unbekannte Prüfsumme ({0}), nichts übernommen.' -f (Get-OptHashKurz $exe[0].FullName)) }
                 $dest = Join-Path $t 'NvidiaProfileInspector'
                 New-Item -ItemType Directory -Path $dest -Force -ErrorAction Stop | Out-Null
-                Expand-Archive -LiteralPath $z -DestinationPath $dest -Force -ErrorAction Stop
-                $exe = @(Get-ChildItem -LiteralPath $dest -Recurse -Filter 'nvidiaProfileInspector.exe' -ErrorAction SilentlyContinue | Select-Object -First 1)
-                if (-not $exe.Count) { throw 'nvidiaProfileInspector.exe fehlt im Archiv.' }
-                if ($exe[0].DirectoryName -ne $dest) { Copy-Item -Path (Join-Path $exe[0].DirectoryName '*') -Destination $dest -Recurse -Force }
+                Copy-Item -Path (Join-Path $exe[0].DirectoryName '*') -Destination $dest -Recurse -Force -ErrorAction Stop
                 Get-ChildItem -LiteralPath $dest -Recurse -File | ForEach-Object { if (Get-Command Unblock-File -ErrorAction SilentlyContinue) { Unblock-File -LiteralPath $_.FullName -ErrorAction SilentlyContinue } }
-                [void](Register-Tool -Name 'NvidiaProfileInspector' -Path (Join-Path $dest 'nvidiaProfileInspector.exe') -Lizenz $script:OptNpiZip.Lizenz -Quelle $script:OptNpiZip.Quelle -Herkunft ('von GitHub geholt auf {0}, Prüfsumme beim Holen festgehalten' -f $env:COMPUTERNAME) -ToolsDir $t)
-                $log.Add(('NVIDIA Profile Inspector übernommen ({0}).' -f $dest))
+                [void](Register-Tool -Name 'NvidiaProfileInspector' -Path (Join-Path $dest 'nvidiaProfileInspector.exe') -Lizenz $script:OptNpiPin.Lizenz -Quelle $script:OptNpiPin.Quelle -Herkunft ('Version {0} von GitHub geholt, Prüfsumme aus der festen Liste bestätigt' -f $ver) -ToolsDir $t)
+                $log.Add(('NVIDIA Profile Inspector {0} übernommen ({1}).' -f $ver, $dest))
             } catch { $ok = $false; $log.Add(('NVIDIA Profile Inspector: {0}' -f $_.Exception.Message)) }
         }
     } finally { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue }
@@ -6106,7 +6397,7 @@ function Invoke-OptDdu($Entry, $Env, [switch]$Pruefen) {
     if ($Pruefen) { return (New-OptResult 'unklar' $(if (Get-OptDduExe) { 'DDU bereit' } else { 'DDU fehlt im Tools-Ordner' })) }
     if ($Env.Neustart) { return (New-OptResult 'Fehler' 'Ein Neustart steht aus (Updates). Erst neu starten, dann DDU vorbereiten.') }
     $exe = Get-OptDduExe
-    if (-not $exe) { return (New-OptResult 'Fehler' 'Display Driver Uninstaller fehlt im Tools-Ordner (Seite Optimierung: Werkzeuge holen).') }
+    if (-not $exe) { return (New-OptResult 'Fehler' ('Display Driver Uninstaller fehlt im Tools-Ordner oder hat keine bekannte Prüfsumme (Seite Optimierung: Werkzeuge holen; freigegeben ist DDU {0}).' -f $script:OptDduPin.Version)) }
     $mod = 'Optimierung'; $step = $Entry.Id; $ttl = $Entry.Titel
     $local = Join-Path (Join-Path $env:windir 'Temp') $script:OptDduDir
     Remove-Item -LiteralPath $local -Recurse -Force -ErrorAction SilentlyContinue
@@ -6117,7 +6408,7 @@ function Invoke-OptDdu($Entry, $Env, [switch]$Pruefen) {
     $r = Invoke-External -File 'bcdedit.exe' -Arguments '/set {current} safeboot minimal' -TimeoutSec 60
     if ($r.ExitCode -ne 0) { Remove-Item -LiteralPath $local -Recurse -Force -ErrorAction SilentlyContinue; return (New-OptResult 'Fehler' ('bcdedit meldet {0}: {1}' -f $r.ExitCode, ($r.Output + $r.Error).Trim())) }
     $ro = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce'
-    $ddu = '"{0}" -silent -removemonitors -removephysx -removegfe -removenvbroadcast -cleanallgpus -removenvcp -removeintelcp -removeamdcp -removeamddirs -restart' -f (Join-Path $local 'DisplayDriverUninstaller.exe')
+    $ddu = '"{0}" -silent -removemonitors -removephysx -removegfe -removenvbroadcast -cleanallgpus -removenvcp -removeintelcp -removeamdcp -removeamddirs -restart' -f (Join-Path $local (Split-Path $exe -Leaf))
     $vals = [ordered]@{
         '*!LeosMinibench1_NormalStart' = 'cmd.exe /c "bcdedit /deletevalue {current} safeboot"'
         '*LeosMinibench2_Hinweis'      = 'cmd.exe /c start "" powershell.exe -NoExit -Command "Write-Host ''Leos Minibench: DDU entfernt die Grafiktreiber. Bitte warten (bis 10 Minuten), der PC startet danach neu.''"'
@@ -6142,7 +6433,7 @@ function Test-OptMaintenanceTasksPresent {
 function Invoke-OptNvidiaProfile($Entry, $Env, [switch]$Pruefen) {
     $exe = Get-OptNpiExe
     if ($Pruefen) { return (New-OptResult 'unklar' $(if ($exe) { 'NVIDIA Profile Inspector bereit' } else { 'NVIDIA Profile Inspector fehlt im Tools-Ordner' })) }
-    if (-not $exe) { return (New-OptResult 'Fehler' 'nvidiaProfileInspector.exe fehlt im Tools-Ordner (Seite Optimierung: Werkzeuge holen).') }
+    if (-not $exe) { return (New-OptResult 'Fehler' ('nvidiaProfileInspector.exe fehlt im Tools-Ordner oder hat keine bekannte Prüfsumme (Seite Optimierung: Werkzeuge holen; freigegeben ist Version {0}).' -f $script:OptNpiPin.Version)) }
     $dir = $(if ($RawDir -and (Test-Path -LiteralPath $RawDir)) { $RawDir } else { [IO.Path]::GetTempPath() })
     $nip = Join-Path $dir 'LeosMinibench-NvidiaProfil.nip'
     [IO.File]::WriteAllText($nip, $script:OptNip, (New-Object Text.UTF8Encoding($true)))
@@ -6434,7 +6725,7 @@ public partial class DiagGui : Form
     Timer timer;
     volatile bool exited, outEof;
     DateTime exitSeen;
-    bool running, done, gotDone, cancelled;
+    internal bool running, done, gotDone, cancelled;
     string htmlPath = "", outDir = "", kiPath = "", kurzPath = "";
 #pragma warning disable 414
     int nK, nW, nI, cntK, cntW, cntI, testsOk, benchWarn, benchCount;
@@ -6466,7 +6757,7 @@ public partial class DiagGui : Form
     Panel[] modBanners = new Panel[6];
     Badge badgeSensStatus;
     internal List<NavItem> nav = new List<NavItem>();
-    List<Control> pages = new List<Control>();
+    internal List<Control> pages = new List<Control>();
     internal int curPage;
 #pragma warning restore 414
 
@@ -6553,11 +6844,11 @@ public partial class DiagGui : Form
     Timer liveTimer;
     volatile bool liveExited, liveEof;
     DateTime liveExitSeen;
-    bool liveRunning, liveStopping;
+    internal bool liveRunning, liveStopping;
     DateTime liveStopAt;
     Button btnLive, btnSensTools, btnSensSave;
     internal ComboBox cmbDriver;
-    int psuWattage = 650;
+    int psuWattage = 650; bool psuEingegeben;
     string psuRating = "80 PLUS Bronze";
     Label lblSensInfo;
     SensorChart chartLive, chartRun;
@@ -6586,7 +6877,7 @@ public partial class DiagGui : Form
         "Geräte neu erkennen lassen (pnputil /scan-devices)",
         "Schnellstart deaktivieren (hilft bei Abstürzen nach dem Einschalten)",
         "Energiesparpläne auf Standard zurücksetzen (eigene Pläne werden vorher gesichert)",
-        "Datenträgerbereinigung (cleanmgr mit allen Kategorien außer Downloads)",
+        "Datenträgerbereinigung (cleanmgr ohne Downloads, Papierkorb, Windows.old und ESD-Installationsdateien)",
         "Leistungszähler aus der Sicherung neu aufbauen (lodctr /r)",
         "Aufgeschobene Windows-Wartungsaufgaben starten (ProcessIdleTasks)",
         "DirectX-, OpenGL-, Intel- und AMD-Shader-Caches leeren",
@@ -6629,7 +6920,7 @@ public partial class DiagGui : Form
     internal int versionPage = -1;
 
     // Hinweise beim Überfahren mit der Maus (ab v2.7): kurze Erklärung zu jedem Bedienelement
-    ToolTip tip = NewTip();
+    internal ToolTip tip = NewTip();
     static ToolTip NewTip()
     {
         ToolTip t = new ToolTip(); t.AutoPopDelay = 30000; t.InitialDelay = 450; t.ReshowDelay = 150; t.ShowAlways = true;
@@ -6734,6 +7025,7 @@ public partial class DiagGui : Form
             if (g.DpiX > 0) UI.DpiScale = g.DpiX / 96.0f;
         }
         this.deviceId = deviceId ?? "";
+        ChangeEntry.EigeneGeraetId = this.deviceId;
         this.psExe = psExe; this.script = script; this.cpDir = cpDir; this.dataDir = dataDir ?? ""; this.version = version ?? "";
         this.disks = disks ?? new string[0];
         dbDir = this.dataDir.Length > 0 ? Path.Combine(this.dataDir, "Datenbank") : "";
@@ -6850,23 +7142,43 @@ public partial class DiagGui : Form
     }
 
 
-    protected override void OnKeyDown(KeyEventArgs e)
+    // Tastenkürzel F5 (Neu laden) und Strg+Eingabe (Start). Bis v4.10 in OnKeyDown ohne KeyPreview: wirkungslos, sobald
+    // ein Kind den Fokus hatte. Ab v4.11 über ProcessCmdKey, das vor dem Element mit Fokus an die Reihe kommt.
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
-        base.OnKeyDown(e);
-        if (e.KeyCode == Keys.F5)
+        if (Tastenkuerzel(keyData, FokusElement())) return true;
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    // Element mit dem Tastaturfokus, auch in verschachtelten Containern
+    Control FokusElement()
+    {
+        Control c = ActiveControl;
+        ContainerControl cc = c as ContainerControl;
+        while (cc != null && cc.ActiveControl != null && cc.ActiveControl != c) { c = cc.ActiveControl; cc = c as ContainerControl; }
+        return c;
+    }
+
+    // true, wenn die Taste hier behandelt wurde. Strg+Eingabe bleibt in mehrzeiligen Textfeldern ein Zeilenumbruch.
+    internal bool Tastenkuerzel(Keys keyData, Control fokus)
+    {
+        if (keyData == Keys.F5)
         {
             if (curPage == 9) RefreshAndSync();
             else FillPresets(false);
-            e.Handled = true;
+            return true;
         }
-        else if (e.Control && e.KeyCode == Keys.Enter)
+        if (keyData == (Keys.Control | Keys.Enter))
         {
+            TextBoxBase tb = fokus as TextBoxBase;
+            if (tb != null && tb.Multiline) return false;
             if (btnStart != null && btnStart.Enabled && btnStart.Visible)
             {
                 btnStart.PerformClick();
-                e.Handled = true;
+                return true;
             }
         }
+        return false;
     }
 
     // Text nur setzen, wenn er sich ändert (jede Zuweisung zeichnet das Element neu)
@@ -7900,7 +8212,7 @@ public partial class DiagGui
                 Dictionary<string, object> d = js.DeserializeObject(File.ReadAllText(SettingsFile, Encoding.UTF8)) as Dictionary<string, object>;
                 if (d != null)
                 {
-                    if (d.ContainsKey("PsuWattage")) psuWattage = Convert.ToInt32(d["PsuWattage"]);
+                    if (d.ContainsKey("PsuWattage")) { psuWattage = Convert.ToInt32(d["PsuWattage"]); psuEingegeben = psuWattage > 0; }
                     if (d.ContainsKey("PsuRating")) psuRating = Convert.ToString(d["PsuRating"]);
                 }
             }
@@ -8588,76 +8900,161 @@ public partial class DiagGui
         return String.Compare(remote, local, StringComparison.OrdinalIgnoreCase) > 0;
     }
 
-    void TriggerUpdateDownload()
+    internal void TriggerUpdateDownload()
     {
+        if (UpdateDownloadAbbrechen()) return;
         if (String.IsNullOrEmpty(AvailableUpdateUrl))
         {
             MessageBox.Show(this, "Keine Download-Adresse für das Update gefunden.", "Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
+        // ab v4.11: ohne bekannte Prüfsumme kein Austausch (bis v4.10 wurde die Datei dann ungeprüft eingesetzt)
+        if (String.IsNullOrEmpty(AvailableUpdateSha256))
+        {
+            UI.Hinweis(UpdateOhnePruefsummeText(AvailableUpdateVersion), "Minibench-Update", this);
+            return;
+        }
+        if (running) { UI.Hinweis("Während eines Laufs ist kein Update möglich.", "Minibench-Update", this); return; }
+        if (HintergrundBelegt("Das Update")) return;
+
         string msg = "Update auf Version " + AvailableUpdateVersion + " jetzt herunterladen und LMB.exe austauschen?\r\n\r\n" +
-                     "Leos Minibench schließt sich dafür. Die bisherige Programmdatei und ein Skript daneben (LeosMinibench.ps1) werden im Datenordner unter Archiv gesichert, danach startet die neue Version.";
+                     "Die Datei wird vor dem Austausch mit der SHA-256-Prüfsumme des Releases verglichen. Leos Minibench schließt sich dafür. Die bisherige Programmdatei und ein Skript daneben (LeosMinibench.ps1) werden im Datenordner unter Archiv gesichert, danach startet die neue Version.";
         if (!UI.Ask(msg, "Minibench Update", this))
             return;
+        if (running || HintergrundBelegt("Das Update")) return;
 
+        string targetExe;
         try
         {
             string updateDir = Path.Combine(dataDir, "Update");
             if (!Directory.Exists(updateDir)) Directory.CreateDirectory(updateDir);
-            string targetExe = Path.Combine(updateDir, "LMB.exe");
-
-            Cursor.Current = Cursors.WaitCursor;
-
+            targetExe = Path.Combine(updateDir, "LMB.exe");
+            if (File.Exists(targetExe)) File.Delete(targetExe);
             NetzVorbereiten(); // Tls12 und Proxy, auch ohne vorherige Prüfung im selben Prozess
-            if (running) { UI.Hinweis("Während eines Laufs ist kein Update möglich.", "Update", this); return; }
-            using (System.Net.WebClient wc = new System.Net.WebClient())
-            {
-                wc.Headers["User-Agent"] = "LeosMinibench";
-                wc.DownloadFile(AvailableUpdateUrl, targetExe);
-            }
-
-            if (File.Exists(targetExe))
-            {
-                string hash = "";
-                using (System.Security.Cryptography.SHA256 sha = System.Security.Cryptography.SHA256.Create())
-                using (FileStream fs = File.OpenRead(targetExe))
-                {
-                    byte[] bytes = sha.ComputeHash(fs);
-                    StringBuilder sb = new StringBuilder();
-                    for (int i = 0; i < bytes.Length; i++) sb.Append(bytes[i].ToString("x2"));
-                    hash = sb.ToString();
-                }
-
-                if (!String.IsNullOrEmpty(AvailableUpdateSha256))
-                {
-                    if (!hash.Equals(AvailableUpdateSha256, StringComparison.OrdinalIgnoreCase))
-                    {
-                        try { File.Delete(targetExe); } catch { }
-                        MessageBox.Show(this,
-                            "Sicherheitsprüfung fehlgeschlagen:\r\n\r\n" +
-                            "Die SHA-256-Prüfsumme der heruntergeladenen Datei stimmt nicht mit der Vorgabe des Releases überein:\r\n\r\n" +
-                            "Erwartet: " + AvailableUpdateSha256 + "\r\n" +
-                            "Berechnet: " + hash + "\r\n\r\n" +
-                            "Die Datei wurde aus Sicherheitsgründen verworfen.",
-                            "Update-Sicherheitsfehler",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Error);
-                        return;
-                    }
-                }
-
-                ExecuteSelfReplace(targetExe);
-            }
         }
         catch (Exception ex)
         {
-            UI.Hinweis("Fehler beim Herunterladen des Updates:\r\n\r\n" + ex.Message, "Update Fehler", this);
+            UI.Hinweis("Das Update kann nicht vorbereitet werden:\r\n\r\n" + ex.Message, "Update Fehler", this);
+            return;
         }
-        finally
+        StarteUpdateDownload(AvailableUpdateUrl, targetExe, AvailableUpdateSha256);
+    }
+
+    // ab v4.11: Herunterladen im Hintergrund (bis v4.10 DownloadFile im Oberflächen-Thread, bis 100 s "Keine Rückmeldung").
+    // Fortschritt steht im Etikett der Kopfzeile; ein Klick darauf bricht ab, ebenso Schließen.
+    System.Net.WebClient updateWc;
+
+    void StarteUpdateDownload(string url, string targetExe, string sha256)
+    {
+        HintergrundArbeit arbeit = HintergrundBeginnen("Das Herunterladen des Updates");
+        if (arbeit == null) return;
+        string altText = badgeUpdate != null ? badgeUpdate.Text : "";
+        System.Net.WebClient wc = new System.Net.WebClient();
+        wc.Headers["User-Agent"] = "LeosMinibench";
+        updateWc = wc;
+        arbeit.Abbrechen = delegate { try { wc.CancelAsync(); } catch { } };
+        if (badgeUpdate != null)
         {
-            Cursor.Current = Cursors.Default;
+            SetText(badgeUpdate, "Update wird geladen ...");
+            Tip(badgeUpdate, "Das Update wird heruntergeladen. Klicken bricht das Herunterladen ab.");
         }
+        wc.DownloadProgressChanged += delegate(object s, System.Net.DownloadProgressChangedEventArgs e) {
+            if (badgeUpdate == null || badgeUpdate.IsDisposed) return;
+            SetText(badgeUpdate, UpdateFortschrittText(e.BytesReceived, e.TotalBytesToReceive));
+        };
+        wc.DownloadFileCompleted += delegate(object s, System.ComponentModel.AsyncCompletedEventArgs e) {
+            updateWc = null;
+            HintergrundEnde(arbeit);
+            try { wc.Dispose(); } catch { }
+            if (IsDisposed || hintergrundGeschlossen) { try { File.Delete(targetExe); } catch { } return; }
+            if (badgeUpdate != null)
+            {
+                SetText(badgeUpdate, altText);
+                Tip(badgeUpdate, "Ein Update für Leos Minibench ist verfügbar. Klicken zum Herunterladen und Aktualisieren.");
+            }
+            if (e.Cancelled || arbeit.Abgebrochen)
+            {
+                try { File.Delete(targetExe); } catch { }
+                UI.Hinweis("Das Herunterladen des Updates wurde abgebrochen. Leos Minibench bleibt unverändert.", "Minibench-Update", this);
+                return;
+            }
+            if (e.Error != null)
+            {
+                try { File.Delete(targetExe); } catch { }
+                UI.Hinweis("Fehler beim Herunterladen des Updates:\r\n\r\n" + FehlerText(e.Error) + "\r\n\r\nLeos Minibench bleibt unverändert.", "Update Fehler", this);
+                return;
+            }
+            string meldung;
+            if (!PruefeUpdateDatei(targetExe, sha256, out meldung)) { UI.Hinweis(meldung, "Update-Sicherheitsfehler", this); return; }
+            if (running) { try { File.Delete(targetExe); } catch { } UI.Hinweis("Während eines Laufs ist kein Update möglich.", "Minibench-Update", this); return; }
+            ExecuteSelfReplace(targetExe);
+        };
+        try { wc.DownloadFileAsync(new Uri(url), targetExe); }
+        catch (Exception ex)
+        {
+            updateWc = null; HintergrundEnde(arbeit);
+            try { wc.Dispose(); } catch { }
+            if (badgeUpdate != null) SetText(badgeUpdate, altText);
+            UI.Hinweis("Fehler beim Herunterladen des Updates:\r\n\r\n" + FehlerText(ex), "Update Fehler", this);
+        }
+    }
+
+    // Klick auf das Etikett während des Herunterladens: nachfragen und abbrechen
+    bool UpdateDownloadAbbrechen()
+    {
+        if (updateWc == null) return false;
+        if (UI.Ask("Das Update wird gerade heruntergeladen. Herunterladen abbrechen?", "Minibench-Update", this) && hintergrund != null) HintergrundBeenden();
+        return true;
+    }
+
+    public static string UpdateFortschrittText(long geladen, long gesamt)
+    {
+        CultureInfo de = new CultureInfo("de-DE");
+        if (gesamt > 0) return "Update wird geladen: " + Math.Min(100, (int)(geladen * 100 / gesamt)) + " %";
+        return "Update wird geladen: " + (geladen / 1048576.0).ToString("0.0", de) + " MB";
+    }
+
+    public static string UpdateOhnePruefsummeText(string version)
+    {
+        string tag = String.IsNullOrEmpty(version) ? "" : version;
+        return "Release ohne Prüfsumme, Update von Hand.\r\n\r\nDas Release " + tag + " nennt keine SHA-256-Prüfsumme für LMB.exe. Ohne sie lässt sich die heruntergeladene Datei nicht prüfen, deshalb tauscht Leos Minibench die Programmdatei nicht selbst aus.\r\n\r\n" +
+               "Die neue LMB.exe steht auf https://github.com/" + UpdateRepo + "/releases" + (tag.Length > 0 ? "/tag/" + tag : "") + " und lässt sich dort von Hand herunterladen.";
+    }
+
+    // Prüft die heruntergeladene Datei gegen die Prüfsumme des Releases. Ohne Prüfsumme oder bei Abweichung wird die Datei
+    // verworfen und meldung erklärt warum; true nur bei Übereinstimmung.
+    public static bool PruefeUpdateDatei(string datei, string erwartet, out string meldung)
+    {
+        meldung = "";
+        if (String.IsNullOrEmpty(datei) || !File.Exists(datei)) { meldung = "Die heruntergeladene Datei fehlt."; return false; }
+        if (String.IsNullOrEmpty(erwartet))
+        {
+            try { File.Delete(datei); } catch { }
+            meldung = "Release ohne Prüfsumme, Update von Hand. Die heruntergeladene Datei wurde verworfen.";
+            return false;
+        }
+        string hash = "";
+        try
+        {
+            using (System.Security.Cryptography.SHA256 sha = System.Security.Cryptography.SHA256.Create())
+            using (FileStream fs = File.OpenRead(datei))
+            {
+                byte[] bytes = sha.ComputeHash(fs);
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < bytes.Length; i++) sb.Append(bytes[i].ToString("x2"));
+                hash = sb.ToString();
+            }
+        }
+        catch (Exception ex) { hash = ""; meldung = ex.Message; }
+        if (hash.Length > 0 && hash.Equals(erwartet.Trim(), StringComparison.OrdinalIgnoreCase)) return true;
+        try { File.Delete(datei); } catch { }
+        meldung = "Sicherheitsprüfung fehlgeschlagen:\r\n\r\n" +
+                  "Die SHA-256-Prüfsumme der heruntergeladenen Datei stimmt nicht mit der Vorgabe des Releases überein:\r\n\r\n" +
+                  "Erwartet: " + erwartet + "\r\n" +
+                  "Berechnet: " + (hash.Length > 0 ? hash : "nicht lesbar (" + meldung + ")") + "\r\n\r\n" +
+                  "Die Datei wurde aus Sicherheitsgründen verworfen.";
+        return false;
     }
 
     // Programmdatei austauschen (ab v4.03 neu). Bis v4.02 hielt das Austauschskript this.psExe für die Programmdatei:
@@ -9120,10 +9517,29 @@ public partial class DiagGui
         return newest;
     }
 
+    // Kinder entfernen und freigeben, Hinweise beim Überfahren vorher lösen (der ToolTip hält sonst jedes Element fest).
+    // Bis v4.10 nur Controls.Clear(): Bei jedem ReloadDb blieben die alten Elemente samt Fensterhandles bestehen.
+    void EntferneKinder(Control parent)
+    {
+        while (parent.Controls.Count > 0)
+        {
+            Control c = parent.Controls[parent.Controls.Count - 1];
+            parent.Controls.RemoveAt(parent.Controls.Count - 1);
+            LoeseTips(c);
+            c.Dispose();
+        }
+    }
+
+    void LoeseTips(Control c)
+    {
+        tip.SetToolTip(c, null);
+        foreach (Control k in c.Controls) LoeseTips(k);
+    }
+
     void BuildStartContent(Panel f)
     {
         f.SuspendLayout();
-        f.Controls.Clear();
+        EntferneKinder(f);
         DbEntry lastRunThisPc = GetCurrentPcLastRun();
         if (lastRunThisPc == null)
         {
@@ -10475,7 +10891,7 @@ e.Result = items;
             if (items == null) return;
 
             container.SuspendLayout();
-            container.Controls.Clear();
+            EntferneKinder(container);
 
             if (items.Count == 0)
             {
@@ -13199,6 +13615,8 @@ public partial class DiagGui
 
     public void InstallWingetPackagesAsync(List<int> selIndices, string[] allWgIds, string[] allWgNames, Label lblWgStatus, Button btnInstallWg, CheckBox[] allWgBoxes, LinkLabel lnkWgNone)
     {
+        if (running) { UI.Hinweis("Während eines Laufs werden keine Programme installiert.", "Softwarepakete installieren", this); return; }
+        if (HintergrundBelegt("Die Installation")) return;
         StringBuilder m = new StringBuilder();
         m.AppendLine("Diese Programme werden über winget installiert (Risikostufe Eingriff):");
         m.AppendLine();
@@ -13206,6 +13624,9 @@ public partial class DiagGui
         m.AppendLine();
         m.AppendLine("Jede Installation steht danach auf der Seite Änderungen und lässt sich dort wieder entfernen. Schon vorhandene Programme bleiben unberührt. Je Programm gilt eine Frist von 20 Minuten.");
         if (MessageBox.Show(this, m.ToString(), "Softwarepakete installieren", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        // Lauf oder Umzug könnten während der Rückfrage begonnen haben
+        if (running || HintergrundBelegt("Die Installation")) return;
+        HintergrundArbeit arbeit = HintergrundBeginnen("Die Installation über winget");
 
         btnInstallWg.Enabled = false;
         foreach (CheckBox cb in allWgBoxes) cb.Enabled = false;
@@ -13238,7 +13659,7 @@ public partial class DiagGui
                         Color c = st == "läuft" ? UI.Accent : (st == "installiert" || st == "bereits installiert") ? UI.Ok : UI.Warn;
                         try { BeginInvoke(new MethodInvoker(delegate { lblWgStatus.Text = tx; lblWgStatus.ForeColor = c; })); } catch { }
                     };
-                    p.Start(); p.BeginOutputReadLine();
+                    p.Start(); arbeit.Prozess = p; p.BeginOutputReadLine();
                     if (!p.WaitForExit(timeoutSec * 1000))
                     {
                         KillProc(p);
@@ -13247,6 +13668,7 @@ public partial class DiagGui
                     // letzte Ausgabezeilen abholen, höchstens 5 s (hält ein Kindprozess die Ausgabe offen, nicht ewig warten)
                     DateTime eu = DateTime.Now.AddSeconds(5);
                     while (!eof && DateTime.Now < eu) System.Threading.Thread.Sleep(20);
+                    arbeit.Prozess = null;
                 }
             }
             catch (Exception ex) { lock (texte) texte.Add("Arbeitsprozess nicht gestartet: " + ex.Message); }
@@ -13254,6 +13676,8 @@ public partial class DiagGui
             try
             {
                 BeginInvoke(new MethodInvoker(delegate {
+                    HintergrundEnde(arbeit);
+                    if (hintergrundGeschlossen) return;
                     btnInstallWg.Enabled = true;
                     foreach (CheckBox cb in allWgBoxes) { cb.Enabled = true; if ((cb.Tag as string) == "installiert") cb.ForeColor = UI.Ok; }
                     lnkWgNone.Enabled = true;
@@ -13341,8 +13765,9 @@ public partial class DiagGui
         lhmAutoFetchAttempted = true;
         try
         {
+            // ab v4.11 mit Frist und ohne das Fenster einzufrieren (Download von GitHub)
             List<string> lines;
-            RunHelper("-SensorWerkzeugeHolen", out lines);
+            RunHelperPumped("-SensorWerkzeugeHolen", out lines, 300);
             UpdateSensTools();
         }
         catch { }
@@ -13709,9 +14134,10 @@ public partial class DiagGui
         MessageBox.Show(this, lines.Count > 0 ? String.Join("\r\n", lines.ToArray()) : "Keine Rückmeldung vom Arbeitsprozess.", "Sensorwerkzeuge", MessageBoxButtons.OK, res == "1" ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
     }
 
-    void StartLive()
+    internal void StartLive()
     {
         if (running) return;
+        if (HintergrundBelegt("Die Live-Ansicht")) return;
         TryAutoFetchSensorTools();
         bool drv = cmbDriver == null || cmbDriver.SelectedIndex == 0;
         try { Directory.CreateDirectory(cpDir); File.Delete(Path.Combine(cpDir, "sensor.stop")); } catch { }
@@ -13819,24 +14245,12 @@ public partial class DiagGui
         }
     }
 
-    string RunHelper(string args, out List<string> lines)
-    {
-        lines = new List<string>();
-        ProcessStartInfo psi = new ProcessStartInfo(psExe, "-NoProfile -ExecutionPolicy Bypass -File \"" + script + "\" -EventMode " + args + " -DatenDir \"" + dataDir.TrimEnd('\\') + "\"");
-        psi.UseShellExecute = false; psi.CreateNoWindow = true; psi.RedirectStandardOutput = true; psi.StandardOutputEncoding = new UTF8Encoding(false);
-        string result = "";
-        using (Process p = Process.Start(psi))
-        {
-            string all = p.StandardOutput.ReadToEnd(); p.WaitForExit(120000);
-            foreach (string line in all.Split('\n'))
-            {
-                string l = line.TrimEnd('\r');
-                if (l.StartsWith("@@LOG|")) { string[] x = l.Split(new char[] { '|' }, 3); if (x.Length == 3 && x[2].Trim().Length > 0) lines.Add(x[2].Trim()); }
-                else if (l.StartsWith("@@RESULT|")) result = l.Substring(9);
-            }
-        }
-        return result;
-    }
+    // Arbeitsprozess für eine kurze Aufgabe (Dashboard, Datenpflege, Import, Export), höchstens 10 Minuten.
+    // Bis v4.10 las RunHelper die Ausgabe mit ReadToEnd vor WaitForExit(120000): Die Frist griff nie, und das Fenster
+    // fror ein, solange der Arbeitsprozess lief. Ab v4.11 liest RunHelperPumped asynchron, beendet den Prozess nach
+    // der Frist und zeichnet das Fenster weiter (gesperrt, bis der Arbeitsprozess fertig ist).
+    public const int RunHelperFristSek = 600;
+    string RunHelper(string args, out List<string> lines) { return RunHelperPumped(args, out lines, RunHelperFristSek); }
 
     // Wie RunHelper, aber ohne die Oberfläche einzufrieren (Downloads, Treiber entfernen)
     string RunHelperPumped(string args, out List<string> lines, int timeoutSec) { return RunHelperPumped(args, out lines, timeoutSec, null); }
@@ -15789,6 +16203,8 @@ public partial class DiagGui
         };
 
         btnStartUmzug.Click += delegate {
+            if (running) { UI.Hinweis("Während eines Laufs startet keine Sicherung.", "System-Umzug", this); return; }
+            if (HintergrundBelegt("Die Sicherung")) return;
             int selIdx = cmbDest.SelectedIndex;
             if (selIdx < 0 || selIdx >= destPaths.Count || String.IsNullOrEmpty(destPaths[selIdx]))
             {
@@ -15841,6 +16257,8 @@ public partial class DiagGui
                             "\r\nEs wird ein autarkes Wiederherstellungspaket (Wiederherstellen.cmd) erzeugt.";
 
             if (MessageBox.Show(this, prompt, "System-Umzug starten", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            if (running || HintergrundBelegt("Die Sicherung")) return;
+            HintergrundArbeit arbeit = HintergrundBeginnen("Die Sicherung für den System-Umzug");
 
             sperre(true);
 
@@ -15860,6 +16278,7 @@ public partial class DiagGui
                 string createdPath = "";
                 bool isSuccess = false;
                 string errMsg = "";
+                bool eof = false;
 
                 try
                 {
@@ -15873,7 +16292,7 @@ public partial class DiagGui
                     {
                         p.StartInfo = psi;
                         p.OutputDataReceived += delegate(object s, DataReceivedEventArgs e) {
-                            if (e.Data == null) return;
+                            if (e.Data == null) { eof = true; return; }
                             string line = e.Data.Trim();
                             if (line.Length == 0) return;
 
@@ -15948,9 +16367,20 @@ public partial class DiagGui
                             }
                         };
                         p.Start();
+                        arbeit.Prozess = p;
                         p.BeginOutputReadLine();
-                        p.WaitForExit();
-                        if (p.ExitCode == 0 && String.IsNullOrEmpty(errMsg)) isSuccess = true;
+                        // ab v4.11 ohne WaitForExit() ohne Frist: Die Sicherung darf lange dauern, endet aber, sobald
+                        // Schließen sie abbricht; danach höchstens 5 s auf die letzten Zeilen warten (hält ein
+                        // Kindprozess die Ausgabe offen, nicht ewig)
+                        while (!p.WaitForExit(1000))
+                        {
+                            if (arbeit.Abgebrochen) { KillProc(p); p.WaitForExit(10000); break; }
+                        }
+                        DateTime eu = DateTime.Now.AddSeconds(5);
+                        while (!eof && DateTime.Now < eu) System.Threading.Thread.Sleep(20);
+                        arbeit.Prozess = null;
+                        if (arbeit.Abgebrochen) { isSuccess = false; errMsg = "Sicherung abgebrochen."; }
+                        else if (p.HasExited && p.ExitCode == 0 && String.IsNullOrEmpty(errMsg)) isSuccess = true;
                     }
                 }
                 catch (Exception ex)
@@ -15961,6 +16391,8 @@ public partial class DiagGui
                 try
                 {
                     BeginInvoke(new MethodInvoker(delegate {
+                        HintergrundEnde(arbeit);
+                        if (hintergrundGeschlossen) return;
                         sperre(false);
                         lblUmzugDetail.Visible = false;
 
@@ -16106,7 +16538,7 @@ public partial class DiagGui
         Stopwatch sw = Stopwatch.StartNew();
         // Haken, deren Eintrag es nicht mehr gibt oder der nicht mehr zurücknehmbar ist, entfallen
         HashSet<string> gueltig = new HashSet<string>(); int open = 0, hier = 0;
-        foreach (ChangeEntry c in changes) { if (c.Undoable) { open++; gueltig.Add(c.Schluessel); } if (String.Equals(c.Computer, Environment.MachineName, StringComparison.OrdinalIgnoreCase)) hier++; }
+        foreach (ChangeEntry c in changes) { if (c.Undoable) { open++; gueltig.Add(c.Schluessel); } if (ChangeEntry.IstDiesesGeraet(c.Computer, c.GeraetId)) hier++; }
         chgHaken.IntersectWith(gueltig);
         string fokus = lvChg.Fokus is ChgZeile ? ((ChgZeile)lvChg.Fokus).Schluessel : "";
 
@@ -16522,8 +16954,10 @@ public partial class DiagGui
 
     static string Q(string s) { return "\"" + (s ?? "").TrimEnd('\\') + "\""; }
 
-    void StartRun()
+    internal void StartRun()
     {
+        // ab v4.11: nicht neben System-Umzug, winget oder Update-Download (Vorgabe 7)
+        if (HintergrundBelegt("Der Lauf")) return;
         List<string> mods = SelectedModules();
         if (mods.Count == 0) return;
         // Live-Ansicht und Lauf greifen auf dieselben Sensoren und denselben Treiber zu
@@ -16617,7 +17051,9 @@ public partial class DiagGui
         // ab v2.66 ohne Rückfrage vor dem Grafik-Lasttest (Wunsch aus dem Praxistest); die Abbruchschwelle wirkt weiter, Esc im Vorschaufenster beendet
         if (drv) a.Append(" -SensorTreiber");
         a.Append(KeepArg());
-        a.Append(" -PsuWattage ").Append(psuWattage);
+        // ab v4.11: Nennleistung nur übergeben, wenn sie eingegeben ist (Einstellungen.json); die Vorgabe 650 W gilt im
+        // Bericht nicht als Eingabe (keine Netzteil-Warnung aus einem angenommenen Wert, Vorgabe 11)
+        if (psuEingegeben) a.Append(" -PsuWattage ").Append(psuWattage);
         if (!string.IsNullOrEmpty(psuRating)) a.Append(" -PsuRating ").Append(Q(psuRating));
         Launch(a.ToString(), String.Join(" + ", mods.ToArray()));
     }
@@ -17620,8 +18056,69 @@ public partial class DiagGui
         catch { }
     }
 
-    void OnClosing(object sender, FormClosingEventArgs e)
+    // ab v4.11: Hintergrundarbeit außerhalb eines Laufs (Sicherung für den System-Umzug, winget-Installation, Herunterladen
+    // eines Updates). Bis v4.10 liefen sie ohne Zustand: Ein Benchmark konnte parallel starten (Vorgabe 7), und Schließen
+    // ließ den Arbeitsprozess unsichtbar weiterlaufen. Jetzt starten Lauf und Live-Ansicht nicht, solange eine läuft, und
+    // Schließen fragt nach und beendet sie. Es gibt höchstens eine zur Zeit.
+    internal class HintergrundArbeit
     {
+        public readonly string Beschreibung;
+        public volatile bool Abgebrochen;
+        public MethodInvoker Abbrechen;
+        readonly object sperre = new object();
+        Process prozess;
+        public Process Prozess { get { lock (sperre) return prozess; } set { lock (sperre) prozess = value; } }
+        public HintergrundArbeit(string beschreibung) { Beschreibung = beschreibung ?? ""; }
+    }
+    internal HintergrundArbeit hintergrund;
+    // Schließen hat die Hintergrundarbeit beendet: Abschlussmeldungen entfallen
+    bool hintergrundGeschlossen;
+
+    // Warum jetzt nichts Neues starten darf; leer, wenn keine Hintergrundarbeit läuft
+    internal string HintergrundSperre(string vorhaben)
+    {
+        HintergrundArbeit h = hintergrund;
+        if (h == null) return "";
+        return h.Beschreibung + " läuft noch. " + vorhaben + " startet erst danach, damit nichts parallel zu anderer Last läuft.";
+    }
+
+    // Meldet die laufende Hintergrundarbeit und liefert true, wenn das Vorhaben warten muss
+    internal bool HintergrundBelegt(string vorhaben)
+    {
+        string s = HintergrundSperre(vorhaben);
+        if (s.Length == 0) return false;
+        UI.Hinweis(s, "Leos Minibench", this);
+        return true;
+    }
+
+    // Belegt den Zustand; null, wenn schon eine Hintergrundarbeit läuft (Aufrufer prüft vorher mit HintergrundBelegt)
+    internal HintergrundArbeit HintergrundBeginnen(string beschreibung)
+    {
+        if (hintergrund != null) return null;
+        hintergrund = new HintergrundArbeit(beschreibung);
+        return hintergrund;
+    }
+
+    internal void HintergrundEnde(HintergrundArbeit h) { if (h != null && hintergrund == h) hintergrund = null; }
+
+    // Bricht die laufende Hintergrundarbeit ab: Abbruch der Aufgabe (z. B. Download) und Arbeitsprozess samt Kindern beenden
+    internal void HintergrundBeenden()
+    {
+        HintergrundArbeit h = hintergrund;
+        if (h == null) return;
+        h.Abgebrochen = true;
+        if (h.Abbrechen != null) { try { h.Abbrechen(); } catch { } }
+        KillProc(h.Prozess);
+    }
+
+    internal void OnClosing(object sender, FormClosingEventArgs e)
+    {
+        if (hintergrund != null)
+        {
+            if (!UI.Ask(hintergrund.Beschreibung + " läuft noch. Abbrechen und schließen?", "Leos Minibench", this)) { e.Cancel = true; return; }
+            HintergrundBeenden();
+            hintergrund = null; hintergrundGeschlossen = true;
+        }
         // Live-Ansicht sauber beenden, damit ein vorübergehend installierter Treiber entfernt wird
         if (liveRunning) StopLiveAndWait();
         StopSoftwareStateCheck();
@@ -18003,9 +18500,18 @@ public partial class DiagGui
         d.Html = htmlPath; d.Ordner = outDir; d.Ki = kiPath;
         d.Meta = String.Format("{0}  ·  Lauf vom {1}{2}{3}",
             e != null ? e.DisplayName : Environment.MachineName, DatumKurz(d.Datum),
-            runStarted != DateTime.MinValue ? String.Format("  ·  Dauer {0:mm\\:ss} Min.", DateTime.Now - runStarted) : "",
+            runStarted != DateTime.MinValue ? "  ·  Dauer " + LaufDauerText(DateTime.Now - runStarted) : "",
             e != null && e.Module.Length > 0 ? "  ·  " + e.Module : "");
         return d;
+    }
+
+    // Dauer eines Laufs: "1:05:12 Std." ab einer Stunde, sonst "mm:ss Min." (bis v4.10 {0:mm\:ss}: nur 0 bis 59 Minuten)
+    public static string LaufDauerText(TimeSpan t)
+    {
+        if (t < TimeSpan.Zero) t = TimeSpan.Zero;
+        CultureInfo inv = CultureInfo.InvariantCulture;
+        if (t.TotalHours >= 1) return String.Format(inv, "{0}:{1:00}:{2:00} Std.", (int)Math.Floor(t.TotalHours), t.Minutes, t.Seconds);
+        return String.Format(inv, "{0:00}:{1:00} Min.", t.Minutes, t.Seconds);
     }
 
     // Eintrag in der Seitenleiste: sichtbar, sobald es ein Ergebnis gibt, mit der Punktzahl als Pille
@@ -19613,9 +20119,15 @@ public static class UI
         }
     }
 
+    // ab v4.11 nur für den Selbsttest: Ist die Liste gesetzt, zeigen Ask und Hinweis keinen Dialog, sondern schreiben
+    // "Titel|Text" hinein; Ask antwortet dann mit MeldungsAntwort
+    public static List<string> Meldungsprotokoll;
+    public static bool MeldungsAntwort;
+
     // ab v4.0: Thematisierte Rueckfragedialoge fuer konsistenten Hell- und Dunkelmodus (ohne ungestyltes MessageBox.Show)
     public static bool Ask(string text, string title = "Frage", IWin32Window owner = null)
     {
+        if (Meldungsprotokoll != null) { Meldungsprotokoll.Add((title ?? "") + "|" + (text ?? "")); return MeldungsAntwort; }
         using (Form f = new Form())
         {
             f.Text = title ?? "Frage";
@@ -19666,6 +20178,7 @@ public static class UI
     // ab v4.0: Thematisierter Hinweisdialog fuer konsistenten Hell- und Dunkelmodus
     public static void Hinweis(string text, string title = "Hinweis", IWin32Window owner = null)
     {
+        if (Meldungsprotokoll != null) { Meldungsprotokoll.Add((title ?? "") + "|" + (text ?? "")); return; }
         using (Form f = new Form())
         {
             f.Text = title ?? "Hinweis";
@@ -22239,7 +22752,18 @@ public class ChangeEntry
     public string Schritt = "", Lauf = "";
     public string Schluessel { get { return FilePath + "*" + Id; } }
     public int Id;
-    public bool Undoable { get { return Status == "aktiv" && String.Equals(Computer, Environment.MachineName, StringComparison.OrdinalIgnoreCase); } }
+    public bool Undoable { get { return IstOffen(Status) && IstDiesesGeraet(Computer, GeraetId); } }
+
+    // ab v4.11 (wie Test-ChangeLogDiesesGeraet und Test-ChangeOffen im Skript): Ein Protokoll gehört zu diesem Gerät, wenn
+    // beide Gerätekennungen bekannt und gleich sind; nur wenn eine fehlt, entscheidet der Computername. So bleibt ein
+    // Protokoll nach dem Umbenennen des PCs zurücknehmbar. "fehlgeschlagen" (bis v4.10) gilt wie "aktiv" als offen.
+    public static string EigeneGeraetId = "";
+    public static bool IstDiesesGeraet(string computer, string geraetId)
+    {
+        if (!String.IsNullOrEmpty(geraetId) && !String.IsNullOrEmpty(EigeneGeraetId)) return String.Equals(geraetId, EigeneGeraetId, StringComparison.Ordinal);
+        return String.Equals(computer, Environment.MachineName, StringComparison.OrdinalIgnoreCase);
+    }
+    public static bool IstOffen(string status) { return status == "aktiv" || status == "fehlgeschlagen"; }
 
     static string S(Dictionary<string, object> d, string k)
     {
@@ -22262,7 +22786,7 @@ public class ChangeEntry
             {
                 Dictionary<string, object> d = js.DeserializeObject(File.ReadAllText(f, Encoding.UTF8)) as Dictionary<string, object>;
                 if (d == null || S(d, "Format") != "Minibench-Aenderungen/1") continue;
-                if (dateien != null) dateien.Add(new string[] { f, S(d, "Computer"), S(d, "Lauf") });
+                if (dateien != null) dateien.Add(new string[] { f, S(d, "Computer"), S(d, "Lauf"), S(d, "GeraetId") });
                 object eo; if (!d.TryGetValue("Eintraege", out eo)) continue;
                 System.Collections.IEnumerable arr = eo as System.Collections.IEnumerable;
                 if (arr == null || eo is string) continue;
@@ -22318,11 +22842,11 @@ public class ChangeMassnahme
 // ab v4.10: ein Lauf des Änderungsprotokolls (eine Datei) mit seinen Maßnahmen
 public class ChangeLauf
 {
-    public string FilePath = "", Computer = "", Zeit = "";
+    public string FilePath = "", Computer = "", Zeit = "", GeraetId = "";
     public List<ChangeEntry> Eintraege = new List<ChangeEntry>();
     public List<ChangeMassnahme> Massnahmen = new List<ChangeMassnahme>();
-    public bool DieserPc { get { return String.Equals(Computer, Environment.MachineName, StringComparison.OrdinalIgnoreCase); } }
-    public int Aktiv { get { int n = 0; foreach (ChangeEntry c in Eintraege) if (c.Status == "aktiv") n++; return n; } }
+    public bool DieserPc { get { return ChangeEntry.IstDiesesGeraet(Computer, GeraetId); } }
+    public int Aktiv { get { int n = 0; foreach (ChangeEntry c in Eintraege) if (ChangeEntry.IstOffen(c.Status)) n++; return n; } }
     public string Module
     {
         get { List<string> m = new List<string>(); foreach (ChangeEntry c in Eintraege) if (c.Modul.Length > 0 && !m.Contains(c.Modul)) m.Add(c.Modul); return String.Join(", ", m.ToArray()); }
@@ -22354,12 +22878,12 @@ public class ChangeLauf
             foreach (string[] d in dateien)
             {
                 if (d == null || d.Length < 3 || nach.ContainsKey(d[0])) continue;
-                ChangeLauf n = new ChangeLauf(); n.FilePath = d[0]; n.Computer = d[1]; n.Zeit = d[2]; nach[d[0]] = n; l.Add(n);
+                ChangeLauf n = new ChangeLauf(); n.FilePath = d[0]; n.Computer = d[1]; n.Zeit = d[2]; if (d.Length > 3) n.GeraetId = d[3] ?? ""; nach[d[0]] = n; l.Add(n);
             }
         foreach (ChangeEntry c in eintraege)
         {
             ChangeLauf n;
-            if (!nach.TryGetValue(c.FilePath, out n)) { n = new ChangeLauf(); n.FilePath = c.FilePath; n.Computer = c.Computer; n.Zeit = c.Lauf; nach[c.FilePath] = n; l.Add(n); }
+            if (!nach.TryGetValue(c.FilePath, out n)) { n = new ChangeLauf(); n.FilePath = c.FilePath; n.Computer = c.Computer; n.GeraetId = c.GeraetId; n.Zeit = c.Lauf; nach[c.FilePath] = n; l.Add(n); }
             n.Eintraege.Add(c);
         }
         foreach (ChangeLauf n in l)
@@ -23309,6 +23833,19 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.11", "19.11.2026", "Sicherheit und Rücknahme: Befunde der Gesamtprüfung behoben",
+            "• Behoben: PawnIO wurde auch installiert, wenn der Treiber auf „nein“ stand (Arbeitsprozesse laufen immer mit Administratorrechten). Jetzt nur noch mit Zustimmung.\r\n" +
+            "• Behoben, Wartung: „Alte Wiederherstellungspunkte löschen“ löschte auch den Punkt, den der Lauf eben angelegt hatte. Die alten Punkte gehen jetzt vor dem neuen; die Nummer zählt nur, wenn der Punkt mit dieser Beschreibung wirklich da ist.\r\n" +
+            "• Behoben, Datenträgerbereinigung: Papierkorb, Windows.old und ESD-Installationsdateien bleiben unangetastet (bisher alle Kategorien außer Downloads, auch als geplante Aufgabe).\r\n" +
+            "• Computerschutz wird nur eingeschaltet, wenn er aus war, und dann mit Eintrag und Gegenbefehl auf der Seite Änderungen.\r\n" +
+            "• Behoben: smartmontools konnte auf fremden PCs zurückbleiben, weil der Deinstaller nie lief. Import einer .minibench-Datei schreibt nur noch in einen neuen Ordner unter Berichte.\r\n" +
+            "• NVIDIA Profile Inspector (3.0.2.3) und DDU (18.1.5.3) nur noch mit fester Prüfsumme; Dateien mit unbekannter Prüfsumme werden abgelehnt.\r\n" +
+            "• Bericht: Verbrauchsstufen ohne Messwert stehen als „nicht gemessen“ da, die Netzteil-Warnung erscheint nur mit eingegebener Nennleistung. „Seit dem letzten Lauf“ meldet keinen falschen Windows-Build mehr; alle Texte dort sind maskiert.\r\n" +
+            "• Rückgängig: Ein Fehlschlag lässt sich erneut versuchen; verzögerter Dienststart, angepasste Energiepläne und selbst angelegte Registry-Schlüssel werden wiederhergestellt bzw. entfernt. Protokolle gehören über die Gerätekennung zum PC, auch nach dem Umbenennen.\r\n" +
+            "• Wartung: alle Schritte stehen im Änderungsprotokoll; vor „Netzwerk zurücksetzen“ wird die IP-Konfiguration gesichert; Shader-Caches nur in den Cache-Ordnern und im Profil des angemeldeten Benutzers.\r\n" +
+            "• Messung: Hybrid-Prozessoren über die echten Kerntypen erkannt (keine falsche Warnung zur Skalierung bei i5-1335U und ähnlichen), Lasttest und RAM-Test nehmen den aktuell freien Speicher, „Median aktualisieren“ schreibt auch Lasttest-Mediane.\r\n" +
+            "• Oberfläche: System-Umzug und Installationen sperren Messungen und fragen beim Schließen nach; Update nur mit Prüfsumme und lädt im Hintergrund mit Fortschritt; Hilfsabläufe frieren das Fenster nicht mehr ein; F5 und Strg+Eingabe wirken überall; Laufdauer über einer Stunde richtig.\r\n" +
+            "• Bau und Veröffentlichung: Tests melden auch nicht geladene Testdateien als Fehler; Veröffentlichen prüft Zweig, Prüfsumme der exe, Tag und Windows-Tests."),
         new Eintrag("4.10", "15.11.2026", "Sensoren, Datenbank und Änderungen im Stil der übrigen Seiten, Protokoll aufräumen",
             "\u2022 Seite Änderungen neu aufgebaut: Sie zeigt zuerst nur die Läufe dieses PCs, gebündelt nach Lauf und Maßnahme. Die einzelnen Werte (Ziel, vorher, nachher) stehen unter ihrer Maßnahme und entstehen erst beim Aufklappen. Ein Haken an einem Lauf oder einer Maßnahme wählt alle zurücknehmbaren Einträge darunter; die Auswahl steht in einem Band über der Liste mit \u201ERückgängig machen\u201C. \u201EAlle PCs\u201C zeigt zusätzlich die Protokolle anderer PCs, nur zur Ansicht.\r\n" +
             "\u2022 Behoben: Die Seite Änderungen brauchte bei vielen Einträgen lange zum Öffnen. Sie legte für jeden Eintrag aller PCs eine Zeile mit Kontrollkästchen an (im Datenordner rund 1.050, davon einer von diesem PC) und zählte bei jeder Zeile alle Haken neu. Die neue Liste zeichnet nur, was sichtbar ist.\r\n" +
@@ -23771,6 +24308,20 @@ $ErrorActionPreference = 'Continue'
 $StartTime = Get-Date
 $script:Inv = [Globalization.CultureInfo]::InvariantCulture
 
+# ab v4.11: Wurde die Nennleistung des Netzteils wirklich eingegeben? Einstellungen.json mit PsuWattage oder ein
+# Parameterwert ungleich der Vorgabe 650 W.
+function Test-PsuEingegeben([switch]$Gebunden, $Wert = $null, [string]$DataDir = '') {
+    if ($Gebunden -and $null -ne $Wert -and [int]$Wert -gt 0 -and [int]$Wert -ne 650) { return $true }
+    try {
+        $p = $(if ($DataDir) { Join-Path $DataDir 'Einstellungen.json' } else { '' })
+        if ($p -and (Test-Path -LiteralPath $p)) {
+            $j = ConvertFrom-Json ([IO.File]::ReadAllText($p, [Text.Encoding]::UTF8)) -ErrorAction Stop
+            if ($null -ne $j.PsuWattage -and [int]$j.PsuWattage -gt 0) { return $true }
+        }
+    } catch { }
+    return $false
+}
+
 # Netzteil-Konfiguration (ab v3.71): CLI-Parameter oder Einstellungen.json
 $activePsuWattage = if ($PSBoundParameters.ContainsKey('PsuWattage')) { [int]$PsuWattage } else { $null }
 $activePsuRating  = if ($PSBoundParameters.ContainsKey('PsuRating'))  { [string]$PsuRating } else { $null }
@@ -23787,6 +24338,10 @@ if ($null -eq $activePsuWattage -or $null -eq $activePsuRating) {
         }
     } catch { }
 }
+# ab v4.11 (Vorgabe 11): Die Nennleistung gilt nur als eingegeben, wenn sie in Einstellungen.json steht oder als
+# Parameter mit einem anderen Wert als der Vorgabe 650 W kommt (die Oberfläche übergibt -PsuWattage immer). Ohne Eingabe
+# rechnet das Verbrauchsmodell weiter mit 650 W für die Wirkungsgradkurve, warnt aber nicht vor Überlastung.
+$script:PsuEingegeben = Test-PsuEingegeben -Gebunden:($PSBoundParameters.ContainsKey('PsuWattage')) -Wert $PsuWattage -DataDir $script:DataDir
 if ($null -eq $activePsuWattage) { $activePsuWattage = $(if ($PsuWattage -ne $null) { [int]$PsuWattage } else { 650 }) }
 if ($null -eq $activePsuRating -or "$activePsuRating" -eq '') { $activePsuRating = $(if ($PsuRating) { [string]$PsuRating } else { '80 PLUS Bronze' }) }
 $script:PsuWattage = $activePsuWattage
@@ -24251,6 +24806,8 @@ function Get-DbEntries {
             Format = [string]$j.Format; GeraetId = $(if ($j.Geraet) { [string]$j.Geraet.Id } else { '' }); Version = [string]$j.Version; Quelle = [string]$j.Quelle
             System = $(if ($j.System) { [string]$j.System } elseif ($j.Hardware -and $j.Hardware.System) { [string]$j.Hardware.System } else { '' })
             Akku = @($j.Akku); Ablauf = $j.Ablauf
+            # ab v4.11: für die Lasttest-Mediane in Update-BenchReferenceMedians (bis v4.10 fehlten beide Felder)
+            Sensoren = $j.Sensoren; Lasttest = $j.Lasttest
         })
     }
     Set-DbDeviceKeys $list
@@ -25027,6 +25584,17 @@ function Get-CimCached([string]$Class, [string]$Namespace = '') {
     return $script:CimCache[$k]
 }
 
+# ab v4.11: freier Arbeitsspeicher in Byte, frisch abgefragt (Get-CimCached liefert den Stand vom Laufbeginn; ein RAM-Test
+# danach konnte mehr belegen als frei war). Ersatz bei Fehler: Wert aus dem Cache.
+function Get-FreeRamBytes {
+    try {
+        $os = @(Get-CimInstance Win32_OperatingSystem -Property FreePhysicalMemory -ErrorAction Stop) | Select-Object -First 1
+        if ($os -and [double]$os.FreePhysicalMemory -gt 0) { return [long]([double]$os.FreePhysicalMemory * 1KB) }
+    } catch { }
+    $c = @(Get-CimCached Win32_OperatingSystem) | Select-Object -First 1
+    if ($c -and [double]$c.FreePhysicalMemory -gt 0) { return [long]([double]$c.FreePhysicalMemory * 1KB) }
+    return [long]0
+}
 # Laufzeit seit dem Start lesbar (ab v2.8): "5 Std 21 Min", "3 Tage 2 Std", ohne "0 Tage"
 function Format-Uptime([TimeSpan]$Span) {
     if ($Span.TotalMinutes -lt 1) { return 'unter 1 Min' }
@@ -25505,6 +26073,17 @@ function Get-EstimatedSystemPower {
     }
 }
 
+# ab v4.11 (Vorgabe 11): Verbrauchsstufe ohne eigenen Messwert
+function New-PowerStageNichtGemessen([string]$Stage, [string]$Grund, [bool]$IsNotebook, $PsuWattage, $PsuRating) {
+    return [pscustomobject]@{
+        Verfuegbar = $false; NichtGemessen = $true; Stage = $Stage; Text = 'nicht gemessen'
+        P_AC = $null; P_DC = $null; CpuW = $null; GpuW = $null; RamW = $null; BoardW = $null; DiskW = $null; FanW = $null; VrmW = $null
+        Wirkungsgrad = $null; WirkungsgradProzent = $null; LoadPercent = $null
+        PsuWattage = $PsuWattage; PsuRating = $PsuRating; IsNotebook = $IsNotebook
+        Aufschluesselung = ('nicht gemessen: {0}' -f $Grund); AufschluesselungKurz = 'nicht gemessen'
+    }
+}
+
 function Get-SystemPowerProfile($Entry = $null) {
     $isNb = $(if ($Entry) {
         if (Get-Command 'Test-EntryIsNotebook' -ErrorAction SilentlyContinue) { [bool](& 'Test-EntryIsNotebook' $Entry) } else { $false }
@@ -25521,6 +26100,8 @@ function Get-SystemPowerProfile($Entry = $null) {
                elseif ($Entry -and $Entry.PsuRating) { [string]$Entry.PsuRating }
                elseif ($script:PsuRating) { [string]$script:PsuRating }
                else { '80 PLUS Bronze' }
+    # ab v4.11: Nennleistung wirklich eingegeben (Einstellungen oder Parameter), nicht nur die Vorgabe 650 W
+    $psuEingegeben = $(if ($Entry) { [bool]($Entry.Netzteil -and $Entry.Netzteil.Eingegeben) } else { [bool]$script:PsuEingegeben })
 
     # RAM-Größe und DIMMs
     $ramGb = 16.0
@@ -25582,6 +26163,8 @@ function Get-SystemPowerProfile($Entry = $null) {
     if ($Entry) {
         if ($Entry.Sensoren) {
             if ($Entry.Sensoren.Leerlauf -and $Entry.Sensoren.Leerlauf.CpuW) { $cpuWIdle = [double]$Entry.Sensoren.Leerlauf.CpuW }
+            # ab v4.11: gemessene GPU-Leistung im Leerlauf auch aus dem Datenbankeintrag (bis v4.10 immer 12 W angenommen)
+            if ($Entry.Sensoren.Leerlauf -and $Entry.Sensoren.Leerlauf.GpuW) { $gpuWIdle = [double]$Entry.Sensoren.Leerlauf.GpuW }
             if ($Entry.Sensoren.Last -and $Entry.Sensoren.Last.CpuWMax) { $cpuWMax = [double]$Entry.Sensoren.Last.CpuWMax }
             if ($Entry.Sensoren.Last -and $Entry.Sensoren.Last.GpuWMax) { $gpuWMax = [double]$Entry.Sensoren.Last.GpuWMax }
             if ($null -eq $cpuWMax -and $Entry.Sensoren.Benchmark -and $Entry.Sensoren.Benchmark.CpuWMax) { $cpuWMax = [double]$Entry.Sensoren.Benchmark.CpuWMax }
@@ -25616,48 +26199,33 @@ function Get-SystemPowerProfile($Entry = $null) {
     }
 
     if (-not $hasDgpu) { $gpuWIdle = 0.0; $gpuWMax = 0.0 }
-    elseif ($null -eq $gpuWIdle -and $hasDgpu) { $gpuWIdle = $(if ($isNb) { 5.0 } else { 12.0 }) }
 
-    if ($null -eq $cpuWIdle -and $null -ne $cpuWMax -and $cpuWMax -gt 0) {
-        $cpuWIdle = $(if ($isNb) { [math]::Min(10.0, [math]::Max(4.0, [math]::Round($cpuWMax * 0.15, 1))) } else { [math]::Min(25.0, [math]::Max(12.0, [math]::Round($cpuWMax * 0.18, 1))) })
-    }
-
-    # Teillast (Alltag & Büro): CPU_Idle + 20 W, GPU_Idle + 15 W + Teillast-Restsystem
-    $cpuWPart = $null; $gpuWPart = $null
-    if ($null -ne $cpuWIdle) {
-        $cpuWPart = [math]::Round($cpuWIdle + 20.0, 1)
-    } elseif ($null -ne $cpuWMax) {
-        $cpuWPart = [math]::Round($cpuWMax * 0.40, 1)
-    }
-
-    if ($hasDgpu) {
-        if ($null -ne $gpuWIdle) {
-            $gpuWPart = [math]::Round($gpuWIdle + 15.0, 1)
-        } elseif ($null -ne $gpuWMax) {
-            $gpuWPart = [math]::Round($gpuWMax * 0.25, 1)
-        }
+    # ab v4.11 (Vorgabe 11): Jede Stufe erscheint nur mit eigenem Messwert. Teillast und Gaming werden nicht gemessen
+    # (bis v4.10: Leerlauf + 20 W bzw. min(0,75 x CPU-Max, 65 W)), der Leerlauf braucht die gemessene CPU-Leistung im
+    # Leerlauf und mit Grafikkarte auch deren Leerlaufleistung (bis v4.10 ersetzt durch 18 % der Volllast bzw. 12 W).
+    $idleGemessen = ($null -ne $cpuWIdle -and $cpuWIdle -gt 0 -and ($null -ne $gpuWIdle))
+    $pIdle = $(if ($idleGemessen) {
+        Get-EstimatedSystemPower -CpuW $cpuWIdle -GpuW $gpuWIdle -IsNotebook:$isNb -GpuName $gpuName -DimmCount $dimmCount -RamOc:$ramOc -Disks $disksList -DiskCount $diskCount -FanCount $fanCount -IsIdle -Stage 'Idle' -PsuWattage $psuWatt -PsuRating $psuRate
     } else {
-        $gpuWPart = 0.0
-    }
-
-    # Gaming: CPU-Schnitt während Grafik-Benchmark (Fallback: min(CPU_Max * 0.75, 65 W)) + maximale GPU-Last
-    $cpuWGaming = $null
-    if ($null -ne $cpuWMax -and $cpuWMax -gt 0) {
-        $cpuWGaming = [math]::Min($cpuWMax * 0.75, 65.0)
-    }
-
-    $pIdle = Get-EstimatedSystemPower -CpuW $cpuWIdle -GpuW $gpuWIdle -IsNotebook:$isNb -GpuName $gpuName -DimmCount $dimmCount -RamOc:$ramOc -Disks $disksList -DiskCount $diskCount -FanCount $fanCount -IsIdle -Stage 'Idle' -PsuWattage $psuWatt -PsuRating $psuRate
-    $pPart = Get-EstimatedSystemPower -CpuW $cpuWPart -GpuW $gpuWPart -IsNotebook:$isNb -GpuName $gpuName -DimmCount $dimmCount -RamOc:$ramOc -Disks $disksList -DiskCount $diskCount -FanCount $fanCount -IsTeillast -Stage 'Teillast' -PsuWattage $psuWatt -PsuRating $psuRate
-    $pGaming = Get-EstimatedSystemPower -CpuW $cpuWGaming -GpuW $gpuWMax -IsNotebook:$isNb -GpuName $gpuName -DimmCount $dimmCount -RamOc:$ramOc -Disks $disksList -DiskCount $diskCount -FanCount $fanCount -Stage 'Gaming' -PsuWattage $psuWatt -PsuRating $psuRate
+        New-PowerStageNichtGemessen 'Idle' $(if ($null -eq $cpuWIdle) { 'Keine gemessene CPU-Leistung im Leerlauf.' } else { 'Keine gemessene Leistung der Grafikkarte im Leerlauf.' }) $isNb $psuWatt $psuRate
+    })
+    $pPart = New-PowerStageNichtGemessen 'Teillast' 'Für Teillast gibt es keine eigene Messung.' $isNb $psuWatt $psuRate
+    $pGaming = New-PowerStageNichtGemessen 'Gaming' 'Für typisches Spielen gibt es keine eigene Messung.' $isNb $psuWatt $psuRate
     $pLoad = Get-EstimatedSystemPower -CpuW $cpuWMax  -GpuW $gpuWMax  -IsNotebook:$isNb -GpuName $gpuName -DimmCount $dimmCount -RamOc:$ramOc -Disks $disksList -DiskCount $diskCount -DiskLoad -FanCount $fanCount -Stage 'Load' -PsuWattage $psuWatt -PsuRating $psuRate
 
-    # Befund / Warnung bei Überlastung (> 85 %)
-    if (-not $Entry -and $pLoad.Verfuegbar -and $pLoad.PsuWattage -gt 0 -and $null -ne $pLoad.LoadPercent -and $pLoad.LoadPercent -gt 85) {
+    # Für die Effizienz-Indizes (Punkte je Watt) bleibt das bisherige Modell, damit gespeicherte Werte vergleichbar bleiben;
+    # sie sind als modelliert gekennzeichnet und erscheinen nicht als Verbrauchsstufe.
+    $gpuWIdleModell = $gpuWIdle
+    if ($null -eq $gpuWIdleModell -and $hasDgpu) { $gpuWIdleModell = $(if ($isNb) { 5.0 } else { 12.0 }) }
+    $cpuWGamingModell = $(if ($null -ne $cpuWMax -and $cpuWMax -gt 0) { [math]::Min($cpuWMax * 0.75, 65.0) } else { $null })
+    $pGamingModell = Get-EstimatedSystemPower -CpuW $cpuWGamingModell -GpuW $gpuWMax -IsNotebook:$isNb -GpuName $gpuName -DimmCount $dimmCount -RamOc:$ramOc -Disks $disksList -DiskCount $diskCount -FanCount $fanCount -Stage 'Gaming' -PsuWattage $psuWatt -PsuRating $psuRate
+
+    # Befund / Warnung bei Überlastung (> 85 %), ab v4.11 nur mit eingegebener Nennleistung (nicht mit der Vorgabe 650 W)
+    if (-not $Entry -and $psuEingegeben -and $pLoad.Verfuegbar -and $pLoad.PsuWattage -gt 0 -and $null -ne $pLoad.LoadPercent -and $pLoad.LoadPercent -gt 85) {
         if (Get-Command Add-Finding -ErrorAction SilentlyContinue) {
             Add-Finding 'WARNUNG' 'Energie' ('Netzteil unter Volllast zu {0:N0} % ausgelastet ({1:N0} W von {2:N0} W Nennleistung). Wenig Puffer für Lastspitzen und Transienten.' -f $pLoad.LoadPercent, $pLoad.P_DC, $pLoad.PsuWattage)
         }
     }
-
     # Effizienz-Indizes ermitteln
     $eff = [ordered]@{
         CpuMT_PerWatt  = $null
@@ -25729,9 +26297,9 @@ function Get-SystemPowerProfile($Entry = $null) {
     }
 
     # Gesamtsystem-Effizienz: gewichtetes harmonisches Mittel der gemessenen Teillast-/Benchmark-Effizienzen
-    $pCpuLoad = Get-EstimatedSystemPower -CpuW $cpuWMax -GpuW $gpuWIdle -IsNotebook:$isNb -GpuName $gpuName -DimmCount $dimmCount -RamOc:$ramOc -Disks $disksList -DiskCount $diskCount -FanCount $fanCount -Stage 'CpuLoad' -PsuWattage $psuWatt -PsuRating $psuRate
+    $pCpuLoad = Get-EstimatedSystemPower -CpuW $cpuWMax -GpuW $gpuWIdleModell -IsNotebook:$isNb -GpuName $gpuName -DimmCount $dimmCount -RamOc:$ramOc -Disks $disksList -DiskCount $diskCount -FanCount $fanCount -Stage 'CpuLoad' -PsuWattage $psuWatt -PsuRating $psuRate
     $pCpuAc = if ($pCpuLoad.Verfuegbar -and $pCpuLoad.P_AC -gt 0) { $pCpuLoad.P_AC } elseif ($null -ne $cpuWMax -and $cpuWMax -gt 0) { $cpuWMax * 1.25 + 25.0 } else { $null }
-    $pGpuAc = if ($pGaming.Verfuegbar -and $pGaming.P_AC -gt 0) { $pGaming.P_AC } elseif ($null -ne $gpuWMax -and $gpuWMax -gt 0) { ($gpuWMax + 50.0) * 1.25 + 25.0 } else { $null }
+    $pGpuAc = if ($pGamingModell.Verfuegbar -and $pGamingModell.P_AC -gt 0) { $pGamingModell.P_AC } elseif ($null -ne $gpuWMax -and $gpuWMax -gt 0) { ($gpuWMax + 50.0) * 1.25 + 25.0 } else { $null }
 
     $effCpuNorm = if ($cpuMtScore -gt 0 -and $null -ne $pCpuAc -and $pCpuAc -gt 0) { (($cpuMtScore / 28000.0) * 100.0 / $pCpuAc) * 100.0 } else { $null }
     $sGpu = if ($null -ne $gpuFps -and $gpuFps -gt 0) { ($gpuFps / 100.0) * 100.0 } elseif ($null -ne $gpuPoints -and $gpuPoints -gt 0) { ($gpuPoints / 10000.0) * 100.0 } elseif ($Entry -and $Entry.Werte -and $Entry.Werte['GPU|VMB'] -gt 0) { ([double]$Entry.Werte['GPU|VMB'] / 300.0) * 100.0 } else { $null }
@@ -25762,6 +26330,7 @@ function Get-SystemPowerProfile($Entry = $null) {
         Effizienz   = [pscustomobject]$eff
         PsuWattage  = $psuWatt
         PsuRating   = $psuRate
+        PsuEingegeben = [bool]$psuEingegeben
     }
 }
 
@@ -26654,43 +27223,40 @@ function Get-DeviceRunComparison {
 
     # 1. Inventar-Änderungen ermitteln
     $diffs = [System.Collections.Generic.List[object]]::new()
-    $curBios = $(if ($script:Facts -and $script:Facts.Contains('BIOS/UEFI')) { [string]$script:Facts['BIOS/UEFI'] } else { '' })
-    $prevBios = $(if ($prev.Hardware -and $prev.Hardware.BiosVersion) { [string]$prev.Hardware.BiosVersion } elseif ($prev.Hardware -and $prev.Hardware.BIOS) { [string]$prev.Hardware.BIOS } else { '' })
-    if ($curBios -and $prevBios) {
-        $cBVer = if ($curBios -match '([A-Za-z0-9._-]+)\s+vom') { $matches[1] } else { $curBios }
-        $pBVer = if ($prevBios -match '([A-Za-z0-9._-]+)\s+vom') { $matches[1] } else { $prevBios }
-        if ($cBVer -ne $pBVer) {
-            $diffs.Add([pscustomobject]@{ Item = 'BIOS'; Old = $pBVer; New = $cBVer; Text = ('BIOS: {0} &rarr; <b>{1}</b>' -f $pBVer, $cBVer) })
-        }
+    # ab v4.11: Unterschiede nur zwischen echten Angaben beider Läufe (Hardware.WinBuild und Hardware.BiosVersion aus der
+    # Datenbank); fehlt eine Seite, wird nichts gemeldet. Alte und neue Werte sind maskiert (Vorgabe 12).
+    $mkDiff = {
+        param([string]$Item, [string]$Label, [string]$Old, [string]$New, [string]$Prefix = '')
+        $diffs.Add([pscustomobject]@{ Item = $Item; Old = $Old; New = $New
+            Text = ('{0}: {1}{2} &rarr; <b>{1}{3}</b>' -f (ConvertTo-HtmlText $Label), (ConvertTo-HtmlText $Prefix), (ConvertTo-HtmlText $Old), (ConvertTo-HtmlText $New)) })
     }
+    $curBios = $(if ($script:Facts -and $script:Facts.Contains('BIOS/UEFI')) { ([string]$script:Facts['BIOS/UEFI']).Trim() } else { '' })
+    $cBVer = $(if ($curBios -match '^(.+?)\s+vom\s') { $Matches[1].Trim() } else { $curBios })
+    $pBVer = ''
+    if ($prev.Hardware -and $prev.Hardware.BiosVersion) { $pBVer = ([string]$prev.Hardware.BiosVersion).Trim() }
+    elseif ($prev.Hardware -and $prev.Hardware.BIOS) { $pB = ([string]$prev.Hardware.BIOS).Trim(); $pBVer = $(if ($pB -match '^(.+?)\s+vom\s') { $Matches[1].Trim() } else { $pB }) }
+    if ($cBVer -and $pBVer -and $cBVer -ne $pBVer) { & $mkDiff 'BIOS' 'BIOS' $pBVer $cBVer }
 
     $curDrv = $(if ($script:Facts -and $script:Facts.Contains('Grafik')) { [string]$script:Facts['Grafik'] } else { '' })
     $prevDrv = $(if ($prev.Hardware -and $prev.Hardware.GpuDriver) { [string]$prev.Hardware.GpuDriver } elseif ($prev.Hardware -and $prev.Hardware.GrafikTreiber) { [string]$prev.Hardware.GrafikTreiber } else { '' })
     if ($curDrv -and $prevDrv) {
         $cDrvVer = if ($curDrv -match '(\d{2,3}\.\d{2})') { $matches[1] } else { $curDrv }
         $pDrvVer = if ($prevDrv -match '(\d{2,3}\.\d{2})') { $matches[1] } else { $prevDrv }
-        if ($cDrvVer -ne $pDrvVer) {
-            $diffs.Add([pscustomobject]@{ Item = 'Grafiktreiber'; Old = $pDrvVer; New = $cDrvVer; Text = ('Grafiktreiber: {0} &rarr; <b>{1}</b>' -f $pDrvVer, $cDrvVer) })
-        }
+        if ($cDrvVer -ne $pDrvVer) { & $mkDiff 'Grafiktreiber' 'Grafiktreiber' $pDrvVer $cDrvVer }
     }
 
+    # Windows-Build: nur Buildnummern vergleichen, nie den Systemnamen ($prev.System) als Ersatz
     $curOs = $(if ($script:Facts -and $script:Facts.Contains('Betriebssystem')) { [string]$script:Facts['Betriebssystem'] } else { '' })
-    $prevOs = $(if ($prev.Hardware -and $prev.Hardware.WinBuild) { [string]$prev.Hardware.WinBuild } elseif ($prev.System) { [string]$prev.System } else { '' })
-    if ($curOs -and $prevOs) {
-        $cBuild = if ($curOs -match 'Build\s+(\d+)') { $matches[1] } else { '' }
-        $pBuild = if ($prevOs -match '(\d{5})') { $matches[1] } else { $prevOs }
-        if ($cBuild -and $pBuild -and $cBuild -ne $pBuild) {
-            $diffs.Add([pscustomobject]@{ Item = 'Windows-Build'; Old = $pBuild; New = $cBuild; Text = ('Windows: Build {0} &rarr; <b>Build {1}</b>' -f $pBuild, $cBuild) })
-        }
-    }
-
+    $cBuild = $(if ($curOs -match 'Build\s+(\d{4,6})') { $Matches[1] } else { '' })
+    $pBuild = $(if ($prev.Hardware -and ([string]$prev.Hardware.WinBuild) -match '^\s*(\d{4,6})') { $Matches[1] } else { '' })
+    if ($cBuild -and $pBuild -and $cBuild -ne $pBuild) { & $mkDiff 'Windows-Build' 'Windows' $pBuild $cBuild 'Build ' }
     $curRam = $(if ($script:Facts -and $script:Facts.Contains('Arbeitsspeicher')) { [string]$script:Facts['Arbeitsspeicher'] } else { '' })
     $prevRam = $(if ($prev.Hardware -and $prev.Hardware.RAM) { [string]$prev.Hardware.RAM } else { '' })
     if ($curRam -and $prevRam) {
         $cSpd = if ($curRam -match '(\d{4,5}\s*MT/s)') { $matches[1] } else { '' }
         $pSpd = if ($prevRam -match '(\d{4,5}\s*MT/s)') { $matches[1] } else { '' }
         if ($cSpd -and $pSpd -and $cSpd -ne $pSpd) {
-            $diffs.Add([pscustomobject]@{ Item = 'RAM-Takt'; Old = $pSpd; New = $cSpd; Text = ('RAM: {0} &rarr; <b>{1}</b>' -f $pSpd, $cSpd) })
+            & $mkDiff 'RAM-Takt' 'RAM' $pSpd $cSpd
         }
     }
 
@@ -29598,7 +30164,8 @@ window.MINIBENCH_DASHBOARD_DATA = window.MINIBENCH_DASHBOARD_DATA || null;
         if (!v || v === 'n/v') {
           const l = s.Metrics?.POWER_LOAD;
           const i = s.Metrics?.POWER_IDLE;
-          if (l || i) return `~${Math.round(l || 0)} W / ~${Math.round(i || 0)} W`;
+          // ab v4.11 (Vorgabe 11): fehlende Stufe als "nicht gemessen" statt 0 W
+          if (l || i) return `${l ? '~' + Math.round(l) + ' W' : 'nicht gemessen'} / ${i ? '~' + Math.round(i) + ' W' : 'nicht gemessen'}`;
           return '<span style="color:var(--text-muted);">n/v (kein Leistungssensor)</span>';
         }
         const tip = escapeHtml(s.Hardware?.PowerLoadTip || 'Mathematisch modellierter Gesamtverbrauch');
@@ -31166,7 +31733,8 @@ function New-PowerEfficiencyHtml($Profile) {
 
     # Interaktive Netzteil-Konfigurationsleiste direkt im Bericht (nur Desktop-PCs; Notebooks nutzen OEM-Modell)
     if (-not $Profile.IsNotebook) {
-        $curWatt = if ($Profile.PsuWattage -gt 0) { [int]$Profile.PsuWattage } else { 650 }
+        # ab v4.11: Feld leer, solange keine Nennleistung eingegeben wurde (die Vorgabe 650 W ist keine Eingabe)
+        $curWatt = if ($Profile.PsuEingegeben -and $Profile.PsuWattage -gt 0) { [string][int]$Profile.PsuWattage } else { '' }
         $curRate = if ($Profile.PsuRating) { [string]$Profile.PsuRating } else { '80 PLUS Bronze' }
         $rOpts = @('Unbekannt', '80 PLUS White', '80 PLUS Bronze', '80 PLUS Silver', '80 PLUS Gold', '80 PLUS Platinum', '80 PLUS Titanium')
         $rSb = New-Object System.Text.StringBuilder
@@ -31181,7 +31749,7 @@ function New-PowerEfficiencyHtml($Profile) {
   </div>
   <div style="display:flex;align-items:center;gap:8px;">
     <label for="cfgPsuWatt" style="font-size:13px;color:var(--muted);font-weight:500;">Nennleistung:</label>
-    <input type="number" id="cfgPsuWatt" value="{0}" min="200" max="2500" step="50" style="width:85px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit;font-size:13px;" oninput="recalcPsuModel()" title="Nennleistung des verbauten Netzteils in Watt (z. B. 550, 650, 750, 850, 1000 W)">
+    <input type="number" id="cfgPsuWatt" value="{0}" placeholder="nicht angegeben" min="200" max="2500" step="50" style="width:85px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit;font-size:13px;" oninput="recalcPsuModel()" title="Nennleistung des verbauten Netzteils in Watt (z. B. 550, 650, 750, 850, 1000 W)">
     <span style="font-size:13px;color:var(--muted);">W</span>
   </div>
   <div style="display:flex;align-items:center;gap:8px;">
@@ -31205,18 +31773,18 @@ function New-PowerEfficiencyHtml($Profile) {
 
     # 1. Leerlauf
     $idle = $Profile.Leerlauf
-    $idleAc = $(if ($idle -and $idle.Verfuegbar) { '~{0:N0} W' -f [math]::Round($idle.P_AC) } else { 'n/v' })
-    $idleDc = $(if ($idle -and $idle.Verfuegbar) { 'intern DC ~{0:N0} W' -f [math]::Round($idle.P_DC) } else { 'kein Leistungssensor' })
-    $idleTip = $(if ($idle -and $idle.Verfuegbar) { $idle.Aufschluesselung } else { 'Keine Messwerte für CPU-Package-Power im Leerlauf vorhanden.' })
+    $idleAc = $(if ($idle -and $idle.Verfuegbar) { '~{0:N0} W' -f [math]::Round($idle.P_AC) } else { 'nicht gemessen' })
+    $idleDc = $(if ($idle -and $idle.Verfuegbar) { 'intern DC ~{0:N0} W' -f [math]::Round($idle.P_DC) } else { 'kein eigener Messwert' })
+    $idleTip = $(if ($idle -and $idle.Verfuegbar) { $idle.Aufschluesselung } elseif ($idle -and $idle.Aufschluesselung) { $idle.Aufschluesselung } else { 'Keine Messwerte für CPU-Package-Power im Leerlauf vorhanden.' })
     $idleDcNum = $(if ($idle -and $idle.Verfuegbar) { [string]::Format($script:Inv, '{0:0.#}', $idle.P_DC) } else { '0' })
     [void]$sb.Append(('<div class="pwr-card hit" id="pwrCardIdle" data-stage="Idle" data-dc="{0}" data-tip="{1}"><h4>Leerlauf (Idle)</h4><div class="pwr-val" id="pwrValIdle">{2}</div><div class="pwr-sub" id="pwrSubIdle">{3}</div></div>' -f `
         $idleDcNum, (ConvertTo-HtmlText $idleTip), $idleAc, (ConvertTo-HtmlText $idleDc)))
 
     # 2. Teillast
     $part = $Profile.Teillast
-    $partAc = $(if ($part -and $part.Verfuegbar) { '~{0:N0} W' -f [math]::Round($part.P_AC) } else { 'n/v' })
-    $partDc = $(if ($part -and $part.Verfuegbar) { 'intern DC ~{0:N0} W' -f [math]::Round($part.P_DC) } else { 'kein Leistungssensor' })
-    $partTip = $(if ($part -and $part.Verfuegbar) { $part.Aufschluesselung } else { 'Keine Messwerte für Teillast vorhanden.' })
+    $partAc = $(if ($part -and $part.Verfuegbar) { '~{0:N0} W' -f [math]::Round($part.P_AC) } else { 'nicht gemessen' })
+    $partDc = $(if ($part -and $part.Verfuegbar) { 'intern DC ~{0:N0} W' -f [math]::Round($part.P_DC) } else { 'kein eigener Messwert' })
+    $partTip = $(if ($part -and $part.Verfuegbar) { $part.Aufschluesselung } elseif ($part -and $part.Aufschluesselung) { $part.Aufschluesselung } else { 'Keine Messwerte für Teillast vorhanden.' })
     $partDcNum = $(if ($part -and $part.Verfuegbar) { [string]::Format($script:Inv, '{0:0.#}', $part.P_DC) } else { '0' })
     [void]$sb.Append(('<div class="pwr-card hit" id="pwrCardPart" data-stage="Teillast" data-dc="{0}" data-tip="{1}"><h4>Teillast (Alltag & Büro)</h4><div class="pwr-val" id="pwrValPart">{2}</div><div class="pwr-sub" id="pwrSubPart">{3}</div></div>' -f `
         $partDcNum, (ConvertTo-HtmlText $partTip), $partAc, (ConvertTo-HtmlText $partDc)))
@@ -31230,11 +31798,15 @@ function New-PowerEfficiencyHtml($Profile) {
         $gameDcNum = [string]::Format($script:Inv, '{0:0.#}', $game.P_DC)
         [void]$sb.Append(('<div class="pwr-card hit" id="pwrCardGame" data-stage="Gaming" data-dc="{0}" data-tip="{1}"><h4>Typisches Gaming</h4><div class="pwr-val" id="pwrValGame">{2}</div><div class="pwr-sub" id="pwrSubGame">{3}</div></div>' -f `
             $gameDcNum, (ConvertTo-HtmlText $gameTip), $gameAc, (ConvertTo-HtmlText $gameDc)))
+    } elseif ($game) {
+        # ab v4.11: ohne eigenen Messwert "nicht gemessen" statt eines Schätzwerts
+        $gameTip = $(if ($game.Aufschluesselung) { $game.Aufschluesselung } else { 'Keine Messwerte für typisches Spielen vorhanden.' })
+        [void]$sb.Append(('<div class="pwr-card hit" id="pwrCardGame" data-stage="Gaming" data-dc="0" data-tip="{0}"><h4>Typisches Gaming</h4><div class="pwr-val" id="pwrValGame">nicht gemessen</div><div class="pwr-sub" id="pwrSubGame">kein eigener Messwert</div></div>' -f (ConvertTo-HtmlText $gameTip)))
     }
 
     # 4. Volllast
     $load = $Profile.Volllast
-    $loadAc = $(if ($load -and $load.Verfuegbar) { '~{0:N0} W' -f [math]::Round($load.P_AC) } else { 'n/v' })
+    $loadAc = $(if ($load -and $load.Verfuegbar) { '~{0:N0} W' -f [math]::Round($load.P_AC) } else { 'nicht gemessen' })
     $loadDc = $(if ($load -and $load.Verfuegbar) { 'intern DC ~{0:N0} W' -f [math]::Round($load.P_DC) } else { 'kein Leistungssensor' })
     $loadTip = $(if ($load -and $load.Verfuegbar) { $load.Aufschluesselung } else { 'Keine Messwerte unter Volllast vorhanden.' })
     $loadDcNum = $(if ($load -and $load.Verfuegbar) { [string]::Format($script:Inv, '{0:0.#}', $load.P_DC) } else { '0' })
@@ -31242,8 +31814,9 @@ function New-PowerEfficiencyHtml($Profile) {
         $loadDcNum, (ConvertTo-HtmlText $loadTip), $loadAc, (ConvertTo-HtmlText $loadDc)))
 
     [void]$sb.Append('</div>')
-    if ($load -and $load.AufschluesselungKurz) {
-        $warnDisplay = $(if ($load.LoadPercent -gt 85) { 'display:block;' } else { 'display:none;' })
+    if ($load -and $load.Verfuegbar -and $load.AufschluesselungKurz) {
+        # ab v4.11: Warnung nur mit eingegebener Nennleistung; ändert der Leser das Feld, rechnet recalcPsuModel neu
+        $warnDisplay = $(if ($Profile.PsuEingegeben -and $load.LoadPercent -gt 85) { 'display:block;' } else { 'display:none;' })
         $warnLoad = $(if ($load.LoadPercent) { [math]::Round($load.LoadPercent) } else { 0 })
         [void]$sb.Append(('<p class="note" style="margin:10px 0 14px;"><b>Volllast-Aufschlüsselung:</b> <span id="pwrLoadBreakdown">{0}</span></p>' -f (ConvertTo-HtmlText $load.AufschluesselungKurz)))
         [void]$sb.Append(('<div id="pwrLoadWarn" style="{0}margin:-6px 0 14px;padding:8px 12px;border-radius:8px;background:var(--warn-bg);border:1px solid var(--warn);color:var(--warn);font-size:13px;font-weight:600;">⚠️ Netzteil unter Volllast zu {1} % ausgelastet. Wenig Puffer für Lastspitzen.</div>' -f $warnDisplay, $warnLoad))
@@ -31270,9 +31843,10 @@ function New-PowerEfficiencyHtml($Profile) {
     }
 
     # Stromkosten-Kalkulator
-    $pTeilNum = $(if ($part -and $part.Verfuegbar -and $part.P_AC -gt 0) { [math]::Round($part.P_AC) } else { 0 })
+    # ab v4.11: nur mit gemessenen Stufen (Leerlauf und Volllast); Teillast wird nicht gemessen
+    $pTeilNum = $(if ($idle -and $idle.Verfuegbar -and $idle.P_AC -gt 0) { [math]::Round($idle.P_AC) } else { 0 })
     $pVollNum = $(if ($load -and $load.Verfuegbar -and $load.P_AC -gt 0) { [math]::Round($load.P_AC) } else { 0 })
-    if ($pTeilNum -gt 0 -or $pVollNum -gt 0) {
+    if ($pTeilNum -gt 0 -and $pVollNum -gt 0) {
         $initKwh = [math]::Round((4 * $pTeilNum + 2 * $pVollNum) * 365 / 1000.0, 1)
         $initCost = [math]::Round($initKwh * 0.35, 2)
         [void]$sb.Append('<details open style="margin-top:14px;border:1px solid var(--line);border-radius:10px;padding:10px 16px;"><summary style="font-weight:650;color:var(--accent);cursor:pointer;">Jährliche Stromkosten-Schätzung (Verbrauchskalkulator)</summary>')
@@ -31280,12 +31854,12 @@ function New-PowerEfficiencyHtml($Profile) {
 <div class="calc-grid">
 <input type="hidden" id="calcPTeil" value="{0}">
 <input type="hidden" id="calcPVoll" value="{1}">
-<div class="calc-field"><label for="calcHTeil">Alltagsbetrieb / Büro (h/Tag):</label><input type="number" id="calcHTeil" value="4" min="0" max="24" step="0.5" oninput="recalcPowerCost()"></div>
+<div class="calc-field"><label for="calcHTeil">Leerlauf und leichte Nutzung (h/Tag):</label><input type="number" id="calcHTeil" value="4" min="0" max="24" step="0.5" oninput="recalcPowerCost()"></div>
 <div class="calc-field"><label for="calcHVoll">Volllast / Gaming (h/Tag):</label><input type="number" id="calcHVoll" value="2" min="0" max="24" step="0.5" oninput="recalcPowerCost()"></div>
 <div class="calc-field"><label for="calcPrice">Strompreis (Cent/kWh):</label><input type="number" id="calcPrice" value="35" min="1" max="150" step="1" oninput="recalcPowerCost()"></div>
 <div class="calc-res"><span>Jahresverbrauch</span><b id="calcOutKwh">{2:N0} kWh</b></div>
 <div class="calc-res"><span>Geschätzte Kosten</span><b id="calcOutCost">{3:N2} €</b></div>
-</div><p class="note" id="calcCostNote" style="margin-top:8px;">Berechnung basiert auf angenommenen 365 Tagen/Jahr mit den modellierten AC-Leistungswerten (~{0} W Teillast, ~{1} W Volllast).</p>
+</div><p class="note" id="calcCostNote" style="margin-top:8px;">Berechnung basiert auf angenommenen 365 Tagen/Jahr mit den modellierten AC-Leistungswerten (~{0} W Leerlauf, ~{1} W Volllast).</p>
 '@
         [void]$sb.Append(($calcTpl -f $pTeilNum, $pVollNum, $initKwh, $initCost))
         [void]$sb.Append(@'
@@ -31366,7 +31940,7 @@ function recalcPsuModel() {
         sEl.textContent = 'intern DC ~' + Math.round(pDc) + ' W (~' + res.etaPct.toLocaleString('de-DE') + ' % Effizienz)';
       }
     }
-    if (c.stage === 'Teillast') newAcPart = pAc;
+    if (c.stage === 'Idle') newAcPart = pAc;
     if (c.stage === 'Load') {
       newAcLoad = pAc;
       var bdEl = document.getElementById('pwrLoadBreakdown');
@@ -31394,7 +31968,7 @@ function recalcPsuModel() {
   if (elPV && newAcLoad > 0) elPV.value = newAcLoad;
   var noteEl = document.getElementById('calcCostNote');
   if (noteEl && newAcPart > 0 && newAcLoad > 0) {
-    noteEl.textContent = 'Berechnung basiert auf angenommenen 365 Tagen/Jahr mit den modellierten AC-Leistungswerten (~' + newAcPart + ' W Teillast, ~' + newAcLoad + ' W Volllast).';
+    noteEl.textContent = 'Berechnung basiert auf angenommenen 365 Tagen/Jahr mit den modellierten AC-Leistungswerten (~' + newAcPart + ' W Leerlauf, ~' + newAcLoad + ' W Volllast).';
   }
   if (typeof recalcPowerCost === 'function') recalcPowerCost();
 }
@@ -31632,8 +32206,9 @@ function New-HtmlReport {
             return [string]::Format($script:Inv, '<span class="ib{3}" title="Index {2}, 100 = typisch"><span class="ibf {0}" style="width:{1}%"></span><span class="ibm"></span></span><b>{2}</b>', $c, $w, $Index, $(if ($Small) { ' s' } else { '' }))
         }
         $refDat = ''; try { if ($script:Ref.Datum) { $refDat = ' vom ' + [datetime]::ParseExact([string]$script:Ref.Datum, 'yyyy-MM-dd', $script:Inv).ToString('dd.MM.yyyy') } } catch { $refDat = ' vom ' + $script:Ref.Datum }
+        # ab v4.11: Referenzname und Datum maskiert (Vorgabe 12)
         $refNote = $(if ($script:RefSavedNow -and -not (Test-HasReference)) { ' Dieser Lauf wurde als Referenz gespeichert; ab dem nächsten Lauf ist dieser PC 100 %.' }
-            elseif ($script:RefSavedNow) { ' Referenz 100 % = {0}{1}; dieser Lauf wurde als neue Referenz gespeichert und gilt ab dem nächsten Lauf.' -f $script:Ref.Name, $refDat } elseif (Test-HasReference) { ' Referenz 100 % = {0}{1}, Laufwerke im Vergleich zur gleichen Klasse.' -f $script:Ref.Name, $refDat } else { ' Keine Referenz festgelegt (Haken "Dieses System als Referenz festlegen" im Benchmark).' })
+            elseif ($script:RefSavedNow) { ' Referenz 100 % = {0}{1}; dieser Lauf wurde als neue Referenz gespeichert und gilt ab dem nächsten Lauf.' -f (ConvertTo-HtmlText $script:Ref.Name), (ConvertTo-HtmlText $refDat) } elseif (Test-HasReference) { ' Referenz 100 % = {0}{1}, Laufwerke im Vergleich zur gleichen Klasse.' -f (ConvertTo-HtmlText $script:Ref.Name), (ConvertTo-HtmlText $refDat) } else { ' Keine Referenz festgelegt (Haken "Dieses System als Referenz festlegen" im Benchmark).' })
         if (Get-Command 'New-RunHistoryHtml' -ErrorAction SilentlyContinue) {
             $histHtml = New-RunHistoryHtml
             if ($histHtml) { [void]$sb.Append($histHtml) }
@@ -35174,6 +35749,14 @@ function Save-DbEntry {
         Mainboard = [string]$script:Facts['Mainboard']
         WindowsInstalliert = [string]$script:Facts['Windows installiert']
     }
+    # ab v4.11: optionale Felder für "Seit dem letzten Lauf" (Format bleibt PC-Diagnose-DB/2). Quelle sind die Angaben, die
+    # Diagnose und Benchmark ohnehin erheben: "Betriebssystem" = "... (Build 26100.1234)", "BIOS/UEFI" = "<Version> vom <Datum>".
+    # Ohne diese Angaben (z. B. Lauf nur mit Lasttest) fehlen die Felder; keine zusätzliche WMI-Abfrage.
+    $winBuild = $(if ([string]$script:Facts['Betriebssystem'] -match 'Build\s+(\d+)') { $Matches[1] } else { '' })
+    if ($winBuild) { $hw['WinBuild'] = $winBuild }
+    $biosText = ([string]$script:Facts['BIOS/UEFI']).Trim()
+    $biosVer = $(if ($biosText -match '^(.+?)\s+vom\s') { $Matches[1].Trim() } else { $biosText })
+    if ($biosVer) { $hw['BiosVersion'] = $biosVer }
     if (Get-Command 'Get-SystemPowerProfile' -ErrorAction SilentlyContinue) {
         $pProfile = Get-SystemPowerProfile
         if ($pProfile -and $script:SensorDb) { $script:SensorDb['Verbrauch'] = $pProfile }
@@ -35349,15 +35932,28 @@ function Import-RunFromDirWithJson([string]$SourceDir, [string]$DbJsonPath, [str
         }
 
         $stamp = $(if ($datum -match '^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})') { '{0}{1}{2}_{3}{4}00' -f $Matches[1], $Matches[2], $Matches[3], $Matches[4], $Matches[5] } else { Get-Date -Format 'yyyyMMdd_HHmmss' })
-        $folderLeaf = $(
-            if ($o.Ordner) { Split-Path ([string]$o.Ordner).TrimEnd('\', '/') -Leaf }
-            elseif ($PreferredName) { $PreferredName }
-            else { '{0}_{1}' -f (Get-SafeName $computer), $stamp }
-        )
-        $destReportDir = Join-Path (Join-Path $script:DataDir 'Berichte') $folderLeaf
-        if (-not (Test-Path -LiteralPath $destReportDir)) {
-            New-Item -ItemType Directory -Path $destReportDir -Force | Out-Null
+        # ab v4.11: Der Ordnername kommt aus der fremden Datenbank.json und wird bereinigt (Get-AblageName: keine Trenn-
+        # oder Sonderzeichen, "." und ".." werden leer). Leere Namen fallen auf den nächsten Vorschlag zurück. Das Ziel muss
+        # unterhalb von Berichte liegen, ein vorhandener Ordner wird nie überschrieben (freier Name, Vorgabe 14).
+        # Bis v4.10 ergab "Berichte\.." den Datenordner selbst, Copy-Item -Force überschrieb dort Netzwerk.json und Referenz.json.
+        $folderLeaf = ''
+        # letzter Pfadteil als Text, nicht mit Split-Path: Das löst ".." gegen den aktuellen Ordner auf
+        $ordnerLeaf = @(([string]$o.Ordner).TrimEnd('\', '/') -split '[\\/]')[-1]
+        foreach ($kand in @($ordnerLeaf, $PreferredName, ('{0}_{1}' -f $computer, $stamp))) {
+            $folderLeaf = Get-AblageName ([string]$kand)
+            if ($folderLeaf -and $folderLeaf -ne '.' -and $folderLeaf -ne '..') { break }
+            $folderLeaf = ''
         }
+        if (-not $folderLeaf) { return ('{0}: Import fehlgeschlagen: kein gültiger Ordnername für den Bericht.' -f $OriginalName) }
+        $berichte = Join-Path $script:DataDir 'Berichte'
+        if (-not (Test-Path -LiteralPath $berichte)) { New-Item -ItemType Directory -Path $berichte -Force | Out-Null }
+        $folderLeaf = Get-FreierName $berichte $folderLeaf ''
+        $destReportDir = Join-Path $berichte $folderLeaf
+        $basis = [IO.Path]::GetFullPath($berichte).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+        if (-not [IO.Path]::GetFullPath($destReportDir).TrimEnd('\', '/').StartsWith($basis, [StringComparison]::OrdinalIgnoreCase)) {
+            return ('{0}: Import fehlgeschlagen: Ordner {1} läge außerhalb von Berichte.' -f $OriginalName, $folderLeaf)
+        }
+        New-Item -ItemType Directory -Path $destReportDir -Force -ErrorAction Stop | Out-Null
         foreach ($f in @(Get-ChildItem -LiteralPath $SourceDir -File -Force -ErrorAction SilentlyContinue)) {
             if ($f.Name -ieq 'Datenbank.json' -or $f.Extension -ieq '.minibench') { continue }
             Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $destReportDir $f.Name) -Force
@@ -36382,10 +36978,12 @@ function Find-Smartctl {
 function Uninstall-Smartmontools {
     $done = $false
     # 1. NSIS-Uninstaller direkt und strikt lautlos mit /S aufrufen (verhindert interaktive Abfrage-Popups)
-    $candidates = @(
+    # ab v4.11: Treffer mit äußerem @() einsammeln; bei genau einem Treffer war $candidates sonst ein Text und
+    # $candidates[0] nur sein erstes Zeichen ("C"), der Deinstaller lief nie
+    $candidates = @(@(
         "$env:ProgramFiles\smartmontools\uninstall.exe",
         "${env:ProgramFiles(x86)}\smartmontools\uninstall.exe"
-    ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+    ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) })
     if ($candidates.Count -gt 0) {
         $uninst = $candidates[0]
         $r = Invoke-External -File $uninst -Arguments '/S' -TimeoutSec 120 -Progress 'smartmontools wird deinstalliert'
@@ -36394,7 +36992,7 @@ function Uninstall-Smartmontools {
         }
     }
     # 2. Absicherung über winget (falls vorhanden und nötig)
-    $stillThere = @("$env:ProgramFiles\smartmontools\bin\smartctl.exe", "${env:ProgramFiles(x86)}\smartmontools\bin\smartctl.exe") | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+    $stillThere = @(@("$env:ProgramFiles\smartmontools\bin\smartctl.exe", "${env:ProgramFiles(x86)}\smartmontools\bin\smartctl.exe") | Where-Object { $_ -and (Test-Path -LiteralPath $_) })
     if ($stillThere.Count -gt 0) {
         $wg = Get-Command winget.exe -ErrorAction SilentlyContinue
         if (-not $wg) {
@@ -36406,7 +37004,7 @@ function Uninstall-Smartmontools {
             if ($u.ExitCode -eq 0) { $done = $true }
         }
     }
-    $stillThereAfter = @("$env:ProgramFiles\smartmontools\bin\smartctl.exe", "${env:ProgramFiles(x86)}\smartmontools\bin\smartctl.exe") | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+    $stillThereAfter = @(@("$env:ProgramFiles\smartmontools\bin\smartctl.exe", "${env:ProgramFiles(x86)}\smartmontools\bin\smartctl.exe") | Where-Object { $_ -and (Test-Path -LiteralPath $_) })
     return ($stillThereAfter.Count -eq 0)
 }
 #endregion
@@ -37373,7 +37971,9 @@ function Open-SensorSession([switch]$Treiber, [switch]$OhneDatentraeger) {
             $s.Treiber = ('PawnIO {0} (von Leos Minibench behalten, wird am Ende entfernt)' -f $pw.Version); $s.TreiberOk = $true
         }
         elseif ($pw.Installiert) { $s.Treiber = ('PawnIO {0} ({1})' -f $pw.Version, $(if (Test-KeptTool 'PawnIO') { 'auf Wunsch behalten' } else { 'bereits vorhanden' })); $s.TreiberOk = $true }
-        elseif ($Treiber -or $isAdmin) {
+        # ab v4.11: nur mit -SensorTreiber (Rückfrage in der Oberfläche). Bis v4.10 genügten Administratorrechte, und
+        # die Arbeitsprozesse laufen immer als Administrator: PawnIO kam auch nach der Antwort "nein" auf den PC.
+        elseif ($Treiber) {
             $r = Install-PawnIoTemporary
             $s.Treiber = $r.Text; $s.TreiberOk = $r.Ok
             if (-not $r.Ok) { $s.Hinweise.Add($r.Text) }
@@ -41013,8 +41613,9 @@ if ($script:Opt['Netzwerk']) {
 if ($script:Opt['RamTest']) {
     Invoke-Section 'Test: Arbeitsspeicher (Mustertest)' -Skippable {
         if (-not $TypesLoaded) { Add-Line '  Übersprungen: C#-Testroutinen nicht verfügbar (Constrained Language Mode / AppLocker).'; return }
-        $os = Get-CimCached Win32_OperatingSystem | Select-Object -First 1
-        $free = [long]$os.FreePhysicalMemory * 1KB
+        # ab v4.11: freier RAM frisch abgefragt (nicht der Stand vom Laufbeginn)
+        $free = Get-FreeRamBytes
+        if ($free -le 0) { Add-Line '  Übersprungen: freier Arbeitsspeicher nicht abfragbar.'; return }
         $rawTarget = [long]($free * $RamTestPercent / 100)
         if (-not [Environment]::Is64BitProcess) { $rawTarget = [math]::Min($rawTarget, 1024MB) }
         $target = [long]([math]::Floor([double]$rawTarget / 256MB) * 256MB)
@@ -41093,6 +41694,9 @@ Invoke-Section 'Energie' -Skippable {
         if ($pProf.Volllast -and $pProf.Volllast.Verfuegbar) {
             Add-Line ('  Volllast (Peak)   : {0}' -f $pProf.Volllast.AufschluesselungKurz)
         }
+        # ab v4.11 (Vorgabe 11): Stufen ohne eigenen Messwert benennen statt schätzen
+        $ohne = @(@(@('Leerlauf', $pProf.Leerlauf), @('Teillast', $pProf.Teillast), @('Gaming', $pProf.Gaming)) | Where-Object { $_[1] -and -not $_[1].Verfuegbar } | ForEach-Object { $_[0] })
+        if ($ohne.Count) { Add-Line ('  Nicht gemessen    : {0}' -f ($ohne -join ', ')) }
     }
 }
 
@@ -41522,6 +42126,73 @@ function Get-NvmeGenFromSpeed([double]$ReadMBs) {
     return 3
 }
 
+# ab v4.11: Hybrid-CPU (Leistungs- und Effizienzkerne) für die erwartete Mehrkern-Skalierung. Bevorzugt aus den echten
+# Kerntypen (GetLogicalProcessorInformationEx, EfficiencyClass je Kern), sonst aus dem Namen. Bis v4.10 nur per Name:
+# i5-1335U, i7-1255U und i7-1360P galten als nicht hybrid, i5-12400 als hybrid. Die Messwerte selbst ändern sich nicht.
+$script:CpuKernklassen = $null
+function Get-CpuKernklassen {
+    if ($null -ne $script:CpuKernklassen) { return $script:CpuKernklassen }
+    $res = @()
+    try {
+        if (-not ('LmbKernTypen' -as [type])) {
+            Add-Type -ErrorAction Stop -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+public static class LmbKernTypen {
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool GetLogicalProcessorInformationEx(int relation, IntPtr buffer, ref uint length);
+    // EfficiencyClass je physischem Kern (RelationProcessorCore = 0; Flags an Byte 8, EfficiencyClass an Byte 9)
+    public static int[] Klassen() {
+        uint len = 0;
+        GetLogicalProcessorInformationEx(0, IntPtr.Zero, ref len);
+        if (len == 0) return new int[0];
+        IntPtr buf = Marshal.AllocHGlobal((int)len);
+        try {
+            if (!GetLogicalProcessorInformationEx(0, buf, ref len)) return new int[0];
+            List<int> l = new List<int>();
+            long off = 0;
+            while (off < len) {
+                IntPtr p = new IntPtr(buf.ToInt64() + off);
+                int rel = Marshal.ReadInt32(p);
+                int size = Marshal.ReadInt32(p, 4);
+                if (size <= 0) break;
+                if (rel == 0) l.Add(Marshal.ReadByte(p, 9));
+                off += size;
+            }
+            return l.ToArray();
+        } finally { Marshal.FreeHGlobal(buf); }
+    }
+}
+'@
+        }
+        $res = @([LmbKernTypen]::Klassen())
+    } catch { $res = @() }
+    $script:CpuKernklassen = $res
+    return $res
+}
+function Test-CpuHybridName([string]$Name) {
+    $n = (([string]$Name) -replace '\(TM\)|\(R\)|®|™', '') -replace '\s+', ' '
+    if ($n -match '(?i)\bCore Ultra [3579]\b') { return $true }
+    if ($n -match '(?i)\bCore [3579] \d{3}([A-Z]*)\b') { return ($Matches[1] -match '(?i)[UHP]') }
+    if ($n -match '(?i)\bi[357]-L1\d') { return $true }
+    # fünfstellig: 12. bis 14. Generation; Notebook (H, U, P) immer hybrid, Desktop 12. Generation ab 12600K, 13./14. ab x3400
+    if ($n -match '(?i)\bi[3579]-(1[234])(\d)\d\d([A-Z]*)\b') {
+        $gen = [int]$Matches[1]; $tier = [int]$Matches[2]; $suf = [string]$Matches[3]
+        if ($suf -match '(?i)[HUP]') { return $true }
+        if ($gen -eq 12) { return ($tier -ge 7 -or ($tier -eq 6 -and $suf -match '(?i)K')) }
+        return ($tier -ge 4)
+    }
+    # vierstellig: Notebook-Prozessoren der 12. und 13. Generation (i3-1215U, i7-1255U, i5-1335U, i7-1360P)
+    if ($n -match '(?i)\bi[3579]-1[23]\d\d[A-Z]*\b') { return $true }
+    return $false
+}
+function Get-CpuHybrid([string]$Name) {
+    $k = @(Get-CpuKernklassen)
+    if ($k.Count) { return [pscustomobject]@{ Hybrid = (@($k | Select-Object -Unique).Count -gt 1); Quelle = 'Kerntypen' } }
+    return [pscustomobject]@{ Hybrid = (Test-CpuHybridName $Name); Quelle = 'Name' }
+}
+
 # Kurzergebnis am Ende eines Messabschnitts (ab v2.8): Bis v2.7 blieben Arbeitsspeicher und Datenträger im Textbericht leer,
 # weil die Tabellen erst in der Auswertung stehen.
 function Add-BenchHeadLine([string]$Gruppe) {
@@ -41580,7 +42251,7 @@ if ($script:BenchSel['CPU']) {
             $mt = [double]$tMT.Result
             $ptsST = [math]::Round($st / 3); $ptsMT = [math]::Round($mt / 3)
             $scal = $(if ($st -gt 0) { $mt / $st } else { 0 })
-            $hybrid = $cpuName -match 'Core\(TM\) Ultra|Core\(TM\) i[3579]-1[2-4]\d{3}|Core\(TM\) [3579] '
+            $hybrid = (Get-CpuHybrid $cpuName).Hybrid
             $smt = [math]::Max(0, $threads - $cores)
             # Die Rechenlast profitiert stark von SMT/Hyper-Threading (gemessen: 6 Kerne/12 Threads skalieren ca. 12x)
             $expScal = $(if ($hybrid) { $cores * 0.8 + $smt * 0.9 } else { $cores + $smt * 0.9 })
@@ -42121,8 +42792,8 @@ if ($ModLast -and (Test-StepEnabled 'Last:alle')) {
             # RAM-Test eine Stufe unter normal und mit CPU-Last nur auf einem Teil der Kerne: sonst nimmt er dem
             # Grafiktreiber und der CPU-Last die Rechenzeit, Bilder/s und Auslastung schwanken stark (Praxistest 02.10.)
             $ramMax = $(if ($end.ContainsKey('CPU')) { [math]::Max(2, [int][math]::Floor($threads / 4)) } else { 0 })
-            $os = Get-CimCached Win32_OperatingSystem | Select-Object -First 1
-            $ramTarget = [long]([double]$os.FreePhysicalMemory * 1KB * $LastRamProzent / 100)
+            # ab v4.11: freier RAM frisch abgefragt (nicht der Stand vom Laufbeginn)
+            $ramTarget = [long]([double](Get-FreeRamBytes) * $LastRamProzent / 100)
             if (-not [Environment]::Is64BitProcess) { $ramTarget = [math]::Min($ramTarget, 1.2GB) }
             $ramTask = Start-LoadJob 'ram' ([int]($plan.RAM * 60) + 60) $threads $ramTarget $ramMax -Low
             Add-Line ('    Arbeitsspeicher: {0} Min., Mustertest über {1} ({2} % des freien RAM){3}' -f $plan.RAM, (Format-Size $ramTarget), $LastRamProzent, $(if ($ramTask.External) { ', eigener Prozess' } elseif ($ramTask.Note) { ', ' + $ramTask.Note } else { '' }))
@@ -42512,6 +43183,396 @@ function Invoke-DismJob([string]$Mode, [int]$ExpectedSec) {
     return [pscustomobject]@{ State = $(if ($r) { [string]@($r)[0].ImageHealthState } else { '' }); Restart = $(if ($r) { [bool]@($r)[0].RestartNeeded } else { $false }); Error = $err }
 }
 
+# ab v4.11: Schritte, die vor dem Wiederherstellungspunkt laufen. "Alte Wiederherstellungspunkte löschen" löschte bis
+# v4.10 zuletzt auch den eben angelegten Punkt des Laufs.
+$script:RepVorPunkt = @('Wiederherstellungspunkte')
+$script:RepPunktMarke = '@Wiederherstellungspunkt'
+
+# Ausführungsplan: Schritte aus $script:RepVorPunkt, dann der Wiederherstellungspunkt (Marke), dann die übrigen in
+# Vertragsreihenfolge
+function Get-WartungPlan([string[]]$Order, [string[]]$Sel, [bool]$MitPunkt) {
+    $vor = @($Order | Where-Object { $Sel -contains $_ -and $script:RepVorPunkt -contains $_ })
+    $nach = @($Order | Where-Object { $Sel -contains $_ -and $script:RepVorPunkt -notcontains $_ })
+    $plan = New-Object System.Collections.Generic.List[string]
+    foreach ($x in $vor) { $plan.Add([string]$x) }
+    if ($MitPunkt) { $plan.Add($script:RepPunktMarke) }
+    foreach ($x in $nach) { $plan.Add([string]$x) }
+    return $plan.ToArray()
+}
+
+# Weg zurück für Eingriffe ohne eigenes Rückgängig (ab v4.11)
+function Get-WartungRueckweg {
+    if ($script:RestorePointNo) { return ('rstrui.exe starten und Wiederherstellungspunkt Nr. {0} wählen' -f $script:RestorePointNo) }
+    return 'nicht umkehrbar (in diesem Lauf wurde kein Wiederherstellungspunkt angelegt)'
+}
+
+# ab v4.11 (Vorgabe 3): Hinweis im Änderungsprotokoll für Schritte ohne automatisches Rückgängig
+function Add-WartungHinweis([string]$Key, [string]$Art, [string]$Ziel, [string]$Nachher, [string]$Gegenbefehl, $Daten = $null) {
+    $risk = $(if ($script:RepRisk -and $script:RepRisk.ContainsKey($Key)) { [string]$script:RepRisk[$Key] } else { 'Eingriff' })
+    $ttl = $(if ($script:RepTitles -and $script:RepTitles.Contains($Key)) { [string]$script:RepTitles[$Key] } else { $Key })
+    return (Add-ChangeRecord -Modul 'Wartung' -Schritt $Key -Titel $ttl -Risiko $risk -Art $Art -Ziel $Ziel -Nachher $Nachher -Daten $Daten -Gegenbefehl $Gegenbefehl -NurHinweis)
+}
+
+# ab v4.11: Wiederherstellungspunkt der Wartung. Computerschutz über Enable-ComputerschutzMitProtokoll (Kern\Aenderungen.ps1,
+# mit Vorher-Zustand und Gegenbefehl). Die Nummer gilt nur, wenn Windows den Punkt mit dieser Beschreibung wirklich angelegt hat.
+function New-WartungRestorePoint {
+    $script:RestorePointNo = ''
+    $rk = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore'
+    $desc = ('Leos Minibench vor Reparatur {0:dd.MM.yyyy HH:mm}' -f (Get-Date))
+    $old = $null; try { $old = (Get-ItemProperty $rk -Name SystemRestorePointCreationFrequency -ErrorAction Stop).SystemRestorePointCreationFrequency } catch { }
+    try {
+        Show-Sub 'Wiederherstellungspunkt' 'wird angelegt' -1
+        if (Get-Command Enable-ComputerschutzMitProtokoll -ErrorAction SilentlyContinue) { [void](Enable-ComputerschutzMitProtokoll -Laufwerk "$env:SystemDrive\") }
+        else { try { Enable-ComputerRestore -Drive ($env:SystemDrive + '\') -ErrorAction Stop } catch { } }
+        if (-not (Test-Path $rk)) { New-Item -Path $rk -Force | Out-Null }
+        Set-ItemProperty -Path $rk -Name SystemRestorePointCreationFrequency -Value 0 -Type DWord -ErrorAction SilentlyContinue
+        Checkpoint-Computer -Description $desc -RestorePointType MODIFY_SETTINGS -ErrorAction Stop
+        $rp = Get-RestorePointByDescription $desc
+        if (-not $rp) { throw 'Windows hat keinen neuen Wiederherstellungspunkt angelegt' }
+        $script:RestorePointNo = [string]$rp.SequenceNumber
+        $txt = ('angelegt: {0} (Nr. {1})' -f $rp.Description, $rp.SequenceNumber)
+        Add-Line ('  Wiederherstellungspunkt {0}' -f $txt)
+        # Weg zurück für alle Eingriffe dieses Laufs; erscheint auf der Seite Änderungen als Hinweis
+        [void](Add-ChangeRecord -Modul 'Reparatur' -Schritt 'Wiederherstellungspunkt' -Titel 'Wiederherstellungspunkt vor den Reparaturen' -Risiko 'Lesen' -Art 'Wiederherstellungspunkt' `
+            -Ziel 'Computerschutz' -Nachher $txt -Daten ([ordered]@{ Nummer = $script:RestorePointNo }) -Gegenbefehl ('rstrui.exe starten und Punkt Nr. {0} wählen; macht die Eingriffe dieses Laufs rückgängig' -f $script:RestorePointNo) -NurHinweis)
+        $script:RepairLog.Add([pscustomobject]@{ Reparatur = 'Wiederherstellungspunkt'; Ergebnis = 'OK'; Details = $txt })
+        Add-TestResult 'Reparatur: Wiederherstellungspunkt' 'OK' $txt
+    } catch {
+        $script:RestorePointNo = ''
+        Add-Line ('  Wiederherstellungspunkt konnte nicht angelegt werden: {0}' -f $_.Exception.Message)
+        $script:RepairLog.Add([pscustomobject]@{ Reparatur = 'Wiederherstellungspunkt'; Ergebnis = 'Warnung'; Details = $_.Exception.Message })
+        Add-TestResult 'Reparatur: Wiederherstellungspunkt' 'Warnung' $_.Exception.Message
+        Add-Finding WARNUNG 'Reparatur' ('Vor den Reparaturen konnte kein Wiederherstellungspunkt angelegt werden ({0}). Computerschutz für Laufwerk {1} prüfen.' -f $_.Exception.Message, $env:SystemDrive)
+    } finally {
+        if ($null -ne $old) { Set-ItemProperty -Path $rk -Name SystemRestorePointCreationFrequency -Value $old -Type DWord -ErrorAction SilentlyContinue }
+        else { Remove-ItemProperty -Path $rk -Name SystemRestorePointCreationFrequency -ErrorAction SilentlyContinue }
+        Hide-Sub
+    }
+}
+
+# ab v4.11 (E2): IP-Konfiguration vor "Netzwerk zurücksetzen" sichern. netsh interface ip dump schreibt ein Skript, das
+# netsh -f wieder einspielt (feste Adressen, DNS-Server); dazu die Konfiguration als Text zum Nachlesen.
+function Save-WartungNetzwerkSicherung {
+    if (-not $script:ChangeLog) { Start-ChangeLog }
+    $dir = Get-ChangeFilesDir
+    if (-not $dir) { throw 'Kein Datenordner für die Sicherung der Netzwerkkonfiguration.' }
+    New-Item -ItemType Directory -Path $dir -Force -ErrorAction Stop | Out-Null
+    $r = Invoke-External -File 'netsh.exe' -Arguments 'interface ip dump' -TimeoutSec 120
+    if ($r.ExitCode -ne 0 -or -not ([string]$r.Output).Trim()) { throw ('netsh interface ip dump meldet {0}' -f $r.ExitCode) }
+    $f = Join-Path $dir 'Netzwerk_ip_dump.txt'
+    [IO.File]::WriteAllText($f, [string]$r.Output, [Text.Encoding]::Default)
+    $t = Join-Path $dir 'Netzwerk_Konfiguration.txt'
+    $txt = ''
+    try { $txt += (Get-NetIPConfiguration -Detailed -ErrorAction Stop | Out-String -Width 200) } catch { }
+    try { $txt += (Get-DnsClientServerAddress -ErrorAction Stop | Format-Table -AutoSize InterfaceAlias, InterfaceIndex, AddressFamily, ServerAddresses | Out-String -Width 200) } catch { }
+    if ($txt) { [IO.File]::WriteAllText($t, $txt, (New-Object Text.UTF8Encoding($true))) } else { $t = '' }
+    return [pscustomobject]@{ Datei = $f; Text = $t }
+}
+
+# ab v4.11 (E3, E4): Shader-Caches im Profil des angemeldeten Benutzers; von AMD nur die Cache-Unterordner
+function Get-WartungShaderCachePfade($User) {
+    $l = @('%LOCALAPPDATA%\NVIDIA\DXCache', '%LOCALAPPDATA%\NVIDIA\GLCache', '%USERPROFILE%\AppData\LocalLow\Intel\ShaderCache')
+    foreach ($b in '%LOCALAPPDATA%\AMD', '%USERPROFILE%\AppData\LocalLow\AMD') { foreach ($c in 'DxCache', 'DxcCache', 'GLCache', 'VkCache') { $l += ('{0}\{1}' -f $b, $c) } }
+    return @($l | ForEach-Object { Expand-OptPath $_ $User })
+}
+
+# Ein Schritt der Wartung (ab v4.11 eigene Funktion, damit Tests ihn mit Attrappen ausführen können)
+function Invoke-WartungSchritt([string]$k) {
+    switch ($k) {
+        'DismRestore' {
+            Write-Step 'DISM ScanHealth läuft (5 bis 20 Minuten) ...'
+            $scan = Invoke-DismJob 'ScanHealth' 600
+            if ($scan.Error) { Add-Line ('  ScanHealth fehlgeschlagen: {0}' -f $scan.Error); Add-RepairResult $k 'Fehler' ('ScanHealth fehlgeschlagen: ' + $scan.Error); break }
+            Add-Line ('  Zustand vor der Reparatur: {0}' -f $scan.State)
+            if ($scan.State -eq 'Healthy') { Add-RepairResult $k 'OK' 'Komponentenspeicher intakt, keine Reparatur nötig'; break }
+            if ($scan.State -eq 'NonRepairable') {
+                Add-RepairResult $k 'Fehler' 'Komponentenspeicher nicht reparierbar'
+                Add-Finding KRITISCH 'Systemdateien' 'Der Komponentenspeicher ist nicht reparierbar. Abhilfe: Inplace-Upgrade mit dem Windows-Installationsmedium (setup.exe, Dateien und Apps behalten).'
+                break
+            }
+            Write-Step 'DISM RestoreHealth läuft (10 bis 30 Minuten, lädt Dateien über Windows Update) ...'
+            $rh = Invoke-DismJob 'RestoreHealth' 1200
+            if ($rh.Error) {
+                Add-Line ('  RestoreHealth fehlgeschlagen: {0}' -f $rh.Error)
+                $hint = $(if ($rh.Error -match '0x800f081f|0x800f0906|0x800f0907|Quelldateien|source files') { ' Die Reparaturquelle fehlt: Windows-ISO einbinden und DISM /Online /Cleanup-Image /RestoreHealth /Source:WIM:X:\sources\install.wim:1 /LimitAccess ausführen.' } else { '' })
+                Add-RepairResult $k 'Fehler' ('RestoreHealth fehlgeschlagen: ' + $rh.Error)
+                Add-Finding KRITISCH 'Systemdateien' ('DISM RestoreHealth konnte den Komponentenspeicher nicht reparieren ({0}).{1}' -f $rh.Error, $hint)
+                break
+            }
+            Add-Line ('  Zustand nach der Reparatur: {0}' -f $rh.State)
+            [void](Add-WartungHinweis $k 'Wartung' 'Komponentenspeicher (DISM RestoreHealth)' ('repariert, Zustand ' + $rh.State) (Get-WartungRueckweg))
+            if ($rh.State -eq 'Healthy') { Add-RepairResult $k 'Repariert' 'Komponentenspeicher repariert' -Restart:$rh.Restart; Add-Finding INFO 'Systemdateien' 'Der Komponentenspeicher war beschädigt und wurde mit DISM repariert.' }
+            else { Add-RepairResult $k 'Fehler' ('Zustand nach RestoreHealth: ' + $rh.State); Add-Finding KRITISCH 'Systemdateien' ('Komponentenspeicher nach der Reparatur weiterhin {0}. Abhilfe: Inplace-Upgrade mit dem Windows-Installationsmedium.' -f $rh.State) }
+        }
+        'Sfc' {
+            Write-Step 'sfc /scannow läuft (5 bis 20 Minuten) ...'
+            $t0 = Get-Date
+            $sfc = Invoke-External -File "$env:windir\System32\sfc.exe" -Arguments '/scannow' -TimeoutSec 5400 -Encoding ([Text.Encoding]::Unicode) -Progress 'Systemdateien reparieren (sfc /scannow)' -ExpectedSec 900
+            (Get-OutLines $sfc) | ForEach-Object { Add-Line ('  ' + $_) }
+            $cbs = Get-CbsEntries $t0
+            if ($cbs.Cannot.Count) { Add-Line ('  CBS.log: {0} nicht reparierbare Dateien, z. B. {1}' -f $cbs.Cannot.Count, (($cbs.Files | Select-Object -First 5) -join ', ')) }
+            $o = $sfc.Output
+            if ($o -match 'erfolgreich repariert|successfully repaired' -or $cbs.Cannot.Count -or $o -match 'konnte einige|nicht reparieren|unable to fix') { [void](Add-WartungHinweis $k 'Wartung' 'Systemdateien (sfc /scannow)' 'beschädigte Dateien ersetzt oder Reparatur versucht' (Get-WartungRueckweg)) }
+            if ($o -match 'keine Integritätsverletzungen|did not find any integrity violations') { Add-RepairResult $k 'OK' 'keine Integritätsverletzungen' }
+            elseif ($cbs.Cannot.Count -or $o -match 'konnte einige|nicht reparieren|unable to fix') {
+                Add-RepairResult $k 'Fehler' ('{0} Dateien nicht reparierbar' -f [math]::Max(1, $cbs.Cannot.Count))
+                Add-Finding KRITISCH 'Systemdateien' 'SFC konnte nicht alle beschädigten Dateien reparieren. Zuerst DISM RestoreHealth ausführen, danach sfc /scannow wiederholen. Hilft das nicht: Inplace-Upgrade mit dem Windows-Installationsmedium.'
+            }
+            elseif ($o -match 'erfolgreich repariert|successfully repaired') { Add-RepairResult $k 'Repariert' 'beschädigte Dateien repariert' -Restart; Add-Finding INFO 'Systemdateien' 'SFC hat beschädigte Systemdateien gefunden und repariert. Ein Neustart schließt die Reparatur ab.' }
+            elseif ($sfc.TimedOut) { Add-RepairResult $k 'Warnung' 'Zeitlimit überschritten' }
+            else { Add-RepairResult $k 'Info' ('Rückgabecode {0}, Ausgabe siehe Bericht' -f $sfc.ExitCode) }
+        }
+        'Komponentenbereinigung' {
+            $sysVol = Get-Volume -DriveLetter $env:SystemDrive.Substring(0, 1) -ErrorAction SilentlyContinue
+            $before = [double]$sysVol.SizeRemaining
+            Write-Step 'DISM StartComponentCleanup läuft (5 bis 30 Minuten) ...'
+            $r = Invoke-External -File "$env:windir\System32\dism.exe" -Arguments '/Online /Cleanup-Image /StartComponentCleanup /NoRestart' -TimeoutSec 5400 -Progress 'Komponentenspeicher bereinigen' -ExpectedSec 900
+            (Get-OutLines $r 4) | ForEach-Object { Add-Line ('  ' + $_) }
+            $after = [double](Get-Volume -DriveLetter $env:SystemDrive.Substring(0, 1) -ErrorAction SilentlyContinue).SizeRemaining
+            $gain = $after - $before
+            [void](Add-WartungHinweis $k 'Bereinigung' 'Komponentenspeicher (DISM StartComponentCleanup)' $(if ($r.ExitCode -eq 0) { 'bereinigt' } else { 'Fehler ' + $r.ExitCode }) 'nicht umkehrbar (ersetzte Komponenten entfernt, ältere Updates lassen sich danach nicht mehr deinstallieren)')
+            if ($r.ExitCode -eq 0) { Add-RepairResult $k 'OK' ('abgeschlossen, Speicherplatz auf {0} {1}' -f $env:SystemDrive, $(if ($gain -gt 50MB) { 'um ' + (Format-Size $gain) + ' vergrößert' } else { 'kaum verändert' })) }
+            else { Add-RepairResult $k 'Warnung' ('DISM-Rückgabecode {0}' -f $r.ExitCode) }
+        }
+        'Dateisystem' {
+            $res = New-Object System.Collections.ArrayList; $restart = $false; $fixed = $false; $bad = $false
+            foreach ($v in @(Get-Volume -ErrorAction SilentlyContinue | Where-Object { $_.DriveLetter -and $_.DriveType -eq 'Fixed' -and $_.FileSystem -in 'NTFS', 'ReFS' } | Sort-Object DriveLetter)) {
+                $dl = [string]$v.DriveLetter
+                Show-Sub ('Dateisystem Laufwerk {0}:' -f $dl) 'Onlinescan' -1
+                try { $scan = "$(Repair-Volume -DriveLetter $dl -Scan -ErrorAction Stop)" } catch { [void]$res.Add(('{0}: Scan fehlgeschlagen ({1})' -f $dl, $_.Exception.Message)); $bad = $true; continue }
+                if ($scan -eq 'NoErrorsFound') { [void]$res.Add(('{0}: ok' -f $dl)); continue }
+                if (('{0}:' -f $dl) -eq $env:SystemDrive) {
+                    $r = Invoke-External -File 'fsutil.exe' -Arguments ('dirty set {0}:' -f $dl)
+                    [void](Add-WartungHinweis $k 'Dateisystem' ('Laufwerk {0}: als fehlerhaft markiert (fsutil dirty set)' -f $dl) 'chkdsk beim nächsten Neustart' 'nicht umkehrbar: Die Markierung lässt sich nicht zurücknehmen, chkdsk prüft beim nächsten Start einmal und entfernt sie')
+                    [void]$res.Add(('{0}: {1}, Reparatur (chkdsk) beim nächsten Neustart eingeplant' -f $dl, $scan)); $restart = $true
+                } else {
+                    Show-Sub ('Dateisystem Laufwerk {0}:' -f $dl) 'SpotFix' -1
+                    try { $fx = "$(Repair-Volume -DriveLetter $dl -SpotFix -ErrorAction Stop)"; [void]$res.Add(('{0}: {1}, SpotFix: {2}' -f $dl, $scan, $fx)); $fixed = $true; [void](Add-WartungHinweis $k 'Dateisystem' ('Laufwerk {0}: (Repair-Volume -SpotFix)' -f $dl) $fx 'nicht umkehrbar (Reparatur des Dateisystems)') }
+                    catch { [void]$res.Add(('{0}: {1}, SpotFix fehlgeschlagen ({2})' -f $dl, $scan, $_.Exception.Message)); $bad = $true }
+                }
+            }
+            Hide-Sub
+            $res | ForEach-Object { Add-Line ('  ' + $_) }
+            $st = $(if ($bad) { 'Warnung' } elseif ($restart) { 'Neustart' } elseif ($fixed) { 'Repariert' } else { 'OK' })
+            Add-RepairResult $k $st ($res -join '; ') -Restart:$restart
+        }
+        'WindowsUpdate' {
+            $svcs = 'wuauserv', 'bits', 'cryptsvc', 'msiserver'
+            $was = @{}
+            foreach ($s in $svcs) { $sv = Get-Service $s -ErrorAction SilentlyContinue; if ($sv) { $was[$s] = [string]$sv.Status; Stop-Service $s -Force -ErrorAction SilentlyContinue } }
+            $sw = [Diagnostics.Stopwatch]::StartNew()
+            while ($sw.Elapsed.TotalSeconds -lt 40 -and @($svcs | Where-Object { (Get-Service $_ -ErrorAction SilentlyContinue).Status -eq 'Running' }).Count) { Show-Sub 'Windows Update zurücksetzen' 'Dienste werden beendet' -1; Start-Sleep -Milliseconds 500 }
+            $ts = Get-Date -Format 'yyyyMMdd_HHmmss'; $msgs = @(); $err = $false
+            foreach ($d in @("$env:windir\SoftwareDistribution", "$env:windir\System32\catroot2")) {
+                if (-not (Test-Path $d)) { continue }
+                $new = '{0}.bak_{1}' -f (Split-Path $d -Leaf), $ts
+                try { Rename-Item -LiteralPath $d -NewName $new -ErrorAction Stop; $msgs += ('{0} umbenannt in {1}' -f (Split-Path $d -Leaf), $new) }
+                catch { $msgs += ('{0} nicht umbenennbar: {1}' -f (Split-Path $d -Leaf), $_.Exception.Message); $err = $true }
+            }
+            foreach ($s in 'cryptsvc', 'bits', 'wuauserv') { Start-Service $s -ErrorAction SilentlyContinue }
+            foreach ($s in $was.Keys) { if ($was[$s] -eq 'Running') { Start-Service $s -ErrorAction SilentlyContinue } }
+            Hide-Sub
+            $old = @(Get-ChildItem $env:windir -Directory -Filter 'SoftwareDistribution.bak_*' -ErrorAction SilentlyContinue) + @(Get-ChildItem "$env:windir\System32" -Directory -Filter 'catroot2.bak_*' -ErrorAction SilentlyContinue)
+            $msgs | ForEach-Object { Add-Line ('  ' + $_) }
+            if ($old.Count -gt 2) { Add-Line ('  Hinweis: {0} Sicherungsordner früherer Zurücksetzungen liegen in {1} und können gelöscht werden, wenn Updates wieder funktionieren.' -f $old.Count, $env:windir) }
+            $ren = @($msgs | Where-Object { $_ -match ' umbenannt in ' })
+            if ($ren.Count) {
+                [void](Add-ChangeRecord -Modul 'Reparatur' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Ordner' -Ziel ('{0}\SoftwareDistribution, catroot2' -f $env:windir) `
+                    -Vorher 'Originalordner' -Nachher ($ren -join '; ') -Gegenbefehl 'Dienste wuauserv, bits, cryptsvc beenden, die neuen Ordner löschen und die Ordner .bak_<Datum> zurückbenennen' -NurHinweis)
+            }
+            Add-RepairResult $k $(if ($err) { 'Warnung' } else { 'Repariert' }) (($msgs -join '; ') + '; Dienste neu gestartet') -Restart
+        }
+        'Netzwerk' {
+            # ab v4.11: erst die IP-Konfiguration sichern; ohne Sicherung wird nichts zurückgesetzt
+            $bk = $null
+            try { $bk = Save-WartungNetzwerkSicherung; Add-Line ('  Gesichert: {0}' -f $bk.Datei) }
+            catch { Add-RepairResult $k 'Fehler' ('Sicherung der IP-Konfiguration fehlgeschlagen, nichts zurückgesetzt: ' + $_.Exception.Message); break }
+            $out = @(); $bad = 0
+            foreach ($c in @(@('ipconfig.exe', '/flushdns'), @('netsh.exe', 'winsock reset'), @('netsh.exe', 'int ip reset'), @('netsh.exe', 'int ipv6 reset'))) {
+                Show-Sub 'Netzwerk zurücksetzen' ('{0} {1}' -f $c[0], $c[1]) -1
+                $r = Invoke-External -File $c[0] -Arguments $c[1] -TimeoutSec 120
+                $out += ('{0} {1}: Rückgabecode {2}' -f $c[0], $c[1], $r.ExitCode)
+                if ($r.ExitCode -ne 0) { $bad++ }
+            }
+            Hide-Sub
+            $out | ForEach-Object { Add-Line ('  ' + $_) }
+            [void](Add-WartungHinweis $k 'Netzwerk' 'DNS-Cache, Winsock, TCP/IP (IPv4 und IPv6)' 'zurückgesetzt' ('netsh -f "{0}" spielt die gesicherte IP-Konfiguration (feste Adressen, DNS-Server) wieder ein, danach neu starten; Winsock-Katalog: {1}' -f $bk.Datei, (Get-WartungRueckweg)) ([ordered]@{ Sicherung = $bk.Datei; Konfiguration = $bk.Text }))
+            Add-RepairResult $k $(if ($bad) { 'Warnung' } else { 'Neustart' }) ('DNS-Cache geleert, Winsock und TCP/IP zurückgesetzt' + $(if ($bad) { (', {0} Befehle mit Fehler' -f $bad) } else { '' })) -Restart
+        }
+        'Temp' {
+            $total = 0.0; $lines = @()
+            $targets = @($env:TEMP, "$env:windir\Temp", "$env:ProgramData\Microsoft\Windows\WER\ReportArchive", "$env:ProgramData\Microsoft\Windows\WER\ReportQueue")
+            $targets += @(Get-ChildItem "$env:SystemDrive\Users" -Directory -Force -ErrorAction SilentlyContinue | ForEach-Object { Join-Path $_.FullName 'AppData\Local\Temp' } | Where-Object { Test-Path -LiteralPath $_ })
+            foreach ($t in @($targets | Where-Object { $_ } | Select-Object -Unique)) {
+                Show-Sub 'Temporäre Dateien löschen' $t -1
+                $f = Remove-OldFiles $t 2
+                $total += $f
+                if ($f -gt 1MB) { $lines += ('{0}: {1}' -f $t, (Format-Size $f)) }
+            }
+            try {
+                if (Get-Command Delete-DeliveryOptimizationCache -ErrorAction SilentlyContinue) {
+                    $doB = $null; try { $doB = (Get-DeliveryOptimizationStatus -ErrorAction Stop | Measure-Object FileSize -Sum).Sum } catch { }
+                    Delete-DeliveryOptimizationCache -Force -ErrorAction Stop
+                    $lines += ('Übermittlungsoptimierung: Cache geleert{0}' -f $(if ($doB) { ' (' + (Format-Size $doB) + ')' } else { '' }))
+                }
+            } catch { }
+            Hide-Sub
+            $lines | ForEach-Object { Add-Line ('  ' + $_) }
+            [void](Add-WartungHinweis $k 'Bereinigung' 'Temporäre Dateien (älter als 2 Tage), Fehlerberichte, Übermittlungsoptimierung' ('{0} gelöscht' -f (Format-Size $total)) 'nicht umkehrbar (temporäre Dateien)')
+            Add-RepairResult $k 'OK' ('{0} freigegeben (Dateien älter als 2 Tage, gesperrte Dateien bleiben erhalten)' -f (Format-Size $total))
+        }
+        'WMI' {
+            $v = Invoke-External -File "$env:windir\System32\wbem\winmgmt.exe" -Arguments '/verifyrepository' -TimeoutSec 600 -Progress 'WMI-Repository prüfen'
+            $txt = ($v.Output + ' ' + $v.Error).Trim()
+            Add-Line ('  Prüfung: {0}' -f $txt)
+            if ($txt -match 'inkonsistent|nicht konsistent|inconsistent|not consistent') {
+                $s = Invoke-External -File "$env:windir\System32\wbem\winmgmt.exe" -Arguments '/salvagerepository' -TimeoutSec 900 -Progress 'WMI-Repository reparieren'
+                [void](Add-WartungHinweis $k 'Wartung' 'WMI-Repository (winmgmt /salvagerepository)' ('Rückgabecode ' + $s.ExitCode) (Get-WartungRueckweg))
+                $v2 = Invoke-External -File "$env:windir\System32\wbem\winmgmt.exe" -Arguments '/verifyrepository' -TimeoutSec 600
+                Add-Line ('  Reparatur: {0}' -f ($s.Output + ' ' + $s.Error).Trim()); Add-Line ('  Erneute Prüfung: {0}' -f ($v2.Output).Trim())
+                if (($v2.Output) -match 'inkonsistent|nicht konsistent|inconsistent|not consistent') { Add-RepairResult $k 'Fehler' 'Repository weiterhin inkonsistent'; Add-Finding WARNUNG 'System' 'Das WMI-Repository ist beschädigt und ließ sich nicht reparieren (winmgmt /resetrepository als letzter Schritt).' }
+                else { Add-RepairResult $k 'Repariert' 'Repository war inkonsistent und wurde repariert' }
+            } elseif ($v.ExitCode -eq 0) { Add-RepairResult $k 'OK' 'Repository konsistent' }
+            else { Add-RepairResult $k 'Info' ('Rückgabecode {0}' -f $v.ExitCode) }
+        }
+        'Zeit' {
+            $svc = Get-Service w32time -ErrorAction SilentlyContinue
+            if ($svc -and $svc.StartType -eq 'Disabled') {
+                try { $c = Set-ServiceStartTypeLogged -Name 'w32time' -StartType 'Manual' -Modul 'Reparatur' -Schritt $k -Titel $script:RepTitles[$k]; if ($c) { Add-Line '  Dienst w32time war deaktiviert und steht jetzt auf Manuell (im Änderungsprotokoll).' } }
+                catch { Add-Line ('  Starttyp von w32time nicht änderbar: {0}' -f $_.Exception.Message) }
+            }
+            Start-Service w32time -ErrorAction SilentlyContinue
+            $r = Invoke-External -File 'w32tm.exe' -Arguments '/resync /force' -TimeoutSec 120 -Progress 'Zeit synchronisieren'
+            if ($r.ExitCode -ne 0) {
+                [void](Invoke-External -File 'w32tm.exe' -Arguments '/config /update' -TimeoutSec 60)
+                Restart-Service w32time -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2
+                $r = Invoke-External -File 'w32tm.exe' -Arguments '/resync /force' -TimeoutSec 120
+            }
+            (Get-OutLines $r 3) | ForEach-Object { Add-Line ('  ' + $_) }
+            Add-RepairResult $k $(if ($r.ExitCode -eq 0) { 'OK' } else { 'Warnung' }) $(if ($r.ExitCode -eq 0) { 'Zeit synchronisiert' } else { 'Synchronisierung fehlgeschlagen, Rückgabecode ' + $r.ExitCode })
+        }
+        'Druck' {
+            Stop-Service Spooler -Force -ErrorAction SilentlyContinue
+            $spool = "$env:windir\System32\spool\PRINTERS"
+            $files = @(Get-ChildItem $spool -File -Force -ErrorAction SilentlyContinue)
+            $n = 0; foreach ($f in $files) { try { Remove-Item -LiteralPath $f.FullName -Force -ErrorAction Stop; $n++ } catch { } }
+            Start-Service Spooler -ErrorAction SilentlyContinue
+            if ($n) { [void](Add-WartungHinweis $k 'Bereinigung' $spool ('{0} Druckaufträge entfernt' -f $n) 'nicht umkehrbar, Dokumente erneut drucken') }
+            $ok = (Get-Service Spooler -ErrorAction SilentlyContinue).Status -eq 'Running'
+            Add-RepairResult $k $(if (-not $ok) { 'Warnung' } elseif ($n) { 'Repariert' } else { 'OK' }) ('{0} hängende Druckaufträge entfernt, Druckspooler {1}' -f $n, $(if ($ok) { 'läuft' } else { 'startet nicht' }))
+        }
+        'Geraete' {
+            $bad0 = @(Get-CimInstance Win32_PnPEntity -Filter 'ConfigManagerErrorCode <> 0' -ErrorAction SilentlyContinue | Where-Object { $_.ConfigManagerErrorCode -notin 22, 45 }).Count
+            $r = Invoke-External -File 'pnputil.exe' -Arguments '/scan-devices' -TimeoutSec 300 -Progress 'Geräte neu erkennen'
+            [void](Add-WartungHinweis $k 'Wartung' 'Geräteerkennung (pnputil /scan-devices)' ('Rückgabecode ' + $r.ExitCode) ('Neu installierte Treiber im Geräte-Manager zurücksetzen oder ' + (Get-WartungRueckweg)))
+            Start-Sleep -Seconds 3
+            $bad1 = @(Get-CimInstance Win32_PnPEntity -Filter 'ConfigManagerErrorCode <> 0' -ErrorAction SilentlyContinue | Where-Object { $_.ConfigManagerErrorCode -notin 22, 45 }).Count
+            Add-RepairResult $k $(if ($r.ExitCode -ne 0) { 'Info' } elseif ($bad1 -lt $bad0) { 'Repariert' } else { 'OK' }) ('Geräte mit Fehlercode vorher {0}, nachher {1}' -f $bad0, $bad1)
+        }
+        'Schnellstart' {
+            $pk = 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power'
+            $old = (Get-ItemProperty $pk -Name HiberbootEnabled -ErrorAction SilentlyContinue).HiberbootEnabled
+            if ($old -eq 0) { Add-RepairResult $k 'OK' 'Schnellstart war bereits deaktiviert' }
+            else {
+                try { [void](Set-RegistryValueLogged -Path $pk -Name 'HiberbootEnabled' -Value 0 -Type 'DWord' -Modul 'Reparatur' -Schritt $k -Titel $script:RepTitles[$k]); Add-RepairResult $k 'Repariert' 'Schnellstart deaktiviert, Windows fährt ab jetzt vollständig herunter (rückgängig über die Seite Änderungen)' }
+                catch { Add-RepairResult $k 'Fehler' $_.Exception.Message }
+            }
+        }
+        'Energieplaene' {
+            # Erst alle Pläne sichern; ohne Sicherung wird nichts zurückgesetzt
+            try { $bk = Backup-PowerSchemesLogged -Modul 'Reparatur' -Schritt $k -Titel $script:RepTitles[$k]; Add-Line ('  Gesichert: {0}' -f $bk.Vorher) }
+            catch { Add-RepairResult $k 'Fehler' ('Sicherung der Energiepläne fehlgeschlagen, nichts zurückgesetzt: ' + $_.Exception.Message); break }
+            $r = Invoke-External -File 'powercfg.exe' -Arguments '-restoredefaultschemes' -TimeoutSec 60
+            $a = Invoke-External -File 'powercfg.exe' -Arguments '/getactivescheme'
+            Add-RepairResult $k $(if ($r.ExitCode -eq 0) { 'OK' } else { 'Warnung' }) ('Standardpläne wiederhergestellt, aktiv: {0}' -f ((($a.Output -split '\(')[-1]) -replace '\)', '').Trim())
+        }
+        'Datentraegerbereinigung' {
+            Write-Step 'Datenträgerbereinigung läuft (cleanmgr /sagerun:4711) ...'
+            # ab v4.11: ohne Downloads, Papierkorb, Windows.old und ESD-Installationsdateien (Get-CleanmgrKeys)
+            $keys = @(Get-CleanmgrKeys)
+            foreach ($kObj in $keys) { try { New-ItemProperty -LiteralPath $kObj.PSPath -Name 'StateFlags4711' -Value 2 -PropertyType DWord -Force -ErrorAction Stop | Out-Null } catch { } }
+            $free0 = [double](Get-Volume -DriveLetter $env:SystemDrive.Substring(0, 1) -ErrorAction SilentlyContinue).SizeRemaining
+            $r = Invoke-External -File (Join-Path $env:windir 'System32\cleanmgr.exe') -Arguments '/sagerun:4711' -TimeoutSec 3600 -Progress 'Datenträgerbereinigung läuft' -ExpectedSec 600
+            foreach ($kObj in $keys) { try { Remove-ItemProperty -LiteralPath $kObj.PSPath -Name 'StateFlags4711' -ErrorAction Stop } catch { } }
+            $free1 = [double](Get-Volume -DriveLetter $env:SystemDrive.Substring(0, 1) -ErrorAction SilentlyContinue).SizeRemaining
+            $freed = [math]::Max(0.0, $free1 - $free0)
+            [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel ('Datenträgerbereinigung, {0} Kategorien ({1})' -f $keys.Count, $script:CleanmgrUmfang) -Nachher ('{0:N0} MB frei geworden' -f ($freed / 1MB)) -Gegenbefehl 'nicht umkehrbar' -NurHinweis)
+            Add-RepairResult $k $(if ($r.TimedOut) { 'Warnung' } else { 'OK' }) ('Datenträgerbereinigung abgeschlossen, {0} freigegeben' -f (Format-Size $freed))
+        }
+        'Leistungszaehler' {
+            Write-Step 'Leistungszähler werden neu aufgebaut (lodctr /r) ...'
+            $r = Invoke-External -File "$env:windir\System32\lodctr.exe" -Arguments '/r' -TimeoutSec 300 -Progress 'Leistungszähler werden neu aufgebaut' -ExpectedSec 30
+            (Get-OutLines $r 3) | ForEach-Object { Add-Line ('  ' + $_) }
+            [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Leistungszaehler' -Ziel 'Leistungsindikatoren' -Nachher $(if ($r.ExitCode -eq 0) { 'neu aufgebaut' } else { 'Fehler ' + $r.ExitCode }) -Gegenbefehl 'nicht umkehrbar, erneut lodctr /r' -NurHinweis)
+            Add-RepairResult $k $(if ($r.ExitCode -eq 0) { 'OK' } else { 'Warnung' }) $(if ($r.ExitCode -eq 0) { 'Leistungsindikatoren erfolgreich aus der Sicherung neu aufgebaut' } else { 'lodctr /r Rückgabecode ' + $r.ExitCode })
+        }
+        'Leerlaufaufgaben' {
+            Write-Step 'Aufgeschobene Windows-Wartungsaufgaben starten (ProcessIdleTasks) ...'
+            $rd = Join-Path $env:windir 'System32\rundll32.exe'
+            if (Test-Path -LiteralPath $rd) {
+                Start-Process -FilePath $rd -ArgumentList 'advapi32.dll,ProcessIdleTasks' -WindowStyle Hidden -ErrorAction Stop
+            }
+            [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Wartung' -Ziel 'Leerlaufaufgaben' -Nachher 'gestartet' -Gegenbefehl 'nicht nötig' -NurHinweis)
+            Add-RepairResult $k 'OK' 'Leerlaufaufgaben gestartet (laufen im Hintergrund bis zu einer Stunde weiter)'
+        }
+        'ShaderCache' {
+            # ab v4.11: Profil des angemeldeten Benutzers, von AMD nur die Cache-Unterordner
+            $targets = @(Get-WartungShaderCachePfade (Get-OptTargetUser))
+            $total = 0.0; $lines = @()
+            foreach ($t in @($targets | Where-Object { Test-Path -LiteralPath $_ })) {
+                $f = Clear-Folder $t
+                $total += $f
+                if ($f -gt 1MB) { $lines += ('{0}: {1}' -f $t, (Format-Size $f)) }
+            }
+            $lines | ForEach-Object { Add-Line ('  ' + $_) }
+            [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel 'Shader-Caches der Grafiktreiber' -Nachher ('{0} gelöscht' -f (Format-Size $total)) -Gegenbefehl 'Spiele bauen Caches automatisch neu auf' -NurHinweis)
+            Add-RepairResult $k 'OK' ('{0} freigegeben (Spiele und Grafiktreiber bauen die Caches beim nächsten Start neu auf)' -f (Format-Size $total))
+        }
+        'UpdateDownloads' {
+            $p = "$env:windir\SoftwareDistribution\Download"
+            $freed = Clear-Folder $p
+            [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel $p -Nachher ('{0} gelöscht' -f (Format-Size $freed)) -Gegenbefehl 'nicht nötig' -NurHinweis)
+            Add-RepairResult $k 'OK' ('{0} freigegeben in SoftwareDistribution\Download' -f (Format-Size $freed))
+        }
+        'Absturzabbilder' {
+            $targets = @(
+                (Expand-OptPath '%LOCALAPPDATA%\CrashDumps' (Get-OptTargetUser)),
+                "$env:SystemDrive\MSOCache",
+                "$env:ProgramData\Microsoft\Windows\RetailDemo",
+                "$env:SystemDrive\AMD"
+            )
+            $total = 0.0; $lines = @()
+            foreach ($t in @($targets | Where-Object { Test-Path -LiteralPath $_ })) {
+                $f = Clear-Folder $t
+                $total += $f
+                if ($f -gt 1MB) { $lines += ('{0}: {1}' -f $t, (Format-Size $f)) }
+            }
+            $lines | ForEach-Object { Add-Line ('  ' + $_) }
+            [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel 'Absturzabbilder und Installationsreste' -Nachher ('{0} gelöscht' -f (Format-Size $total)) -Gegenbefehl 'nicht umkehrbar' -NurHinweis)
+            Add-RepairResult $k 'OK' ('{0} freigegeben (CrashDumps, temporäre Installationsquellen und Treiberentpackreste)' -f (Format-Size $total))
+        }
+        'Prefetch' {
+            $p = "$env:windir\Prefetch"
+            $freed = Clear-Folder $p
+            [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel $p -Nachher ('{0} gelöscht' -f (Format-Size $freed)) -Gegenbefehl 'Windows baut Prefetch-Daten neu auf' -NurHinweis)
+            Add-RepairResult $k 'OK' ('{0} freigegeben in Windows\Prefetch' -f (Format-Size $freed))
+        }
+        'PaketCache' {
+            $p = "$env:ProgramData\Package Cache"
+            $freed = Clear-Folder $p
+            [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel $p -Nachher ('{0} gelöscht' -f (Format-Size $freed)) -Gegenbefehl 'nicht umkehrbar' -NurHinweis)
+            Add-RepairResult $k 'OK' ('{0} freigegeben in ProgramData\Package Cache' -f (Format-Size $freed))
+        }
+        'Wiederherstellungspunkte' {
+            $d = ([string]$env:SystemDrive).TrimEnd('\')
+            $r = Invoke-External -File "$env:windir\System32\vssadmin.exe" -Arguments ('delete shadows /for={0} /all /quiet' -f $d) -TimeoutSec 600
+            $ok = ($r.ExitCode -eq 0 -or ($r.Output + $r.Error) -match 'No items found|Keine Elemente')
+            [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Wiederherstellungspunkte' -Ziel ('Schattenkopien auf {0}' -f $d) -Nachher $(if ($ok) { 'gelöscht' } else { 'Fehler ' + $r.ExitCode }) -Gegenbefehl 'nicht umkehrbar' -NurHinweis)
+            Add-RepairResult $k $(if ($ok) { 'OK' } else { 'Warnung' }) $(if ($ok) { 'Alte Schattenkopien auf dem Systemlaufwerk gelöscht' } else { 'vssadmin Fehler: ' + ($r.Output + ' ' + $r.Error).Trim() })
+        }
+    }
+}
+
 if ($ModRep) {
     # Änderungsprotokoll dieses Laufs (Datei entsteht erst mit der ersten Änderung)
     Start-ChangeLog
@@ -42520,330 +43581,16 @@ if ($ModRep) {
     if ($OhneWiederherstellungspunkt -and (Get-RiskRank $maxRep) -ge (Get-RiskRank 'Eingriff')) {
         Add-Finding INFO 'Reparatur' 'Die Reparaturen enthalten Eingriffe ohne automatisches Rückgängig, ein Wiederherstellungspunkt wurde aber bewusst nicht angelegt.'
     }
-    if (-not $OhneWiederherstellungspunkt) {
-        Invoke-Section 'Reparatur: Wiederherstellungspunkt anlegen' {
-            $rk = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\SystemRestore'
-            $old = $null; try { $old = (Get-ItemProperty $rk -Name SystemRestorePointCreationFrequency -ErrorAction Stop).SystemRestorePointCreationFrequency } catch { }
-            try {
-                Show-Sub 'Wiederherstellungspunkt' 'wird angelegt' -1
-                try { Enable-ComputerRestore -Drive ($env:SystemDrive + '\') -ErrorAction Stop } catch { }
-                if (-not (Test-Path $rk)) { New-Item -Path $rk -Force | Out-Null }
-                Set-ItemProperty -Path $rk -Name SystemRestorePointCreationFrequency -Value 0 -Type DWord -ErrorAction SilentlyContinue
-                Checkpoint-Computer -Description ('Leos Minibench vor Reparatur {0:dd.MM.yyyy HH:mm}' -f (Get-Date)) -RestorePointType MODIFY_SETTINGS -ErrorAction Stop
-                $rp = Get-ComputerRestorePoint -ErrorAction SilentlyContinue | Sort-Object SequenceNumber -Descending | Select-Object -First 1
-                $txt = $(if ($rp) { 'angelegt: {0} (Nr. {1})' -f $rp.Description, $rp.SequenceNumber } else { 'angelegt' })
-                if ($rp) { $script:RestorePointNo = [string]$rp.SequenceNumber }
-                Add-Line ('  Wiederherstellungspunkt {0}' -f $txt)
-                # Weg zurück für alle Eingriffe dieses Laufs; erscheint auf der Seite Änderungen als Hinweis
-                [void](Add-ChangeRecord -Modul 'Reparatur' -Schritt 'Wiederherstellungspunkt' -Titel 'Wiederherstellungspunkt vor den Reparaturen' -Risiko 'Lesen' -Art 'Wiederherstellungspunkt' `
-                    -Ziel 'Computerschutz' -Nachher $txt -Daten ([ordered]@{ Nummer = $script:RestorePointNo }) -Gegenbefehl ('rstrui.exe starten und Punkt Nr. {0} wählen; macht die Eingriffe dieses Laufs rückgängig' -f $script:RestorePointNo) -NurHinweis)
-                $script:RepairLog.Add([pscustomobject]@{ Reparatur = 'Wiederherstellungspunkt'; Ergebnis = 'OK'; Details = $txt })
-                Add-TestResult 'Reparatur: Wiederherstellungspunkt' 'OK' $txt
-            } catch {
-                Add-Line ('  Wiederherstellungspunkt konnte nicht angelegt werden: {0}' -f $_.Exception.Message)
-                $script:RepairLog.Add([pscustomobject]@{ Reparatur = 'Wiederherstellungspunkt'; Ergebnis = 'Warnung'; Details = $_.Exception.Message })
-                Add-TestResult 'Reparatur: Wiederherstellungspunkt' 'Warnung' $_.Exception.Message
-                Add-Finding WARNUNG 'Reparatur' ('Vor den Reparaturen konnte kein Wiederherstellungspunkt angelegt werden ({0}). Computerschutz für Laufwerk {1} prüfen.' -f $_.Exception.Message, $env:SystemDrive)
-            } finally {
-                if ($null -ne $old) { Set-ItemProperty -Path $rk -Name SystemRestorePointCreationFrequency -Value $old -Type DWord -ErrorAction SilentlyContinue }
-                else { Remove-ItemProperty -Path $rk -Name SystemRestorePointCreationFrequency -ErrorAction SilentlyContinue }
-                Hide-Sub
-            }
-        }
-    }
-
-    foreach ($repKey in @($script:RepOrder | Where-Object { $script:RepSel -contains $_ })) {
+    # ab v4.11: alte Wiederherstellungspunkte vor dem neuen Punkt löschen (Get-WartungPlan)
+    foreach ($repKey in @(Get-WartungPlan $script:RepOrder $script:RepSel (-not $OhneWiederherstellungspunkt))) {
+        if ($repKey -eq $script:RepPunktMarke) { Invoke-Section 'Reparatur: Wiederherstellungspunkt anlegen' { New-WartungRestorePoint }; continue }
         if (-not (Test-StepEnabled ('Rep:' + $repKey))) { continue }
         $script:CurRep = $repKey
         Invoke-Section ('Reparatur: ' + $script:RepTitles[$repKey]) {
             $k = $script:CurRep
             $st = Get-ModuleStep 'Wartung' $k; if (-not $st) { $st = Get-ModuleStep 'Reparatur' $k }
             Add-Line ('  Risikostufe: {0}{1}' -f (Get-RiskLabel $st.Risiko), $(switch ($st.Rueckgaengig) { 'Protokoll' { ', rückgängig über die Seite Änderungen' } 'Wiederherstellungspunkt' { ', zurück nur über den Wiederherstellungspunkt' } 'Hinweis' { ', Weg zurück steht im Änderungsprotokoll' } default { ', nicht umkehrbar' } }))
-            switch ($k) {
-                'DismRestore' {
-                    Write-Step 'DISM ScanHealth läuft (5 bis 20 Minuten) ...'
-                    $scan = Invoke-DismJob 'ScanHealth' 600
-                    if ($scan.Error) { Add-Line ('  ScanHealth fehlgeschlagen: {0}' -f $scan.Error); Add-RepairResult $k 'Fehler' ('ScanHealth fehlgeschlagen: ' + $scan.Error); break }
-                    Add-Line ('  Zustand vor der Reparatur: {0}' -f $scan.State)
-                    if ($scan.State -eq 'Healthy') { Add-RepairResult $k 'OK' 'Komponentenspeicher intakt, keine Reparatur nötig'; break }
-                    if ($scan.State -eq 'NonRepairable') {
-                        Add-RepairResult $k 'Fehler' 'Komponentenspeicher nicht reparierbar'
-                        Add-Finding KRITISCH 'Systemdateien' 'Der Komponentenspeicher ist nicht reparierbar. Abhilfe: Inplace-Upgrade mit dem Windows-Installationsmedium (setup.exe, Dateien und Apps behalten).'
-                        break
-                    }
-                    Write-Step 'DISM RestoreHealth läuft (10 bis 30 Minuten, lädt Dateien über Windows Update) ...'
-                    $rh = Invoke-DismJob 'RestoreHealth' 1200
-                    if ($rh.Error) {
-                        Add-Line ('  RestoreHealth fehlgeschlagen: {0}' -f $rh.Error)
-                        $hint = $(if ($rh.Error -match '0x800f081f|0x800f0906|0x800f0907|Quelldateien|source files') { ' Die Reparaturquelle fehlt: Windows-ISO einbinden und DISM /Online /Cleanup-Image /RestoreHealth /Source:WIM:X:\sources\install.wim:1 /LimitAccess ausführen.' } else { '' })
-                        Add-RepairResult $k 'Fehler' ('RestoreHealth fehlgeschlagen: ' + $rh.Error)
-                        Add-Finding KRITISCH 'Systemdateien' ('DISM RestoreHealth konnte den Komponentenspeicher nicht reparieren ({0}).{1}' -f $rh.Error, $hint)
-                        break
-                    }
-                    Add-Line ('  Zustand nach der Reparatur: {0}' -f $rh.State)
-                    if ($rh.State -eq 'Healthy') { Add-RepairResult $k 'Repariert' 'Komponentenspeicher repariert' -Restart:$rh.Restart; Add-Finding INFO 'Systemdateien' 'Der Komponentenspeicher war beschädigt und wurde mit DISM repariert.' }
-                    else { Add-RepairResult $k 'Fehler' ('Zustand nach RestoreHealth: ' + $rh.State); Add-Finding KRITISCH 'Systemdateien' ('Komponentenspeicher nach der Reparatur weiterhin {0}. Abhilfe: Inplace-Upgrade mit dem Windows-Installationsmedium.' -f $rh.State) }
-                }
-                'Sfc' {
-                    Write-Step 'sfc /scannow läuft (5 bis 20 Minuten) ...'
-                    $t0 = Get-Date
-                    $sfc = Invoke-External -File "$env:windir\System32\sfc.exe" -Arguments '/scannow' -TimeoutSec 5400 -Encoding ([Text.Encoding]::Unicode) -Progress 'Systemdateien reparieren (sfc /scannow)' -ExpectedSec 900
-                    (Get-OutLines $sfc) | ForEach-Object { Add-Line ('  ' + $_) }
-                    $cbs = Get-CbsEntries $t0
-                    if ($cbs.Cannot.Count) { Add-Line ('  CBS.log: {0} nicht reparierbare Dateien, z. B. {1}' -f $cbs.Cannot.Count, (($cbs.Files | Select-Object -First 5) -join ', ')) }
-                    $o = $sfc.Output
-                    if ($o -match 'keine Integritätsverletzungen|did not find any integrity violations') { Add-RepairResult $k 'OK' 'keine Integritätsverletzungen' }
-                    elseif ($cbs.Cannot.Count -or $o -match 'konnte einige|nicht reparieren|unable to fix') {
-                        Add-RepairResult $k 'Fehler' ('{0} Dateien nicht reparierbar' -f [math]::Max(1, $cbs.Cannot.Count))
-                        Add-Finding KRITISCH 'Systemdateien' 'SFC konnte nicht alle beschädigten Dateien reparieren. Zuerst DISM RestoreHealth ausführen, danach sfc /scannow wiederholen. Hilft das nicht: Inplace-Upgrade mit dem Windows-Installationsmedium.'
-                    }
-                    elseif ($o -match 'erfolgreich repariert|successfully repaired') { Add-RepairResult $k 'Repariert' 'beschädigte Dateien repariert' -Restart; Add-Finding INFO 'Systemdateien' 'SFC hat beschädigte Systemdateien gefunden und repariert. Ein Neustart schließt die Reparatur ab.' }
-                    elseif ($sfc.TimedOut) { Add-RepairResult $k 'Warnung' 'Zeitlimit überschritten' }
-                    else { Add-RepairResult $k 'Info' ('Rückgabecode {0}, Ausgabe siehe Bericht' -f $sfc.ExitCode) }
-                }
-                'Komponentenbereinigung' {
-                    $sysVol = Get-Volume -DriveLetter $env:SystemDrive.Substring(0, 1) -ErrorAction SilentlyContinue
-                    $before = [double]$sysVol.SizeRemaining
-                    Write-Step 'DISM StartComponentCleanup läuft (5 bis 30 Minuten) ...'
-                    $r = Invoke-External -File "$env:windir\System32\dism.exe" -Arguments '/Online /Cleanup-Image /StartComponentCleanup /NoRestart' -TimeoutSec 5400 -Progress 'Komponentenspeicher bereinigen' -ExpectedSec 900
-                    (Get-OutLines $r 4) | ForEach-Object { Add-Line ('  ' + $_) }
-                    $after = [double](Get-Volume -DriveLetter $env:SystemDrive.Substring(0, 1) -ErrorAction SilentlyContinue).SizeRemaining
-                    $gain = $after - $before
-                    if ($r.ExitCode -eq 0) { Add-RepairResult $k 'OK' ('abgeschlossen, Speicherplatz auf {0} {1}' -f $env:SystemDrive, $(if ($gain -gt 50MB) { 'um ' + (Format-Size $gain) + ' vergrößert' } else { 'kaum verändert' })) }
-                    else { Add-RepairResult $k 'Warnung' ('DISM-Rückgabecode {0}' -f $r.ExitCode) }
-                }
-                'Dateisystem' {
-                    $res = New-Object System.Collections.ArrayList; $restart = $false; $fixed = $false; $bad = $false
-                    foreach ($v in @(Get-Volume -ErrorAction SilentlyContinue | Where-Object { $_.DriveLetter -and $_.DriveType -eq 'Fixed' -and $_.FileSystem -in 'NTFS', 'ReFS' } | Sort-Object DriveLetter)) {
-                        $dl = [string]$v.DriveLetter
-                        Show-Sub ('Dateisystem Laufwerk {0}:' -f $dl) 'Onlinescan' -1
-                        try { $scan = "$(Repair-Volume -DriveLetter $dl -Scan -ErrorAction Stop)" } catch { [void]$res.Add(('{0}: Scan fehlgeschlagen ({1})' -f $dl, $_.Exception.Message)); $bad = $true; continue }
-                        if ($scan -eq 'NoErrorsFound') { [void]$res.Add(('{0}: ok' -f $dl)); continue }
-                        if (('{0}:' -f $dl) -eq $env:SystemDrive) {
-                            $r = Invoke-External -File 'fsutil.exe' -Arguments ('dirty set {0}:' -f $dl)
-                            [void]$res.Add(('{0}: {1}, Reparatur (chkdsk) beim nächsten Neustart eingeplant' -f $dl, $scan)); $restart = $true
-                        } else {
-                            Show-Sub ('Dateisystem Laufwerk {0}:' -f $dl) 'SpotFix' -1
-                            try { $fx = "$(Repair-Volume -DriveLetter $dl -SpotFix -ErrorAction Stop)"; [void]$res.Add(('{0}: {1}, SpotFix: {2}' -f $dl, $scan, $fx)); $fixed = $true }
-                            catch { [void]$res.Add(('{0}: {1}, SpotFix fehlgeschlagen ({2})' -f $dl, $scan, $_.Exception.Message)); $bad = $true }
-                        }
-                    }
-                    Hide-Sub
-                    $res | ForEach-Object { Add-Line ('  ' + $_) }
-                    $st = $(if ($bad) { 'Warnung' } elseif ($restart) { 'Neustart' } elseif ($fixed) { 'Repariert' } else { 'OK' })
-                    Add-RepairResult $k $st ($res -join '; ') -Restart:$restart
-                }
-                'WindowsUpdate' {
-                    $svcs = 'wuauserv', 'bits', 'cryptsvc', 'msiserver'
-                    $was = @{}
-                    foreach ($s in $svcs) { $sv = Get-Service $s -ErrorAction SilentlyContinue; if ($sv) { $was[$s] = [string]$sv.Status; Stop-Service $s -Force -ErrorAction SilentlyContinue } }
-                    $sw = [Diagnostics.Stopwatch]::StartNew()
-                    while ($sw.Elapsed.TotalSeconds -lt 40 -and @($svcs | Where-Object { (Get-Service $_ -ErrorAction SilentlyContinue).Status -eq 'Running' }).Count) { Show-Sub 'Windows Update zurücksetzen' 'Dienste werden beendet' -1; Start-Sleep -Milliseconds 500 }
-                    $ts = Get-Date -Format 'yyyyMMdd_HHmmss'; $msgs = @(); $err = $false
-                    foreach ($d in @("$env:windir\SoftwareDistribution", "$env:windir\System32\catroot2")) {
-                        if (-not (Test-Path $d)) { continue }
-                        $new = '{0}.bak_{1}' -f (Split-Path $d -Leaf), $ts
-                        try { Rename-Item -LiteralPath $d -NewName $new -ErrorAction Stop; $msgs += ('{0} umbenannt in {1}' -f (Split-Path $d -Leaf), $new) }
-                        catch { $msgs += ('{0} nicht umbenennbar: {1}' -f (Split-Path $d -Leaf), $_.Exception.Message); $err = $true }
-                    }
-                    foreach ($s in 'cryptsvc', 'bits', 'wuauserv') { Start-Service $s -ErrorAction SilentlyContinue }
-                    foreach ($s in $was.Keys) { if ($was[$s] -eq 'Running') { Start-Service $s -ErrorAction SilentlyContinue } }
-                    Hide-Sub
-                    $old = @(Get-ChildItem $env:windir -Directory -Filter 'SoftwareDistribution.bak_*' -ErrorAction SilentlyContinue) + @(Get-ChildItem "$env:windir\System32" -Directory -Filter 'catroot2.bak_*' -ErrorAction SilentlyContinue)
-                    $msgs | ForEach-Object { Add-Line ('  ' + $_) }
-                    if ($old.Count -gt 2) { Add-Line ('  Hinweis: {0} Sicherungsordner früherer Zurücksetzungen liegen in {1} und können gelöscht werden, wenn Updates wieder funktionieren.' -f $old.Count, $env:windir) }
-                    $ren = @($msgs | Where-Object { $_ -match ' umbenannt in ' })
-                    if ($ren.Count) {
-                        [void](Add-ChangeRecord -Modul 'Reparatur' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Ordner' -Ziel ('{0}\SoftwareDistribution, catroot2' -f $env:windir) `
-                            -Vorher 'Originalordner' -Nachher ($ren -join '; ') -Gegenbefehl 'Dienste wuauserv, bits, cryptsvc beenden, die neuen Ordner löschen und die Ordner .bak_<Datum> zurückbenennen' -NurHinweis)
-                    }
-                    Add-RepairResult $k $(if ($err) { 'Warnung' } else { 'Repariert' }) (($msgs -join '; ') + '; Dienste neu gestartet') -Restart
-                }
-                'Netzwerk' {
-                    $out = @(); $bad = 0
-                    foreach ($c in @(@('ipconfig.exe', '/flushdns'), @('netsh.exe', 'winsock reset'), @('netsh.exe', 'int ip reset'), @('netsh.exe', 'int ipv6 reset'))) {
-                        Show-Sub 'Netzwerk zurücksetzen' ('{0} {1}' -f $c[0], $c[1]) -1
-                        $r = Invoke-External -File $c[0] -Arguments $c[1] -TimeoutSec 120
-                        $out += ('{0} {1}: Rückgabecode {2}' -f $c[0], $c[1], $r.ExitCode)
-                        if ($r.ExitCode -ne 0) { $bad++ }
-                    }
-                    Hide-Sub
-                    $out | ForEach-Object { Add-Line ('  ' + $_) }
-                    Add-RepairResult $k $(if ($bad) { 'Warnung' } else { 'Neustart' }) ('DNS-Cache geleert, Winsock und TCP/IP zurückgesetzt' + $(if ($bad) { (', {0} Befehle mit Fehler' -f $bad) } else { '' })) -Restart
-                }
-                'Temp' {
-                    $total = 0.0; $lines = @()
-                    $targets = @($env:TEMP, "$env:windir\Temp", "$env:ProgramData\Microsoft\Windows\WER\ReportArchive", "$env:ProgramData\Microsoft\Windows\WER\ReportQueue")
-                    $targets += @(Get-ChildItem "$env:SystemDrive\Users" -Directory -Force -ErrorAction SilentlyContinue | ForEach-Object { Join-Path $_.FullName 'AppData\Local\Temp' } | Where-Object { Test-Path -LiteralPath $_ })
-                    foreach ($t in @($targets | Where-Object { $_ } | Select-Object -Unique)) {
-                        Show-Sub 'Temporäre Dateien löschen' $t -1
-                        $f = Remove-OldFiles $t 2
-                        $total += $f
-                        if ($f -gt 1MB) { $lines += ('{0}: {1}' -f $t, (Format-Size $f)) }
-                    }
-                    try {
-                        if (Get-Command Delete-DeliveryOptimizationCache -ErrorAction SilentlyContinue) {
-                            $doB = $null; try { $doB = (Get-DeliveryOptimizationStatus -ErrorAction Stop | Measure-Object FileSize -Sum).Sum } catch { }
-                            Delete-DeliveryOptimizationCache -Force -ErrorAction Stop
-                            $lines += ('Übermittlungsoptimierung: Cache geleert{0}' -f $(if ($doB) { ' (' + (Format-Size $doB) + ')' } else { '' }))
-                        }
-                    } catch { }
-                    Hide-Sub
-                    $lines | ForEach-Object { Add-Line ('  ' + $_) }
-                    Add-RepairResult $k 'OK' ('{0} freigegeben (Dateien älter als 2 Tage, gesperrte Dateien bleiben erhalten)' -f (Format-Size $total))
-                }
-                'WMI' {
-                    $v = Invoke-External -File "$env:windir\System32\wbem\winmgmt.exe" -Arguments '/verifyrepository' -TimeoutSec 600 -Progress 'WMI-Repository prüfen'
-                    $txt = ($v.Output + ' ' + $v.Error).Trim()
-                    Add-Line ('  Prüfung: {0}' -f $txt)
-                    if ($txt -match 'inkonsistent|nicht konsistent|inconsistent|not consistent') {
-                        $s = Invoke-External -File "$env:windir\System32\wbem\winmgmt.exe" -Arguments '/salvagerepository' -TimeoutSec 900 -Progress 'WMI-Repository reparieren'
-                        $v2 = Invoke-External -File "$env:windir\System32\wbem\winmgmt.exe" -Arguments '/verifyrepository' -TimeoutSec 600
-                        Add-Line ('  Reparatur: {0}' -f ($s.Output + ' ' + $s.Error).Trim()); Add-Line ('  Erneute Prüfung: {0}' -f ($v2.Output).Trim())
-                        if (($v2.Output) -match 'inkonsistent|nicht konsistent|inconsistent|not consistent') { Add-RepairResult $k 'Fehler' 'Repository weiterhin inkonsistent'; Add-Finding WARNUNG 'System' 'Das WMI-Repository ist beschädigt und ließ sich nicht reparieren (winmgmt /resetrepository als letzter Schritt).' }
-                        else { Add-RepairResult $k 'Repariert' 'Repository war inkonsistent und wurde repariert' }
-                    } elseif ($v.ExitCode -eq 0) { Add-RepairResult $k 'OK' 'Repository konsistent' }
-                    else { Add-RepairResult $k 'Info' ('Rückgabecode {0}' -f $v.ExitCode) }
-                }
-                'Zeit' {
-                    $svc = Get-Service w32time -ErrorAction SilentlyContinue
-                    if ($svc -and $svc.StartType -eq 'Disabled') {
-                        try { $c = Set-ServiceStartTypeLogged -Name 'w32time' -StartType 'Manual' -Modul 'Reparatur' -Schritt $k -Titel $script:RepTitles[$k]; if ($c) { Add-Line '  Dienst w32time war deaktiviert und steht jetzt auf Manuell (im Änderungsprotokoll).' } }
-                        catch { Add-Line ('  Starttyp von w32time nicht änderbar: {0}' -f $_.Exception.Message) }
-                    }
-                    Start-Service w32time -ErrorAction SilentlyContinue
-                    $r = Invoke-External -File 'w32tm.exe' -Arguments '/resync /force' -TimeoutSec 120 -Progress 'Zeit synchronisieren'
-                    if ($r.ExitCode -ne 0) {
-                        [void](Invoke-External -File 'w32tm.exe' -Arguments '/config /update' -TimeoutSec 60)
-                        Restart-Service w32time -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2
-                        $r = Invoke-External -File 'w32tm.exe' -Arguments '/resync /force' -TimeoutSec 120
-                    }
-                    (Get-OutLines $r 3) | ForEach-Object { Add-Line ('  ' + $_) }
-                    Add-RepairResult $k $(if ($r.ExitCode -eq 0) { 'OK' } else { 'Warnung' }) $(if ($r.ExitCode -eq 0) { 'Zeit synchronisiert' } else { 'Synchronisierung fehlgeschlagen, Rückgabecode ' + $r.ExitCode })
-                }
-                'Druck' {
-                    Stop-Service Spooler -Force -ErrorAction SilentlyContinue
-                    $spool = "$env:windir\System32\spool\PRINTERS"
-                    $files = @(Get-ChildItem $spool -File -Force -ErrorAction SilentlyContinue)
-                    $n = 0; foreach ($f in $files) { try { Remove-Item -LiteralPath $f.FullName -Force -ErrorAction Stop; $n++ } catch { } }
-                    Start-Service Spooler -ErrorAction SilentlyContinue
-                    $ok = (Get-Service Spooler -ErrorAction SilentlyContinue).Status -eq 'Running'
-                    Add-RepairResult $k $(if (-not $ok) { 'Warnung' } elseif ($n) { 'Repariert' } else { 'OK' }) ('{0} hängende Druckaufträge entfernt, Druckspooler {1}' -f $n, $(if ($ok) { 'läuft' } else { 'startet nicht' }))
-                }
-                'Geraete' {
-                    $bad0 = @(Get-CimInstance Win32_PnPEntity -Filter 'ConfigManagerErrorCode <> 0' -ErrorAction SilentlyContinue | Where-Object { $_.ConfigManagerErrorCode -notin 22, 45 }).Count
-                    $r = Invoke-External -File 'pnputil.exe' -Arguments '/scan-devices' -TimeoutSec 300 -Progress 'Geräte neu erkennen'
-                    Start-Sleep -Seconds 3
-                    $bad1 = @(Get-CimInstance Win32_PnPEntity -Filter 'ConfigManagerErrorCode <> 0' -ErrorAction SilentlyContinue | Where-Object { $_.ConfigManagerErrorCode -notin 22, 45 }).Count
-                    Add-RepairResult $k $(if ($r.ExitCode -ne 0) { 'Info' } elseif ($bad1 -lt $bad0) { 'Repariert' } else { 'OK' }) ('Geräte mit Fehlercode vorher {0}, nachher {1}' -f $bad0, $bad1)
-                }
-                'Schnellstart' {
-                    $pk = 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power'
-                    $old = (Get-ItemProperty $pk -Name HiberbootEnabled -ErrorAction SilentlyContinue).HiberbootEnabled
-                    if ($old -eq 0) { Add-RepairResult $k 'OK' 'Schnellstart war bereits deaktiviert' }
-                    else {
-                        try { [void](Set-RegistryValueLogged -Path $pk -Name 'HiberbootEnabled' -Value 0 -Type 'DWord' -Modul 'Reparatur' -Schritt $k -Titel $script:RepTitles[$k]); Add-RepairResult $k 'Repariert' 'Schnellstart deaktiviert, Windows fährt ab jetzt vollständig herunter (rückgängig über die Seite Änderungen)' }
-                        catch { Add-RepairResult $k 'Fehler' $_.Exception.Message }
-                    }
-                }
-                'Energieplaene' {
-                    # Erst alle Pläne sichern; ohne Sicherung wird nichts zurückgesetzt
-                    try { $bk = Backup-PowerSchemesLogged -Modul 'Reparatur' -Schritt $k -Titel $script:RepTitles[$k]; Add-Line ('  Gesichert: {0}' -f $bk.Vorher) }
-                    catch { Add-RepairResult $k 'Fehler' ('Sicherung der Energiepläne fehlgeschlagen, nichts zurückgesetzt: ' + $_.Exception.Message); break }
-                    $r = Invoke-External -File 'powercfg.exe' -Arguments '-restoredefaultschemes' -TimeoutSec 60
-                    $a = Invoke-External -File 'powercfg.exe' -Arguments '/getactivescheme'
-                    Add-RepairResult $k $(if ($r.ExitCode -eq 0) { 'OK' } else { 'Warnung' }) ('Standardpläne wiederhergestellt, aktiv: {0}' -f ((($a.Output -split '\(')[-1]) -replace '\)', '').Trim())
-                }
-                'Datentraegerbereinigung' {
-                    Write-Step 'Datenträgerbereinigung läuft (cleanmgr /sagerun:4711) ...'
-                    $root = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches'
-                    $keys = @(Get-ChildItem -LiteralPath $root -ErrorAction SilentlyContinue | Where-Object { $_.PSChildName -ne 'DownloadsFolder' })
-                    foreach ($kObj in $keys) { try { New-ItemProperty -LiteralPath $kObj.PSPath -Name 'StateFlags4711' -Value 2 -PropertyType DWord -Force -ErrorAction Stop | Out-Null } catch { } }
-                    $free0 = [double](Get-Volume -DriveLetter $env:SystemDrive.Substring(0, 1) -ErrorAction SilentlyContinue).SizeRemaining
-                    $r = Invoke-External -File (Join-Path $env:windir 'System32\cleanmgr.exe') -Arguments '/sagerun:4711' -TimeoutSec 3600 -Progress 'Datenträgerbereinigung läuft' -ExpectedSec 600
-                    foreach ($kObj in $keys) { try { Remove-ItemProperty -LiteralPath $kObj.PSPath -Name 'StateFlags4711' -ErrorAction Stop } catch { } }
-                    $free1 = [double](Get-Volume -DriveLetter $env:SystemDrive.Substring(0, 1) -ErrorAction SilentlyContinue).SizeRemaining
-                    $freed = [math]::Max(0.0, $free1 - $free0)
-                    [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel ('Datenträgerbereinigung, {0} Kategorien' -f $keys.Count) -Nachher ('{0:N0} MB frei geworden' -f ($freed / 1MB)) -Gegenbefehl 'nicht umkehrbar' -NurHinweis)
-                    Add-RepairResult $k $(if ($r.TimedOut) { 'Warnung' } else { 'OK' }) ('Datenträgerbereinigung abgeschlossen, {0} freigegeben' -f (Format-Size $freed))
-                }
-                'Leistungszaehler' {
-                    Write-Step 'Leistungszähler werden neu aufgebaut (lodctr /r) ...'
-                    $r = Invoke-External -File "$env:windir\System32\lodctr.exe" -Arguments '/r' -TimeoutSec 300 -Progress 'Leistungszähler werden neu aufgebaut' -ExpectedSec 30
-                    (Get-OutLines $r 3) | ForEach-Object { Add-Line ('  ' + $_) }
-                    [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Leistungszaehler' -Ziel 'Leistungsindikatoren' -Nachher $(if ($r.ExitCode -eq 0) { 'neu aufgebaut' } else { 'Fehler ' + $r.ExitCode }) -Gegenbefehl 'nicht umkehrbar, erneut lodctr /r' -NurHinweis)
-                    Add-RepairResult $k $(if ($r.ExitCode -eq 0) { 'OK' } else { 'Warnung' }) $(if ($r.ExitCode -eq 0) { 'Leistungsindikatoren erfolgreich aus der Sicherung neu aufgebaut' } else { 'lodctr /r Rückgabecode ' + $r.ExitCode })
-                }
-                'Leerlaufaufgaben' {
-                    Write-Step 'Aufgeschobene Windows-Wartungsaufgaben starten (ProcessIdleTasks) ...'
-                    $rd = Join-Path $env:windir 'System32\rundll32.exe'
-                    if (Test-Path -LiteralPath $rd) {
-                        Start-Process -FilePath $rd -ArgumentList 'advapi32.dll,ProcessIdleTasks' -WindowStyle Hidden -ErrorAction Stop
-                    }
-                    [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Wartung' -Ziel 'Leerlaufaufgaben' -Nachher 'gestartet' -Gegenbefehl 'nicht nötig' -NurHinweis)
-                    Add-RepairResult $k 'OK' 'Leerlaufaufgaben gestartet (laufen im Hintergrund bis zu einer Stunde weiter)'
-                }
-                'ShaderCache' {
-                    $targets = @(
-                        "$env:LOCALAPPDATA\NVIDIA\DXCache",
-                        "$env:LOCALAPPDATA\NVIDIA\GLCache",
-                        "$env:USERPROFILE\AppData\LocalLow\Intel\ShaderCache",
-                        "$env:LOCALAPPDATA\AMD",
-                        "$env:USERPROFILE\AppData\LocalLow\AMD"
-                    )
-                    $total = 0.0; $lines = @()
-                    foreach ($t in @($targets | Where-Object { Test-Path -LiteralPath $_ })) {
-                        $f = Clear-Folder $t
-                        $total += $f
-                        if ($f -gt 1MB) { $lines += ('{0}: {1}' -f $t, (Format-Size $f)) }
-                    }
-                    $lines | ForEach-Object { Add-Line ('  ' + $_) }
-                    [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel 'Shader-Caches der Grafiktreiber' -Nachher ('{0} gelöscht' -f (Format-Size $total)) -Gegenbefehl 'Spiele bauen Caches automatisch neu auf' -NurHinweis)
-                    Add-RepairResult $k 'OK' ('{0} freigegeben (Spiele und Grafiktreiber bauen die Caches beim nächsten Start neu auf)' -f (Format-Size $total))
-                }
-                'UpdateDownloads' {
-                    $p = "$env:windir\SoftwareDistribution\Download"
-                    $freed = Clear-Folder $p
-                    [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel $p -Nachher ('{0} gelöscht' -f (Format-Size $freed)) -Gegenbefehl 'nicht nötig' -NurHinweis)
-                    Add-RepairResult $k 'OK' ('{0} freigegeben in SoftwareDistribution\Download' -f (Format-Size $freed))
-                }
-                'Absturzabbilder' {
-                    $targets = @(
-                        "$env:LOCALAPPDATA\CrashDumps",
-                        "$env:SystemDrive\MSOCache",
-                        "$env:ProgramData\Microsoft\Windows\RetailDemo",
-                        "$env:SystemDrive\AMD"
-                    )
-                    $total = 0.0; $lines = @()
-                    foreach ($t in @($targets | Where-Object { Test-Path -LiteralPath $_ })) {
-                        $f = Clear-Folder $t
-                        $total += $f
-                        if ($f -gt 1MB) { $lines += ('{0}: {1}' -f $t, (Format-Size $f)) }
-                    }
-                    $lines | ForEach-Object { Add-Line ('  ' + $_) }
-                    [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel 'Absturzabbilder und Installationsreste' -Nachher ('{0} gelöscht' -f (Format-Size $total)) -Gegenbefehl 'nicht umkehrbar' -NurHinweis)
-                    Add-RepairResult $k 'OK' ('{0} freigegeben (CrashDumps, temporäre Installationsquellen und Treiberentpackreste)' -f (Format-Size $total))
-                }
-                'Prefetch' {
-                    $p = "$env:windir\Prefetch"
-                    $freed = Clear-Folder $p
-                    [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel $p -Nachher ('{0} gelöscht' -f (Format-Size $freed)) -Gegenbefehl 'Windows baut Prefetch-Daten neu auf' -NurHinweis)
-                    Add-RepairResult $k 'OK' ('{0} freigegeben in Windows\Prefetch' -f (Format-Size $freed))
-                }
-                'PaketCache' {
-                    $p = "$env:ProgramData\Package Cache"
-                    $freed = Clear-Folder $p
-                    [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Bereinigung' -Ziel $p -Nachher ('{0} gelöscht' -f (Format-Size $freed)) -Gegenbefehl 'nicht umkehrbar' -NurHinweis)
-                    Add-RepairResult $k 'OK' ('{0} freigegeben in ProgramData\Package Cache' -f (Format-Size $freed))
-                }
-                'Wiederherstellungspunkte' {
-                    $d = ([string]$env:SystemDrive).TrimEnd('\')
-                    $r = Invoke-External -File "$env:windir\System32\vssadmin.exe" -Arguments ('delete shadows /for={0} /all /quiet' -f $d) -TimeoutSec 600
-                    $ok = ($r.ExitCode -eq 0 -or ($r.Output + $r.Error) -match 'No items found|Keine Elemente')
-                    [void](Add-ChangeRecord -Modul 'Wartung' -Schritt $k -Titel $script:RepTitles[$k] -Risiko 'Eingriff' -Art 'Wiederherstellungspunkte' -Ziel ('Schattenkopien auf {0}' -f $d) -Nachher $(if ($ok) { 'gelöscht' } else { 'Fehler ' + $r.ExitCode }) -Gegenbefehl 'nicht umkehrbar' -NurHinweis)
-                    Add-RepairResult $k $(if ($ok) { 'OK' } else { 'Warnung' }) $(if ($ok) { 'Alte Schattenkopien auf dem Systemlaufwerk gelöscht' } else { 'vssadmin Fehler: ' + ($r.Output + ' ' + $r.Error).Trim() })
-                }
-            }
+            Invoke-WartungSchritt $k
         }
     }
     if ($script:RestartNeeded.Count) { Add-Finding INFO 'Reparatur' ('Neustart erforderlich, damit diese Reparaturen wirksam werden: {0}.' -f (($script:RestartNeeded | Select-Object -Unique) -join ', ')) }
@@ -42919,6 +43666,11 @@ if ($ModOpt) {
             if ($r.Ergebnis -in 'angewendet', 'teilweise' -and $script:RestorePointNo) { Add-Line ('  Der Wiederherstellungspunkt dieses Laufs ({0}) wurde mit gelöscht, es wird ein neuer angelegt.' -f $script:RestorePointNo); $script:RestorePointNo = $null }
         }
     }
+    # ab v4.11: Der Punkt der Wartung zählt nur, wenn es ihn noch gibt; sonst legt die Optimierung einen eigenen an
+    if ($script:RestorePointNo -and ((Test-RestorePointPresent $script:RestorePointNo) -eq $false)) {
+        Add-Line ('  Der Wiederherstellungspunkt dieses Laufs (Nr. {0}) ist nicht mehr vorhanden, die Optimierung legt einen eigenen an.' -f $script:RestorePointNo)
+        $script:RestorePointNo = ''
+    }
     # Bleibt nach dem Abgleich nichts zu ändern, entfällt der Wiederherstellungspunkt (ab v4.05)
     $script:OptZuTun = @($script:OptSel | Where-Object { $_.Id -ne 'Wiederherstellungspunkte' }).Count
     if (-not $script:OptZuTun) {
@@ -42926,8 +43678,15 @@ if ($ModOpt) {
     } elseif (-not $OptOhneWiederherstellungspunkt -and -not $script:RestorePointNo) {
         Invoke-Section 'Optimierung: Wiederherstellungspunkt anlegen' {
             Show-Sub 'Wiederherstellungspunkt' 'wird angelegt' -1
-            $rp = New-RestorePointLogged 'Optimierung' ('Leos Minibench vor Optimierung {0:dd.MM.yyyy HH:mm}' -f (Get-Date))
+            $rpText = ('Leos Minibench vor Optimierung {0:dd.MM.yyyy HH:mm}' -f (Get-Date))
+            $rp = New-RestorePointLogged 'Optimierung' $rpText
             Hide-Sub
+            # ab v4.11: nur ein wirklich angelegter Punkt zählt (Windows überspringt Punkte in der Sperrfrist ohne Fehler)
+            if ($rp.Ok) {
+                $echt = Get-RestorePointByDescription $rpText
+                if ($echt) { $rp = [pscustomobject]@{ Ok = $true; Text = $rp.Text; Nummer = [string]$echt.SequenceNumber } }
+                else { $rp = [pscustomobject]@{ Ok = $false; Text = 'Windows hat keinen neuen Wiederherstellungspunkt angelegt'; Nummer = '' } }
+            }
             if ($rp.Ok) { $script:RestorePointNo = $rp.Nummer; Add-Line ('  Wiederherstellungspunkt {0}' -f $rp.Text); Add-TestResult 'Optimierung: Wiederherstellungspunkt' 'OK' $rp.Text }
             else {
                 Add-Line ('  Wiederherstellungspunkt konnte nicht angelegt werden: {0}' -f $rp.Text)

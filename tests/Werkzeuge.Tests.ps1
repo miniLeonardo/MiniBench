@@ -90,3 +90,50 @@ Describe 'Übergang von 2.1' {
         Join-Path $tools 'Tools.json' | Should -Not -Exist
     }
 }
+
+# ab v4.11: Bei genau einem gefundenen Deinstaller war $candidates ein Text und $candidates[0] nur "C" (Befund A5).
+# Programme-Ordner zeigen auf den Testordner, der Deinstaller ist eine Attrappe (Invoke-External).
+Describe 'smartmontools entfernen' {
+    BeforeAll {
+        Import-MinibenchTestModule -Parts 'Kern\Werkzeuge.ps1', 'Kern\Smartmontools.ps1' -Setup @'
+function Invoke-External { param([string]$File, [string]$Arguments = '', [int]$TimeoutSec = 600, $Encoding = $null, [string]$Progress = '', [int]$ExpectedSec = 0) [pscustomobject]@{ ExitCode = 0; Output = ''; Error = ''; TimedOut = $false } }
+'@
+    }
+    BeforeEach {
+        $script:altPf = $env:ProgramFiles
+        $script:altPf86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+        $basis = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
+        $script:pf = Join-Path $basis 'Programme'
+        $script:pf86 = Join-Path $basis 'Programme86'
+        New-Item -ItemType Directory -Path (Join-Path $script:pf 'smartmontools\bin'), $script:pf86 -Force | Out-Null
+        $script:uninst = Join-Path $script:pf 'smartmontools\uninstall.exe'
+        $script:ctl = Join-Path $script:pf 'smartmontools\bin\smartctl.exe'
+        Set-Content -LiteralPath $script:uninst -Value 'x'; Set-Content -LiteralPath $script:ctl -Value 'x'
+        [Environment]::SetEnvironmentVariable('ProgramFiles', $script:pf)
+        [Environment]::SetEnvironmentVariable('ProgramFiles(x86)', $script:pf86)
+        $script:Aufrufe = @()
+        Mock -ModuleName MinibenchTest Invoke-External {
+            $script:Aufrufe += ('{0} {1}' -f $File, $Arguments)
+            # der echte NSIS-Deinstaller entfernt den ganzen Ordner
+            if ($File -like '*uninstall.exe') { Remove-Item -LiteralPath (Split-Path $File -Parent) -Recurse -Force }
+            [pscustomobject]@{ ExitCode = 0; Output = ''; Error = ''; TimedOut = $false }
+        }
+    }
+    AfterEach {
+        [Environment]::SetEnvironmentVariable('ProgramFiles', $script:altPf)
+        [Environment]::SetEnvironmentVariable('ProgramFiles(x86)', $script:altPf86)
+    }
+    It 'ruft bei genau einem Treffer den Deinstaller mit vollem Pfad und /S auf und meldet Erfolg' {
+        MinibenchTest\Uninstall-Smartmontools | Should -BeTrue
+        @($script:Aufrufe).Count | Should -Be 1
+        $script:Aufrufe[0] | Should -Be ('{0} /S' -f $script:uninst)
+        Test-Path -LiteralPath $script:ctl | Should -BeFalse
+    }
+    It 'meldet einen Rest, wenn smartctl.exe danach noch da ist' {
+        Mock -ModuleName MinibenchTest Invoke-External { $script:Aufrufe += ('{0} {1}' -f $File, $Arguments); [pscustomobject]@{ ExitCode = 1; Output = ''; Error = ''; TimedOut = $false } }
+        Mock -ModuleName MinibenchTest Get-Command { $null }
+        Mock -ModuleName MinibenchTest Get-ChildItem { $null }
+        MinibenchTest\Uninstall-Smartmontools | Should -BeFalse
+        $script:Aufrufe[0] | Should -Be ('{0} /S' -f $script:uninst)
+    }
+}

@@ -356,9 +356,18 @@ public partial class DiagGui
         d.Html = htmlPath; d.Ordner = outDir; d.Ki = kiPath;
         d.Meta = String.Format("{0}  ·  Lauf vom {1}{2}{3}",
             e != null ? e.DisplayName : Environment.MachineName, DatumKurz(d.Datum),
-            runStarted != DateTime.MinValue ? String.Format("  ·  Dauer {0:mm\\:ss} Min.", DateTime.Now - runStarted) : "",
+            runStarted != DateTime.MinValue ? "  ·  Dauer " + LaufDauerText(DateTime.Now - runStarted) : "",
             e != null && e.Module.Length > 0 ? "  ·  " + e.Module : "");
         return d;
+    }
+
+    // Dauer eines Laufs: "1:05:12 Std." ab einer Stunde, sonst "mm:ss Min." (bis v4.10 {0:mm\:ss}: nur 0 bis 59 Minuten)
+    public static string LaufDauerText(TimeSpan t)
+    {
+        if (t < TimeSpan.Zero) t = TimeSpan.Zero;
+        CultureInfo inv = CultureInfo.InvariantCulture;
+        if (t.TotalHours >= 1) return String.Format(inv, "{0}:{1:00}:{2:00} Std.", (int)Math.Floor(t.TotalHours), t.Minutes, t.Seconds);
+        return String.Format(inv, "{0:00}:{1:00} Min.", t.Minutes, t.Seconds);
     }
 
     // Eintrag in der Seitenleiste: sichtbar, sobald es ein Ergebnis gibt, mit der Punktzahl als Pille

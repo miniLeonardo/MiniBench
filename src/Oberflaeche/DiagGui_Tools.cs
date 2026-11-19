@@ -618,6 +618,8 @@ public partial class DiagGui
 
     public void InstallWingetPackagesAsync(List<int> selIndices, string[] allWgIds, string[] allWgNames, Label lblWgStatus, Button btnInstallWg, CheckBox[] allWgBoxes, LinkLabel lnkWgNone)
     {
+        if (running) { UI.Hinweis("Während eines Laufs werden keine Programme installiert.", "Softwarepakete installieren", this); return; }
+        if (HintergrundBelegt("Die Installation")) return;
         StringBuilder m = new StringBuilder();
         m.AppendLine("Diese Programme werden über winget installiert (Risikostufe Eingriff):");
         m.AppendLine();
@@ -625,6 +627,9 @@ public partial class DiagGui
         m.AppendLine();
         m.AppendLine("Jede Installation steht danach auf der Seite Änderungen und lässt sich dort wieder entfernen. Schon vorhandene Programme bleiben unberührt. Je Programm gilt eine Frist von 20 Minuten.");
         if (MessageBox.Show(this, m.ToString(), "Softwarepakete installieren", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        // Lauf oder Umzug könnten während der Rückfrage begonnen haben
+        if (running || HintergrundBelegt("Die Installation")) return;
+        HintergrundArbeit arbeit = HintergrundBeginnen("Die Installation über winget");
 
         btnInstallWg.Enabled = false;
         foreach (CheckBox cb in allWgBoxes) cb.Enabled = false;
@@ -657,7 +662,7 @@ public partial class DiagGui
                         Color c = st == "läuft" ? UI.Accent : (st == "installiert" || st == "bereits installiert") ? UI.Ok : UI.Warn;
                         try { BeginInvoke(new MethodInvoker(delegate { lblWgStatus.Text = tx; lblWgStatus.ForeColor = c; })); } catch { }
                     };
-                    p.Start(); p.BeginOutputReadLine();
+                    p.Start(); arbeit.Prozess = p; p.BeginOutputReadLine();
                     if (!p.WaitForExit(timeoutSec * 1000))
                     {
                         KillProc(p);
@@ -666,6 +671,7 @@ public partial class DiagGui
                     // letzte Ausgabezeilen abholen, höchstens 5 s (hält ein Kindprozess die Ausgabe offen, nicht ewig warten)
                     DateTime eu = DateTime.Now.AddSeconds(5);
                     while (!eof && DateTime.Now < eu) System.Threading.Thread.Sleep(20);
+                    arbeit.Prozess = null;
                 }
             }
             catch (Exception ex) { lock (texte) texte.Add("Arbeitsprozess nicht gestartet: " + ex.Message); }
@@ -673,6 +679,8 @@ public partial class DiagGui
             try
             {
                 BeginInvoke(new MethodInvoker(delegate {
+                    HintergrundEnde(arbeit);
+                    if (hintergrundGeschlossen) return;
                     btnInstallWg.Enabled = true;
                     foreach (CheckBox cb in allWgBoxes) { cb.Enabled = true; if ((cb.Tag as string) == "installiert") cb.ForeColor = UI.Ok; }
                     lnkWgNone.Enabled = true;

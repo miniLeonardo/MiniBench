@@ -101,7 +101,7 @@ public partial class DiagGui
         Stopwatch sw = Stopwatch.StartNew();
         // Haken, deren Eintrag es nicht mehr gibt oder der nicht mehr zurücknehmbar ist, entfallen
         HashSet<string> gueltig = new HashSet<string>(); int open = 0, hier = 0;
-        foreach (ChangeEntry c in changes) { if (c.Undoable) { open++; gueltig.Add(c.Schluessel); } if (String.Equals(c.Computer, Environment.MachineName, StringComparison.OrdinalIgnoreCase)) hier++; }
+        foreach (ChangeEntry c in changes) { if (c.Undoable) { open++; gueltig.Add(c.Schluessel); } if (ChangeEntry.IstDiesesGeraet(c.Computer, c.GeraetId)) hier++; }
         chgHaken.IntersectWith(gueltig);
         string fokus = lvChg.Fokus is ChgZeile ? ((ChgZeile)lvChg.Fokus).Schluessel : "";
 

@@ -42,7 +42,7 @@ public partial class DiagGui : Form
     Timer timer;
     volatile bool exited, outEof;
     DateTime exitSeen;
-    bool running, done, gotDone, cancelled;
+    internal bool running, done, gotDone, cancelled;
     string htmlPath = "", outDir = "", kiPath = "", kurzPath = "";
 #pragma warning disable 414
     int nK, nW, nI, cntK, cntW, cntI, testsOk, benchWarn, benchCount;
@@ -74,7 +74,7 @@ public partial class DiagGui : Form
     Panel[] modBanners = new Panel[6];
     Badge badgeSensStatus;
     internal List<NavItem> nav = new List<NavItem>();
-    List<Control> pages = new List<Control>();
+    internal List<Control> pages = new List<Control>();
     internal int curPage;
 #pragma warning restore 414
 
@@ -161,11 +161,11 @@ public partial class DiagGui : Form
     Timer liveTimer;
     volatile bool liveExited, liveEof;
     DateTime liveExitSeen;
-    bool liveRunning, liveStopping;
+    internal bool liveRunning, liveStopping;
     DateTime liveStopAt;
     Button btnLive, btnSensTools, btnSensSave;
     internal ComboBox cmbDriver;
-    int psuWattage = 650;
+    int psuWattage = 650; bool psuEingegeben;
     string psuRating = "80 PLUS Bronze";
     Label lblSensInfo;
     SensorChart chartLive, chartRun;
@@ -194,7 +194,7 @@ public partial class DiagGui : Form
         "Geräte neu erkennen lassen (pnputil /scan-devices)",
         "Schnellstart deaktivieren (hilft bei Abstürzen nach dem Einschalten)",
         "Energiesparpläne auf Standard zurücksetzen (eigene Pläne werden vorher gesichert)",
-        "Datenträgerbereinigung (cleanmgr mit allen Kategorien außer Downloads)",
+        "Datenträgerbereinigung (cleanmgr ohne Downloads, Papierkorb, Windows.old und ESD-Installationsdateien)",
         "Leistungszähler aus der Sicherung neu aufbauen (lodctr /r)",
         "Aufgeschobene Windows-Wartungsaufgaben starten (ProcessIdleTasks)",
         "DirectX-, OpenGL-, Intel- und AMD-Shader-Caches leeren",
@@ -237,7 +237,7 @@ public partial class DiagGui : Form
     internal int versionPage = -1;
 
     // Hinweise beim Überfahren mit der Maus (ab v2.7): kurze Erklärung zu jedem Bedienelement
-    ToolTip tip = NewTip();
+    internal ToolTip tip = NewTip();
     static ToolTip NewTip()
     {
         ToolTip t = new ToolTip(); t.AutoPopDelay = 30000; t.InitialDelay = 450; t.ReshowDelay = 150; t.ShowAlways = true;
@@ -342,6 +342,7 @@ public partial class DiagGui : Form
             if (g.DpiX > 0) UI.DpiScale = g.DpiX / 96.0f;
         }
         this.deviceId = deviceId ?? "";
+        ChangeEntry.EigeneGeraetId = this.deviceId;
         this.psExe = psExe; this.script = script; this.cpDir = cpDir; this.dataDir = dataDir ?? ""; this.version = version ?? "";
         this.disks = disks ?? new string[0];
         dbDir = this.dataDir.Length > 0 ? Path.Combine(this.dataDir, "Datenbank") : "";
@@ -458,23 +459,43 @@ public partial class DiagGui : Form
     }
 
 
-    protected override void OnKeyDown(KeyEventArgs e)
+    // Tastenkürzel F5 (Neu laden) und Strg+Eingabe (Start). Bis v4.10 in OnKeyDown ohne KeyPreview: wirkungslos, sobald
+    // ein Kind den Fokus hatte. Ab v4.11 über ProcessCmdKey, das vor dem Element mit Fokus an die Reihe kommt.
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
-        base.OnKeyDown(e);
-        if (e.KeyCode == Keys.F5)
+        if (Tastenkuerzel(keyData, FokusElement())) return true;
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    // Element mit dem Tastaturfokus, auch in verschachtelten Containern
+    Control FokusElement()
+    {
+        Control c = ActiveControl;
+        ContainerControl cc = c as ContainerControl;
+        while (cc != null && cc.ActiveControl != null && cc.ActiveControl != c) { c = cc.ActiveControl; cc = c as ContainerControl; }
+        return c;
+    }
+
+    // true, wenn die Taste hier behandelt wurde. Strg+Eingabe bleibt in mehrzeiligen Textfeldern ein Zeilenumbruch.
+    internal bool Tastenkuerzel(Keys keyData, Control fokus)
+    {
+        if (keyData == Keys.F5)
         {
             if (curPage == 9) RefreshAndSync();
             else FillPresets(false);
-            e.Handled = true;
+            return true;
         }
-        else if (e.Control && e.KeyCode == Keys.Enter)
+        if (keyData == (Keys.Control | Keys.Enter))
         {
+            TextBoxBase tb = fokus as TextBoxBase;
+            if (tb != null && tb.Multiline) return false;
             if (btnStart != null && btnStart.Enabled && btnStart.Visible)
             {
                 btnStart.PerformClick();
-                e.Handled = true;
+                return true;
             }
         }
+        return false;
     }
 
     // Text nur setzen, wenn er sich ändert (jede Zuweisung zeichnet das Element neu)

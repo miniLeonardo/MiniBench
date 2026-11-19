@@ -5,18 +5,18 @@ Seit 4.07 steht hier nur noch, was für die nächste Version gebraucht wird: Sta
 abgelehnte Vorschläge, Fallstricke. Was eine Version geändert hat, steht in CHANGELOG.md (kurz), in
 Doku\Versionshistorie.txt und in Doku\Änderungen_vX.Y.txt (ausführlich); es wird hier nicht wiederholt.
 
-## Stand: Version 4.10 (15.11.2026)
-Release-Commit "Release v4.10: Sensoren, Datenbank und Änderungen im Stil der übrigen Seiten, Protokoll aufräumen" von
-Claude vorbereitet (Grundlage 34f5ef3, Release v4.09, am 15.11.2026 im Projektordner eingespielt), als git bundle übergeben.
+## Stand: Version 4.11 (19.11.2026)
+Release-Commit "Release v4.11: Sicherheit und Rücknahme: Befunde der Gesamtprüfung behoben", von Claude unter Windows
+(ULB-PC10039) mit Bauen.cmd gebaut und getestet (erster Windows-Bau seit 4.0). Grundlage 05ca12f (Release v4.10).
 
-Inhalt von 4.10 (Einzelheiten in Doku\Änderungen_v4.10.txt):
-1. Seiten Sensoren live, Datenbank und Änderungen im neuen Aufbau. Alle drei nutzen die selbst gezeichnete Liste
-   ZeilenListe (Liste.cs) statt nativer Listenfelder; Sensoren live nutzt den Rahmen der Modulseiten, Datenbank und
-   Änderungen den neuen Rahmen ListenSeite (DiagGui_Modulseite.cs).
-2. Seite Änderungen: zuerst nur dieser PC, gebündelt nach Lauf und Maßnahme; behebt die lange Wartezeit beim Öffnen.
-   "Aufräumen …" verschiebt erledigte Läufe und auf Wunsch Protokolle anderer PCs ins Archiv (-AenderungenAufraeumen).
-3. Nach Rückgängig liest die Oberfläche den Zustand der Optimierung neu (Sperre "bereits aktiv" fällt sofort).
-4. Seite Info und Versionen füllt ihre Versionshistorie erst beim ersten Öffnen.
+Inhalt von 4.11 (Einzelheiten in Doku\Änderungen_v4.11.txt): Fehlerbehebungsversion nach der Gesamtprüfung vom
+19.11.2026. Alle Befunde der Stufen Dringend bis Messung behoben (PawnIO ohne Zustimmung, Wiederherstellungspunkt,
+Datenträgerbereinigung, Computerschutz, smartmontools, Import, Prüfsummen der Optimierungswerkzeuge, Verbrauchsmodell,
+Systemvergleich, Rückgängig, Wartung, Hybrid-Erkennung, freier RAM, Oberfläche, Bau und Veröffentlichung).
+
+**Zuerst lesen:** Doku\Pruefung_4.10.md (alle Befunde der Gesamtprüfung mit Fundstelle; Spalte Ziel "offen" sind die
+Kandidaten für die nächsten Versionen) und Doku\Ideen.md (gesammelte Ideen, nicht ungefragt bauen). Beide aktuell
+halten: behobene Befunde mit Version in die Spalte Stand, gewählte Ideen markieren.
 
 ## Aufbau der Oberfläche (src\Oberflaeche, Reihenfolge in Oberflaeche.ps1)
 DiagGui.cs                 Rahmen: using-Zeilen für alle Teile, Felder, Start, Seitenleiste, Fußleiste, ShowPage, gemeinsame Bausteine
@@ -50,6 +50,7 @@ Neue Seite: eigene Datei DiagGui_<Name>.cs ohne using-Zeilen, in Oberflaeche.ps1
 (Get-GuiText in tests\Hilfen.ps1), nicht in einer bestimmten Datei.
 
 ## Versionen bisher (je eine Zeile, neueste zuerst)
+4.11 Sicherheit und Rücknahme: Befunde der Gesamtprüfung behoben. 4.10 Sensoren, Datenbank und Änderungen im Stil der übrigen Seiten (05ca12f).
 4.09 Lasttest und System-Umzug im Stil der übrigen Seiten, Schalter ohne Beschnitt (34f5ef3).
 4.08 Ergebnis als Seite, Benchmark und Diagnose im Stil der übrigen Seiten (c9a16bb). 4.07 Eine Datei je Seite,
 kürzerer Start, Akzentfarbe, dezente Bewegung (ba3489b). 4.06 Update-Prüfung und Referenz
@@ -63,6 +64,7 @@ b582625). 3.84 bis 3.87 GitHub, Sensoren, Update-Prüfung, Läufe je Gerät. 3.8
 Startseite, Konfigurationsprüfung, Dashboard in Bausteinen, LMB.exe. 3.64 bis 3.67 Gestaltungsregeln der Oberfläche.
 
 ## Offene Befunde
+Weitere offene Befunde aus der Gesamtprüfung vom 19.11.2026: Doku\Pruefung_4.10.md (Ziel offen, G6 bis G11 aus 4.11).
 1. 4.10 unter Windows bestätigen: Seiten Sensoren live, Datenbank und Änderungen bei 100, 125 und 150 %, Mausrad und
    Tastatur in den Listen, Kontextmenü der Datenbank, Bildlaufleiste des Detailbereichs im dunklen Schema, Live-Ansicht
    mit echten Sensoren (Kennzahlen, Liste, volle Aufzeichnung), "Aufräumen …" mit anschließendem Abgleich, Wartezeit der
@@ -98,6 +100,8 @@ Startseite, Konfigurationsprüfung, Dashboard in Bausteinen, LMB.exe. 3.64 bis 3
 14. Am 15.11.2026 vorgeschlagen und von Leonardo nicht gewählt (nicht abgelehnt, nicht ungefragt bauen): "Ergebnis
     ansehen" für jeden Lauf der Datenbank, Veränderung zum vorigen Lauf, Suchfelder und Filter in Sensorliste, Datenbank
     und Änderungen, wählbares Zeitfenster der Kurven.
+15. 4.11 unter Windows von Hand bestätigen: siehe Grenzen in Doku\Änderungen_v4.11.txt (Hintergrundsperre, Update
+   mit Fortschritt, Tastenkürzel, Computerschutz mit Administratorrechten, DDU holen).
 
 ## Abgelehnte Vorschläge (Entscheidung Leonardo, 10.11.2026): nicht umsetzen und nicht erneut vorschlagen
 GitHub Actions bzw. CI; Diagnosepaket (Logs als ZIP); Szenario-Kacheln auf der Startseite; Vorher-Nachher-Messung;
@@ -155,4 +159,5 @@ Schnelltest für Peripherie, sicheres Löschen, Testmatrix-Dateien.
     OnClosing vier Minuten auf den Arbeitsprozess.
 
 ## Letzter Commit
-Release-Commit v4.10 mit Tag v4.10 (Nachfolger von 34f5ef3, Release v4.09), übergeben als MiniBench_v4.10.bundle.
+Release-Commit v4.11 (lokal von Bauen.cmd, Tag und Übertragung mit Veroeffentlichen.ps1). Vorgänger:
+05ca12f Release v4.10: Sensoren, Datenbank und Änderungen im Stil der übrigen Seiten, Protokoll aufräumen

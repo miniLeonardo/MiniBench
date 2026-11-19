@@ -798,3 +798,61 @@ function Get-SensorReadings { param([switch]$MitDatentraeger, $CpuSample = $null
         $l | Should -Contain '  Datenträger: Temperatur max 42 °C'
     }
 }
+
+# ab v4.11 (Befund F1): Hybrid-Erkennung für die erwartete Mehrkern-Skalierung. Bevorzugt echte Kerntypen, sonst Name.
+Describe 'Hybrid-CPU für die erwartete Mehrkern-Skalierung (ab v4.11)' {
+    BeforeAll {
+        Import-MinibenchTestModule -Functions 'Test-CpuHybridName', 'Get-CpuHybrid', 'Get-CpuKernklassen'
+    }
+    It 'erkennt Hybrid-CPUs am Namen: <Name> = <Hybrid>' -TestCases @(
+        @{ Name = '13th Gen Intel(R) Core(TM) i5-1335U'; Hybrid = $true }
+        @{ Name = '12th Gen Intel(R) Core(TM) i7-1255U'; Hybrid = $true }
+        @{ Name = '13th Gen Intel(R) Core(TM) i7-1360P'; Hybrid = $true }
+        @{ Name = '12th Gen Intel(R) Core(TM) i3-1215U'; Hybrid = $true }
+        @{ Name = 'Intel(R) Core(TM) Ultra 7 155H'; Hybrid = $true }
+        @{ Name = 'Intel(R) Core(TM) Ultra 5 225'; Hybrid = $true }
+        @{ Name = 'Intel(R) Core(TM) 5 120U'; Hybrid = $true }
+        @{ Name = '12th Gen Intel(R) Core(TM) i5-12400'; Hybrid = $false }
+        @{ Name = '12th Gen Intel(R) Core(TM) i5-12400F'; Hybrid = $false }
+        @{ Name = '12th Gen Intel(R) Core(TM) i3-12100'; Hybrid = $false }
+        @{ Name = '12th Gen Intel(R) Core(TM) i5-12600'; Hybrid = $false }
+        @{ Name = '12th Gen Intel(R) Core(TM) i5-12600K'; Hybrid = $true }
+        @{ Name = '12th Gen Intel(R) Core(TM) i7-12700'; Hybrid = $true }
+        @{ Name = '12th Gen Intel(R) Core(TM) i5-12450H'; Hybrid = $true }
+        @{ Name = '13th Gen Intel(R) Core(TM) i5-13400F'; Hybrid = $true }
+        @{ Name = '13th Gen Intel(R) Core(TM) i3-13100'; Hybrid = $false }
+        @{ Name = '14th Gen Intel(R) Core(TM) i7-14700K'; Hybrid = $true }
+        @{ Name = '11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz'; Hybrid = $false }
+        @{ Name = 'Intel(R) Core(TM) i5-8265U CPU @ 1.60GHz'; Hybrid = $false }
+        @{ Name = 'AMD Ryzen 7 7800X3D 8-Core Processor'; Hybrid = $false }
+    ) {
+        MinibenchTest\Test-CpuHybridName $Name | Should -Be $Hybrid
+    }
+    It 'echte Kerntypen gehen dem Namen vor' {
+        Mock -ModuleName MinibenchTest Get-CpuKernklassen { @(1, 1, 1, 1, 1, 1, 0, 0, 0, 0) }
+        $r = MinibenchTest\Get-CpuHybrid '12th Gen Intel(R) Core(TM) i5-12400'
+        $r.Hybrid | Should -BeTrue
+        $r.Quelle | Should -Be 'Kerntypen'
+        Mock -ModuleName MinibenchTest Get-CpuKernklassen { @(0, 0, 0, 0, 0, 0, 0, 0, 0, 0) }
+        (MinibenchTest\Get-CpuHybrid '13th Gen Intel(R) Core(TM) i5-1335U').Hybrid | Should -BeFalse
+        Mock -ModuleName MinibenchTest Get-CpuKernklassen { @() }
+        $r = MinibenchTest\Get-CpuHybrid '13th Gen Intel(R) Core(TM) i5-1335U'
+        $r.Hybrid | Should -BeTrue
+        $r.Quelle | Should -Be 'Name'
+    }
+    It 'liest unter Windows die Kerntypen (eigener Prozess, C# 5)' {
+        if (-not (Test-IstWindows)) { Set-ItResult -Skipped -Because 'GetLogicalProcessorInformationEx gibt es nur unter Windows'; return }
+        $fn = @((Get-TopFunctions)['Get-CpuKernklassen'])[0]
+        $tmp = Join-Path ([IO.Path]::GetTempPath()) ('LmbKern_{0}_{1}.ps1' -f $PID, [guid]::NewGuid().ToString('N').Substring(0, 6))
+        [IO.File]::WriteAllText($tmp, ('$script:CpuKernklassen = $null' + "`r`n" + $fn + "`r`n" + '$k = @(Get-CpuKernklassen); "{0}|{1}" -f $k.Count, (($k | Select-Object -Unique) -join ",")'), (New-Object Text.UTF8Encoding($true)))
+        try { $out = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $tmp } finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
+        $teile = ([string]@($out)[-1]).Split('|')
+        [int]$teile[0] | Should -BeGreaterThan 0
+        [int]$teile[0] | Should -BeLessOrEqual ([Environment]::ProcessorCount)
+    }
+    It 'die Messung bleibt unverändert, nur die Erwartung nutzt die Erkennung' {
+        $a = Get-SrcText 'Module/Benchmark/Ablauf.ps1'
+        $a | Should -Match '\$hybrid = \(Get-CpuHybrid \$cpuName\)\.Hybrid'
+        $a | Should -Not -Match "Core\\\(TM\\\) i\[3579\]-1\[2-4\]\\d\{3\}"
+    }
+}

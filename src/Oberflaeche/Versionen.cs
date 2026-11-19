@@ -11,6 +11,19 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.11", "19.11.2026", "Sicherheit und Rücknahme: Befunde der Gesamtprüfung behoben",
+            "• Behoben: PawnIO wurde auch installiert, wenn der Treiber auf „nein“ stand (Arbeitsprozesse laufen immer mit Administratorrechten). Jetzt nur noch mit Zustimmung.\r\n" +
+            "• Behoben, Wartung: „Alte Wiederherstellungspunkte löschen“ löschte auch den Punkt, den der Lauf eben angelegt hatte. Die alten Punkte gehen jetzt vor dem neuen; die Nummer zählt nur, wenn der Punkt mit dieser Beschreibung wirklich da ist.\r\n" +
+            "• Behoben, Datenträgerbereinigung: Papierkorb, Windows.old und ESD-Installationsdateien bleiben unangetastet (bisher alle Kategorien außer Downloads, auch als geplante Aufgabe).\r\n" +
+            "• Computerschutz wird nur eingeschaltet, wenn er aus war, und dann mit Eintrag und Gegenbefehl auf der Seite Änderungen.\r\n" +
+            "• Behoben: smartmontools konnte auf fremden PCs zurückbleiben, weil der Deinstaller nie lief. Import einer .minibench-Datei schreibt nur noch in einen neuen Ordner unter Berichte.\r\n" +
+            "• NVIDIA Profile Inspector (3.0.2.3) und DDU (18.1.5.3) nur noch mit fester Prüfsumme; Dateien mit unbekannter Prüfsumme werden abgelehnt.\r\n" +
+            "• Bericht: Verbrauchsstufen ohne Messwert stehen als „nicht gemessen“ da, die Netzteil-Warnung erscheint nur mit eingegebener Nennleistung. „Seit dem letzten Lauf“ meldet keinen falschen Windows-Build mehr; alle Texte dort sind maskiert.\r\n" +
+            "• Rückgängig: Ein Fehlschlag lässt sich erneut versuchen; verzögerter Dienststart, angepasste Energiepläne und selbst angelegte Registry-Schlüssel werden wiederhergestellt bzw. entfernt. Protokolle gehören über die Gerätekennung zum PC, auch nach dem Umbenennen.\r\n" +
+            "• Wartung: alle Schritte stehen im Änderungsprotokoll; vor „Netzwerk zurücksetzen“ wird die IP-Konfiguration gesichert; Shader-Caches nur in den Cache-Ordnern und im Profil des angemeldeten Benutzers.\r\n" +
+            "• Messung: Hybrid-Prozessoren über die echten Kerntypen erkannt (keine falsche Warnung zur Skalierung bei i5-1335U und ähnlichen), Lasttest und RAM-Test nehmen den aktuell freien Speicher, „Median aktualisieren“ schreibt auch Lasttest-Mediane.\r\n" +
+            "• Oberfläche: System-Umzug und Installationen sperren Messungen und fragen beim Schließen nach; Update nur mit Prüfsumme und lädt im Hintergrund mit Fortschritt; Hilfsabläufe frieren das Fenster nicht mehr ein; F5 und Strg+Eingabe wirken überall; Laufdauer über einer Stunde richtig.\r\n" +
+            "• Bau und Veröffentlichung: Tests melden auch nicht geladene Testdateien als Fehler; Veröffentlichen prüft Zweig, Prüfsumme der exe, Tag und Windows-Tests."),
         new Eintrag("4.10", "15.11.2026", "Sensoren, Datenbank und Änderungen im Stil der übrigen Seiten, Protokoll aufräumen",
             "\u2022 Seite Änderungen neu aufgebaut: Sie zeigt zuerst nur die Läufe dieses PCs, gebündelt nach Lauf und Maßnahme. Die einzelnen Werte (Ziel, vorher, nachher) stehen unter ihrer Maßnahme und entstehen erst beim Aufklappen. Ein Haken an einem Lauf oder einer Maßnahme wählt alle zurücknehmbaren Einträge darunter; die Auswahl steht in einem Band über der Liste mit \u201ERückgängig machen\u201C. \u201EAlle PCs\u201C zeigt zusätzlich die Protokolle anderer PCs, nur zur Ansicht.\r\n" +
             "\u2022 Behoben: Die Seite Änderungen brauchte bei vielen Einträgen lange zum Öffnen. Sie legte für jeden Eintrag aller PCs eine Zeile mit Kontrollkästchen an (im Datenordner rund 1.050, davon einer von diesem PC) und zählte bei jeder Zeile alle Haken neu. Die neue Liste zeichnet nur, was sichtbar ist.\r\n" +

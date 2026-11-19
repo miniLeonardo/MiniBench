@@ -3,6 +3,20 @@ $ErrorActionPreference = 'Continue'
 $StartTime = Get-Date
 $script:Inv = [Globalization.CultureInfo]::InvariantCulture
 
+# ab v4.11: Wurde die Nennleistung des Netzteils wirklich eingegeben? Einstellungen.json mit PsuWattage oder ein
+# Parameterwert ungleich der Vorgabe 650 W.
+function Test-PsuEingegeben([switch]$Gebunden, $Wert = $null, [string]$DataDir = '') {
+    if ($Gebunden -and $null -ne $Wert -and [int]$Wert -gt 0 -and [int]$Wert -ne 650) { return $true }
+    try {
+        $p = $(if ($DataDir) { Join-Path $DataDir 'Einstellungen.json' } else { '' })
+        if ($p -and (Test-Path -LiteralPath $p)) {
+            $j = ConvertFrom-Json ([IO.File]::ReadAllText($p, [Text.Encoding]::UTF8)) -ErrorAction Stop
+            if ($null -ne $j.PsuWattage -and [int]$j.PsuWattage -gt 0) { return $true }
+        }
+    } catch { }
+    return $false
+}
+
 # Netzteil-Konfiguration (ab v3.71): CLI-Parameter oder Einstellungen.json
 $activePsuWattage = if ($PSBoundParameters.ContainsKey('PsuWattage')) { [int]$PsuWattage } else { $null }
 $activePsuRating  = if ($PSBoundParameters.ContainsKey('PsuRating'))  { [string]$PsuRating } else { $null }
@@ -19,6 +33,10 @@ if ($null -eq $activePsuWattage -or $null -eq $activePsuRating) {
         }
     } catch { }
 }
+# ab v4.11 (Vorgabe 11): Die Nennleistung gilt nur als eingegeben, wenn sie in Einstellungen.json steht oder als
+# Parameter mit einem anderen Wert als der Vorgabe 650 W kommt (die Oberfläche übergibt -PsuWattage immer). Ohne Eingabe
+# rechnet das Verbrauchsmodell weiter mit 650 W für die Wirkungsgradkurve, warnt aber nicht vor Überlastung.
+$script:PsuEingegeben = Test-PsuEingegeben -Gebunden:($PSBoundParameters.ContainsKey('PsuWattage')) -Wert $PsuWattage -DataDir $script:DataDir
 if ($null -eq $activePsuWattage) { $activePsuWattage = $(if ($PsuWattage -ne $null) { [int]$PsuWattage } else { 650 }) }
 if ($null -eq $activePsuRating -or "$activePsuRating" -eq '') { $activePsuRating = $(if ($PsuRating) { [string]$PsuRating } else { '80 PLUS Bronze' }) }
 $script:PsuWattage = $activePsuWattage

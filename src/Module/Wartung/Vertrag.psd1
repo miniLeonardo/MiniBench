@@ -56,8 +56,8 @@
            Titel = 'Energiesparpläne zurücksetzen'
            Text  = 'Energiesparpläne auf Standard zurücksetzen (eigene Pläne werden vorher gesichert)' }
         @{ Key = 'Datentraegerbereinigung'; Typ = 'Massnahme'; Risiko = 'Eingriff'; Neustart = 'nie'; Rueckgaengig = 'keins'; Minuten = 10; Vorauswahl = $false; Ueblich = $true; Gruppe = 'Bereinigung und Speicherplatz'
-           Titel = 'Datenträgerbereinigung mit allen Kategorien'
-           Text  = 'Datenträgerbereinigung (cleanmgr mit allen Kategorien außer Downloads)' }
+           Titel = 'Datenträgerbereinigung'
+           Text  = 'Datenträgerbereinigung (cleanmgr ohne Downloads, Papierkorb, Windows.old und ESD-Installationsdateien)' }
         @{ Key = 'Leistungszaehler'; Typ = 'Massnahme'; Risiko = 'Eingriff'; Neustart = 'nie'; Rueckgaengig = 'keins'; Minuten = 1; Vorauswahl = $false; Ueblich = $false; Gruppe = 'Dienste, Geräte und Energie'
            Titel = 'Leistungszähler neu aufbauen'
            Text  = 'Leistungszähler aus der Sicherung neu aufbauen (lodctr /r)' }

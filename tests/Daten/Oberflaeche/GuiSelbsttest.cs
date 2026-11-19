@@ -85,6 +85,12 @@ public static class GuiSelbsttest
         Fall("Sensoren.Seite", SensorenSeite);
         Fall("Datenbank.Seite", DatenbankSeite);
         Fall("Versionen.Spaeter", VersionenSpaeter);
+        Fall("Hintergrund.Sperre", HintergrundSperre);
+        Fall("Update.Pruefsumme", UpdatePruefsumme);
+        Fall("Tastenkuerzel", Tastenkuerzel);
+        Fall("Ergebnis.Dauer", ErgebnisDauer);
+        Fall("Startseite.Neuaufbau", StartseiteNeuaufbau);
+        Fall("Aenderungen.Geraet", AenderungenGeraet);
         foreach (string l in outLines) System.Console.WriteLine(l);
         return 0;
     }
@@ -96,6 +102,30 @@ public static class GuiSelbsttest
         catch (System.Exception ex) { outLines.Add("FEHL|" + name + "|" + ex.Message.Replace("\r", " ").Replace("\n", " ")); }
     }
     static void Ist(bool bedingung, string text) { if (!bedingung) throw new System.Exception(text); }
+
+    // ab v4.11: Protokoll gehört über die Gerätekennung zu diesem PC (auch nach Umbenennen), "fehlgeschlagen" bleibt offen
+    static void AenderungenGeraet()
+    {
+        string alt = ChangeEntry.EigeneGeraetId;
+        try
+        {
+            string hier = System.Environment.MachineName;
+            ChangeEntry.EigeneGeraetId = "G-EIGEN";
+            Ist(ChangeEntry.IstDiesesGeraet("ALTERNAME", "G-EIGEN"), "umbenannter PC mit gleicher Kennung gilt als dieser PC");
+            Ist(!ChangeEntry.IstDiesesGeraet(hier, "G-FREMD"), "gleicher Name, andere Kennung gilt als anderer PC");
+            Ist(ChangeEntry.IstDiesesGeraet(hier, ""), "Protokoll ohne Kennung: Name entscheidet");
+            Ist(!ChangeEntry.IstDiesesGeraet("ANDERER", ""), "Protokoll ohne Kennung, anderer Name");
+            ChangeEntry.EigeneGeraetId = "";
+            Ist(ChangeEntry.IstDiesesGeraet(hier, "G-FREMD"), "eigene Kennung unbekannt: Name entscheidet");
+            ChangeEntry.EigeneGeraetId = "G-EIGEN";
+            ChangeEntry a = new ChangeEntry(); a.Computer = "ALTERNAME"; a.GeraetId = "G-EIGEN"; a.Status = "fehlgeschlagen"; a.FilePath = "x.json"; a.Lauf = "2026-11-01 10:00:00";
+            Ist(a.Undoable, "fehlgeschlagener Eintrag dieses Geräts ist erneut zurücknehmbar");
+            List<ChangeLauf> l = ChangeLauf.Gruppiere(new List<ChangeEntry> { a }, null);
+            Ist(l.Count == 1 && l[0].DieserPc && l[0].Aktiv == 1, "Lauf mit offenem Eintrag gehört zu diesem PC");
+            Ist(ChangeLauf.Aufzuraeumen(l, true, 0, true, System.DateTime.Now).Count == 0, "Aufräumen lässt offenes Protokoll dieses Geräts liegen");
+        }
+        finally { ChangeEntry.EigeneGeraetId = alt; }
+    }
 
     static void UiSkalierung()
     {
@@ -538,7 +568,7 @@ public static class GuiSelbsttest
 
     static void AblageKurzform()
     {
-        Ist(DiagGui.AblageKurz("\\\\ulb.ad.hhu.de\\Home\\wad32muj\\Desktop\\LMB\\Minibench-Daten") == "Ablage: ...\\LMB\\Minibench-Daten", DiagGui.AblageKurz("\\\\ulb.ad.hhu.de\\Home\\wad32muj\\Desktop\\LMB\\Minibench-Daten"));
+        Ist(DiagGui.AblageKurz("\\\\nas.example.org\\home\\nutzer\\Desktop\\LMB\\Minibench-Daten") == "Ablage: ...\\LMB\\Minibench-Daten", DiagGui.AblageKurz("\\\\nas.example.org\\home\\nutzer\\Desktop\\LMB\\Minibench-Daten"));
         Ist(DiagGui.AblageKurz("E:\\Minibench-Daten") == "Ablage: E:\\Minibench-Daten", "Stick");
         Ist(DiagGui.AblageKurz("") == "Ablage: kein Datenordner", "leer");
     }
@@ -1478,7 +1508,7 @@ public static class GuiSelbsttest
         string dir = System.IO.Path.Combine(System.IO.Path.Combine(d, "Änderungen"), pc);
         System.IO.Directory.CreateDirectory(dir);
         System.Text.StringBuilder b = new System.Text.StringBuilder();
-        b.Append("{\"Format\":\"Minibench-Aenderungen/1\",\"Computer\":\"").Append(pc).Append("\",\"GeraetId\":\"G-x\",\"Version\":\"4.10\",\"Lauf\":\"").Append(lauf).Append("\",\"Eintraege\":[");
+        b.Append("{\"Format\":\"Minibench-Aenderungen/1\",\"Computer\":\"").Append(pc).Append("\",\"GeraetId\":\"").Append(pc == System.Environment.MachineName ? "G-test" : "G-" + pc).Append("\",\"Version\":\"4.10\",\"Lauf\":\"").Append(lauf).Append("\",\"Eintraege\":[");
         int id = 0;
         for (int m = 0; m < massnahmen; m++)
             for (int k = 0; k < je; k++)
@@ -1630,6 +1660,152 @@ public static class GuiSelbsttest
                 g.ShowPage(g.versionPage);
                 Ist(g.versionenGefuellt, "nach dem Öffnen gefüllt");
                 g.ShowPage(0);
+            }
+        }
+        finally { Raeume(d); }
+    }
+
+    // ------------------------------------------------------------ ab v4.11: Befunde der Gesamtprüfung 4.10
+    // C1: Solange System-Umzug, winget oder Update-Download laufen, starten weder Lauf noch Live-Ansicht; Schließen fragt nach
+    static void HintergrundSperre()
+    {
+        string d = NeuerDatenordner();
+        System.Collections.Generic.List<string> m = new System.Collections.Generic.List<string>();
+        try
+        {
+            using (DiagGui g = NeueOberflaeche(d, null))
+            {
+                UI.Meldungsprotokoll = m; UI.MeldungsAntwort = false;
+                Ist(g.HintergrundSperre("Der Lauf") == "" && g.hintergrund == null, "ohne Hintergrundarbeit frei");
+                DiagGui.HintergrundArbeit h = g.HintergrundBeginnen("Die Sicherung für den System-Umzug");
+                Ist(h != null && g.HintergrundBeginnen("Die Installation über winget") == null && g.hintergrund == h, "höchstens eine Hintergrundarbeit");
+                g.StartRun();
+                Ist(m.Count == 1 && m[0].Contains("Die Sicherung für den System-Umzug läuft noch") && m[0].Contains("Der Lauf startet erst danach") && !g.running, "Lauf verweigert: " + (m.Count > 0 ? m[0] : "keine Meldung"));
+                g.StartLive();
+                Ist(m.Count == 2 && m[1].Contains("Die Live-Ansicht startet erst danach") && !g.liveRunning, "Live-Ansicht verweigert");
+                bool abgebrochen = false;
+                h.Abbrechen = delegate { abgebrochen = true; };
+                FormClosingEventArgs e = new FormClosingEventArgs(CloseReason.UserClosing, false);
+                g.OnClosing(g, e);
+                Ist(e.Cancel && !abgebrochen && !h.Abgebrochen && g.hintergrund == h && m.Count == 3 && m[2].Contains("Abbrechen und schließen"), "Schließen fragt nach, Nein lässt die Arbeit weiterlaufen");
+                UI.MeldungsAntwort = true;
+                e = new FormClosingEventArgs(CloseReason.UserClosing, false);
+                g.OnClosing(g, e);
+                Ist(!e.Cancel && abgebrochen && h.Abgebrochen && g.hintergrund == null, "Ja beendet die Hintergrundarbeit");
+                g.HintergrundEnde(h);
+                Ist(g.HintergrundSperre("Der Lauf") == "", "danach wieder frei");
+            }
+        }
+        finally { UI.Meldungsprotokoll = null; UI.MeldungsAntwort = false; Raeume(d); }
+    }
+
+    // C2: Ohne bekannte SHA-256 kein Austausch, die Datei wird verworfen; C3: Fortschritt im Etikett
+    static void UpdatePruefsumme()
+    {
+        string d = NeuerDatenordner();
+        string f = System.IO.Path.Combine(d, "LMB.exe");
+        string altUrl = DiagGui.AvailableUpdateUrl, altSha = DiagGui.AvailableUpdateSha256, altVer = DiagGui.AvailableUpdateVersion;
+        System.Collections.Generic.List<string> m = new System.Collections.Generic.List<string>();
+        try
+        {
+            string meldung;
+            System.IO.File.WriteAllText(f, "neue Version");
+            Ist(!DiagGui.PruefeUpdateDatei(f, "", out meldung) && !System.IO.File.Exists(f) && meldung.Contains("Release ohne Prüfsumme, Update von Hand") && meldung.Contains("verworfen"), "ohne Prüfsumme verworfen: " + meldung);
+            System.IO.File.WriteAllText(f, "neue Version");
+            Ist(!DiagGui.PruefeUpdateDatei(f, new string('0', 64), out meldung) && !System.IO.File.Exists(f) && meldung.Contains("Sicherheitsprüfung fehlgeschlagen"), "falsche Prüfsumme verworfen");
+            System.IO.File.WriteAllText(f, "neue Version");
+            string sha;
+            using (System.Security.Cryptography.SHA256 s = System.Security.Cryptography.SHA256.Create())
+                sha = System.BitConverter.ToString(s.ComputeHash(System.IO.File.ReadAllBytes(f))).Replace("-", "");
+            Ist(DiagGui.PruefeUpdateDatei(f, sha, out meldung) && System.IO.File.Exists(f) && meldung == "", "passende Prüfsumme (Großbuchstaben) wird angenommen");
+            Ist(!DiagGui.PruefeUpdateDatei(System.IO.Path.Combine(d, "fehlt.exe"), sha, out meldung), "fehlende Datei");
+            Ist(DiagGui.UpdateFortschrittText(50, 200) == "Update wird geladen: 25 %", DiagGui.UpdateFortschrittText(50, 200));
+            Ist(DiagGui.UpdateFortschrittText(1572864, -1) == "Update wird geladen: 1,5 MB", DiagGui.UpdateFortschrittText(1572864, -1));
+            using (DiagGui g = NeueOberflaeche(d, null))
+            {
+                UI.Meldungsprotokoll = m;
+                DiagGui.AvailableUpdateUrl = "https://example.invalid/LMB.exe"; DiagGui.AvailableUpdateSha256 = ""; DiagGui.AvailableUpdateVersion = "v9.99";
+                g.TriggerUpdateDownload();
+                Ist(m.Count == 1 && m[0].Contains("Release ohne Prüfsumme, Update von Hand") && m[0].Contains("releases/tag/v9.99"), "Meldung ohne Prüfsumme: " + (m.Count > 0 ? m[0] : "keine"));
+                Ist(g.hintergrund == null && !System.IO.Directory.Exists(System.IO.Path.Combine(d, "Update")), "ohne Prüfsumme wird nichts heruntergeladen");
+            }
+        }
+        finally
+        {
+            UI.Meldungsprotokoll = null;
+            DiagGui.AvailableUpdateUrl = altUrl; DiagGui.AvailableUpdateSha256 = altSha; DiagGui.AvailableUpdateVersion = altVer;
+            Raeume(d);
+        }
+    }
+
+    // C5: F5 und Strg+Eingabe über ProcessCmdKey, damit sie auch mit Fokus in einem Kind wirken
+    static void Tastenkuerzel()
+    {
+        string d = NeuerDatenordner();
+        try
+        {
+            using (DiagGui g = NeueOberflaeche(d, null))
+            using (TextBox tb = new TextBox())
+            {
+                System.Reflection.MethodInfo mi = typeof(DiagGui).GetMethod("ProcessCmdKey", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null, new System.Type[] { typeof(Message).MakeByRefType(), typeof(Keys) }, null);
+                Ist(mi != null && mi.DeclaringType == typeof(DiagGui), "DiagGui überschreibt ProcessCmdKey");
+                Ist((bool)mi.Invoke(g, new object[] { new Message(), Keys.F5 }), "ProcessCmdKey behandelt F5");
+                tb.Multiline = true;
+                Ist(g.Tastenkuerzel(Keys.F5, tb), "F5 wirkt auch mit Fokus im Textfeld");
+                Ist(!g.Tastenkuerzel(Keys.Control | Keys.Enter, tb), "Strg+Eingabe bleibt im mehrzeiligen Textfeld ein Zeilenumbruch");
+                Ist(!g.Tastenkuerzel(Keys.Enter, null) && !g.Tastenkuerzel(Keys.A, null) && !g.Tastenkuerzel(Keys.Shift | Keys.F5, null), "andere Tasten gehen an das Element");
+            }
+        }
+        finally { Raeume(d); }
+    }
+
+    // C6: Dauer des Laufs über eine Stunde
+    static void ErgebnisDauer()
+    {
+        Ist(DiagGui.LaufDauerText(System.TimeSpan.FromSeconds(3912)) == "1:05:12 Std.", DiagGui.LaufDauerText(System.TimeSpan.FromSeconds(3912)));
+        Ist(DiagGui.LaufDauerText(System.TimeSpan.FromSeconds(75)) == "01:15 Min.", DiagGui.LaufDauerText(System.TimeSpan.FromSeconds(75)));
+        Ist(DiagGui.LaufDauerText(System.TimeSpan.FromSeconds(3599)) == "59:59 Min.", "knapp unter einer Stunde");
+        Ist(DiagGui.LaufDauerText(System.TimeSpan.FromHours(25.5)) == "25:30:00 Std.", DiagGui.LaufDauerText(System.TimeSpan.FromHours(25.5)));
+        Ist(DiagGui.LaufDauerText(System.TimeSpan.FromSeconds(-5)) == "00:00 Min.", "negative Dauer");
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern int GetGuiResources(System.IntPtr prozess, int art);
+    static int ZaehleElemente(Control c) { int n = 1; foreach (Control k in c.Controls) n += ZaehleElemente(k); return n; }
+    static Control MitHinweis(ToolTip t, Control c)
+    {
+        foreach (Control k in c.Controls)
+        {
+            if (t.GetToolTip(k).Length > 0) return k;
+            Control x = MitHinweis(t, k); if (x != null) return x;
+        }
+        return null;
+    }
+
+    // C7: Startseite gibt beim Neuaufbau die alten Elemente frei und löst ihre Hinweise; Handles wachsen nicht
+    static void StartseiteNeuaufbau()
+    {
+        string d = NeuerDatenordner();
+        try
+        {
+            SchreibeLauf(d, "2026-11-10 14:20", true, true);
+            using (DiagGui g = NeueOberflaeche(d, null))
+            {
+                Control start = g.pages[0];
+                g.CreateControl();
+                g.ReloadDb();
+                int n1 = ZaehleElemente(start);
+                Control alt = MitHinweis(g.tip, start);
+                Ist(alt != null && n1 > 20, "Startseite mit Elementen und Hinweisen: " + n1);
+                System.IntPtr ich = System.Diagnostics.Process.GetCurrentProcess().Handle;
+                int user1 = GetGuiResources(ich, 1), gdi1 = GetGuiResources(ich, 0);
+                for (int i = 0; i < 5; i++) g.ReloadDb();
+                int n2 = ZaehleElemente(start), user2 = GetGuiResources(ich, 1), gdi2 = GetGuiResources(ich, 0);
+                Ist(n2 == n1, "Anzahl der Elemente bleibt gleich: " + n1 + " -> " + n2);
+                Ist(alt.IsDisposed && alt.Parent == null, "altes Element freigegeben");
+                Ist(g.tip.GetToolTip(alt) == "", "Hinweis des alten Elements gelöst");
+                Ist(user2 - user1 < 30, "USER-Objekte wachsen nicht: " + user1 + " -> " + user2);
+                Ist(gdi2 - gdi1 < 60, "GDI-Objekte wachsen nicht: " + gdi1 + " -> " + gdi2);
             }
         }
         finally { Raeume(d); }

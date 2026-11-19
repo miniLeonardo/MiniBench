@@ -235,76 +235,161 @@ public partial class DiagGui
         return String.Compare(remote, local, StringComparison.OrdinalIgnoreCase) > 0;
     }
 
-    void TriggerUpdateDownload()
+    internal void TriggerUpdateDownload()
     {
+        if (UpdateDownloadAbbrechen()) return;
         if (String.IsNullOrEmpty(AvailableUpdateUrl))
         {
             MessageBox.Show(this, "Keine Download-Adresse für das Update gefunden.", "Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
+        // ab v4.11: ohne bekannte Prüfsumme kein Austausch (bis v4.10 wurde die Datei dann ungeprüft eingesetzt)
+        if (String.IsNullOrEmpty(AvailableUpdateSha256))
+        {
+            UI.Hinweis(UpdateOhnePruefsummeText(AvailableUpdateVersion), "Minibench-Update", this);
+            return;
+        }
+        if (running) { UI.Hinweis("Während eines Laufs ist kein Update möglich.", "Minibench-Update", this); return; }
+        if (HintergrundBelegt("Das Update")) return;
+
         string msg = "Update auf Version " + AvailableUpdateVersion + " jetzt herunterladen und LMB.exe austauschen?\r\n\r\n" +
-                     "Leos Minibench schließt sich dafür. Die bisherige Programmdatei und ein Skript daneben (LeosMinibench.ps1) werden im Datenordner unter Archiv gesichert, danach startet die neue Version.";
+                     "Die Datei wird vor dem Austausch mit der SHA-256-Prüfsumme des Releases verglichen. Leos Minibench schließt sich dafür. Die bisherige Programmdatei und ein Skript daneben (LeosMinibench.ps1) werden im Datenordner unter Archiv gesichert, danach startet die neue Version.";
         if (!UI.Ask(msg, "Minibench Update", this))
             return;
+        if (running || HintergrundBelegt("Das Update")) return;
 
+        string targetExe;
         try
         {
             string updateDir = Path.Combine(dataDir, "Update");
             if (!Directory.Exists(updateDir)) Directory.CreateDirectory(updateDir);
-            string targetExe = Path.Combine(updateDir, "LMB.exe");
-
-            Cursor.Current = Cursors.WaitCursor;
-
+            targetExe = Path.Combine(updateDir, "LMB.exe");
+            if (File.Exists(targetExe)) File.Delete(targetExe);
             NetzVorbereiten(); // Tls12 und Proxy, auch ohne vorherige Prüfung im selben Prozess
-            if (running) { UI.Hinweis("Während eines Laufs ist kein Update möglich.", "Update", this); return; }
-            using (System.Net.WebClient wc = new System.Net.WebClient())
-            {
-                wc.Headers["User-Agent"] = "LeosMinibench";
-                wc.DownloadFile(AvailableUpdateUrl, targetExe);
-            }
-
-            if (File.Exists(targetExe))
-            {
-                string hash = "";
-                using (System.Security.Cryptography.SHA256 sha = System.Security.Cryptography.SHA256.Create())
-                using (FileStream fs = File.OpenRead(targetExe))
-                {
-                    byte[] bytes = sha.ComputeHash(fs);
-                    StringBuilder sb = new StringBuilder();
-                    for (int i = 0; i < bytes.Length; i++) sb.Append(bytes[i].ToString("x2"));
-                    hash = sb.ToString();
-                }
-
-                if (!String.IsNullOrEmpty(AvailableUpdateSha256))
-                {
-                    if (!hash.Equals(AvailableUpdateSha256, StringComparison.OrdinalIgnoreCase))
-                    {
-                        try { File.Delete(targetExe); } catch { }
-                        MessageBox.Show(this,
-                            "Sicherheitsprüfung fehlgeschlagen:\r\n\r\n" +
-                            "Die SHA-256-Prüfsumme der heruntergeladenen Datei stimmt nicht mit der Vorgabe des Releases überein:\r\n\r\n" +
-                            "Erwartet: " + AvailableUpdateSha256 + "\r\n" +
-                            "Berechnet: " + hash + "\r\n\r\n" +
-                            "Die Datei wurde aus Sicherheitsgründen verworfen.",
-                            "Update-Sicherheitsfehler",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Error);
-                        return;
-                    }
-                }
-
-                ExecuteSelfReplace(targetExe);
-            }
         }
         catch (Exception ex)
         {
-            UI.Hinweis("Fehler beim Herunterladen des Updates:\r\n\r\n" + ex.Message, "Update Fehler", this);
+            UI.Hinweis("Das Update kann nicht vorbereitet werden:\r\n\r\n" + ex.Message, "Update Fehler", this);
+            return;
         }
-        finally
+        StarteUpdateDownload(AvailableUpdateUrl, targetExe, AvailableUpdateSha256);
+    }
+
+    // ab v4.11: Herunterladen im Hintergrund (bis v4.10 DownloadFile im Oberflächen-Thread, bis 100 s "Keine Rückmeldung").
+    // Fortschritt steht im Etikett der Kopfzeile; ein Klick darauf bricht ab, ebenso Schließen.
+    System.Net.WebClient updateWc;
+
+    void StarteUpdateDownload(string url, string targetExe, string sha256)
+    {
+        HintergrundArbeit arbeit = HintergrundBeginnen("Das Herunterladen des Updates");
+        if (arbeit == null) return;
+        string altText = badgeUpdate != null ? badgeUpdate.Text : "";
+        System.Net.WebClient wc = new System.Net.WebClient();
+        wc.Headers["User-Agent"] = "LeosMinibench";
+        updateWc = wc;
+        arbeit.Abbrechen = delegate { try { wc.CancelAsync(); } catch { } };
+        if (badgeUpdate != null)
         {
-            Cursor.Current = Cursors.Default;
+            SetText(badgeUpdate, "Update wird geladen ...");
+            Tip(badgeUpdate, "Das Update wird heruntergeladen. Klicken bricht das Herunterladen ab.");
         }
+        wc.DownloadProgressChanged += delegate(object s, System.Net.DownloadProgressChangedEventArgs e) {
+            if (badgeUpdate == null || badgeUpdate.IsDisposed) return;
+            SetText(badgeUpdate, UpdateFortschrittText(e.BytesReceived, e.TotalBytesToReceive));
+        };
+        wc.DownloadFileCompleted += delegate(object s, System.ComponentModel.AsyncCompletedEventArgs e) {
+            updateWc = null;
+            HintergrundEnde(arbeit);
+            try { wc.Dispose(); } catch { }
+            if (IsDisposed || hintergrundGeschlossen) { try { File.Delete(targetExe); } catch { } return; }
+            if (badgeUpdate != null)
+            {
+                SetText(badgeUpdate, altText);
+                Tip(badgeUpdate, "Ein Update für Leos Minibench ist verfügbar. Klicken zum Herunterladen und Aktualisieren.");
+            }
+            if (e.Cancelled || arbeit.Abgebrochen)
+            {
+                try { File.Delete(targetExe); } catch { }
+                UI.Hinweis("Das Herunterladen des Updates wurde abgebrochen. Leos Minibench bleibt unverändert.", "Minibench-Update", this);
+                return;
+            }
+            if (e.Error != null)
+            {
+                try { File.Delete(targetExe); } catch { }
+                UI.Hinweis("Fehler beim Herunterladen des Updates:\r\n\r\n" + FehlerText(e.Error) + "\r\n\r\nLeos Minibench bleibt unverändert.", "Update Fehler", this);
+                return;
+            }
+            string meldung;
+            if (!PruefeUpdateDatei(targetExe, sha256, out meldung)) { UI.Hinweis(meldung, "Update-Sicherheitsfehler", this); return; }
+            if (running) { try { File.Delete(targetExe); } catch { } UI.Hinweis("Während eines Laufs ist kein Update möglich.", "Minibench-Update", this); return; }
+            ExecuteSelfReplace(targetExe);
+        };
+        try { wc.DownloadFileAsync(new Uri(url), targetExe); }
+        catch (Exception ex)
+        {
+            updateWc = null; HintergrundEnde(arbeit);
+            try { wc.Dispose(); } catch { }
+            if (badgeUpdate != null) SetText(badgeUpdate, altText);
+            UI.Hinweis("Fehler beim Herunterladen des Updates:\r\n\r\n" + FehlerText(ex), "Update Fehler", this);
+        }
+    }
+
+    // Klick auf das Etikett während des Herunterladens: nachfragen und abbrechen
+    bool UpdateDownloadAbbrechen()
+    {
+        if (updateWc == null) return false;
+        if (UI.Ask("Das Update wird gerade heruntergeladen. Herunterladen abbrechen?", "Minibench-Update", this) && hintergrund != null) HintergrundBeenden();
+        return true;
+    }
+
+    public static string UpdateFortschrittText(long geladen, long gesamt)
+    {
+        CultureInfo de = new CultureInfo("de-DE");
+        if (gesamt > 0) return "Update wird geladen: " + Math.Min(100, (int)(geladen * 100 / gesamt)) + " %";
+        return "Update wird geladen: " + (geladen / 1048576.0).ToString("0.0", de) + " MB";
+    }
+
+    public static string UpdateOhnePruefsummeText(string version)
+    {
+        string tag = String.IsNullOrEmpty(version) ? "" : version;
+        return "Release ohne Prüfsumme, Update von Hand.\r\n\r\nDas Release " + tag + " nennt keine SHA-256-Prüfsumme für LMB.exe. Ohne sie lässt sich die heruntergeladene Datei nicht prüfen, deshalb tauscht Leos Minibench die Programmdatei nicht selbst aus.\r\n\r\n" +
+               "Die neue LMB.exe steht auf https://github.com/" + UpdateRepo + "/releases" + (tag.Length > 0 ? "/tag/" + tag : "") + " und lässt sich dort von Hand herunterladen.";
+    }
+
+    // Prüft die heruntergeladene Datei gegen die Prüfsumme des Releases. Ohne Prüfsumme oder bei Abweichung wird die Datei
+    // verworfen und meldung erklärt warum; true nur bei Übereinstimmung.
+    public static bool PruefeUpdateDatei(string datei, string erwartet, out string meldung)
+    {
+        meldung = "";
+        if (String.IsNullOrEmpty(datei) || !File.Exists(datei)) { meldung = "Die heruntergeladene Datei fehlt."; return false; }
+        if (String.IsNullOrEmpty(erwartet))
+        {
+            try { File.Delete(datei); } catch { }
+            meldung = "Release ohne Prüfsumme, Update von Hand. Die heruntergeladene Datei wurde verworfen.";
+            return false;
+        }
+        string hash = "";
+        try
+        {
+            using (System.Security.Cryptography.SHA256 sha = System.Security.Cryptography.SHA256.Create())
+            using (FileStream fs = File.OpenRead(datei))
+            {
+                byte[] bytes = sha.ComputeHash(fs);
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < bytes.Length; i++) sb.Append(bytes[i].ToString("x2"));
+                hash = sb.ToString();
+            }
+        }
+        catch (Exception ex) { hash = ""; meldung = ex.Message; }
+        if (hash.Length > 0 && hash.Equals(erwartet.Trim(), StringComparison.OrdinalIgnoreCase)) return true;
+        try { File.Delete(datei); } catch { }
+        meldung = "Sicherheitsprüfung fehlgeschlagen:\r\n\r\n" +
+                  "Die SHA-256-Prüfsumme der heruntergeladenen Datei stimmt nicht mit der Vorgabe des Releases überein:\r\n\r\n" +
+                  "Erwartet: " + erwartet + "\r\n" +
+                  "Berechnet: " + (hash.Length > 0 ? hash : "nicht lesbar (" + meldung + ")") + "\r\n\r\n" +
+                  "Die Datei wurde aus Sicherheitsgründen verworfen.";
+        return false;
     }
 
     // Programmdatei austauschen (ab v4.03 neu). Bis v4.02 hielt das Austauschskript this.psExe für die Programmdatei:

@@ -115,6 +115,17 @@ function Get-CimCached([string]$Class, [string]$Namespace = '') {
     return $script:CimCache[$k]
 }
 
+# ab v4.11: freier Arbeitsspeicher in Byte, frisch abgefragt (Get-CimCached liefert den Stand vom Laufbeginn; ein RAM-Test
+# danach konnte mehr belegen als frei war). Ersatz bei Fehler: Wert aus dem Cache.
+function Get-FreeRamBytes {
+    try {
+        $os = @(Get-CimInstance Win32_OperatingSystem -Property FreePhysicalMemory -ErrorAction Stop) | Select-Object -First 1
+        if ($os -and [double]$os.FreePhysicalMemory -gt 0) { return [long]([double]$os.FreePhysicalMemory * 1KB) }
+    } catch { }
+    $c = @(Get-CimCached Win32_OperatingSystem) | Select-Object -First 1
+    if ($c -and [double]$c.FreePhysicalMemory -gt 0) { return [long]([double]$c.FreePhysicalMemory * 1KB) }
+    return [long]0
+}
 # Laufzeit seit dem Start lesbar (ab v2.8): "5 Std 21 Min", "3 Tage 2 Std", ohne "0 Tage"
 function Format-Uptime([TimeSpan]$Span) {
     if ($Span.TotalMinutes -lt 1) { return 'unter 1 Min' }
@@ -593,6 +604,17 @@ function Get-EstimatedSystemPower {
     }
 }
 
+# ab v4.11 (Vorgabe 11): Verbrauchsstufe ohne eigenen Messwert
+function New-PowerStageNichtGemessen([string]$Stage, [string]$Grund, [bool]$IsNotebook, $PsuWattage, $PsuRating) {
+    return [pscustomobject]@{
+        Verfuegbar = $false; NichtGemessen = $true; Stage = $Stage; Text = 'nicht gemessen'
+        P_AC = $null; P_DC = $null; CpuW = $null; GpuW = $null; RamW = $null; BoardW = $null; DiskW = $null; FanW = $null; VrmW = $null
+        Wirkungsgrad = $null; WirkungsgradProzent = $null; LoadPercent = $null
+        PsuWattage = $PsuWattage; PsuRating = $PsuRating; IsNotebook = $IsNotebook
+        Aufschluesselung = ('nicht gemessen: {0}' -f $Grund); AufschluesselungKurz = 'nicht gemessen'
+    }
+}
+
 function Get-SystemPowerProfile($Entry = $null) {
     $isNb = $(if ($Entry) {
         if (Get-Command 'Test-EntryIsNotebook' -ErrorAction SilentlyContinue) { [bool](& 'Test-EntryIsNotebook' $Entry) } else { $false }
@@ -609,6 +631,8 @@ function Get-SystemPowerProfile($Entry = $null) {
                elseif ($Entry -and $Entry.PsuRating) { [string]$Entry.PsuRating }
                elseif ($script:PsuRating) { [string]$script:PsuRating }
                else { '80 PLUS Bronze' }
+    # ab v4.11: Nennleistung wirklich eingegeben (Einstellungen oder Parameter), nicht nur die Vorgabe 650 W
+    $psuEingegeben = $(if ($Entry) { [bool]($Entry.Netzteil -and $Entry.Netzteil.Eingegeben) } else { [bool]$script:PsuEingegeben })
 
     # RAM-Größe und DIMMs
     $ramGb = 16.0
@@ -670,6 +694,8 @@ function Get-SystemPowerProfile($Entry = $null) {
     if ($Entry) {
         if ($Entry.Sensoren) {
             if ($Entry.Sensoren.Leerlauf -and $Entry.Sensoren.Leerlauf.CpuW) { $cpuWIdle = [double]$Entry.Sensoren.Leerlauf.CpuW }
+            # ab v4.11: gemessene GPU-Leistung im Leerlauf auch aus dem Datenbankeintrag (bis v4.10 immer 12 W angenommen)
+            if ($Entry.Sensoren.Leerlauf -and $Entry.Sensoren.Leerlauf.GpuW) { $gpuWIdle = [double]$Entry.Sensoren.Leerlauf.GpuW }
             if ($Entry.Sensoren.Last -and $Entry.Sensoren.Last.CpuWMax) { $cpuWMax = [double]$Entry.Sensoren.Last.CpuWMax }
             if ($Entry.Sensoren.Last -and $Entry.Sensoren.Last.GpuWMax) { $gpuWMax = [double]$Entry.Sensoren.Last.GpuWMax }
             if ($null -eq $cpuWMax -and $Entry.Sensoren.Benchmark -and $Entry.Sensoren.Benchmark.CpuWMax) { $cpuWMax = [double]$Entry.Sensoren.Benchmark.CpuWMax }
@@ -704,48 +730,33 @@ function Get-SystemPowerProfile($Entry = $null) {
     }
 
     if (-not $hasDgpu) { $gpuWIdle = 0.0; $gpuWMax = 0.0 }
-    elseif ($null -eq $gpuWIdle -and $hasDgpu) { $gpuWIdle = $(if ($isNb) { 5.0 } else { 12.0 }) }
 
-    if ($null -eq $cpuWIdle -and $null -ne $cpuWMax -and $cpuWMax -gt 0) {
-        $cpuWIdle = $(if ($isNb) { [math]::Min(10.0, [math]::Max(4.0, [math]::Round($cpuWMax * 0.15, 1))) } else { [math]::Min(25.0, [math]::Max(12.0, [math]::Round($cpuWMax * 0.18, 1))) })
-    }
-
-    # Teillast (Alltag & Büro): CPU_Idle + 20 W, GPU_Idle + 15 W + Teillast-Restsystem
-    $cpuWPart = $null; $gpuWPart = $null
-    if ($null -ne $cpuWIdle) {
-        $cpuWPart = [math]::Round($cpuWIdle + 20.0, 1)
-    } elseif ($null -ne $cpuWMax) {
-        $cpuWPart = [math]::Round($cpuWMax * 0.40, 1)
-    }
-
-    if ($hasDgpu) {
-        if ($null -ne $gpuWIdle) {
-            $gpuWPart = [math]::Round($gpuWIdle + 15.0, 1)
-        } elseif ($null -ne $gpuWMax) {
-            $gpuWPart = [math]::Round($gpuWMax * 0.25, 1)
-        }
+    # ab v4.11 (Vorgabe 11): Jede Stufe erscheint nur mit eigenem Messwert. Teillast und Gaming werden nicht gemessen
+    # (bis v4.10: Leerlauf + 20 W bzw. min(0,75 x CPU-Max, 65 W)), der Leerlauf braucht die gemessene CPU-Leistung im
+    # Leerlauf und mit Grafikkarte auch deren Leerlaufleistung (bis v4.10 ersetzt durch 18 % der Volllast bzw. 12 W).
+    $idleGemessen = ($null -ne $cpuWIdle -and $cpuWIdle -gt 0 -and ($null -ne $gpuWIdle))
+    $pIdle = $(if ($idleGemessen) {
+        Get-EstimatedSystemPower -CpuW $cpuWIdle -GpuW $gpuWIdle -IsNotebook:$isNb -GpuName $gpuName -DimmCount $dimmCount -RamOc:$ramOc -Disks $disksList -DiskCount $diskCount -FanCount $fanCount -IsIdle -Stage 'Idle' -PsuWattage $psuWatt -PsuRating $psuRate
     } else {
-        $gpuWPart = 0.0
-    }
-
-    # Gaming: CPU-Schnitt während Grafik-Benchmark (Fallback: min(CPU_Max * 0.75, 65 W)) + maximale GPU-Last
-    $cpuWGaming = $null
-    if ($null -ne $cpuWMax -and $cpuWMax -gt 0) {
-        $cpuWGaming = [math]::Min($cpuWMax * 0.75, 65.0)
-    }
-
-    $pIdle = Get-EstimatedSystemPower -CpuW $cpuWIdle -GpuW $gpuWIdle -IsNotebook:$isNb -GpuName $gpuName -DimmCount $dimmCount -RamOc:$ramOc -Disks $disksList -DiskCount $diskCount -FanCount $fanCount -IsIdle -Stage 'Idle' -PsuWattage $psuWatt -PsuRating $psuRate
-    $pPart = Get-EstimatedSystemPower -CpuW $cpuWPart -GpuW $gpuWPart -IsNotebook:$isNb -GpuName $gpuName -DimmCount $dimmCount -RamOc:$ramOc -Disks $disksList -DiskCount $diskCount -FanCount $fanCount -IsTeillast -Stage 'Teillast' -PsuWattage $psuWatt -PsuRating $psuRate
-    $pGaming = Get-EstimatedSystemPower -CpuW $cpuWGaming -GpuW $gpuWMax -IsNotebook:$isNb -GpuName $gpuName -DimmCount $dimmCount -RamOc:$ramOc -Disks $disksList -DiskCount $diskCount -FanCount $fanCount -Stage 'Gaming' -PsuWattage $psuWatt -PsuRating $psuRate
+        New-PowerStageNichtGemessen 'Idle' $(if ($null -eq $cpuWIdle) { 'Keine gemessene CPU-Leistung im Leerlauf.' } else { 'Keine gemessene Leistung der Grafikkarte im Leerlauf.' }) $isNb $psuWatt $psuRate
+    })
+    $pPart = New-PowerStageNichtGemessen 'Teillast' 'Für Teillast gibt es keine eigene Messung.' $isNb $psuWatt $psuRate
+    $pGaming = New-PowerStageNichtGemessen 'Gaming' 'Für typisches Spielen gibt es keine eigene Messung.' $isNb $psuWatt $psuRate
     $pLoad = Get-EstimatedSystemPower -CpuW $cpuWMax  -GpuW $gpuWMax  -IsNotebook:$isNb -GpuName $gpuName -DimmCount $dimmCount -RamOc:$ramOc -Disks $disksList -DiskCount $diskCount -DiskLoad -FanCount $fanCount -Stage 'Load' -PsuWattage $psuWatt -PsuRating $psuRate
 
-    # Befund / Warnung bei Überlastung (> 85 %)
-    if (-not $Entry -and $pLoad.Verfuegbar -and $pLoad.PsuWattage -gt 0 -and $null -ne $pLoad.LoadPercent -and $pLoad.LoadPercent -gt 85) {
+    # Für die Effizienz-Indizes (Punkte je Watt) bleibt das bisherige Modell, damit gespeicherte Werte vergleichbar bleiben;
+    # sie sind als modelliert gekennzeichnet und erscheinen nicht als Verbrauchsstufe.
+    $gpuWIdleModell = $gpuWIdle
+    if ($null -eq $gpuWIdleModell -and $hasDgpu) { $gpuWIdleModell = $(if ($isNb) { 5.0 } else { 12.0 }) }
+    $cpuWGamingModell = $(if ($null -ne $cpuWMax -and $cpuWMax -gt 0) { [math]::Min($cpuWMax * 0.75, 65.0) } else { $null })
+    $pGamingModell = Get-EstimatedSystemPower -CpuW $cpuWGamingModell -GpuW $gpuWMax -IsNotebook:$isNb -GpuName $gpuName -DimmCount $dimmCount -RamOc:$ramOc -Disks $disksList -DiskCount $diskCount -FanCount $fanCount -Stage 'Gaming' -PsuWattage $psuWatt -PsuRating $psuRate
+
+    # Befund / Warnung bei Überlastung (> 85 %), ab v4.11 nur mit eingegebener Nennleistung (nicht mit der Vorgabe 650 W)
+    if (-not $Entry -and $psuEingegeben -and $pLoad.Verfuegbar -and $pLoad.PsuWattage -gt 0 -and $null -ne $pLoad.LoadPercent -and $pLoad.LoadPercent -gt 85) {
         if (Get-Command Add-Finding -ErrorAction SilentlyContinue) {
             Add-Finding 'WARNUNG' 'Energie' ('Netzteil unter Volllast zu {0:N0} % ausgelastet ({1:N0} W von {2:N0} W Nennleistung). Wenig Puffer für Lastspitzen und Transienten.' -f $pLoad.LoadPercent, $pLoad.P_DC, $pLoad.PsuWattage)
         }
     }
-
     # Effizienz-Indizes ermitteln
     $eff = [ordered]@{
         CpuMT_PerWatt  = $null
@@ -817,9 +828,9 @@ function Get-SystemPowerProfile($Entry = $null) {
     }
 
     # Gesamtsystem-Effizienz: gewichtetes harmonisches Mittel der gemessenen Teillast-/Benchmark-Effizienzen
-    $pCpuLoad = Get-EstimatedSystemPower -CpuW $cpuWMax -GpuW $gpuWIdle -IsNotebook:$isNb -GpuName $gpuName -DimmCount $dimmCount -RamOc:$ramOc -Disks $disksList -DiskCount $diskCount -FanCount $fanCount -Stage 'CpuLoad' -PsuWattage $psuWatt -PsuRating $psuRate
+    $pCpuLoad = Get-EstimatedSystemPower -CpuW $cpuWMax -GpuW $gpuWIdleModell -IsNotebook:$isNb -GpuName $gpuName -DimmCount $dimmCount -RamOc:$ramOc -Disks $disksList -DiskCount $diskCount -FanCount $fanCount -Stage 'CpuLoad' -PsuWattage $psuWatt -PsuRating $psuRate
     $pCpuAc = if ($pCpuLoad.Verfuegbar -and $pCpuLoad.P_AC -gt 0) { $pCpuLoad.P_AC } elseif ($null -ne $cpuWMax -and $cpuWMax -gt 0) { $cpuWMax * 1.25 + 25.0 } else { $null }
-    $pGpuAc = if ($pGaming.Verfuegbar -and $pGaming.P_AC -gt 0) { $pGaming.P_AC } elseif ($null -ne $gpuWMax -and $gpuWMax -gt 0) { ($gpuWMax + 50.0) * 1.25 + 25.0 } else { $null }
+    $pGpuAc = if ($pGamingModell.Verfuegbar -and $pGamingModell.P_AC -gt 0) { $pGamingModell.P_AC } elseif ($null -ne $gpuWMax -and $gpuWMax -gt 0) { ($gpuWMax + 50.0) * 1.25 + 25.0 } else { $null }
 
     $effCpuNorm = if ($cpuMtScore -gt 0 -and $null -ne $pCpuAc -and $pCpuAc -gt 0) { (($cpuMtScore / 28000.0) * 100.0 / $pCpuAc) * 100.0 } else { $null }
     $sGpu = if ($null -ne $gpuFps -and $gpuFps -gt 0) { ($gpuFps / 100.0) * 100.0 } elseif ($null -ne $gpuPoints -and $gpuPoints -gt 0) { ($gpuPoints / 10000.0) * 100.0 } elseif ($Entry -and $Entry.Werte -and $Entry.Werte['GPU|VMB'] -gt 0) { ([double]$Entry.Werte['GPU|VMB'] / 300.0) * 100.0 } else { $null }
@@ -850,6 +861,7 @@ function Get-SystemPowerProfile($Entry = $null) {
         Effizienz   = [pscustomobject]$eff
         PsuWattage  = $psuWatt
         PsuRating   = $psuRate
+        PsuEingegeben = [bool]$psuEingegeben
     }
 }
 

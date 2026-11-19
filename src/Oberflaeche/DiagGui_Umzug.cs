@@ -632,6 +632,8 @@ public partial class DiagGui
         };
 
         btnStartUmzug.Click += delegate {
+            if (running) { UI.Hinweis("Während eines Laufs startet keine Sicherung.", "System-Umzug", this); return; }
+            if (HintergrundBelegt("Die Sicherung")) return;
             int selIdx = cmbDest.SelectedIndex;
             if (selIdx < 0 || selIdx >= destPaths.Count || String.IsNullOrEmpty(destPaths[selIdx]))
             {
@@ -684,6 +686,8 @@ public partial class DiagGui
                             "\r\nEs wird ein autarkes Wiederherstellungspaket (Wiederherstellen.cmd) erzeugt.";
 
             if (MessageBox.Show(this, prompt, "System-Umzug starten", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            if (running || HintergrundBelegt("Die Sicherung")) return;
+            HintergrundArbeit arbeit = HintergrundBeginnen("Die Sicherung für den System-Umzug");
 
             sperre(true);
 
@@ -703,6 +707,7 @@ public partial class DiagGui
                 string createdPath = "";
                 bool isSuccess = false;
                 string errMsg = "";
+                bool eof = false;
 
                 try
                 {
@@ -716,7 +721,7 @@ public partial class DiagGui
                     {
                         p.StartInfo = psi;
                         p.OutputDataReceived += delegate(object s, DataReceivedEventArgs e) {
-                            if (e.Data == null) return;
+                            if (e.Data == null) { eof = true; return; }
                             string line = e.Data.Trim();
                             if (line.Length == 0) return;
 
@@ -791,9 +796,20 @@ public partial class DiagGui
                             }
                         };
                         p.Start();
+                        arbeit.Prozess = p;
                         p.BeginOutputReadLine();
-                        p.WaitForExit();
-                        if (p.ExitCode == 0 && String.IsNullOrEmpty(errMsg)) isSuccess = true;
+                        // ab v4.11 ohne WaitForExit() ohne Frist: Die Sicherung darf lange dauern, endet aber, sobald
+                        // Schließen sie abbricht; danach höchstens 5 s auf die letzten Zeilen warten (hält ein
+                        // Kindprozess die Ausgabe offen, nicht ewig)
+                        while (!p.WaitForExit(1000))
+                        {
+                            if (arbeit.Abgebrochen) { KillProc(p); p.WaitForExit(10000); break; }
+                        }
+                        DateTime eu = DateTime.Now.AddSeconds(5);
+                        while (!eof && DateTime.Now < eu) System.Threading.Thread.Sleep(20);
+                        arbeit.Prozess = null;
+                        if (arbeit.Abgebrochen) { isSuccess = false; errMsg = "Sicherung abgebrochen."; }
+                        else if (p.HasExited && p.ExitCode == 0 && String.IsNullOrEmpty(errMsg)) isSuccess = true;
                     }
                 }
                 catch (Exception ex)
@@ -804,6 +820,8 @@ public partial class DiagGui
                 try
                 {
                     BeginInvoke(new MethodInvoker(delegate {
+                        HintergrundEnde(arbeit);
+                        if (hintergrundGeschlossen) return;
                         sperre(false);
                         lblUmzugDetail.Visible = false;
 

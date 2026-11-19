@@ -5,6 +5,21 @@ Neueste Version zuerst. Einzelheiten je Version in Doku\Änderungen_vX.Y.txt (ab
 keine Änderungsdateien mehr; die Einträge nennen nur, was im Quelltext und in den Änderungen zu 2.2 belegt ist.
 Die Liste steht auch im Programm (Info-Knopf oben rechts, Quelle: src\Oberflaeche\Versionen.cs).
 
+VERSION 4.11  (19.11.2026)  SICHERHEIT UND RÜCKNAHME: BEFUNDE DER GESAMTPRÜFUNG BEHOBEN
+=======================================================================================
+• Behoben: PawnIO wurde auch installiert, wenn der Treiber auf „nein“ stand (Arbeitsprozesse laufen immer mit Administratorrechten). Jetzt nur noch mit Zustimmung.
+• Behoben, Wartung: „Alte Wiederherstellungspunkte löschen“ löschte auch den Punkt, den der Lauf eben angelegt hatte. Die alten Punkte gehen jetzt vor dem neuen; die Nummer zählt nur, wenn der Punkt mit dieser Beschreibung wirklich da ist.
+• Behoben, Datenträgerbereinigung: Papierkorb, Windows.old und ESD-Installationsdateien bleiben unangetastet (bisher alle Kategorien außer Downloads, auch als geplante Aufgabe).
+• Computerschutz wird nur eingeschaltet, wenn er aus war, und dann mit Eintrag und Gegenbefehl auf der Seite Änderungen.
+• Behoben: smartmontools konnte auf fremden PCs zurückbleiben, weil der Deinstaller nie lief. Import einer .minibench-Datei schreibt nur noch in einen neuen Ordner unter Berichte.
+• NVIDIA Profile Inspector (3.0.2.3) und DDU (18.1.5.3) nur noch mit fester Prüfsumme; Dateien mit unbekannter Prüfsumme werden abgelehnt.
+• Bericht: Verbrauchsstufen ohne Messwert stehen als „nicht gemessen“ da, die Netzteil-Warnung erscheint nur mit eingegebener Nennleistung. „Seit dem letzten Lauf“ meldet keinen falschen Windows-Build mehr; alle Texte dort sind maskiert.
+• Rückgängig: Ein Fehlschlag lässt sich erneut versuchen; verzögerter Dienststart, angepasste Energiepläne und selbst angelegte Registry-Schlüssel werden wiederhergestellt bzw. entfernt. Protokolle gehören über die Gerätekennung zum PC, auch nach dem Umbenennen.
+• Wartung: alle Schritte stehen im Änderungsprotokoll; vor „Netzwerk zurücksetzen“ wird die IP-Konfiguration gesichert; Shader-Caches nur in den Cache-Ordnern und im Profil des angemeldeten Benutzers.
+• Messung: Hybrid-Prozessoren über die echten Kerntypen erkannt (keine falsche Warnung zur Skalierung bei i5-1335U und ähnlichen), Lasttest und RAM-Test nehmen den aktuell freien Speicher, „Median aktualisieren“ schreibt auch Lasttest-Mediane.
+• Oberfläche: System-Umzug und Installationen sperren Messungen und fragen beim Schließen nach; Update nur mit Prüfsumme und lädt im Hintergrund mit Fortschritt; Hilfsabläufe frieren das Fenster nicht mehr ein; F5 und Strg+Eingabe wirken überall; Laufdauer über einer Stunde richtig.
+• Bau und Veröffentlichung: Tests melden auch nicht geladene Testdateien als Fehler; Veröffentlichen prüft Zweig, Prüfsumme der exe, Tag und Windows-Tests.
+
 VERSION 4.10  (15.11.2026)  SENSOREN, DATENBANK UND ÄNDERUNGEN IM STIL DER ÜBRIGEN SEITEN, PROTOKOLL AUFRÄUMEN
 ==============================================================================================================
 • Seite Änderungen neu aufgebaut: Sie zeigt zuerst nur die Läufe dieses PCs, gebündelt nach Lauf und Maßnahme. Die einzelnen Werte (Ziel, vorher, nachher) stehen unter ihrer Maßnahme und entstehen erst beim Aufklappen. Ein Haken an einem Lauf oder einer Maßnahme wählt alle zurücknehmbaren Einträge darunter; die Auswahl steht in einem Band über der Liste mit „Rückgängig machen“. „Alle PCs“ zeigt zusätzlich die Protokolle anderer PCs, nur zur Ansicht.

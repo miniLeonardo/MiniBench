@@ -36,6 +36,14 @@ function Save-DbEntry {
         Mainboard = [string]$script:Facts['Mainboard']
         WindowsInstalliert = [string]$script:Facts['Windows installiert']
     }
+    # ab v4.11: optionale Felder für "Seit dem letzten Lauf" (Format bleibt PC-Diagnose-DB/2). Quelle sind die Angaben, die
+    # Diagnose und Benchmark ohnehin erheben: "Betriebssystem" = "... (Build 26100.1234)", "BIOS/UEFI" = "<Version> vom <Datum>".
+    # Ohne diese Angaben (z. B. Lauf nur mit Lasttest) fehlen die Felder; keine zusätzliche WMI-Abfrage.
+    $winBuild = $(if ([string]$script:Facts['Betriebssystem'] -match 'Build\s+(\d+)') { $Matches[1] } else { '' })
+    if ($winBuild) { $hw['WinBuild'] = $winBuild }
+    $biosText = ([string]$script:Facts['BIOS/UEFI']).Trim()
+    $biosVer = $(if ($biosText -match '^(.+?)\s+vom\s') { $Matches[1].Trim() } else { $biosText })
+    if ($biosVer) { $hw['BiosVersion'] = $biosVer }
     if (Get-Command 'Get-SystemPowerProfile' -ErrorAction SilentlyContinue) {
         $pProfile = Get-SystemPowerProfile
         if ($pProfile -and $script:SensorDb) { $script:SensorDb['Verbrauch'] = $pProfile }
@@ -211,15 +219,28 @@ function Import-RunFromDirWithJson([string]$SourceDir, [string]$DbJsonPath, [str
         }
 
         $stamp = $(if ($datum -match '^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})') { '{0}{1}{2}_{3}{4}00' -f $Matches[1], $Matches[2], $Matches[3], $Matches[4], $Matches[5] } else { Get-Date -Format 'yyyyMMdd_HHmmss' })
-        $folderLeaf = $(
-            if ($o.Ordner) { Split-Path ([string]$o.Ordner).TrimEnd('\', '/') -Leaf }
-            elseif ($PreferredName) { $PreferredName }
-            else { '{0}_{1}' -f (Get-SafeName $computer), $stamp }
-        )
-        $destReportDir = Join-Path (Join-Path $script:DataDir 'Berichte') $folderLeaf
-        if (-not (Test-Path -LiteralPath $destReportDir)) {
-            New-Item -ItemType Directory -Path $destReportDir -Force | Out-Null
+        # ab v4.11: Der Ordnername kommt aus der fremden Datenbank.json und wird bereinigt (Get-AblageName: keine Trenn-
+        # oder Sonderzeichen, "." und ".." werden leer). Leere Namen fallen auf den nächsten Vorschlag zurück. Das Ziel muss
+        # unterhalb von Berichte liegen, ein vorhandener Ordner wird nie überschrieben (freier Name, Vorgabe 14).
+        # Bis v4.10 ergab "Berichte\.." den Datenordner selbst, Copy-Item -Force überschrieb dort Netzwerk.json und Referenz.json.
+        $folderLeaf = ''
+        # letzter Pfadteil als Text, nicht mit Split-Path: Das löst ".." gegen den aktuellen Ordner auf
+        $ordnerLeaf = @(([string]$o.Ordner).TrimEnd('\', '/') -split '[\\/]')[-1]
+        foreach ($kand in @($ordnerLeaf, $PreferredName, ('{0}_{1}' -f $computer, $stamp))) {
+            $folderLeaf = Get-AblageName ([string]$kand)
+            if ($folderLeaf -and $folderLeaf -ne '.' -and $folderLeaf -ne '..') { break }
+            $folderLeaf = ''
         }
+        if (-not $folderLeaf) { return ('{0}: Import fehlgeschlagen: kein gültiger Ordnername für den Bericht.' -f $OriginalName) }
+        $berichte = Join-Path $script:DataDir 'Berichte'
+        if (-not (Test-Path -LiteralPath $berichte)) { New-Item -ItemType Directory -Path $berichte -Force | Out-Null }
+        $folderLeaf = Get-FreierName $berichte $folderLeaf ''
+        $destReportDir = Join-Path $berichte $folderLeaf
+        $basis = [IO.Path]::GetFullPath($berichte).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+        if (-not [IO.Path]::GetFullPath($destReportDir).TrimEnd('\', '/').StartsWith($basis, [StringComparison]::OrdinalIgnoreCase)) {
+            return ('{0}: Import fehlgeschlagen: Ordner {1} läge außerhalb von Berichte.' -f $OriginalName, $folderLeaf)
+        }
+        New-Item -ItemType Directory -Path $destReportDir -Force -ErrorAction Stop | Out-Null
         foreach ($f in @(Get-ChildItem -LiteralPath $SourceDir -File -Force -ErrorAction SilentlyContinue)) {
             if ($f.Name -ieq 'Datenbank.json' -or $f.Extension -ieq '.minibench') { continue }
             Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $destReportDir $f.Name) -Force

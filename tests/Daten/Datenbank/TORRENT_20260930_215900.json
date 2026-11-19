@@ -100,7 +100,7 @@
       "[WARNUNG] Lizenz: Windows ist per KMS-Volumenlizenz (GVLK) aktiviert, obwohl der PC in keiner Domäne ist. Das deutet auf eine inoffizielle Aktivierung hin, Lizenz prüfen.",
       "[INFO] Dienste: Dienstabstürze (SCM 7031/7034): 2x, zuletzt 30.09.2026 13:17.",
       "[INFO] Geräte: Virtual Desktop Monitor: Code 22 (deaktiviert).",
-      "[INFO] Leistung: Die Messwerte dieses PCs sind als Referenz gespeichert (C:\\Users\\fried\\Desktop\\PC-Diagnose_TORRENT_20260930_2156\\PC-Diagnose-Referenz.json). Auf anderen PCs mit -ReferenzDatei laden oder die Datei neben das Skript legen.",
+      "[INFO] Leistung: Die Messwerte dieses PCs sind als Referenz gespeichert (C:\\Users\\nutzer\\Desktop\\PC-Diagnose_TORRENT_20260930_2156\\PC-Diagnose-Referenz.json). Auf anderen PCs mit -ReferenzDatei laden oder die Datei neben das Skript legen.",
       "[INFO] SMART: Samsung SSD 860 EVO 1TB [/dev/sdb]: ungewöhnlich viele Einschaltzyklen (137.765 bei 22.033 Betriebsstunden), meist durch Energiesparfunktionen der SATA-Verbindung.",
       "[INFO] SMART: WDS100T3X0C-00SJG0 [/dev/sde]: 204 unsaubere Abschaltungen."
     ]

@@ -82,8 +82,8 @@ if ($ModLast -and (Test-StepEnabled 'Last:alle')) {
             # RAM-Test eine Stufe unter normal und mit CPU-Last nur auf einem Teil der Kerne: sonst nimmt er dem
             # Grafiktreiber und der CPU-Last die Rechenzeit, Bilder/s und Auslastung schwanken stark (Praxistest 02.10.)
             $ramMax = $(if ($end.ContainsKey('CPU')) { [math]::Max(2, [int][math]::Floor($threads / 4)) } else { 0 })
-            $os = Get-CimCached Win32_OperatingSystem | Select-Object -First 1
-            $ramTarget = [long]([double]$os.FreePhysicalMemory * 1KB * $LastRamProzent / 100)
+            # ab v4.11: freier RAM frisch abgefragt (nicht der Stand vom Laufbeginn)
+            $ramTarget = [long]([double](Get-FreeRamBytes) * $LastRamProzent / 100)
             if (-not [Environment]::Is64BitProcess) { $ramTarget = [math]::Min($ramTarget, 1.2GB) }
             $ramTask = Start-LoadJob 'ram' ([int]($plan.RAM * 60) + 60) $threads $ramTarget $ramMax -Low
             Add-Line ('    Arbeitsspeicher: {0} Min., Mustertest über {1} ({2} % des freien RAM){3}' -f $plan.RAM, (Format-Size $ramTarget), $LastRamProzent, $(if ($ramTask.External) { ', eigener Prozess' } elseif ($ramTask.Note) { ', ' + $ramTask.Note } else { '' }))

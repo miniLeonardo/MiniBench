@@ -48,10 +48,29 @@ public partial class DiagGui
         return newest;
     }
 
+    // Kinder entfernen und freigeben, Hinweise beim Überfahren vorher lösen (der ToolTip hält sonst jedes Element fest).
+    // Bis v4.10 nur Controls.Clear(): Bei jedem ReloadDb blieben die alten Elemente samt Fensterhandles bestehen.
+    void EntferneKinder(Control parent)
+    {
+        while (parent.Controls.Count > 0)
+        {
+            Control c = parent.Controls[parent.Controls.Count - 1];
+            parent.Controls.RemoveAt(parent.Controls.Count - 1);
+            LoeseTips(c);
+            c.Dispose();
+        }
+    }
+
+    void LoeseTips(Control c)
+    {
+        tip.SetToolTip(c, null);
+        foreach (Control k in c.Controls) LoeseTips(k);
+    }
+
     void BuildStartContent(Panel f)
     {
         f.SuspendLayout();
-        f.Controls.Clear();
+        EntferneKinder(f);
         DbEntry lastRunThisPc = GetCurrentPcLastRun();
         if (lastRunThisPc == null)
         {
@@ -1403,7 +1422,7 @@ e.Result = items;
             if (items == null) return;
 
             container.SuspendLayout();
-            container.Controls.Clear();
+            EntferneKinder(container);
 
             if (items.Count == 0)
             {

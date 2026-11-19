@@ -1,0 +1,143 @@
+﻿LEOS MINIBENCH 4.11: ÄNDERUNGEN
+===============================
+
+Auftrag vom 19.11.2026: das Projekt in seiner Ganzheit prüfen, Ideen sammeln und alle Befunde der Stufen Dringend bis
+Messung in 4.11 beheben, Git-Release vorbereiten. Die vollständige Befundliste mit Fundstellen steht in
+Doku\Pruefung_4.10.md (Spalte Stand nennt, was 4.11 behoben hat), die Ideen in Doku\Ideen.md. Neue Funktionen gibt es
+keine. Ereigniskanal, Datenbankformat (PC-Diagnose-DB/2, zwei optionale Felder), Format des Änderungsprotokolls
+(Minibench-Aenderungen/1, zusätzliche Felder), Vorlagen und Geraete.json bleiben verträglich.
+
+
+1. SCHUTZ FREMDER PCS
+  PawnIO (A1)                 Kern\Sensoren.ps1: Der Treiber kam auch ohne -SensorTreiber, weil die Bedingung
+                              "-or $isAdmin" lautete und Arbeitsprozesse immer erhöht laufen. Jetzt nur mit Zustimmung.
+  Wiederherstellungspunkt (A2) Wartung: Get-WartungPlan stellt "Alte Wiederherstellungspunkte löschen" vor das Anlegen
+                              des neuen Punkts. New-WartungRestorePoint und New-RestorePointLogged übernehmen eine Nummer
+                              nur, wenn ein Punkt mit genau der Beschreibung des Laufs existiert; die Optimierung legt
+                              selbst einen an, wenn die Nummer der Wartung nicht mehr gilt.
+  Datenträgerbereinigung (A3) Ausgeschlossen: Downloads, Papierkorb, Windows.old (Previous Installations), ESD-
+                              Installationsdateien. Gilt für Wartung, Optimierung und die geplante Aufgabe.
+  Computerschutz (A4)         Enable-ComputerschutzMitProtokoll liest den Zustand aus SPP\Clients (Ersatz:
+                              RPSessionInterval, Richtlinie DisableSR). War er aus, wird er eingeschaltet und mit Art
+                              "Computerschutz", Risiko Ändern und Gegenbefehl Disable-ComputerRestore protokolliert. Ist
+                              der Zustand nicht lesbar, wird nur ein Hinweis geschrieben (ein automatisches Ausschalten
+                              würde sonst vorhandene Punkte löschen).
+  smartmontools (A5)          Einzelobjekt-Falle von PS 5.1: $candidates[0] war das Zeichen "C". Jetzt mit @().
+  Import (A6)                 Ordnername wird zerlegt und mit Get-AblageName bereinigt, "." und ".." abgelehnt, freier
+                              Name mit Get-FreierName, Ziel muss unter Berichte liegen.
+  Werkzeuge der Optimierung   NVIDIA Profile Inspector 3.0.2.3 (zip e2d12f09…, exe 355e491a…) und DDU 18.1.5.3
+  (A7)                        (Archiv f5923e10…, "Display Driver Uninstaller.exe" d9f66e3e…) mit fester Prüfsumme.
+                              Vorgefundene oder geladene Dateien mit anderer Prüfsumme werden abgelehnt, auch wenn sie
+                              schon im Manifest standen. Der Weg über winget download entfällt.
+
+
+2. BERICHT UND DASHBOARD
+  Verbrauch (A8)              Teillast und Gaming "nicht gemessen", Leerlauf nur mit gemessener CPU- und (falls
+                              vorhanden) GPU-Leistung. Netzteil-Warnung nur mit eingegebener Nennleistung
+                              (Einstellungen.json); die Oberfläche übergibt -PsuWattage nur noch, wenn eine eingetragen ist.
+                              Die Effizienz-Indizes rechnen intern weiter mit dem bisherigen Modell, damit gespeicherte
+                              Werte vergleichbar bleiben (siehe Grenzen).
+  Seit dem letzten Lauf (A9)  Datenbankeinträge tragen Hardware.WinBuild und Hardware.BiosVersion (optional). Der
+                              Build-Vergleich nimmt nur echte Buildnummern; bis 4.10 stand bei jedem Lauf
+                              "Build <Hersteller Modell> -> Build 26100". Alle Texte und der Referenzname sind maskiert.
+
+
+3. RÜCKGÄNGIG UND ÄNDERUNGSPROTOKOLL
+  Erneut versuchen (D1)       Ein Fehlschlag lässt den Eintrag "aktiv" (Feld Fehlversuche, Text im Ergebnis). Einträge
+                              mit dem alten Status "fehlgeschlagen" gelten in Skript und Oberfläche als offen.
+  Verzögerter Start (D2)      DelayedAutostart wird gesichert (VorherVerzoegert) und mit sc.exe wiederhergestellt.
+  Energiepläne (D3)           Gesicherte Pläne werden auch dann eingespielt, wenn die GUID noch existiert (Zwischen-
+                              sicherung, delete, import mit derselben GUID, Rückfall bei Fehler).
+  Registry-Schlüssel (D4)     Selbst angelegte Schlüssel stehen in Daten.NeueSchluessel und werden beim Rückgängig
+                              entfernt, wenn sie leer sind.
+  Gerätekennung (D5)          Protokolle gehören über die GeraetId zum PC, der Name gilt nur, wenn eine Kennung fehlt.
+                              Skript (Test-ChangeLogDiesesGeraet, Move-ChangeArchiv, Restore-TemporaryChanges sucht
+                              in allen Ordnern) und Oberfläche (ChangeEntry.IstDiesesGeraet) rechnen gleich.
+
+
+4. WARTUNG
+  Protokoll (E1)              Temp, Druckaufträge, Komponentenbereinigung, Dateisystem, Netzwerk, WMI, Geräte, DISM und
+                              SFC schreiben Hinweise mit Weg zurück (Wiederherstellungspunkt Nr. X oder nicht umkehrbar).
+  Netzwerk (E2)               Vor dem Zurücksetzen "netsh interface ip dump" und die Konfiguration in den Änderungsordner;
+                              Gegenbefehl netsh -f. Scheitert die Sicherung, wird nicht zurückgesetzt.
+  Shader-Caches (E3, E4)      Nur AMD\DxCache, DxcCache, GLCache, VkCache, im Profil des angemeldeten Benutzers
+                              (Get-OptTargetUser), ebenso CrashDumps.
+
+
+5. MESSUNG
+  Hybrid (F1)                 Get-CpuKernklassen liest EfficiencyClass (GetLogicalProcessorInformationEx), sonst ein
+                              verbessertes Namensmuster. Es ändern sich nur Erwartung und Warnung der Mehrkern-
+                              Skalierung, keine Messwerte.
+  Freier RAM (F2)             Get-FreeRamBytes fragt frisch ab (bisher der Wert vom Diagnosebeginn).
+  Lasttest-Mediane (F3)       Get-DbEntries übernimmt Sensoren und Lasttest.
+
+
+6. OBERFLÄCHE
+  Hintergrundarbeit (C1)      System-Umzug, winget-Installation und Update-Download setzen einen gemeinsamen Zustand;
+                              Lauf und Live-Ansicht starten dann nicht (Vorgabe 7), Schließen fragt nach und beendet den
+                              Prozessbaum. Der Umzug wartet nicht mehr ohne Frist.
+  Update (C2, C3)             Ohne Prüfsumme kein Austausch ("Update von Hand"). Download mit DownloadFileAsync,
+                              Fortschritt im Etikett der Kopfzeile, Abbruch per Klick.
+  Hilfsabläufe (C4)           RunHelper nutzt RunHelperPumped mit Frist (600 s, Sensorwerkzeuge 300 s).
+  Tastenkürzel (C5)           F5 und Strg+Eingabe über ProcessCmdKey; in mehrzeiligen Feldern bleibt Strg+Eingabe ein
+                              Zeilenumbruch.
+  Dauer (C6)                  "h:mm:ss Std." ab einer Stunde.
+  Startseite (C7)             Alte Elemente werden beim Neuaufbau freigegeben, Hinweise gelöst.
+
+
+7. BAU UND VERÖFFENTLICHUNG
+  Exit-Code (B1)              Testen.ps1 zählt auch nicht geladene Testdateien und fehlgeschlagene Blöcke; Abbruch von
+                              Invoke-Pester ergibt Exit 97.
+  Windows-Bau (B2)            4.11 ist der erste Release seit 4.0, der unter Windows mit Bauen.cmd gebaut wird.
+  Veröffentlichen (B3, B4)    Abbruch, wenn der Zweig nicht main ist, die exe nicht zur Prüfsumme in Stand.txt passt, ein
+                              vorhandener Tag nicht auf HEAD zeigt oder Stand.txt keine Windows-Testzeile mit 0
+                              Fehlschlägen hat (überspringbar mit -OhneWindowsTests). Fehlende Release-Tags, die in main
+                              liegen (v4.08), werden mit übertragen.
+  Archiv (B5)                 Bauen.cmd bestimmt die Version je Datei (exe aus der Produktversion, ps1, Stand.txt) und
+                              archiviert alles Abweichende; nie löschen, bei Namensgleichheit mit Zeitstempel. Neue
+                              Dateien erst als .neu, dann ersetzt.
+  Zeilenenden (B6)            .gitattributes (Text mit CRLF, exe/zip/Bilder binär, WinSAT-XML binär).
+  Datenschutz (B7)            Kein Rechnername in Stand.txt, erfundene Pfade im Selbsttest und in den Testdaten.
+  Bauen.cmd (B8)              Kodierung von "Gesamtläufe", Schrittnummern, Commit über git add -u plus neue Pfade.
+  Notebook-Test (B9)          Datenbank-Test zur Standardreferenz mit Attrappe für die Bauform, Fall Notebook ergänzt.
+
+
+GEFUNDEN UND BEHOBEN
+  1. DDU-Dateiname            Invoke-OptDdu suchte "DisplayDriverUninstaller.exe"; das offizielle Paket heißt "Display
+                              Driver Uninstaller.exe". DDU ließ sich deshalb nie starten.
+  2. Split-Path ".."          Beim Import löste Split-Path -Leaf ".." gegen den aktuellen Ordner auf; der Ordnername
+                              wird jetzt als Text zerlegt.
+  3. Nummer des Punkts        New-RestorePointLogged nahm den neuesten Punkt, auch wenn Windows wegen der Sperrfrist
+                              keinen neuen angelegt hatte; jetzt nur der mit der eigenen Beschreibung.
+  4. Text der Bereinigung     Vertrag und Oberfläche nannten noch "alle Kategorien außer Downloads".
+  5. Selbsttest Änderungen    Die Testdaten gaben allen PCs dieselbe Gerätekennung; mit der neuen Zuordnung je Kennung.
+
+
+GRENZEN
+  Effizienz-Indizes           Rechnen intern weiter mit angenommenem GPU-Leerlauf und Gaming-Anteil (Vergleichbarkeit
+                              gespeicherter Werte). Offen als Befund in Doku\Pruefung_4.10.md.
+  DDU entpacken               Nur mit Attrappen geprüft; ein Durchgang "Werkzeuge holen" auf einem Prüf-PC fehlt.
+  Computerschutz lesen        SPP\Clients ist ohne Erhöhung nicht lesbar; mit Administratorrechten noch unter Windows
+                              bestätigen. Rückgängig mit Disable-ComputerRestore löscht die Punkte des Laufwerks (steht
+                              im Gegenbefehl).
+  Energiepläne                powercfg /delete kann eingebaute Pläne verweigern; der Eintrag bleibt dann aktiv.
+  netsh-Sicherung             als ANSI geschrieben; Adapternamen mit Sonderzeichen beim Einspielen ungeprüft.
+  Hilfsabläufe                RunHelperPumped sperrt das Fenster weiter, solange der Arbeitsprozess läuft; Export oder
+                              Import über 10 Minuten bricht ab.
+  Von Hand bestätigen         Umzug oder Installation und gleichzeitiger Start, Schließen mit Rückfrage, Update mit
+                              Fortschritt und Abbruch, F5 und Strg+Eingabe mit Fokus in Auswahlfeldern, USER- und
+                              GDI-Objekte nach mehrfachem Neuladen der Startseite.
+
+
+UMSTIEG
+  Nichts zu tun. Einträge mit Status "fehlgeschlagen" aus älteren Versionen lassen sich erneut zurücknehmen. Wer im
+  Tools-Ordner eine andere Version von DDU oder NVIDIA Profile Inspector liegen hat, holt die Werkzeuge neu.
+
+
+QUELLEN
+  GetLogicalProcessorInformationEx, EfficiencyClass: https://learn.microsoft.com/windows/win32/api/winnt/ns-winnt-processor_relationship
+  Enable-ComputerRestore: https://learn.microsoft.com/powershell/module/microsoft.powershell.management/enable-computerrestore
+  sc.exe config start= delayed-auto: https://learn.microsoft.com/windows-server/administration/windows-commands/sc-config
+  NVIDIA Profile Inspector 3.0.2.3: https://github.com/Orbmu2k/nvidiaProfileInspector/releases/tag/v3.0.2.3
+  Display Driver Uninstaller: https://www.wagnardsoft.com/
+  Pester Ergebnisobjekt (FailedContainersCount): https://pester.dev/docs/usage/output

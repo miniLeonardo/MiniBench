@@ -175,7 +175,7 @@ Describe 'Launcher, Startfenster und Anwendungsmanifest' {
         (Get-SrcText 'Kern/Adminrechte.ps1') | Should -Match '-not \$Datenpflege'
         (Get-SrcText 'Oberflaeche/Oberflaeche.ps1') | Should -Match 'Invoke-Datenpflege -DataDir \$script:DataDir -MindestAlterMin 60'
         $cmd | Should -Match '-Datenpflege -DatenDir \$bData -ArchivDir'
-        $cmd | Should -Match "Archiv\\v\{0\}' -f \`$oldVer"
+        $cmd | Should -Match "Archiv\\v\{0\}' -f \`$Version"
     }
 }
 
@@ -317,3 +317,61 @@ Describe 'Regeln für die Testsuite selbst' {
     }
 }
 
+Describe 'Bauen.cmd: Archiv des vorigen Builds (ab v4.11)' {
+    BeforeAll {
+        # Hilfsfunktionen aus Schritt 4 von Bauen.cmd laden (Get-Sha256Hex, Get-BuildDateiVersion, Move-BuildArchiv)
+        $ast = [Management.Automation.Language.Parser]::ParseInput($cmd, [ref]$null, [ref]$null)
+        $script:BauFunktionen = @($ast.FindAll({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -in 'Get-Sha256Hex', 'Get-BuildDateiVersion', 'Move-BuildArchiv' }, $true) | ForEach-Object { $_.Extent.Text })
+        $script:ArchivTmp = Join-Path ([IO.Path]::GetTempPath()) ('MinibenchBauArchiv_' + $PID)
+    }
+    AfterAll { Remove-Item -LiteralPath $script:ArchivTmp -Recurse -Force -ErrorAction SilentlyContinue }
+    BeforeEach {
+        Remove-Item -LiteralPath $script:ArchivTmp -Recurse -Force -ErrorAction SilentlyContinue
+        $Here = $script:ArchivTmp
+        $build = Join-Path $Here 'Aktueller Build'
+        New-Item -ItemType Directory -Path $build -Force | Out-Null
+        foreach ($t in $script:BauFunktionen) { . ([scriptblock]::Create($t)) }
+    }
+    It 'enthält die Hilfsfunktionen und löscht keine Datei des vorigen Builds' {
+        $script:BauFunktionen.Count | Should -Be 3
+        $cmd | Should -Not -Match 'Remove-Item \$exe'
+        $cmd | Should -Not -Match "Filter 'Änderungen_v\*\.txt'[^\r\n]*Remove-Item"
+        $cmd | Should -Match "Copy-Item -LiteralPath \`$neu\[\`$n\] -Destination \`$neuDatei"
+        $cmd | Should -Match "\[IO\.File\]::WriteAllText\(\(Join-Path \`$build 'Stand\.txt\.neu'\)"
+    }
+    It 'liest die Version aus ps1 und Stand.txt' {
+        [IO.File]::WriteAllText((Join-Path $build 'LeosMinibench.ps1'), "#Requires -Version 5.1`r`n`$ScriptVersion = '4.10'`r`n")
+        [IO.File]::WriteAllText((Join-Path $build 'Stand.txt'), "LEOS MINIBENCH`r`nVersion   : 4.09 (Dateiversion 4.9.0.0)`r`n")
+        Get-BuildDateiVersion (Join-Path $build 'LeosMinibench.ps1') | Should -Be '4.10'
+        Get-BuildDateiVersion (Join-Path $build 'Stand.txt') | Should -Be '4.09'
+        Get-BuildDateiVersion (Join-Path $build 'fehlt.ps1') | Should -Be ''
+    }
+    It 'verschiebt in Archiv\v<Version> und überschreibt dort nichts (Zeitstempel)' {
+        [IO.File]::WriteAllText((Join-Path $build 'LeosMinibench.ps1'), 'alt 1')
+        Move-BuildArchiv 'LeosMinibench.ps1' '4.10' 6> $null
+        $arc = Join-Path $Here 'Archiv\v4.10'
+        [IO.File]::ReadAllText((Join-Path $arc 'LeosMinibench.ps1')) | Should -Be 'alt 1'
+        Test-Path -LiteralPath (Join-Path $build 'LeosMinibench.ps1') | Should -BeFalse
+        # gleicher Name, anderer Inhalt: beide bleiben erhalten
+        [IO.File]::WriteAllText((Join-Path $build 'LeosMinibench.ps1'), 'alt 2')
+        Move-BuildArchiv 'LeosMinibench.ps1' '4.10' 6> $null
+        [IO.File]::ReadAllText((Join-Path $arc 'LeosMinibench.ps1')) | Should -Be 'alt 1'
+        $zweite = @(Get-ChildItem -LiteralPath $arc -Filter 'LeosMinibench_*.ps1')
+        $zweite.Count | Should -Be 1
+        [IO.File]::ReadAllText($zweite[0].FullName) | Should -Be 'alt 2'
+        # Stand.txt unter eigenem Namen
+        [IO.File]::WriteAllText((Join-Path $build 'Stand.txt'), 'Version   : 4.10')
+        Move-BuildArchiv 'Stand.txt' '4.10' 'Stand_v4.10.txt' 6> $null
+        Test-Path -LiteralPath (Join-Path $arc 'Stand_v4.10.txt') | Should -BeTrue
+    }
+    It 'lässt eine schon archivierte, gleiche Datei liegen und ohne Version nichts verschieben' {
+        $arc = Join-Path $Here 'Archiv\v4.10'
+        New-Item -ItemType Directory -Path $arc -Force | Out-Null
+        [IO.File]::WriteAllText((Join-Path $arc 'LeosMinibench.ps1'), 'gleich')
+        [IO.File]::WriteAllText((Join-Path $build 'LeosMinibench.ps1'), 'gleich')
+        Move-BuildArchiv 'LeosMinibench.ps1' '4.10' 6> $null
+        @(Get-ChildItem -LiteralPath $arc).Count | Should -Be 1
+        Move-BuildArchiv 'LeosMinibench.ps1' '' 6> $null
+        Test-Path -LiteralPath (Join-Path $build 'LeosMinibench.ps1') | Should -BeTrue
+    }
+}

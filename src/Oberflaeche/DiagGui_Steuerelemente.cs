@@ -573,9 +573,15 @@ public static class UI
         }
     }
 
+    // ab v4.11 nur für den Selbsttest: Ist die Liste gesetzt, zeigen Ask und Hinweis keinen Dialog, sondern schreiben
+    // "Titel|Text" hinein; Ask antwortet dann mit MeldungsAntwort
+    public static List<string> Meldungsprotokoll;
+    public static bool MeldungsAntwort;
+
     // ab v4.0: Thematisierte Rueckfragedialoge fuer konsistenten Hell- und Dunkelmodus (ohne ungestyltes MessageBox.Show)
     public static bool Ask(string text, string title = "Frage", IWin32Window owner = null)
     {
+        if (Meldungsprotokoll != null) { Meldungsprotokoll.Add((title ?? "") + "|" + (text ?? "")); return MeldungsAntwort; }
         using (Form f = new Form())
         {
             f.Text = title ?? "Frage";
@@ -626,6 +632,7 @@ public static class UI
     // ab v4.0: Thematisierter Hinweisdialog fuer konsistenten Hell- und Dunkelmodus
     public static void Hinweis(string text, string title = "Hinweis", IWin32Window owner = null)
     {
+        if (Meldungsprotokoll != null) { Meldungsprotokoll.Add((title ?? "") + "|" + (text ?? "")); return; }
         using (Form f = new Form())
         {
             f.Text = title ?? "Hinweis";

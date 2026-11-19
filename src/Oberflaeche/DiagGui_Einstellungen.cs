@@ -105,7 +105,7 @@ public partial class DiagGui
                 Dictionary<string, object> d = js.DeserializeObject(File.ReadAllText(SettingsFile, Encoding.UTF8)) as Dictionary<string, object>;
                 if (d != null)
                 {
-                    if (d.ContainsKey("PsuWattage")) psuWattage = Convert.ToInt32(d["PsuWattage"]);
+                    if (d.ContainsKey("PsuWattage")) { psuWattage = Convert.ToInt32(d["PsuWattage"]); psuEingegeben = psuWattage > 0; }
                     if (d.ContainsKey("PsuRating")) psuRating = Convert.ToString(d["PsuRating"]);
                 }
             }

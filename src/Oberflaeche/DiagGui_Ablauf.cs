@@ -103,8 +103,10 @@ public partial class DiagGui
 
     static string Q(string s) { return "\"" + (s ?? "").TrimEnd('\\') + "\""; }
 
-    void StartRun()
+    internal void StartRun()
     {
+        // ab v4.11: nicht neben System-Umzug, winget oder Update-Download (Vorgabe 7)
+        if (HintergrundBelegt("Der Lauf")) return;
         List<string> mods = SelectedModules();
         if (mods.Count == 0) return;
         // Live-Ansicht und Lauf greifen auf dieselben Sensoren und denselben Treiber zu
@@ -198,7 +200,9 @@ public partial class DiagGui
         // ab v2.66 ohne Rückfrage vor dem Grafik-Lasttest (Wunsch aus dem Praxistest); die Abbruchschwelle wirkt weiter, Esc im Vorschaufenster beendet
         if (drv) a.Append(" -SensorTreiber");
         a.Append(KeepArg());
-        a.Append(" -PsuWattage ").Append(psuWattage);
+        // ab v4.11: Nennleistung nur übergeben, wenn sie eingegeben ist (Einstellungen.json); die Vorgabe 650 W gilt im
+        // Bericht nicht als Eingabe (keine Netzteil-Warnung aus einem angenommenen Wert, Vorgabe 11)
+        if (psuEingegeben) a.Append(" -PsuWattage ").Append(psuWattage);
         if (!string.IsNullOrEmpty(psuRating)) a.Append(" -PsuRating ").Append(Q(psuRating));
         Launch(a.ToString(), String.Join(" + ", mods.ToArray()));
     }

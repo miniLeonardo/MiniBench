@@ -81,4 +81,120 @@ Describe 'Bauen.cmd und Git' {
         ($b[0] -eq 0xEF -and $b[1] -eq 0xBB) | Should -BeFalse
         [char]$b[0] | Should -Be '<'
     }
+    It 'schreibt Gesamtläufe richtig kodiert und nummeriert die Schritte 1 bis 7 je einmal' {
+        $script:Bauen | Should -Not -Match ([string][char]0x00C3)
+        $script:Bauen | Should -Match 'Gesamtläufe: \{1\}'
+        $nr = @([regex]::Matches($script:Bauen, '(?m)^    # (\d)\. ') | ForEach-Object { [int]$_.Groups[1].Value })
+        ($nr -join ',') | Should -Be '1,2,3,4,5,6,7'
+    }
+    It 'nimmt alle getrackten Änderungen und neue Dateien nur aus festen Pfaden auf, ohne Push' {
+        $script:Bauen | Should -Match 'git\.exe -C \$Here add -u -- \.'
+        $script:Bauen | Should -Match "'Aktueller Build/Stand\.txt', 'Aktueller Build/LeosMinibench\.ps1'"
+        $script:Bauen | Should -Match "'\.gitattributes'"
+        # nicht der ganze Aktuelle Build (Minibench-Daten, Logs) und kein automatischer Push
+        $script:Bauen | Should -Not -Match "'Aktueller Build',"
+        $script:Bauen | Should -Not -Match '& git\.exe [^\r\n]*\bpush\b'
+        $script:Bauen | Should -Match 'Veroeffentlichen\.ps1'
+    }
+    It 'bricht bei Abbruch des Testlaufs (Rückgabe 97) ab und committet nicht' {
+        $script:Bauen | Should -Match 'elseif \(\$tc -eq 97\) \{ throw'
+    }
+}
+
+Describe 'Testen.ps1: Rückgabe aus allen Fehlerarten (ab v4.11)' {
+    BeforeAll { $script:Testen = Get-RepoText 'tests/Testen.ps1' }
+    It 'zählt fehlgeschlagene Tests, nicht geladene Testdateien und Blöcke und wertet einen Abbruch als 97' {
+        $script:Testen | Should -Match '\$nTests = \[int\]\$res\.FailedCount'
+        $script:Testen | Should -Match '\$nDateien = \[int\]\$res\.FailedContainersCount'
+        $script:Testen | Should -Match '\$nBloecke = \[int\]\$res\.FailedBlocksCount'
+        $script:Testen | Should -Match '\$fehler = \$nTests \+ \$nDateien \+ \$nBloecke'
+        $script:Testen | Should -Match '(?s)try \{\s+\$res = @\(Invoke-Pester -Configuration \$cfg\)'
+        $script:Testen | Should -Match 'exit 97'
+        $script:Testen | Should -Match 'exit \[math\]::Min\(96, \$fehler\)'
+        $script:Testen | Should -Not -Match 'exit \[math\]::Min\(\d+, \[int\]\$res\.FailedCount\)'
+    }
+    It 'eine Testdatei, die nicht lädt, ergibt eine Rückgabe ungleich 0 und steht in der Zusammenfassung' {
+        if (-not (Test-IstWindows)) { Set-ItResult -Skipped -Because 'braucht powershell.exe'; return }
+        $tmp = Join-Path ([IO.Path]::GetTempPath()) ('MinibenchTestenRueckgabe_' + $PID)
+        New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+        try {
+            $kaputt = Join-Path $tmp 'Kaputt.Tests.ps1'
+            [IO.File]::WriteAllText($kaputt, "throw 'Ladefehler'`r`nDescribe 'x' { It 'y' { 1 | Should -Be 1 } }`r`n")
+            $sum = Join-Path $tmp 'Zusammenfassung.txt'
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $global:MinibenchRepoRoot 'tests\Testen.ps1') -Kurz -Datei $kaputt -Zusammenfassung $sum *> $null
+            $rc = $LASTEXITCODE
+            $rc | Should -Not -Be 0
+            $rc | Should -Not -Be 99 -Because 'Pester 5 oder neuer ist hier installiert'
+            [IO.File]::ReadAllText($sum, [Text.Encoding]::UTF8) | Should -Match '1 Testdateien nicht geladen'
+        } finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+}
+
+Describe 'Veroeffentlichen.ps1 prüft vor jedem Push (ab v4.11)' {
+    BeforeAll {
+        $script:Veroeff = Get-RepoText 'Veroeffentlichen.ps1'
+        $ast = [Management.Automation.Language.Parser]::ParseInput($script:Veroeff, [ref]$null, [ref]$null)
+        foreach ($fn in $ast.FindAll({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -in 'Get-StandLmbSha', 'Test-StandWindowsTests' }, $true)) {
+            . ([scriptblock]::Create($fn.Extent.Text))
+        }
+        $script:ErsterPush = $script:Veroeff.IndexOf('push origin HEAD:main')
+        $script:Ue = [string][char]0x00FC
+    }
+    It 'prüft Zweig, Prüfsumme, Tag und Testzeile vor dem ersten Push' {
+        $script:ErsterPush | Should -BeGreaterThan 0
+        foreach ($p in @('rev-parse --abbrev-ref HEAD', 'Get-StandLmbSha $standText', "(`$tag + '^{commit}')", 'Test-StandWindowsTests $standText')) {
+            $i = $script:Veroeff.IndexOf($p)
+            $i | Should -BeGreaterThan 0 -Because $p
+            $i | Should -BeLessThan $script:ErsterPush -Because $p
+        }
+        $script:Veroeff | Should -Match "-ne 'main'\) \{ throw"
+        $script:Veroeff | Should -Match '\$standSha -ne \$sha\) \{ throw'
+        $script:Veroeff | Should -Match '\$tagCommit\.Trim\(\) -ne \$head\.Trim\(\)\) \{'
+        $script:Veroeff | Should -Match 'param\(\[switch\]\$Entwurf, \[switch\]\$OhnePush, \[switch\]\$OhneWindowsTests\)'
+    }
+    It 'liest die Prüfsumme von LMB.exe aus Stand.txt' {
+        $h = 'A30D462A8CA20E1C8892FB6FC1E270E36D6B6E6FD6DA0AF7242A8AA63DBFC878'
+        Get-StandLmbSha ("Dateien`r`n  LMB.exe                  2,817 KB  $h`r`n  LeosMinibench.ps1        2,741 KB  " + ('0' * 64) + "`r`n") | Should -Be $h.ToLowerInvariant()
+        Get-StandLmbSha ("  LMB.exe                  2.817 KB  $h") | Should -Be $h.ToLowerInvariant()
+        Get-StandLmbSha "  LeosMinibench.ps1   1 KB  $h" | Should -Be ''
+        Get-StandLmbSha '' | Should -Be ''
+    }
+    It 'erkennt nur einen Testlauf unter Windows ohne Fehlschläge' {
+        Test-StandWindowsTests ("Tests     : 1203 bestanden, 0 fehlgeschlagen, 81 " + $script:Ue + "bersprungen (Pester 6.2.0, PowerShell 5.1.26100.9818) (Laufzeit: 12:34)") | Should -BeTrue
+        Test-StandWindowsTests ("Tests     : 1203 bestanden, 2 fehlgeschlagen, 81 " + $script:Ue + "bersprungen (Pester 6.2.0, PowerShell 5.1.26100.9818)") | Should -BeFalse
+        Test-StandWindowsTests ("Tests     : 1203 bestanden, 0 fehlgeschlagen, 81 " + $script:Ue + "bersprungen, 1 Testdateien nicht geladen (Pester 6.2.0, PowerShell 5.1.1)") | Should -BeFalse
+        Test-StandWindowsTests ("Tests     : Sandbox 941 bestanden, 51 fehlgeschlagen (nur ohne Windows), 81 " + $script:Ue + "bersprungen") | Should -BeFalse
+        Test-StandWindowsTests 'Tests     : nicht ausgeführt (Bauen.cmd ohnetests) (Laufzeit: --)' | Should -BeFalse
+    }
+    It 'überträgt fehlende Release-Tags nur, wenn sie auf einen Commit von main zeigen' {
+        $script:Veroeff | Should -Match 'ls-remote --tags origin'
+        $script:Veroeff | Should -Match 'merge-base --is-ancestor \$ft HEAD'
+        $script:Veroeff | Should -Match '''\^v\\d\+\\\.\\d\+\$'''
+        $script:Veroeff.IndexOf('ls-remote --tags origin') | Should -BeGreaterThan $script:ErsterPush
+    }
+}
+
+Describe 'Keine persönlichen Angaben im Build (ab v4.11)' {
+    It 'Bauen.cmd schreibt keinen Rechnernamen in Stand.txt' {
+        $script:Bauen | Should -Not -Match 'COMPUTERNAME'
+        $script:Bauen | Should -Match "'Gebaut    : \{0:dd\.MM\.yyyy HH:mm\} unter Windows, PowerShell \{1\}'"
+    }
+    It 'Aktueller Build\Stand.txt nennt den Rechnernamen nicht' {
+        $f = Join-Path $global:MinibenchRepoRoot 'Aktueller Build/Stand.txt'
+        if (-not (Test-Path -LiteralPath $f)) { Set-ItResult -Skipped -Because 'Aktueller Build fehlt noch'; return }
+        $name = [Environment]::MachineName
+        if (-not $name) { Set-ItResult -Skipped -Because 'Rechnername unbekannt'; return }
+        [IO.File]::ReadAllText($f, [Text.Encoding]::UTF8) | Should -Not -Match ('(?i)\b' + [regex]::Escape($name) + '\b')
+    }
+}
+
+Describe '.gitattributes (ab v4.11)' {
+    It 'legt CRLF für Quelltext und Textdateien fest und behandelt exe als binär' {
+        $ga = Get-RepoText '.gitattributes'
+        foreach ($m in @('*.cmd', '*.ps1', '*.psd1', '*.cs', '*.txt', '*.md', '*.json')) {
+            $ga | Should -Match ('(?m)^' + [regex]::Escape($m) + '\s+text eol=crlf\s*$') -Because $m
+        }
+        $ga | Should -Match '(?m)^\*\.exe\s+binary\s*$'
+        $ga | Should -Match '(?m)^tests/Daten/WinSAT/\*\.xml\s+binary\s*$'
+    }
 }

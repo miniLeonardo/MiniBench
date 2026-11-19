@@ -897,3 +897,151 @@ Describe 'Geräte-Verlauf und Abschnitt Seit dem letzten Lauf (v3.87)' {
         $res.TrendFindings[0].Text | Should -Match 'CPU unter gleicher Last .* K wärmer'
     }
 }
+
+# ab v4.11: Befunde A8 (Verbrauchsmodell nur mit Messwerten, Netzteil-Warnung nur mit Eingabe) und A9 (Seit dem letzten
+# Lauf: Build nur aus echten Buildnummern, Texte maskiert) der Prüfung 4.10
+Describe 'Verbrauchsstufen nur mit Messwert (ab v4.11)' {
+    BeforeAll {
+        Import-MinibenchTestModule -Parts 'Kern\Berichtshilfen.ps1', 'Bericht\HtmlBericht.ps1' -Functions 'Get-GpuKind', 'Test-EntryIsNotebook', 'Test-PsuEingegeben', 'ConvertTo-HtmlText'
+        $script:dgpu = {
+            param($Leerlauf)
+            [pscustomobject]@{
+                System    = 'Gaming PC'
+                Hardware  = [pscustomobject]@{ RAM = '32 GB DDR5'; GPU = 'NVIDIA GeForce RTX 4070' }
+                Laufwerke = @('NVMe 1 TB')
+                Sensoren  = [pscustomobject]@{ Leerlauf = $Leerlauf; Last = [pscustomobject]@{ CpuWMax = 120.0; GpuWMax = 200.0 } }
+                Werte     = [ordered]@{ 'CPU|MT' = 12000.0; 'GPU|REND' = 180.0 }
+            }
+        }
+    }
+    It 'Teillast und Gaming sind nicht gemessen, statt geschätzt' {
+        $p = MinibenchTest\Get-SystemPowerProfile (& $script:dgpu ([pscustomobject]@{ CpuW = 20.0; GpuW = 15.0 }))
+        $p.Leerlauf.Verfuegbar | Should -BeTrue
+        $p.Volllast.Verfuegbar | Should -BeTrue
+        foreach ($s in $p.Teillast, $p.Gaming) {
+            $s.Verfuegbar | Should -BeFalse
+            $s.Text | Should -Be 'nicht gemessen'
+            $s.P_AC | Should -BeNullOrEmpty
+        }
+        # Effizienz-Indizes wie bisher (gespeicherte Werte bleiben vergleichbar)
+        $p.Effizienz.CpuMT_PerWatt | Should -Be 100.0
+        $p.Effizienz.Gpu_PerWatt | Should -Be 0.9
+    }
+    It 'Leerlauf ohne gemessene GPU-Leerlaufleistung oder ohne CPU-Leerlaufwert ist nicht gemessen' {
+        (MinibenchTest\Get-SystemPowerProfile (& $script:dgpu ([pscustomobject]@{ CpuW = 20.0 }))).Leerlauf.Verfuegbar | Should -BeFalse
+        $p = MinibenchTest\Get-SystemPowerProfile (& $script:dgpu $null)
+        $p.Leerlauf.Verfuegbar | Should -BeFalse
+        $p.Leerlauf.Aufschluesselung | Should -Match 'nicht gemessen'
+        # ohne Grafikkarte genügt der CPU-Wert
+        $igpu = [pscustomobject]@{ System = 'Büro-PC'; Hardware = [pscustomobject]@{ RAM = '16 GB'; GPU = 'Intel UHD Graphics 770' }; Laufwerke = @('NVMe 512 GB'); Sensoren = [pscustomobject]@{ Leerlauf = [pscustomobject]@{ CpuW = 8.0 } } }
+        (MinibenchTest\Get-SystemPowerProfile $igpu).Leerlauf.Verfuegbar | Should -BeTrue
+    }
+    It 'Netzteil-Warnung nur mit eingegebener Nennleistung' {
+        Mock -ModuleName MinibenchTest Add-Finding { }
+        Mock -ModuleName MinibenchTest Test-IsNotebookSystem { $false }
+        & (Get-Module MinibenchTest) {
+            $script:Facts = [ordered]@{ 'Arbeitsspeicher' = '32 GB (2x 16 GB DDR5)' }
+            $script:SensorDb = [ordered]@{ Last = [ordered]@{ CpuWMax = 260.0 } }
+            $script:PsuWattage = 300; $script:PsuRating = '80 PLUS Bronze'
+            $script:PsuEingegeben = $false
+        }
+        $p = MinibenchTest\Get-SystemPowerProfile
+        $p.Volllast.LoadPercent | Should -BeGreaterThan 85
+        $p.PsuEingegeben | Should -BeFalse
+        Should -Invoke -ModuleName MinibenchTest Add-Finding -Times 0 -Exactly
+        Set-ModuleVar 'PsuEingegeben' $true
+        [void](MinibenchTest\Get-SystemPowerProfile)
+        Should -Invoke -ModuleName MinibenchTest Add-Finding -Times 1 -Exactly
+        & (Get-Module MinibenchTest) { $script:SensorDb = $null; $script:Facts = $null; $script:PsuEingegeben = $false; $script:PsuWattage = $null }
+    }
+    It 'Vorgabe 650 W gilt nicht als Eingabe, Einstellungen.json und andere Werte schon' {
+        $d = Join-Path $TestDrive ('psu_' + [guid]::NewGuid().ToString('N').Substring(0, 6))
+        New-Item -ItemType Directory -Path $d | Out-Null
+        MinibenchTest\Test-PsuEingegeben -Gebunden -Wert 650 -DataDir $d | Should -BeFalse
+        MinibenchTest\Test-PsuEingegeben -Wert 650 -DataDir $d | Should -BeFalse
+        MinibenchTest\Test-PsuEingegeben -Gebunden -Wert 850 -DataDir $d | Should -BeTrue
+        [IO.File]::WriteAllText((Join-Path $d 'Einstellungen.json'), '{ "PsuWattage": 650 }', (New-Object Text.UTF8Encoding($true)))
+        MinibenchTest\Test-PsuEingegeben -Gebunden -Wert 650 -DataDir $d | Should -BeTrue
+    }
+    It 'Bericht zeigt "nicht gemessen", Warnung und Nennleistung nur mit Eingabe' {
+        $ng = { param($s) [pscustomobject]@{ Verfuegbar = $false; NichtGemessen = $true; Text = 'nicht gemessen'; Aufschluesselung = ('nicht gemessen: keine Messung ' + $s); P_AC = $null; P_DC = $null } }
+        $prof = [pscustomobject]@{
+            IsNotebook = $false; PsuWattage = 650; PsuRating = '80 PLUS Bronze'; PsuEingegeben = $false
+            Leerlauf   = [pscustomobject]@{ Verfuegbar = $true; P_AC = 45; P_DC = 38; Aufschluesselung = 'Leerlauf' }
+            Teillast   = (& $ng 'Teillast')
+            Gaming     = (& $ng 'Gaming')
+            Volllast   = [pscustomobject]@{ Verfuegbar = $true; P_AC = 640; P_DC = 590; LoadPercent = 90.8; Aufschluesselung = 'Volllast'; AufschluesselungKurz = 'Volllast kurz' }
+            Effizienz  = [pscustomobject]@{ CpuMT_PerWatt = $null; Gpu_PerWatt = $null; System_PerWatt = $null }
+        }
+        $h = MinibenchTest\New-PowerEfficiencyHtml $prof
+        $h | Should -Match 'id="pwrValPart">nicht gemessen<'
+        $h | Should -Match 'id="pwrValGame">nicht gemessen<'
+        $h | Should -Match 'id="cfgPsuWatt" value=""'
+        $h | Should -Match 'id="pwrLoadWarn" style="display:none;'
+        # Stromkosten aus den gemessenen Stufen Leerlauf und Volllast
+        $h | Should -Match 'id="calcPTeil" value="45"'
+        $h | Should -Not -Match 'W Teillast, ~'
+        $prof.PsuEingegeben = $true
+        $h2 = MinibenchTest\New-PowerEfficiencyHtml $prof
+        $h2 | Should -Match 'id="cfgPsuWatt" value="650"'
+        $h2 | Should -Match 'id="pwrLoadWarn" style="display:block;'
+        # ohne gemessenen Leerlauf kein Kostenrechner
+        $prof.Leerlauf = (& $ng 'Leerlauf')
+        MinibenchTest\New-PowerEfficiencyHtml $prof | Should -Not -Match 'id="calcPTeil"'
+    }
+    It 'Dashboard zeigt fehlende Stufe als "nicht gemessen" statt 0 W' {
+        $js = Get-SrcText 'Bericht/Dashboard/daten.js'
+        $js | Should -Not -Match 'Math\.round\(l \|\| 0\)'
+        $js | Should -Match "'nicht gemessen'"
+    }
+}
+
+Describe 'Seit dem letzten Lauf: nur echte Angaben, maskiert (ab v4.11)' {
+    BeforeAll {
+        Import-MinibenchTestModule -Parts 'Kern\Geraeteidentitaet.ps1', 'Kern\Referenz_Vergleich.ps1', 'Kern\Berichtshilfen.ps1', 'Bericht\Bausteine_Systemvergleich.ps1', 'Bericht\HtmlBericht.ps1' -Functions 'ConvertTo-HtmlText', 'Send-GuiEvent'
+        $script:lauf = {
+            param($Hardware, [string]$System = 'Dell Inc. OptiPlex 7090')
+            [pscustomobject]@{ Computer = 'TESTPC'; Datum = '2026-05-10 10:00:00'; GeraetId = 'G-TESTPC1'; System = $System; Hardware = $Hardware
+                Werte = @{ 'CPU|MT' = 15000.0 }; Messwerte = @{}; Laufwerke = @(); Messdauer = '120'; Quelle = 'Datenbank' }
+        }
+        function Set-Fakten($f) { & (Get-Module MinibenchTest) { param($x) $script:StartTime = [datetime]'2026-10-29 14:00:00'; $script:Facts = $x } $f }
+    }
+    BeforeEach {
+        Mock -ModuleName MinibenchTest Get-DeviceIdentity { [pscustomobject]@{ Id = 'G-TESTPC1' } }
+        Mock -ModuleName MinibenchTest Get-CurrentRefValues { @{ 'CPU|MT' = 15000.0 } }
+    }
+    It 'ohne WinBuild im früheren Lauf kein Build-Unterschied (nie der Systemname als Ersatz)' {
+        $prev = & $script:lauf ([pscustomobject]@{ RAM = '16 GB' })
+        Mock -ModuleName MinibenchTest Get-DbEntries { @($prev) }
+        Set-Fakten ([ordered]@{ 'Betriebssystem' = 'Windows 11 Pro 24H2 (Build 26100.1742)' })
+        $c = MinibenchTest\Get-DeviceRunComparison
+        $c.HasHistory | Should -BeTrue
+        @($c.InventoryChanges | Where-Object { $_.Item -eq 'Windows-Build' }).Count | Should -Be 0
+        MinibenchTest\New-RunHistoryHtml | Should -Not -Match 'OptiPlex'
+    }
+    It 'gleiche Buildnummer ergibt keinen Unterschied, andere Buildnummer schon' {
+        $prev = & $script:lauf ([pscustomobject]@{ WinBuild = '26100'; BiosVersion = '1.15.0' })
+        Mock -ModuleName MinibenchTest Get-DbEntries { @($prev) }
+        Set-Fakten ([ordered]@{ 'Betriebssystem' = 'Windows 11 Pro 24H2 (Build 26100.1742)'; 'BIOS/UEFI' = '1.15.0 vom 01.02.2026' })
+        @((MinibenchTest\Get-DeviceRunComparison).InventoryChanges).Count | Should -Be 0
+        Set-Fakten ([ordered]@{ 'Betriebssystem' = 'Windows 11 Pro 25H2 (Build 26200.7000)'; 'BIOS/UEFI' = '1.16.0 vom 01.09.2026' })
+        $items = @((MinibenchTest\Get-DeviceRunComparison).InventoryChanges | ForEach-Object { $_.Item })
+        $items | Should -Contain 'Windows-Build'
+        $items | Should -Contain 'BIOS'
+    }
+    It 'Werte aus Datenbank und WMI erscheinen maskiert im HTML' {
+        $prev = & $script:lauf ([pscustomobject]@{ BiosVersion = '<script>alert(1)</script>'; GpuDriver = 'x<b>y' })
+        Mock -ModuleName MinibenchTest Get-DbEntries { @($prev) }
+        Set-Fakten ([ordered]@{ 'BIOS/UEFI' = 'A&B vom 01.09.2026'; 'Grafik' = 'Karte "<i>"' })
+        $h = MinibenchTest\New-RunHistoryHtml
+        $h | Should -Not -Match '<script>'
+        $h | Should -Match '&lt;script&gt;'
+        $h | Should -Match 'A&amp;B'
+        $h | Should -Not -Match '<i>'
+    }
+    It 'Referenzname im Benchmark-Hinweis ist maskiert' {
+        $b = Get-SrcText 'Bericht/HtmlBericht.ps1'
+        $b | Should -Not -Match "-f \`$script:Ref\.Name"
+        ([regex]::Matches($b, 'ConvertTo-HtmlText \$script:Ref\.Name')).Count | Should -BeGreaterThan 1
+    }
+}

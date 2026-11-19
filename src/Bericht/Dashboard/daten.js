@@ -775,7 +775,8 @@
         if (!v || v === 'n/v') {
           const l = s.Metrics?.POWER_LOAD;
           const i = s.Metrics?.POWER_IDLE;
-          if (l || i) return `~${Math.round(l || 0)} W / ~${Math.round(i || 0)} W`;
+          // ab v4.11 (Vorgabe 11): fehlende Stufe als "nicht gemessen" statt 0 W
+          if (l || i) return `${l ? '~' + Math.round(l) + ' W' : 'nicht gemessen'} / ${i ? '~' + Math.round(i) + ' W' : 'nicht gemessen'}`;
           return '<span style="color:var(--text-muted);">n/v (kein Leistungssensor)</span>';
         }
         const tip = escapeHtml(s.Hardware?.PowerLoadTip || 'Mathematisch modellierter Gesamtverbrauch');

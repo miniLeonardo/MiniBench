@@ -144,6 +144,73 @@ function Get-NvmeGenFromSpeed([double]$ReadMBs) {
     return 3
 }
 
+# ab v4.11: Hybrid-CPU (Leistungs- und Effizienzkerne) für die erwartete Mehrkern-Skalierung. Bevorzugt aus den echten
+# Kerntypen (GetLogicalProcessorInformationEx, EfficiencyClass je Kern), sonst aus dem Namen. Bis v4.10 nur per Name:
+# i5-1335U, i7-1255U und i7-1360P galten als nicht hybrid, i5-12400 als hybrid. Die Messwerte selbst ändern sich nicht.
+$script:CpuKernklassen = $null
+function Get-CpuKernklassen {
+    if ($null -ne $script:CpuKernklassen) { return $script:CpuKernklassen }
+    $res = @()
+    try {
+        if (-not ('LmbKernTypen' -as [type])) {
+            Add-Type -ErrorAction Stop -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+public static class LmbKernTypen {
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool GetLogicalProcessorInformationEx(int relation, IntPtr buffer, ref uint length);
+    // EfficiencyClass je physischem Kern (RelationProcessorCore = 0; Flags an Byte 8, EfficiencyClass an Byte 9)
+    public static int[] Klassen() {
+        uint len = 0;
+        GetLogicalProcessorInformationEx(0, IntPtr.Zero, ref len);
+        if (len == 0) return new int[0];
+        IntPtr buf = Marshal.AllocHGlobal((int)len);
+        try {
+            if (!GetLogicalProcessorInformationEx(0, buf, ref len)) return new int[0];
+            List<int> l = new List<int>();
+            long off = 0;
+            while (off < len) {
+                IntPtr p = new IntPtr(buf.ToInt64() + off);
+                int rel = Marshal.ReadInt32(p);
+                int size = Marshal.ReadInt32(p, 4);
+                if (size <= 0) break;
+                if (rel == 0) l.Add(Marshal.ReadByte(p, 9));
+                off += size;
+            }
+            return l.ToArray();
+        } finally { Marshal.FreeHGlobal(buf); }
+    }
+}
+'@
+        }
+        $res = @([LmbKernTypen]::Klassen())
+    } catch { $res = @() }
+    $script:CpuKernklassen = $res
+    return $res
+}
+function Test-CpuHybridName([string]$Name) {
+    $n = (([string]$Name) -replace '\(TM\)|\(R\)|®|™', '') -replace '\s+', ' '
+    if ($n -match '(?i)\bCore Ultra [3579]\b') { return $true }
+    if ($n -match '(?i)\bCore [3579] \d{3}([A-Z]*)\b') { return ($Matches[1] -match '(?i)[UHP]') }
+    if ($n -match '(?i)\bi[357]-L1\d') { return $true }
+    # fünfstellig: 12. bis 14. Generation; Notebook (H, U, P) immer hybrid, Desktop 12. Generation ab 12600K, 13./14. ab x3400
+    if ($n -match '(?i)\bi[3579]-(1[234])(\d)\d\d([A-Z]*)\b') {
+        $gen = [int]$Matches[1]; $tier = [int]$Matches[2]; $suf = [string]$Matches[3]
+        if ($suf -match '(?i)[HUP]') { return $true }
+        if ($gen -eq 12) { return ($tier -ge 7 -or ($tier -eq 6 -and $suf -match '(?i)K')) }
+        return ($tier -ge 4)
+    }
+    # vierstellig: Notebook-Prozessoren der 12. und 13. Generation (i3-1215U, i7-1255U, i5-1335U, i7-1360P)
+    if ($n -match '(?i)\bi[3579]-1[23]\d\d[A-Z]*\b') { return $true }
+    return $false
+}
+function Get-CpuHybrid([string]$Name) {
+    $k = @(Get-CpuKernklassen)
+    if ($k.Count) { return [pscustomobject]@{ Hybrid = (@($k | Select-Object -Unique).Count -gt 1); Quelle = 'Kerntypen' } }
+    return [pscustomobject]@{ Hybrid = (Test-CpuHybridName $Name); Quelle = 'Name' }
+}
+
 # Kurzergebnis am Ende eines Messabschnitts (ab v2.8): Bis v2.7 blieben Arbeitsspeicher und Datenträger im Textbericht leer,
 # weil die Tabellen erst in der Auswertung stehen.
 function Add-BenchHeadLine([string]$Gruppe) {
@@ -202,7 +269,7 @@ if ($script:BenchSel['CPU']) {
             $mt = [double]$tMT.Result
             $ptsST = [math]::Round($st / 3); $ptsMT = [math]::Round($mt / 3)
             $scal = $(if ($st -gt 0) { $mt / $st } else { 0 })
-            $hybrid = $cpuName -match 'Core\(TM\) Ultra|Core\(TM\) i[3579]-1[2-4]\d{3}|Core\(TM\) [3579] '
+            $hybrid = (Get-CpuHybrid $cpuName).Hybrid
             $smt = [math]::Max(0, $threads - $cores)
             # Die Rechenlast profitiert stark von SMT/Hyper-Threading (gemessen: 6 Kerne/12 Threads skalieren ca. 12x)
             $expScal = $(if ($hybrid) { $cores * 0.8 + $smt * 0.9 } else { $cores + $smt * 0.9 })

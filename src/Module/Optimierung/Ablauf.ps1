@@ -62,6 +62,11 @@ if ($ModOpt) {
             if ($r.Ergebnis -in 'angewendet', 'teilweise' -and $script:RestorePointNo) { Add-Line ('  Der Wiederherstellungspunkt dieses Laufs ({0}) wurde mit gelöscht, es wird ein neuer angelegt.' -f $script:RestorePointNo); $script:RestorePointNo = $null }
         }
     }
+    # ab v4.11: Der Punkt der Wartung zählt nur, wenn es ihn noch gibt; sonst legt die Optimierung einen eigenen an
+    if ($script:RestorePointNo -and ((Test-RestorePointPresent $script:RestorePointNo) -eq $false)) {
+        Add-Line ('  Der Wiederherstellungspunkt dieses Laufs (Nr. {0}) ist nicht mehr vorhanden, die Optimierung legt einen eigenen an.' -f $script:RestorePointNo)
+        $script:RestorePointNo = ''
+    }
     # Bleibt nach dem Abgleich nichts zu ändern, entfällt der Wiederherstellungspunkt (ab v4.05)
     $script:OptZuTun = @($script:OptSel | Where-Object { $_.Id -ne 'Wiederherstellungspunkte' }).Count
     if (-not $script:OptZuTun) {
@@ -69,8 +74,15 @@ if ($ModOpt) {
     } elseif (-not $OptOhneWiederherstellungspunkt -and -not $script:RestorePointNo) {
         Invoke-Section 'Optimierung: Wiederherstellungspunkt anlegen' {
             Show-Sub 'Wiederherstellungspunkt' 'wird angelegt' -1
-            $rp = New-RestorePointLogged 'Optimierung' ('Leos Minibench vor Optimierung {0:dd.MM.yyyy HH:mm}' -f (Get-Date))
+            $rpText = ('Leos Minibench vor Optimierung {0:dd.MM.yyyy HH:mm}' -f (Get-Date))
+            $rp = New-RestorePointLogged 'Optimierung' $rpText
             Hide-Sub
+            # ab v4.11: nur ein wirklich angelegter Punkt zählt (Windows überspringt Punkte in der Sperrfrist ohne Fehler)
+            if ($rp.Ok) {
+                $echt = Get-RestorePointByDescription $rpText
+                if ($echt) { $rp = [pscustomobject]@{ Ok = $true; Text = $rp.Text; Nummer = [string]$echt.SequenceNumber } }
+                else { $rp = [pscustomobject]@{ Ok = $false; Text = 'Windows hat keinen neuen Wiederherstellungspunkt angelegt'; Nummer = '' } }
+            }
             if ($rp.Ok) { $script:RestorePointNo = $rp.Nummer; Add-Line ('  Wiederherstellungspunkt {0}' -f $rp.Text); Add-TestResult 'Optimierung: Wiederherstellungspunkt' 'OK' $rp.Text }
             else {
                 Add-Line ('  Wiederherstellungspunkt konnte nicht angelegt werden: {0}' -f $rp.Text)

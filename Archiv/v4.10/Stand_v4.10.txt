@@ -1,0 +1,17 @@
+﻿LEOS MINIBENCH: AKTUELLER BUILD
+===============================
+Version   : 4.10 (Dateiversion 4.10.0.0)
+Gebaut    : 15.11.2026 in der Linux-Sandbox von Claude (Testbau, nicht mit Bauen.cmd)
+Tests     : Sandbox 941 bestanden, 51 fehlgeschlagen (nur ohne Windows, dieselben wie auf 4.09), 81 übersprungen; Selbsttest der Oberfläche 74 Fälle; Windows-Tests stehen aus
+Quelltext : 45 Teile aus src, 43,299 Zeilen
+
+Dateien (SHA-256 zur Kontrolle auf dem Stick: Get-FileHash <Datei>)
+  LMB.exe                  2,817 KB  a30d462a8ca20e1c8892fb6fc1e270e36d6b6e6fd6da0af7242a8aa63dbfc878
+  LeosMinibench.ps1        2,741 KB  5871c4b5b3d87a683e59919812430e452ac89aaf66732f4fb7e56d6fd6aabd71
+  LeosMinibench.cmd            1 KB  e9d1f704e9dfddc078ed0181c4ee80b59040f15b24203184d83e10442e09844c
+  LMB.cmd                      1 KB  71f6f9665c3251681c678a718203f4d1df958db438b7788e02d6d9743cd6bf6d
+
+Testbau: LMB.exe ist mit dem Mono-Compiler aus demselben Startprogramm wie in Bauen.cmd übersetzt (Symbol, Manifest
+mit Administratorrechten und DPI-Angaben, Versionsangaben). Der nächste Lauf von Bauen.cmd ersetzt ihn.
+Änderungen dieser Version: Doku\Änderungen_v4.10.txt; alle Versionen: Seite Versionen im Programm und Doku\Versionshistorie.txt.
+Diesen Ordner nicht von Hand ändern: Bauen.cmd erzeugt ihn bei jedem Bau neu aus src.

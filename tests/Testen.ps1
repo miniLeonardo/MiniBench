@@ -1,4 +1,7 @@
-﻿# Führt alle Pester-Tests in diesem Ordner aus. Rückgabe: 0 = alles bestanden, 99 = Pester 5 fehlt, sonst Zahl der Fehlschläge.
+﻿# Führt alle Pester-Tests in diesem Ordner aus. Rückgabe: 0 = alles bestanden, 99 = Pester 5 fehlt,
+# 97 = Testlauf abgebrochen (Invoke-Pester ohne Ergebnis), sonst Zahl der Fehlschläge (höchstens 96).
+# Als Fehlschlag zählen fehlgeschlagene Tests, Testdateien, die nicht laden (FailedContainers), und fehlgeschlagene
+# Blöcke wie BeforeAll oder AfterAll (FailedBlocks); ab v4.11, vorher zählten nur fehlgeschlagene Tests.
 # Aufruf über Testen.cmd oder Bauen.cmd. -Kurz zeigt nur Fehlschläge und die Summe.
 # -Zusammenfassung <Datei> schreibt das Ergebnis in eine Zeile (für Stand.txt im Aktuellen Build).
 # -Gesamtlauf führt unter Windows auch die Gesamtläufe aus (Lauf.Tests.ps1, einige Minuten, Attrappen statt Systemänderungen).
@@ -35,11 +38,36 @@ if ($Datei) {
 }
 $cfg.Run.PassThru = $true
 $cfg.Output.Verbosity = $(if ($Kurz) { 'Normal' } else { 'Detailed' })
-$res = Invoke-Pester -Configuration $cfg
+# Ein Abbruch von Invoke-Pester (Ausnahme oder kein Ergebnis) gilt als Fehlschlag (Rückgabe 97), nie als bestanden.
+$res = $null; $abbruch = ''
+try {
+    $res = @(Invoke-Pester -Configuration $cfg) | Where-Object { $_ -and $_.PSObject.Properties['FailedCount'] } | Select-Object -Last 1
+} catch { $abbruch = [string]$_.Exception.Message }
+if (-not $res -and -not $abbruch) { $abbruch = 'Invoke-Pester hat kein Ergebnis geliefert' }
 # übersetzte Oberfläche der Tests (Hilfen.ps1, Get-GuiUebersetzung) wieder entfernen
 if ($global:MinibenchGuiUebersetzung) { Remove-Item -LiteralPath $global:MinibenchGuiUebersetzung.Ordner -Recurse -Force -ErrorAction SilentlyContinue; $global:MinibenchGuiUebersetzung = $null; $global:MinibenchGuiSelbsttest = $null }
-$line = '{0} bestanden, {1} fehlgeschlagen, {2} übersprungen (Pester {3}, PowerShell {4})' -f $res.PassedCount, $res.FailedCount, $res.SkippedCount, $pester.Version, $PSVersionTable.PSVersion
+$nTests = 0; $nDateien = 0; $nBloecke = 0
+if ($res) {
+    $nTests = [int]$res.FailedCount
+    if ($res.PSObject.Properties['FailedContainersCount']) { $nDateien = [int]$res.FailedContainersCount }
+    if ($res.PSObject.Properties['FailedBlocksCount']) { $nBloecke = [int]$res.FailedBlocksCount }
+    # Pester meldet einen fehlgeschlagenen Lauf, ohne dass einer der Zähler steigt: als ein Fehlschlag werten
+    if (($nTests + $nDateien + $nBloecke) -eq 0 -and [string]$res.Result -eq 'Failed') { $nBloecke = 1 }
+}
+$fehler = $nTests + $nDateien + $nBloecke
+$zusatz = ''
+if ($nDateien -gt 0) { $zusatz += (', {0} Testdateien nicht geladen' -f $nDateien) }
+if ($nBloecke -gt 0) { $zusatz += (', {0} Blöcke fehlgeschlagen' -f $nBloecke) }
+if ($abbruch) {
+    $line = 'Testlauf abgebrochen: {0} (Pester {1}, PowerShell {2})' -f $abbruch, $pester.Version, $PSVersionTable.PSVersion
+} else {
+    $line = '{0} bestanden, {1} fehlgeschlagen, {2} übersprungen{3} (Pester {4}, PowerShell {5})' -f $res.PassedCount, $res.FailedCount, $res.SkippedCount, $zusatz, $pester.Version, $PSVersionTable.PSVersion
+}
 if ($Zusammenfassung) { [IO.File]::WriteAllText($Zusammenfassung, $line) }
 Write-Host ''
-Write-Host ('  Tests: {0} bestanden, {1} fehlgeschlagen, {2} übersprungen (Pester {3})' -f $res.PassedCount, $res.FailedCount, $res.SkippedCount, $pester.Version) -ForegroundColor $(if ($res.FailedCount) { 'Red' } else { 'Green' })
-exit [math]::Min(98, [int]$res.FailedCount)
+if ($abbruch) {
+    Write-Host ('  Tests: Testlauf abgebrochen: {0} (Pester {1})' -f $abbruch, $pester.Version) -ForegroundColor Red
+    exit 97
+}
+Write-Host ('  Tests: {0} bestanden, {1} fehlgeschlagen, {2} übersprungen{3} (Pester {4})' -f $res.PassedCount, $res.FailedCount, $res.SkippedCount, $zusatz, $pester.Version) -ForegroundColor $(if ($fehler) { 'Red' } else { 'Green' })
+exit [math]::Min(96, $fehler)

@@ -314,7 +314,8 @@ function New-PowerEfficiencyHtml($Profile) {
 
     # Interaktive Netzteil-Konfigurationsleiste direkt im Bericht (nur Desktop-PCs; Notebooks nutzen OEM-Modell)
     if (-not $Profile.IsNotebook) {
-        $curWatt = if ($Profile.PsuWattage -gt 0) { [int]$Profile.PsuWattage } else { 650 }
+        # ab v4.11: Feld leer, solange keine Nennleistung eingegeben wurde (die Vorgabe 650 W ist keine Eingabe)
+        $curWatt = if ($Profile.PsuEingegeben -and $Profile.PsuWattage -gt 0) { [string][int]$Profile.PsuWattage } else { '' }
         $curRate = if ($Profile.PsuRating) { [string]$Profile.PsuRating } else { '80 PLUS Bronze' }
         $rOpts = @('Unbekannt', '80 PLUS White', '80 PLUS Bronze', '80 PLUS Silver', '80 PLUS Gold', '80 PLUS Platinum', '80 PLUS Titanium')
         $rSb = New-Object System.Text.StringBuilder
@@ -329,7 +330,7 @@ function New-PowerEfficiencyHtml($Profile) {
   </div>
   <div style="display:flex;align-items:center;gap:8px;">
     <label for="cfgPsuWatt" style="font-size:13px;color:var(--muted);font-weight:500;">Nennleistung:</label>
-    <input type="number" id="cfgPsuWatt" value="{0}" min="200" max="2500" step="50" style="width:85px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit;font-size:13px;" oninput="recalcPsuModel()" title="Nennleistung des verbauten Netzteils in Watt (z. B. 550, 650, 750, 850, 1000 W)">
+    <input type="number" id="cfgPsuWatt" value="{0}" placeholder="nicht angegeben" min="200" max="2500" step="50" style="width:85px;padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit;font-size:13px;" oninput="recalcPsuModel()" title="Nennleistung des verbauten Netzteils in Watt (z. B. 550, 650, 750, 850, 1000 W)">
     <span style="font-size:13px;color:var(--muted);">W</span>
   </div>
   <div style="display:flex;align-items:center;gap:8px;">
@@ -353,18 +354,18 @@ function New-PowerEfficiencyHtml($Profile) {
 
     # 1. Leerlauf
     $idle = $Profile.Leerlauf
-    $idleAc = $(if ($idle -and $idle.Verfuegbar) { '~{0:N0} W' -f [math]::Round($idle.P_AC) } else { 'n/v' })
-    $idleDc = $(if ($idle -and $idle.Verfuegbar) { 'intern DC ~{0:N0} W' -f [math]::Round($idle.P_DC) } else { 'kein Leistungssensor' })
-    $idleTip = $(if ($idle -and $idle.Verfuegbar) { $idle.Aufschluesselung } else { 'Keine Messwerte für CPU-Package-Power im Leerlauf vorhanden.' })
+    $idleAc = $(if ($idle -and $idle.Verfuegbar) { '~{0:N0} W' -f [math]::Round($idle.P_AC) } else { 'nicht gemessen' })
+    $idleDc = $(if ($idle -and $idle.Verfuegbar) { 'intern DC ~{0:N0} W' -f [math]::Round($idle.P_DC) } else { 'kein eigener Messwert' })
+    $idleTip = $(if ($idle -and $idle.Verfuegbar) { $idle.Aufschluesselung } elseif ($idle -and $idle.Aufschluesselung) { $idle.Aufschluesselung } else { 'Keine Messwerte für CPU-Package-Power im Leerlauf vorhanden.' })
     $idleDcNum = $(if ($idle -and $idle.Verfuegbar) { [string]::Format($script:Inv, '{0:0.#}', $idle.P_DC) } else { '0' })
     [void]$sb.Append(('<div class="pwr-card hit" id="pwrCardIdle" data-stage="Idle" data-dc="{0}" data-tip="{1}"><h4>Leerlauf (Idle)</h4><div class="pwr-val" id="pwrValIdle">{2}</div><div class="pwr-sub" id="pwrSubIdle">{3}</div></div>' -f `
         $idleDcNum, (ConvertTo-HtmlText $idleTip), $idleAc, (ConvertTo-HtmlText $idleDc)))
 
     # 2. Teillast
     $part = $Profile.Teillast
-    $partAc = $(if ($part -and $part.Verfuegbar) { '~{0:N0} W' -f [math]::Round($part.P_AC) } else { 'n/v' })
-    $partDc = $(if ($part -and $part.Verfuegbar) { 'intern DC ~{0:N0} W' -f [math]::Round($part.P_DC) } else { 'kein Leistungssensor' })
-    $partTip = $(if ($part -and $part.Verfuegbar) { $part.Aufschluesselung } else { 'Keine Messwerte für Teillast vorhanden.' })
+    $partAc = $(if ($part -and $part.Verfuegbar) { '~{0:N0} W' -f [math]::Round($part.P_AC) } else { 'nicht gemessen' })
+    $partDc = $(if ($part -and $part.Verfuegbar) { 'intern DC ~{0:N0} W' -f [math]::Round($part.P_DC) } else { 'kein eigener Messwert' })
+    $partTip = $(if ($part -and $part.Verfuegbar) { $part.Aufschluesselung } elseif ($part -and $part.Aufschluesselung) { $part.Aufschluesselung } else { 'Keine Messwerte für Teillast vorhanden.' })
     $partDcNum = $(if ($part -and $part.Verfuegbar) { [string]::Format($script:Inv, '{0:0.#}', $part.P_DC) } else { '0' })
     [void]$sb.Append(('<div class="pwr-card hit" id="pwrCardPart" data-stage="Teillast" data-dc="{0}" data-tip="{1}"><h4>Teillast (Alltag & Büro)</h4><div class="pwr-val" id="pwrValPart">{2}</div><div class="pwr-sub" id="pwrSubPart">{3}</div></div>' -f `
         $partDcNum, (ConvertTo-HtmlText $partTip), $partAc, (ConvertTo-HtmlText $partDc)))
@@ -378,11 +379,15 @@ function New-PowerEfficiencyHtml($Profile) {
         $gameDcNum = [string]::Format($script:Inv, '{0:0.#}', $game.P_DC)
         [void]$sb.Append(('<div class="pwr-card hit" id="pwrCardGame" data-stage="Gaming" data-dc="{0}" data-tip="{1}"><h4>Typisches Gaming</h4><div class="pwr-val" id="pwrValGame">{2}</div><div class="pwr-sub" id="pwrSubGame">{3}</div></div>' -f `
             $gameDcNum, (ConvertTo-HtmlText $gameTip), $gameAc, (ConvertTo-HtmlText $gameDc)))
+    } elseif ($game) {
+        # ab v4.11: ohne eigenen Messwert "nicht gemessen" statt eines Schätzwerts
+        $gameTip = $(if ($game.Aufschluesselung) { $game.Aufschluesselung } else { 'Keine Messwerte für typisches Spielen vorhanden.' })
+        [void]$sb.Append(('<div class="pwr-card hit" id="pwrCardGame" data-stage="Gaming" data-dc="0" data-tip="{0}"><h4>Typisches Gaming</h4><div class="pwr-val" id="pwrValGame">nicht gemessen</div><div class="pwr-sub" id="pwrSubGame">kein eigener Messwert</div></div>' -f (ConvertTo-HtmlText $gameTip)))
     }
 
     # 4. Volllast
     $load = $Profile.Volllast
-    $loadAc = $(if ($load -and $load.Verfuegbar) { '~{0:N0} W' -f [math]::Round($load.P_AC) } else { 'n/v' })
+    $loadAc = $(if ($load -and $load.Verfuegbar) { '~{0:N0} W' -f [math]::Round($load.P_AC) } else { 'nicht gemessen' })
     $loadDc = $(if ($load -and $load.Verfuegbar) { 'intern DC ~{0:N0} W' -f [math]::Round($load.P_DC) } else { 'kein Leistungssensor' })
     $loadTip = $(if ($load -and $load.Verfuegbar) { $load.Aufschluesselung } else { 'Keine Messwerte unter Volllast vorhanden.' })
     $loadDcNum = $(if ($load -and $load.Verfuegbar) { [string]::Format($script:Inv, '{0:0.#}', $load.P_DC) } else { '0' })
@@ -390,8 +395,9 @@ function New-PowerEfficiencyHtml($Profile) {
         $loadDcNum, (ConvertTo-HtmlText $loadTip), $loadAc, (ConvertTo-HtmlText $loadDc)))
 
     [void]$sb.Append('</div>')
-    if ($load -and $load.AufschluesselungKurz) {
-        $warnDisplay = $(if ($load.LoadPercent -gt 85) { 'display:block;' } else { 'display:none;' })
+    if ($load -and $load.Verfuegbar -and $load.AufschluesselungKurz) {
+        # ab v4.11: Warnung nur mit eingegebener Nennleistung; ändert der Leser das Feld, rechnet recalcPsuModel neu
+        $warnDisplay = $(if ($Profile.PsuEingegeben -and $load.LoadPercent -gt 85) { 'display:block;' } else { 'display:none;' })
         $warnLoad = $(if ($load.LoadPercent) { [math]::Round($load.LoadPercent) } else { 0 })
         [void]$sb.Append(('<p class="note" style="margin:10px 0 14px;"><b>Volllast-Aufschlüsselung:</b> <span id="pwrLoadBreakdown">{0}</span></p>' -f (ConvertTo-HtmlText $load.AufschluesselungKurz)))
         [void]$sb.Append(('<div id="pwrLoadWarn" style="{0}margin:-6px 0 14px;padding:8px 12px;border-radius:8px;background:var(--warn-bg);border:1px solid var(--warn);color:var(--warn);font-size:13px;font-weight:600;">⚠️ Netzteil unter Volllast zu {1} % ausgelastet. Wenig Puffer für Lastspitzen.</div>' -f $warnDisplay, $warnLoad))
@@ -418,9 +424,10 @@ function New-PowerEfficiencyHtml($Profile) {
     }
 
     # Stromkosten-Kalkulator
-    $pTeilNum = $(if ($part -and $part.Verfuegbar -and $part.P_AC -gt 0) { [math]::Round($part.P_AC) } else { 0 })
+    # ab v4.11: nur mit gemessenen Stufen (Leerlauf und Volllast); Teillast wird nicht gemessen
+    $pTeilNum = $(if ($idle -and $idle.Verfuegbar -and $idle.P_AC -gt 0) { [math]::Round($idle.P_AC) } else { 0 })
     $pVollNum = $(if ($load -and $load.Verfuegbar -and $load.P_AC -gt 0) { [math]::Round($load.P_AC) } else { 0 })
-    if ($pTeilNum -gt 0 -or $pVollNum -gt 0) {
+    if ($pTeilNum -gt 0 -and $pVollNum -gt 0) {
         $initKwh = [math]::Round((4 * $pTeilNum + 2 * $pVollNum) * 365 / 1000.0, 1)
         $initCost = [math]::Round($initKwh * 0.35, 2)
         [void]$sb.Append('<details open style="margin-top:14px;border:1px solid var(--line);border-radius:10px;padding:10px 16px;"><summary style="font-weight:650;color:var(--accent);cursor:pointer;">Jährliche Stromkosten-Schätzung (Verbrauchskalkulator)</summary>')
@@ -428,12 +435,12 @@ function New-PowerEfficiencyHtml($Profile) {
 <div class="calc-grid">
 <input type="hidden" id="calcPTeil" value="{0}">
 <input type="hidden" id="calcPVoll" value="{1}">
-<div class="calc-field"><label for="calcHTeil">Alltagsbetrieb / Büro (h/Tag):</label><input type="number" id="calcHTeil" value="4" min="0" max="24" step="0.5" oninput="recalcPowerCost()"></div>
+<div class="calc-field"><label for="calcHTeil">Leerlauf und leichte Nutzung (h/Tag):</label><input type="number" id="calcHTeil" value="4" min="0" max="24" step="0.5" oninput="recalcPowerCost()"></div>
 <div class="calc-field"><label for="calcHVoll">Volllast / Gaming (h/Tag):</label><input type="number" id="calcHVoll" value="2" min="0" max="24" step="0.5" oninput="recalcPowerCost()"></div>
 <div class="calc-field"><label for="calcPrice">Strompreis (Cent/kWh):</label><input type="number" id="calcPrice" value="35" min="1" max="150" step="1" oninput="recalcPowerCost()"></div>
 <div class="calc-res"><span>Jahresverbrauch</span><b id="calcOutKwh">{2:N0} kWh</b></div>
 <div class="calc-res"><span>Geschätzte Kosten</span><b id="calcOutCost">{3:N2} €</b></div>
-</div><p class="note" id="calcCostNote" style="margin-top:8px;">Berechnung basiert auf angenommenen 365 Tagen/Jahr mit den modellierten AC-Leistungswerten (~{0} W Teillast, ~{1} W Volllast).</p>
+</div><p class="note" id="calcCostNote" style="margin-top:8px;">Berechnung basiert auf angenommenen 365 Tagen/Jahr mit den modellierten AC-Leistungswerten (~{0} W Leerlauf, ~{1} W Volllast).</p>
 '@
         [void]$sb.Append(($calcTpl -f $pTeilNum, $pVollNum, $initKwh, $initCost))
         [void]$sb.Append(@'
@@ -514,7 +521,7 @@ function recalcPsuModel() {
         sEl.textContent = 'intern DC ~' + Math.round(pDc) + ' W (~' + res.etaPct.toLocaleString('de-DE') + ' % Effizienz)';
       }
     }
-    if (c.stage === 'Teillast') newAcPart = pAc;
+    if (c.stage === 'Idle') newAcPart = pAc;
     if (c.stage === 'Load') {
       newAcLoad = pAc;
       var bdEl = document.getElementById('pwrLoadBreakdown');
@@ -542,7 +549,7 @@ function recalcPsuModel() {
   if (elPV && newAcLoad > 0) elPV.value = newAcLoad;
   var noteEl = document.getElementById('calcCostNote');
   if (noteEl && newAcPart > 0 && newAcLoad > 0) {
-    noteEl.textContent = 'Berechnung basiert auf angenommenen 365 Tagen/Jahr mit den modellierten AC-Leistungswerten (~' + newAcPart + ' W Teillast, ~' + newAcLoad + ' W Volllast).';
+    noteEl.textContent = 'Berechnung basiert auf angenommenen 365 Tagen/Jahr mit den modellierten AC-Leistungswerten (~' + newAcPart + ' W Leerlauf, ~' + newAcLoad + ' W Volllast).';
   }
   if (typeof recalcPowerCost === 'function') recalcPowerCost();
 }
@@ -780,8 +787,9 @@ function New-HtmlReport {
             return [string]::Format($script:Inv, '<span class="ib{3}" title="Index {2}, 100 = typisch"><span class="ibf {0}" style="width:{1}%"></span><span class="ibm"></span></span><b>{2}</b>', $c, $w, $Index, $(if ($Small) { ' s' } else { '' }))
         }
         $refDat = ''; try { if ($script:Ref.Datum) { $refDat = ' vom ' + [datetime]::ParseExact([string]$script:Ref.Datum, 'yyyy-MM-dd', $script:Inv).ToString('dd.MM.yyyy') } } catch { $refDat = ' vom ' + $script:Ref.Datum }
+        # ab v4.11: Referenzname und Datum maskiert (Vorgabe 12)
         $refNote = $(if ($script:RefSavedNow -and -not (Test-HasReference)) { ' Dieser Lauf wurde als Referenz gespeichert; ab dem nächsten Lauf ist dieser PC 100 %.' }
-            elseif ($script:RefSavedNow) { ' Referenz 100 % = {0}{1}; dieser Lauf wurde als neue Referenz gespeichert und gilt ab dem nächsten Lauf.' -f $script:Ref.Name, $refDat } elseif (Test-HasReference) { ' Referenz 100 % = {0}{1}, Laufwerke im Vergleich zur gleichen Klasse.' -f $script:Ref.Name, $refDat } else { ' Keine Referenz festgelegt (Haken "Dieses System als Referenz festlegen" im Benchmark).' })
+            elseif ($script:RefSavedNow) { ' Referenz 100 % = {0}{1}; dieser Lauf wurde als neue Referenz gespeichert und gilt ab dem nächsten Lauf.' -f (ConvertTo-HtmlText $script:Ref.Name), (ConvertTo-HtmlText $refDat) } elseif (Test-HasReference) { ' Referenz 100 % = {0}{1}, Laufwerke im Vergleich zur gleichen Klasse.' -f (ConvertTo-HtmlText $script:Ref.Name), (ConvertTo-HtmlText $refDat) } else { ' Keine Referenz festgelegt (Haken "Dieses System als Referenz festlegen" im Benchmark).' })
         if (Get-Command 'New-RunHistoryHtml' -ErrorAction SilentlyContinue) {
             $histHtml = New-RunHistoryHtml
             if ($histHtml) { [void]$sb.Append($histHtml) }

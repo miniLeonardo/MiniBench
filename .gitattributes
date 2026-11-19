@@ -1,0 +1,32 @@
+# Zeilenenden und Binärdateien für Leos Minibench (ab v4.11). Ohne BOM: git liest diese Datei selbst.
+# Alle Textdateien stehen in der Arbeitskopie mit CRLF (Windows PowerShell 5.1, cmd.exe, csc.exe), im Repository mit LF.
+# Damit stimmen die Prüfsummen in Aktueller Build\Stand.txt auf jedem Rechner, unabhängig von core.autocrlf.
+* text=auto eol=crlf
+
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
+*.psd1      text eol=crlf
+*.psm1      text eol=crlf
+*.cs        text eol=crlf
+*.txt       text eol=crlf
+*.md        text eol=crlf
+*.json      text eol=crlf
+*.xml       text eol=crlf
+*.html      text eol=crlf
+*.css       text eol=crlf
+*.js        text eol=crlf
+*.svg       text eol=crlf
+*.nip       text eol=crlf
+.gitignore  text eol=crlf
+.gitattributes text eol=crlf
+
+# WinSAT-Ausgaben sind UTF-16 (so liefert Windows sie); git darf sie nicht als Text umschreiben.
+tests/Daten/WinSAT/*.xml binary
+
+*.exe       binary
+*.dll       binary
+*.ico       binary
+*.png       binary
+*.jpg       binary
+*.zip       binary
+*.7z        binary

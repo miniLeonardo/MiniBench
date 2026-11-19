@@ -196,7 +196,18 @@ public class ChangeEntry
     public string Schritt = "", Lauf = "";
     public string Schluessel { get { return FilePath + "*" + Id; } }
     public int Id;
-    public bool Undoable { get { return Status == "aktiv" && String.Equals(Computer, Environment.MachineName, StringComparison.OrdinalIgnoreCase); } }
+    public bool Undoable { get { return IstOffen(Status) && IstDiesesGeraet(Computer, GeraetId); } }
+
+    // ab v4.11 (wie Test-ChangeLogDiesesGeraet und Test-ChangeOffen im Skript): Ein Protokoll gehört zu diesem Gerät, wenn
+    // beide Gerätekennungen bekannt und gleich sind; nur wenn eine fehlt, entscheidet der Computername. So bleibt ein
+    // Protokoll nach dem Umbenennen des PCs zurücknehmbar. "fehlgeschlagen" (bis v4.10) gilt wie "aktiv" als offen.
+    public static string EigeneGeraetId = "";
+    public static bool IstDiesesGeraet(string computer, string geraetId)
+    {
+        if (!String.IsNullOrEmpty(geraetId) && !String.IsNullOrEmpty(EigeneGeraetId)) return String.Equals(geraetId, EigeneGeraetId, StringComparison.Ordinal);
+        return String.Equals(computer, Environment.MachineName, StringComparison.OrdinalIgnoreCase);
+    }
+    public static bool IstOffen(string status) { return status == "aktiv" || status == "fehlgeschlagen"; }
 
     static string S(Dictionary<string, object> d, string k)
     {
@@ -219,7 +230,7 @@ public class ChangeEntry
             {
                 Dictionary<string, object> d = js.DeserializeObject(File.ReadAllText(f, Encoding.UTF8)) as Dictionary<string, object>;
                 if (d == null || S(d, "Format") != "Minibench-Aenderungen/1") continue;
-                if (dateien != null) dateien.Add(new string[] { f, S(d, "Computer"), S(d, "Lauf") });
+                if (dateien != null) dateien.Add(new string[] { f, S(d, "Computer"), S(d, "Lauf"), S(d, "GeraetId") });
                 object eo; if (!d.TryGetValue("Eintraege", out eo)) continue;
                 System.Collections.IEnumerable arr = eo as System.Collections.IEnumerable;
                 if (arr == null || eo is string) continue;
@@ -275,11 +286,11 @@ public class ChangeMassnahme
 // ab v4.10: ein Lauf des Änderungsprotokolls (eine Datei) mit seinen Maßnahmen
 public class ChangeLauf
 {
-    public string FilePath = "", Computer = "", Zeit = "";
+    public string FilePath = "", Computer = "", Zeit = "", GeraetId = "";
     public List<ChangeEntry> Eintraege = new List<ChangeEntry>();
     public List<ChangeMassnahme> Massnahmen = new List<ChangeMassnahme>();
-    public bool DieserPc { get { return String.Equals(Computer, Environment.MachineName, StringComparison.OrdinalIgnoreCase); } }
-    public int Aktiv { get { int n = 0; foreach (ChangeEntry c in Eintraege) if (c.Status == "aktiv") n++; return n; } }
+    public bool DieserPc { get { return ChangeEntry.IstDiesesGeraet(Computer, GeraetId); } }
+    public int Aktiv { get { int n = 0; foreach (ChangeEntry c in Eintraege) if (ChangeEntry.IstOffen(c.Status)) n++; return n; } }
     public string Module
     {
         get { List<string> m = new List<string>(); foreach (ChangeEntry c in Eintraege) if (c.Modul.Length > 0 && !m.Contains(c.Modul)) m.Add(c.Modul); return String.Join(", ", m.ToArray()); }
@@ -311,12 +322,12 @@ public class ChangeLauf
             foreach (string[] d in dateien)
             {
                 if (d == null || d.Length < 3 || nach.ContainsKey(d[0])) continue;
-                ChangeLauf n = new ChangeLauf(); n.FilePath = d[0]; n.Computer = d[1]; n.Zeit = d[2]; nach[d[0]] = n; l.Add(n);
+                ChangeLauf n = new ChangeLauf(); n.FilePath = d[0]; n.Computer = d[1]; n.Zeit = d[2]; if (d.Length > 3) n.GeraetId = d[3] ?? ""; nach[d[0]] = n; l.Add(n);
             }
         foreach (ChangeEntry c in eintraege)
         {
             ChangeLauf n;
-            if (!nach.TryGetValue(c.FilePath, out n)) { n = new ChangeLauf(); n.FilePath = c.FilePath; n.Computer = c.Computer; n.Zeit = c.Lauf; nach[c.FilePath] = n; l.Add(n); }
+            if (!nach.TryGetValue(c.FilePath, out n)) { n = new ChangeLauf(); n.FilePath = c.FilePath; n.Computer = c.Computer; n.GeraetId = c.GeraetId; n.Zeit = c.Lauf; nach[c.FilePath] = n; l.Add(n); }
             n.Eintraege.Add(c);
         }
         foreach (ChangeLauf n in l)

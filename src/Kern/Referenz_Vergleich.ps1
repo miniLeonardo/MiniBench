@@ -62,6 +62,8 @@ function Get-DbEntries {
             Format = [string]$j.Format; GeraetId = $(if ($j.Geraet) { [string]$j.Geraet.Id } else { '' }); Version = [string]$j.Version; Quelle = [string]$j.Quelle
             System = $(if ($j.System) { [string]$j.System } elseif ($j.Hardware -and $j.Hardware.System) { [string]$j.Hardware.System } else { '' })
             Akku = @($j.Akku); Ablauf = $j.Ablauf
+            # ab v4.11: für die Lasttest-Mediane in Update-BenchReferenceMedians (bis v4.10 fehlten beide Felder)
+            Sensoren = $j.Sensoren; Lasttest = $j.Lasttest
         })
     }
     Set-DbDeviceKeys $list

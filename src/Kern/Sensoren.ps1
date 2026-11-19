@@ -300,7 +300,9 @@ function Open-SensorSession([switch]$Treiber, [switch]$OhneDatentraeger) {
             $s.Treiber = ('PawnIO {0} (von Leos Minibench behalten, wird am Ende entfernt)' -f $pw.Version); $s.TreiberOk = $true
         }
         elseif ($pw.Installiert) { $s.Treiber = ('PawnIO {0} ({1})' -f $pw.Version, $(if (Test-KeptTool 'PawnIO') { 'auf Wunsch behalten' } else { 'bereits vorhanden' })); $s.TreiberOk = $true }
-        elseif ($Treiber -or $isAdmin) {
+        # ab v4.11: nur mit -SensorTreiber (Rückfrage in der Oberfläche). Bis v4.10 genügten Administratorrechte, und
+        # die Arbeitsprozesse laufen immer als Administrator: PawnIO kam auch nach der Antwort "nein" auf den PC.
+        elseif ($Treiber) {
             $r = Install-PawnIoTemporary
             $s.Treiber = $r.Text; $s.TreiberOk = $r.Ok
             if (-not $r.Ok) { $s.Hinweise.Add($r.Text) }

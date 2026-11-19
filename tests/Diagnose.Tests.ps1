@@ -297,3 +297,31 @@ Describe 'Resizable BAR / SAM Erkennung (Test-RebarStatus)' {
         $res.Active | Should -BeFalse
     }
 }
+
+# ab v4.11 (Befund F2): RAM-Tests von Diagnose und Lasttest nehmen den freien Arbeitsspeicher frisch, nicht aus dem
+# Cache vom Laufbeginn
+Describe 'Freier Arbeitsspeicher für RAM-Tests (ab v4.11)' {
+    BeforeAll {
+        Import-MinibenchTestModule -Functions 'Get-FreeRamBytes', 'Get-CimCached' -Setup '$script:CimCache = @{}'
+    }
+    It 'fragt FreePhysicalMemory frisch ab' {
+        Mock -ModuleName MinibenchTest Get-CimInstance { [pscustomobject]@{ FreePhysicalMemory = 4194304 } }
+        Mock -ModuleName MinibenchTest Get-CimCached { @([pscustomobject]@{ FreePhysicalMemory = 16777216 }) }
+        MinibenchTest\Get-FreeRamBytes | Should -Be 4GB
+        Should -Invoke -ModuleName MinibenchTest Get-CimCached -Times 0 -Exactly
+    }
+    It 'nimmt bei Fehler den Wert aus dem Cache' {
+        Mock -ModuleName MinibenchTest Get-CimInstance { throw 'WMI nicht erreichbar' }
+        Mock -ModuleName MinibenchTest Get-CimCached { @([pscustomobject]@{ FreePhysicalMemory = 2097152 }) }
+        MinibenchTest\Get-FreeRamBytes | Should -Be 2GB
+        Mock -ModuleName MinibenchTest Get-CimCached { @() }
+        MinibenchTest\Get-FreeRamBytes | Should -Be 0
+    }
+    It 'Diagnose und Lasttest nutzen Get-FreeRamBytes' {
+        foreach ($p in 'Module/Diagnose/Ablauf.ps1', 'Module/Lasttest/Ablauf.ps1') {
+            $t = Get-SrcText $p
+            $t | Should -Match 'Get-FreeRamBytes' -Because $p
+            $t | Should -Not -Match 'Get-CimCached Win32_OperatingSystem \| Select-Object -First 1\s*\r?\n\s*\$(free|ramTarget) = ' -Because $p
+        }
+    }
+}

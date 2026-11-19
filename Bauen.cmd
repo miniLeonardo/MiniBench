@@ -11,10 +11,13 @@ param([string]$Here, [string]$A1 = '')
 # Baut Leos Minibench aus dem Ordner src in den Ordner "Aktueller Build":
 #   1. fügt src laut src\Bauplan.txt zusammen und prüft die Syntax
 #   2. führt die Pester-Tests in tests aus (falls Pester 5 installiert ist); bei Fehlern bleibt der Aktuelle Build unverändert
-#   3. baut die exe und legt exe, ps1, LeosMinibench.cmd und Stand.txt in "Aktueller Build"
-#   4. ab v2.7: verschiebt den vorigen Build nach Archiv\v<alte Version> und räumt die Daten im Aktuellen Build auf
-#      (Datenpflege: Lasttests vor v2.67, unvollständige und kurze Läufe nach Archiv\Minibench-Daten)
+#   3. baut die exe in einem Arbeitsordner
+#   4. legt exe, ps1, LeosMinibench.cmd und Stand.txt in "Aktueller Build" (erst als .neu, dann umbenannt); Dateien einer
+#      anderen Version wandern vorher nach Archiv\v<ihre Version> (ab v2.7, ab v4.11 je Datei bestimmt, nie gelöscht)
 #   5. passt README.md automatisch an die gebaute Version an
+#   6. räumt die Daten im Aktuellen Build auf (Datenpflege: Lasttests vor v2.67, unvollständige und kurze Läufe nach
+#      Archiv\Minibench-Daten)
+#   7. committet nach bestandenen Tests lokal; übertragen wird nur mit Veroeffentlichen.ps1
 # Aufruf: Bauen.cmd [ohnetests]
 # Benötigt nur Windows (csc.exe des .NET Framework 4), keine Downloads.
 $ohneTests = ([string]$A1).Trim().ToLowerInvariant() -eq 'ohnetests'
@@ -35,6 +38,7 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("Diagnose, Benchmark, Lasttest, Reparatur und Sensoren für Windows")]
 [assembly: AssemblyVersion("@@VERSION@@")]
 [assembly: AssemblyFileVersion("@@VERSION@@")]
+[assembly: AssemblyInformationalVersion("@@VERSION_TEXT@@")]
 
 // Startfenster (ab v2.6, Roadmap v2.5): erscheint sofort nach dem Doppelklick, zeigt Symbol, Version und die Startphase,
 // bis die Oberfläche gezeichnet ist (benanntes Ereignis LEOSMINIBENCH_BEREIT) oder PowerShell endet.
@@ -312,6 +316,7 @@ Write-Host ''
 Write-Host '  Leos Minibench wird gebaut' -ForegroundColor Cyan
 Write-Host ''
 $work = ''
+$neuDateien = @()   # Schritt 4: nicht umbenannte .neu-Dateien räumt finally weg
 try {
     if (-not $Here) { $Here = (Get-Location).Path }
     $Here = $Here.TrimEnd('\')
@@ -340,7 +345,7 @@ try {
     # 2. Tests
     $testInfo = ''
     $gesamtDuration = ''
-    $testsOk = $false   # nur nach bestandenen Tests wird committet (Schritt 6)
+    $testsOk = $false   # nur nach bestandenen Tests wird committet (Schritt 7)
     if ($ohneTests) {
         $testInfo = 'nicht ausgeführt (Bauen.cmd ohnetests)'
         Write-Host '  Tests    : übersprungen (ohnetests)' -ForegroundColor Yellow
@@ -354,8 +359,9 @@ try {
         $gesamtDuration = '{0:mm\:ss}' -f $gesamtSw.Elapsed
         $sum = ''; if (Test-Path -LiteralPath $sumFile) { $sum = ([IO.File]::ReadAllText($sumFile)).Trim(); Remove-Item -LiteralPath $sumFile -Force -ErrorAction SilentlyContinue }
         if ($tc -eq 99) { $testInfo = 'nicht ausgeführt (Pester 5 fehlt)'; Write-Host '  Tests    : Pester 5 fehlt, Tests übersprungen (siehe oben)' -ForegroundColor Yellow }
-        elseif ($tc -ne 0) { throw ('{0} Tests sind fehlgeschlagen. Der Aktuelle Build bleibt unverändert (Bauen.cmd ohnetests erzwingt den Bau).' -f $tc) }
-        else { $testsOk = $true; $testInfo = $(if ($sum) { $sum } else { 'alle bestanden' }); Write-Host ('  Tests    : {0} (GesamtlÃ¤ufe: {1})' -f $testInfo, $gesamtDuration) -ForegroundColor Green }
+        elseif ($tc -eq 97) { throw 'Der Testlauf ist abgebrochen (Invoke-Pester ohne Ergebnis). Der Aktuelle Build bleibt unverändert (Bauen.cmd ohnetests erzwingt den Bau).' }
+        elseif ($tc -ne 0) { throw ('{0} Fehlschläge in den Tests (Tests, nicht geladene Testdateien und Blöcke). Der Aktuelle Build bleibt unverändert (Bauen.cmd ohnetests erzwingt den Bau).' -f $tc) }
+        else { $testsOk = $true; $testInfo = $(if ($sum) { $sum } else { 'alle bestanden' }); Write-Host ('  Tests    : {0} (Gesamtläufe: {1})' -f $testInfo, $gesamtDuration) -ForegroundColor Green }
     }
 
     # 3. exe in einem Arbeitsordner bauen
@@ -387,45 +393,6 @@ try {
     if ($p.ExitCode -ne 0 -or -not (Test-Path $fExe)) { Write-Host $stdout; Write-Host $stderr; throw ('csc.exe hat den Fehlercode {0} gemeldet.' -f $p.ExitCode) }
 
     # 4. in "Aktueller Build" übernehmen. Ein dort vorhandener Ordner Minibench-Daten bleibt unberührt.
-    New-Item -ItemType Directory -Path $build -Force | Out-Null
-    $exe = Join-Path $build 'LMB.exe'
-    # ab v2.7: Der vorige Build (andere Version) wandert nach Archiv\v<alte Version>: exe, ps1, Stand und Änderungsdatei.
-    # Gleiche Version (neuer Bau desselben Stands) wird wie bisher ersetzt.
-    $oldVer = ''
-    $oldStand = Join-Path $build 'Stand.txt'
-    if (Test-Path -LiteralPath $oldStand) { $st0 = [IO.File]::ReadAllText($oldStand); if ($st0 -match 'Version\s*:\s*([\d.]+)') { $oldVer = $Matches[1] } }
-    if ($oldVer -and $oldVer -ne $ver) {
-        $arc = Join-Path $Here ('Archiv\v{0}' -f $oldVer)
-        New-Item -ItemType Directory -Path $arc -Force | Out-Null
-        $moves = @(@('LMB.exe', 'LMB.exe'), @('LeosMinibench.exe', 'LeosMinibench.exe'), @('LeosMinibench.ps1', 'LeosMinibench.ps1'), @('Stand.txt', ('Stand_v{0}.txt' -f $oldVer)), @(('Änderungen_v{0}.txt' -f $oldVer), ('Änderungen_v{0}.txt' -f $oldVer)))
-        foreach ($m in $moves) {
-            $src = Join-Path $build $m[0]; $dst = Join-Path $arc $m[1]
-            if (-not (Test-Path -LiteralPath $src)) { continue }
-            if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $src -Force -ErrorAction SilentlyContinue; continue }
-            try { Move-Item -LiteralPath $src -Destination $dst -ErrorAction Stop } catch { throw ('{0} lässt sich nicht nach {1} verschieben ({2}). Leos Minibench schließen und erneut bauen.' -f $src, $arc, $_.Exception.Message) }
-        }
-        Write-Host ('  Archiv   : Version {0} nach {1} verschoben' -f $oldVer, $arc)
-    }
-    if (Test-Path $exe) { try { Remove-Item $exe -Force -ErrorAction Stop } catch { throw ('{0} ist noch geöffnet. Leos Minibench schließen und erneut bauen.' -f $exe) } }
-    $oldExe = Join-Path $build 'LeosMinibench.exe'
-    if (Test-Path $oldExe) { try { Remove-Item $oldExe -Force -ErrorAction SilentlyContinue } catch { } }
-    Copy-Item -LiteralPath $fExe -Destination $exe -Force
-    Copy-Item -LiteralPath $fPs1 -Destination (Join-Path $build 'LeosMinibench.ps1') -Force
-    Copy-Item -LiteralPath (Join-Path $srcDir 'LeosMinibench.cmd') -Destination (Join-Path $build 'LeosMinibench.cmd') -Force
-    if (Test-Path -LiteralPath (Join-Path $srcDir 'LMB.cmd')) {
-        Copy-Item -LiteralPath (Join-Path $srcDir 'LMB.cmd') -Destination (Join-Path $build 'LMB.cmd') -Force
-    }
-    # ab v2.7 ohne Änderungsdatei: Sie liegt in Doku, die Versionshistorie steht im Programm (Seite Versionen)
-    Get-ChildItem -LiteralPath $build -Filter 'Änderungen_v*.txt' -File -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
-    $files = @('LMB.exe', 'LeosMinibench.ps1', 'LeosMinibench.cmd', 'LMB.cmd') | Where-Object { Test-Path -LiteralPath (Join-Path $build $_) }
-    $st = New-Object System.Text.StringBuilder
-    [void]$st.AppendLine('LEOS MINIBENCH: AKTUELLER BUILD')
-    [void]$st.AppendLine('===============================')
-    [void]$st.AppendLine(('Version   : {0} (Dateiversion {1})' -f $ver, $asmVer))
-    [void]$st.AppendLine(('Gebaut    : {0:dd.MM.yyyy HH:mm} auf {1}' -f (Get-Date), $env:COMPUTERNAME))
-    [void]$st.AppendLine(('Tests     : {0} (Laufzeit: {1})' -f $testInfo, $(if ($gesamtDuration) { $gesamtDuration } else { '--' })))
-    [void]$st.AppendLine(('Quelltext : {0} Teile aus src, {1:N0} Zeilen' -f $r.Teile.Count, $r.Zeilen))
-    [void]$st.AppendLine('')
     function Get-Sha256Hex([string]$Path) {
         if (Get-Command Get-FileHash -ErrorAction SilentlyContinue) {
             try { return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant() } catch { }
@@ -437,6 +404,88 @@ try {
             return (($bytes | ForEach-Object { $_.ToString('x2') }) -join '')
         } finally { $fs.Dispose(); $sha.Dispose() }
     }
+    # Version einer Datei im Aktuellen Build aus ihrem Inhalt (ab v4.11): exe aus der Produktversion (ab v4.11 der
+    # Versionstext, vorher die Dateiversion 4.8.0.0 = 4.08), ps1 aus $ScriptVersion, Stand.txt aus der Zeile Version.
+    function Get-BuildDateiVersion([string]$Path) {
+        if (-not (Test-Path -LiteralPath $Path)) { return '' }
+        try {
+            if ($Path -match '\.exe$') {
+                $vi = [Diagnostics.FileVersionInfo]::GetVersionInfo($Path)
+                if ([string]$vi.ProductVersion -match '^\s*(\d+\.\d+)\s*$') { return $Matches[1] }
+                if ($vi.FileMajorPart -or $vi.FileMinorPart) {
+                    if ($vi.FileMinorPart -eq 0) { return ('{0}.0' -f $vi.FileMajorPart) }
+                    return ('{0}.{1:00}' -f $vi.FileMajorPart, $vi.FileMinorPart)
+                }
+                return ''
+            }
+            $txt = [IO.File]::ReadAllText($Path, [Text.Encoding]::UTF8)
+            if ($Path -match '\.ps1$') { $mv = [regex]::Match($txt, '(?m)^\$ScriptVersion\s*=\s*''([\d.]+)''') }
+            else { $mv = [regex]::Match($txt, 'Version\s*:\s*([\d.]+)') }
+            if ($mv.Success) { return $mv.Groups[1].Value }
+        } catch { }
+        return ''
+    }
+    # Verschiebt eine Datei des Aktuellen Builds nach Archiv\v<Version>. Vorgabe 14: nie löschen. Liegt dort schon eine
+    # andere Datei gleichen Namens, bekommt die archivierte einen Zeitstempel; liegt dieselbe Datei dort, genügt das.
+    function Move-BuildArchiv([string]$Name, [string]$Version, [string]$ZielName = '') {
+        $quelle = Join-Path $build $Name
+        if (-not $Version -or -not (Test-Path -LiteralPath $quelle)) { return }
+        if (-not $ZielName) { $ZielName = $Name }
+        $arc = Join-Path $Here ('Archiv\v{0}' -f $Version)
+        New-Item -ItemType Directory -Path $arc -Force | Out-Null
+        $dst = Join-Path $arc $ZielName
+        if (Test-Path -LiteralPath $dst) {
+            if ((Get-Sha256Hex $dst) -eq (Get-Sha256Hex $quelle)) { return }
+            $dst = Join-Path $arc ('{0}_{1:yyyyMMdd-HHmmss}{2}' -f [IO.Path]::GetFileNameWithoutExtension($ZielName), (Get-Date), [IO.Path]::GetExtension($ZielName))
+        }
+        try { Move-Item -LiteralPath $quelle -Destination $dst -ErrorAction Stop } catch { throw ('{0} lässt sich nicht nach {1} verschieben ({2}). Leos Minibench schließen und erneut bauen.' -f $quelle, $arc, $_.Exception.Message) }
+        Write-Host ('  Archiv   : {0} (Version {1}) nach {2}' -f $Name, $Version, $dst)
+    }
+    # Ersetzt <Ziel> durch <Ziel>.neu (File.Replace: auf NTFS in einem Schritt, das Ziel ist nie halb geschrieben;
+    # ohne Sicherungskopie: [NullString]::Value, denn $null käme als leerer Pfad an).
+    function Complete-NeueDatei([string]$Ziel) {
+        try {
+            if (Test-Path -LiteralPath $Ziel) { [IO.File]::Replace($Ziel + '.neu', $Ziel, [NullString]::Value) } else { [IO.File]::Move($Ziel + '.neu', $Ziel) }
+        } catch { throw ('{0} lässt sich nicht ersetzen ({1}). Leos Minibench schließen und erneut bauen.' -f $Ziel, $_.Exception.GetBaseException().Message) }
+    }
+    New-Item -ItemType Directory -Path $build -Force | Out-Null
+    $exe = Join-Path $build 'LMB.exe'
+    # Neue Dateien zuerst als <Name>.neu: Scheitert das Kopieren, bleibt der vorige Build vollständig.
+    $neu = [ordered]@{ 'LMB.exe' = $fExe; 'LeosMinibench.ps1' = $fPs1; 'LeosMinibench.cmd' = (Join-Path $srcDir 'LeosMinibench.cmd') }
+    if (Test-Path -LiteralPath (Join-Path $srcDir 'LMB.cmd')) { $neu['LMB.cmd'] = Join-Path $srcDir 'LMB.cmd' }
+    foreach ($n in @($neu.Keys)) {
+        $neuDatei = Join-Path $build ($n + '.neu')
+        $neuDateien += $neuDatei
+        Copy-Item -LiteralPath $neu[$n] -Destination $neuDatei -Force -ErrorAction Stop
+    }
+    # ab v2.7: Der vorige Build (andere Version) wandert nach Archiv\v<alte Version>: exe, ps1, Stand und Änderungsdatei.
+    # Ab v4.11 bestimmt jede Datei ihre Version selbst: git kann Stand.txt und LeosMinibench.ps1 schon durch den neuen
+    # Stand ersetzt haben, während LMB.exe (nicht in git) noch die alte Version ist. Gleiche Version wird ersetzt.
+    $verStand = Get-BuildDateiVersion (Join-Path $build 'Stand.txt')
+    foreach ($n in @('LMB.exe', 'LeosMinibench.ps1')) {
+        $v = Get-BuildDateiVersion (Join-Path $build $n)
+        if (-not $v) { $v = $verStand }
+        if ($v -and $v -ne $ver) { Move-BuildArchiv $n $v }
+    }
+    # LeosMinibench.exe (Name bis v3.x) gehört nicht mehr in den Build: immer ins Archiv
+    $altExe = Join-Path $build 'LeosMinibench.exe'
+    if (Test-Path -LiteralPath $altExe) { $v = Get-BuildDateiVersion $altExe; if (-not $v) { $v = $(if ($verStand) { $verStand } else { 'unbekannt' }) }; Move-BuildArchiv 'LeosMinibench.exe' $v }
+    if ($verStand -and $verStand -ne $ver) { Move-BuildArchiv 'Stand.txt' $verStand ('Stand_v{0}.txt' -f $verStand) }
+    # bis v2.67 lag die Änderungsdatei im Build; sie liegt in Doku und wandert ins Archiv ihrer Version
+    foreach ($af in @(Get-ChildItem -LiteralPath $build -Filter 'Änderungen_v*.txt' -File -ErrorAction SilentlyContinue)) {
+        Move-BuildArchiv $af.Name ($af.BaseName -replace '^.nderungen_v', '')
+    }
+    foreach ($n in @($neu.Keys)) { Complete-NeueDatei (Join-Path $build $n) }
+    $files = @('LMB.exe', 'LeosMinibench.ps1', 'LeosMinibench.cmd', 'LMB.cmd') | Where-Object { Test-Path -LiteralPath (Join-Path $build $_) }
+    $st = New-Object System.Text.StringBuilder
+    [void]$st.AppendLine('LEOS MINIBENCH: AKTUELLER BUILD')
+    [void]$st.AppendLine('===============================')
+    [void]$st.AppendLine(('Version   : {0} (Dateiversion {1})' -f $ver, $asmVer))
+    # ab v4.11 ohne Rechnernamen (Stand.txt liegt im öffentlichen Repository)
+    [void]$st.AppendLine(('Gebaut    : {0:dd.MM.yyyy HH:mm} unter Windows, PowerShell {1}' -f (Get-Date), $PSVersionTable.PSVersion))
+    [void]$st.AppendLine(('Tests     : {0} (Laufzeit: {1})' -f $testInfo, $(if ($gesamtDuration) { $gesamtDuration } else { '--' })))
+    [void]$st.AppendLine(('Quelltext : {0} Teile aus src, {1:N0} Zeilen' -f $r.Teile.Count, $r.Zeilen))
+    [void]$st.AppendLine('')
     [void]$st.AppendLine('Dateien (SHA-256 zur Kontrolle auf dem Stick: Get-FileHash <Datei>)')
     $lmbSha = ''
     foreach ($f in $files) {
@@ -455,7 +504,9 @@ try {
     [void]$st.AppendLine('Der Ordner Minibench-Daten auf dem Stick (Berichte, Datenbank, Tools, Änderungsprotokoll) bleibt dabei erhalten.')
     [void]$st.AppendLine('Ein Ordner Minibench-Daten hier im Aktuellen Build entsteht nur, wenn das Programm von hier gestartet wurde; er gehört nicht auf den Stick.')
     [void]$st.AppendLine('Diesen Ordner nicht von Hand ändern: Bauen.cmd erzeugt ihn bei jedem Bau neu aus src.')
-    [IO.File]::WriteAllText((Join-Path $build 'Stand.txt'), $st.ToString(), $utf8Bom)
+    $neuDateien += (Join-Path $build 'Stand.txt.neu')
+    [IO.File]::WriteAllText((Join-Path $build 'Stand.txt.neu'), $st.ToString(), $utf8Bom)
+    Complete-NeueDatei (Join-Path $build 'Stand.txt')
 
     # 5. README.md an die aktuelle Version anpassen
     $readmeFile = Join-Path $Here 'README.md'
@@ -473,7 +524,7 @@ try {
         Write-Host ('  README   : Version {0} in README.md aktualisiert' -f $ver)
     }
 
-    # 5. Datenpflege im Aktuellen Build (ab v2.7): Lasttests vor v2.67, unvollständige und kurze Läufe nach
+    # 6. Datenpflege im Aktuellen Build (ab v2.7): Lasttests vor v2.67, unvollständige und kurze Läufe nach
     #    Archiv\Minibench-Daten des Projektordners. Fehler hier verhindern den Bau nicht.
     $bData = Join-Path $build 'Minibench-Daten'
     if (Test-Path -LiteralPath $bData) {
@@ -484,8 +535,10 @@ try {
         } catch { Write-Host ('  Hinweis  : Datenpflege nicht möglich: {0}' -f $_.Exception.Message) -ForegroundColor Yellow }
     }
 
-    # 6. Git (ab v3.31, ab v3.53 überarbeitet, ab v3.62 mit automatischem Push): nach erfolgreichem Bau UND
-    #    bestandenen Tests lokaler Commit und automatische Übertragung nach GitHub (git push).
+    # 7. Git (ab v3.31, ab v3.53 überarbeitet): nach erfolgreichem Bau UND bestandenen Tests nur ein lokaler Commit.
+    #    Übertragen wird nicht hier, sondern mit Veroeffentlichen.ps1 (prüft Zweig, Tag, Prüfsumme und Testzeile).
+    #    Ab v4.11: alle getrackten Änderungen (git add -u, z. B. Aktualisiere-Berichte.ps1) und neue Dateien nur aus
+    #    festen Pfaden; Minibench-Daten, Logs und exe hält .gitignore fern.
     #    Die Nachricht kommt aus dem Titel des Eintrags in src\Oberflaeche\Versionen.cs ("Release vX.Y: <Titel>").
     $gitCmd = Get-Command git.exe -ErrorAction SilentlyContinue
     $isGitRepo = Test-Path -LiteralPath (Join-Path $Here '.git')
@@ -493,8 +546,13 @@ try {
         Write-Host '  Git      : kein Commit, weil die Tests nicht gelaufen sind.' -ForegroundColor Yellow
     } elseif ($gitCmd -and $isGitRepo) {
         try {
-            $stageFiles = @('src', 'Doku', 'tests', 'Bauen.cmd', 'Testen.cmd', 'README.md', 'CHANGELOG.md', 'AGENTS.md', 'LICENSE', '.gitignore', 'Veroeffentlichen.ps1', 'Aktueller Build', 'Archiv') | Where-Object { Test-Path -LiteralPath (Join-Path $Here $_) }
-            foreach ($sf in $stageFiles) { & git.exe -C $Here add -- $sf 2>&1 | Out-Null }
+            $addOut = & git.exe -C $Here add -u -- . 2>&1
+            if ($LASTEXITCODE -ne 0) { throw ('git add -u: {0}' -f ((@($addOut) | Select-Object -Last 2) -join ' ')) }
+            $stageFiles = @('src', 'tests', 'Doku', 'CHANGELOG.md', 'README.md', '.gitattributes', 'Aktueller Build/Stand.txt', 'Aktueller Build/LeosMinibench.ps1', 'Aktueller Build/LeosMinibench.cmd', 'Aktueller Build/LMB.cmd', 'Archiv') | Where-Object { Test-Path -LiteralPath (Join-Path $Here $_) }
+            foreach ($sf in $stageFiles) {
+                $addOut = & git.exe -C $Here add -- $sf 2>&1
+                if ($LASTEXITCODE -ne 0) { throw ('git add {0}: {1}' -f $sf, ((@($addOut) | Select-Object -Last 2) -join ' ')) }
+            }
             & git.exe -C $Here diff --cached --quiet
             if ($LASTEXITCODE -eq 0) {
                 Write-Host '  Git      : nichts zu committen.' -ForegroundColor Gray
@@ -505,7 +563,7 @@ try {
                 $commitOut = & git.exe -C $Here commit -m $commitMsg 2>&1
                 if ($LASTEXITCODE -eq 0) {
                     Write-Host ('  Git      : lokal committed ({0})' -f $commitMsg) -ForegroundColor Green
-                    Write-Host '  Git      : Bereit für Übertragung nach GitHub (manuell mit "git push" übertragen).' -ForegroundColor Cyan
+                    Write-Host '  Git      : Übertragung nach GitHub mit Veroeffentlichen.ps1.' -ForegroundColor Cyan
                 } else {
                     Write-Host ('  Hinweis  : git commit fehlgeschlagen: {0}' -f ((@($commitOut) | Select-Object -Last 3) -join ' ')) -ForegroundColor Yellow
                 }
@@ -525,4 +583,5 @@ try {
     exit 1
 } finally {
     if ($work) { Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue }
+    foreach ($nd in @($neuDateien)) { if (Test-Path -LiteralPath $nd) { Remove-Item -LiteralPath $nd -Force -ErrorAction SilentlyContinue } }
 }

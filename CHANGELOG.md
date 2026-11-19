@@ -2,6 +2,25 @@
 
 Alle wesentlichen Änderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v4.11 (19.11.2026)
+
+Fehlerbehebungsversion nach der Gesamtprüfung vom 19.11.2026 (Doku\Pruefung_4.10.md). Keine neuen Funktionen.
+
+### Behoben
+* **PawnIO:** wurde auch bei der Wahl „nein“ installiert; jetzt nur mit Zustimmung.
+* **Wiederherstellungspunkt:** „Alte Wiederherstellungspunkte löschen“ löschte den Punkt des eigenen Laufs; alte Punkte gehen jetzt vorher, die Nummer zählt nur, wenn der Punkt existiert.
+* **Datenträgerbereinigung:** Papierkorb, Windows.old und ESD-Installationsdateien bleiben unangetastet.
+* **Computerschutz:** nur eingeschaltet, wenn er aus war, dann mit Protokolleintrag und Gegenbefehl.
+* **smartmontools:** Der Deinstaller lief nie (PS-5.1-Falle), das Werkzeug konnte auf fremden PCs bleiben.
+* **Import:** Ein .minibench-Paket kann nicht mehr außerhalb von Berichte schreiben oder vorhandene Berichte überschreiben.
+* **Werkzeuge der Optimierung:** NVIDIA Profile Inspector 3.0.2.3 und DDU 18.1.5.3 nur mit fester Prüfsumme.
+* **Bericht:** Verbrauchsstufen ohne Messwert als „nicht gemessen“, Netzteil-Warnung nur mit eingegebener Nennleistung; „Seit dem letzten Lauf“ ohne falschen Windows-Build, Texte und Referenzname maskiert.
+* **Rückgängig:** erneuter Versuch nach Fehlschlag, verzögerter Dienststart, angepasste Energiepläne, selbst angelegte Registry-Schlüssel; Zuordnung der Protokolle über die Gerätekennung.
+* **Wartung:** alle Schritte im Änderungsprotokoll, Sicherung der IP-Konfiguration vor dem Netzwerk-Reset, Shader-Caches nur in den Cache-Ordnern des angemeldeten Benutzers.
+* **Messung:** Hybrid-Erkennung über echte Kerntypen, frisch abgefragter freier RAM für Lasttest und RAM-Test, Lasttest-Mediane in „Median aktualisieren“.
+* **Oberfläche:** Umzug und Installationen sperren Messungen und fragen beim Schließen; Update nur mit Prüfsumme, Download im Hintergrund mit Fortschritt; kein Einfrieren bei Hilfsabläufen; F5 und Strg+Eingabe überall; Laufdauer über einer Stunde.
+* **Bau und Release:** Exit-Code der Tests erfasst nicht geladene Testdateien; Veroeffentlichen.ps1 prüft Zweig, Prüfsumme der exe, Tag und Windows-Tests; .gitattributes für Zeilenenden; Archiv ohne Löschen; kein Rechnername in Stand.txt.
+
 ## v4.10 (15.11.2026)
 
 ### Neu

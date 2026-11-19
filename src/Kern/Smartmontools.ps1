@@ -26,10 +26,12 @@ function Find-Smartctl {
 function Uninstall-Smartmontools {
     $done = $false
     # 1. NSIS-Uninstaller direkt und strikt lautlos mit /S aufrufen (verhindert interaktive Abfrage-Popups)
-    $candidates = @(
+    # ab v4.11: Treffer mit äußerem @() einsammeln; bei genau einem Treffer war $candidates sonst ein Text und
+    # $candidates[0] nur sein erstes Zeichen ("C"), der Deinstaller lief nie
+    $candidates = @(@(
         "$env:ProgramFiles\smartmontools\uninstall.exe",
         "${env:ProgramFiles(x86)}\smartmontools\uninstall.exe"
-    ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+    ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) })
     if ($candidates.Count -gt 0) {
         $uninst = $candidates[0]
         $r = Invoke-External -File $uninst -Arguments '/S' -TimeoutSec 120 -Progress 'smartmontools wird deinstalliert'
@@ -38,7 +40,7 @@ function Uninstall-Smartmontools {
         }
     }
     # 2. Absicherung über winget (falls vorhanden und nötig)
-    $stillThere = @("$env:ProgramFiles\smartmontools\bin\smartctl.exe", "${env:ProgramFiles(x86)}\smartmontools\bin\smartctl.exe") | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+    $stillThere = @(@("$env:ProgramFiles\smartmontools\bin\smartctl.exe", "${env:ProgramFiles(x86)}\smartmontools\bin\smartctl.exe") | Where-Object { $_ -and (Test-Path -LiteralPath $_) })
     if ($stillThere.Count -gt 0) {
         $wg = Get-Command winget.exe -ErrorAction SilentlyContinue
         if (-not $wg) {
@@ -50,7 +52,7 @@ function Uninstall-Smartmontools {
             if ($u.ExitCode -eq 0) { $done = $true }
         }
     }
-    $stillThereAfter = @("$env:ProgramFiles\smartmontools\bin\smartctl.exe", "${env:ProgramFiles(x86)}\smartmontools\bin\smartctl.exe") | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+    $stillThereAfter = @(@("$env:ProgramFiles\smartmontools\bin\smartctl.exe", "${env:ProgramFiles(x86)}\smartmontools\bin\smartctl.exe") | Where-Object { $_ -and (Test-Path -LiteralPath $_) })
     return ($stillThereAfter.Count -eq 0)
 }
 #endregion
