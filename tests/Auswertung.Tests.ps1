@@ -228,6 +228,93 @@ Describe 'Korrekturen aus dem Praxistest 03.10.2026' {
     }
 }
 
+# Praxistest vom 20.11.2026: Der Arbeitsprozess stürzte beim Start des CPU-Benchmarks ab (Zugriffsverletzung im
+# AMD-Treiber), Windows lief weiter und wurde zwei Stunden später neu gestartet. Der nächste Lauf ließ den CPU-Benchmark aus.
+Describe 'Absturzanalyse: Absturz des Arbeitsprozesses' {
+    BeforeAll {
+        Import-MinibenchTestModule -Parts 'Kern\Checkpoints_Absturzanalyse.ps1' -Functions 'Get-ShortText', 'Add-Sub', 'Get-SkipSwitch' -Setup @'
+$script:Lines = New-Object System.Collections.Generic.List[string]
+$script:Findings = New-Object System.Collections.Generic.List[object]
+$script:Disabled = New-Object System.Collections.Generic.List[string]
+$script:SkippedByCrash = ''
+$script:EvBoot = $null
+$script:EvPs = @()
+$script:EvKp = @()
+$AnalyzeLastRun = $false
+function Add-Section { param([string]$Title) $script:Lines.Add('== ' + $Title) }
+function Add-Line { param([string]$Text = '') $script:Lines.Add($Text) }
+function Out-Report { param([Parameter(ValueFromPipeline = $true)]$InputObject) process { } }
+function Add-Finding { param([string]$Level, [string]$Area, [string]$Text) $script:Findings.Add([pscustomobject]@{ Stufe = $Level; Bereich = $Area; Befund = $Text }) }
+function Test-StepEnabled { param([string]$Key) $true }
+function Get-EnabledStepCount { 5 }
+function Disable-Step { param([string]$Key) $script:Disabled.Add($Key) }
+function Get-OptCategories { @() }
+function Get-CimCached { param($Class) [pscustomobject]@{ LastBootUpTime = (Get-Date) } }
+function Write-Host { }
+function Get-Ev { param([hashtable]$Filter, [int]$Max = 1000)
+    if ($Filter.ProviderName -eq 'EventLog' -and $Filter.Id -eq 6005) { return @($script:EvBoot | Where-Object { $_ }) }
+    if ($Filter.ProviderName -eq 'Application Error') { return @($script:EvPs) }
+    if ($Filter.ProviderName -eq 'Microsoft-Windows-Kernel-Power') { return @($script:EvKp | Where-Object { $_.TimeCreated -ge $Filter.StartTime -and $_.TimeCreated -le $Filter.EndTime }) }
+    return @()
+}
+'@
+        function New-Ev([datetime]$Zeit, [string]$Wert = 'powershell.exe', [int]$Id = 1000, [string]$Quelle = 'Application Error') {
+            [pscustomobject]@{ TimeCreated = $Zeit; Id = $Id; ProviderName = $Quelle; Message = ('Fehlerhafter Anwendungsname: {0}' -f $Wert); Properties = @([pscustomobject]@{ Value = $Wert }) }
+        }
+        function New-Abbruch {
+            $cp = Join-Path $TestDrive ('cp_' + [guid]::NewGuid().ToString('N'))
+            $out = Join-Path $cp 'Bericht'; $raw = Join-Path $cp 'Anhang'
+            New-Item -ItemType Directory -Path $out, $raw -Force | Out-Null
+            Set-ModuleVar 'CpDir' $cp
+            Set-ModuleVar 'CpLog' (Join-Path $cp 'checkpoint.log')
+            Set-ModuleVar 'CpFlag' (Join-Path $cp 'laufend.json')
+            Set-ModuleVar 'RawDir' $raw
+            & (Get-Module MinibenchTest) { $script:Lines.Clear(); $script:Findings.Clear(); $script:Disabled.Clear(); $script:SkippedByCrash = '' }
+            [IO.File]::WriteAllText((Join-Path $cp 'laufend.json'), (@{ Start = '2026-11-20 14:46:01'; Version = '4.12'; Modus = 'Diagnose'; OutputDir = $out } | ConvertTo-Json), [Text.Encoding]::UTF8)
+            [IO.File]::WriteAllLines((Join-Path $cp 'checkpoint.log'), [string[]]@(
+                '2026-11-20 15:16:07 | START   | [24/31] Absturzabbilder und Zuverlässigkeit',
+                '2026-11-20 15:16:09 | OK      | Absturzabbilder und Zuverlässigkeit (00:00:01)',
+                '2026-11-20 15:16:09 | START   | [25/31] Benchmark: Prozessor'), [Text.Encoding]::UTF8)
+            [IO.File]::WriteAllLines((Join-Path $out 'Protokoll_ohne_Bericht.txt'), [string[]]@(
+                'LEOS MINIBENCH 4.12: LAUF OHNE BERICHT',
+                'Unbehandelte Ausnahme: System.Reflection.TargetInvocationException: Ein Aufrufziel hat einen Ausnahmefehler verursacht. ---> System.AccessViolationException: Es wurde versucht, im geschützten Speicher zu lesen oder zu schreiben.',
+                '   bei LibreHardwareMonitor.Interop.AtiAdlxx.ADL2_Adapter_FrameMetrics_Get(IntPtr context, Int32 adapterIndex, Int32 displayIndex, Single& fps)',
+                '   bei LibreHardwareMonitor.Hardware.Gpu.AmdGpu.Update()'), [Text.Encoding]::UTF8)
+        }
+    }
+    It 'wertet den PowerShell-Absturz vor einem späteren Neustart als Prozessabsturz und lässt den Abschnitt nicht aus' {
+        New-Abbruch
+        Set-ModuleVar 'EvBoot' (New-Ev ([datetime]'2026-11-20 17:27:44') 'boot' 6005 'EventLog')
+        Set-ModuleVar 'EvPs' @(New-Ev ([datetime]'2026-11-20 15:16:18'))
+        Set-ModuleVar 'EvKp' @()
+        MinibenchTest\Invoke-CrashAnalysis
+        $text = (Get-ModuleVar 'Lines') -join "`n"
+        $text | Should -Match 'Arbeitsprozess \(PowerShell\) ist abgestürzt'
+        $text | Should -Match 'Neustart um 20\.11\. 17:27 kam später'
+        $text | Should -Match 'Fehlermeldung\s+: System\.AccessViolationException: .* in LibreHardwareMonitor\.Interop\.AtiAdlxx\.ADL2_Adapter_FrameMetrics_Get'
+        $text | Should -Not -Match 'Beim aktuellen Lauf übersprungen'
+        @(Get-ModuleVar 'Disabled').Count | Should -Be 0
+        Get-ModuleVar 'SkippedByCrash' | Should -BeNullOrEmpty
+        @((Get-ModuleVar 'Findings') | Where-Object { $_.Bereich -eq 'Absturz' })[0].Stufe | Should -Be 'WARNUNG'
+    }
+    It 'lässt den Abschnitt nach einem Systemabsturz ohne PowerShell-Fehler weiterhin aus' {
+        New-Abbruch
+        Set-ModuleVar 'EvBoot' (New-Ev ([datetime]'2026-11-20 15:18:00') 'boot' 6005 'EventLog')
+        Set-ModuleVar 'EvPs' @()
+        Set-ModuleVar 'EvKp' @(New-Ev ([datetime]'2026-11-20 15:18:02') '0' 41 'Microsoft-Windows-Kernel-Power')
+        MinibenchTest\Invoke-CrashAnalysis
+        (Get-ModuleVar 'Lines') -join "`n" | Should -Match 'Beim aktuellen Lauf übersprungen: Benchmark: Prozessor'
+        @(Get-ModuleVar 'Disabled') | Should -Be @('Bench:CPU')
+    }
+    It 'ordnet nur PowerShell-Abstürze vor dem nächsten Systemstart dem Lauf zu' {
+        $last = [datetime]'2026-11-20 15:16:09'
+        $ev = @((New-Ev $last.AddSeconds(9)), (New-Ev $last.AddMinutes(30)), (New-Ev $last.AddSeconds(30)))
+        @(MinibenchTest\Get-ProcessCrashEvents $ev $last.AddMinutes(-2) $last $null).Count | Should -Be 2
+        @(MinibenchTest\Get-ProcessCrashEvents $ev $last.AddMinutes(-2) $last $last.AddSeconds(20)).Count | Should -Be 1
+        @(MinibenchTest\Get-ProcessCrashEvents @() $last.AddMinutes(-2) $last $null).Count | Should -Be 0
+    }
+}
+
 Describe 'Absturzabbilder (Minidump)' {
     BeforeAll {
         Import-MinibenchTestModule -Parts 'Kern\Checkpoints_Absturzanalyse.ps1'

@@ -1,0 +1,66 @@
+﻿LEOS MINIBENCH 4.13: ÄNDERUNGEN
+===============================
+
+Auftrag vom 21.11.2026 nach einem Praxistest auf einem fremden PC mit 4.12 (Ryzen 5 5600XT, Radeon RX 9060 XT,
+Windows 11 Build 26100): Der erste Lauf (Diagnose vollständig und Benchmark) endete nach "Test beenden" beim
+SMART-Langtest ohne Bericht, dem zweiten Lauf fehlte die CPU-Auswertung. Ereigniskanal, Datenbankformat, Format des
+Änderungsprotokolls, Vorlagen und Messwerte sind unverändert.
+
+
+1. LAUF OHNE BERICHT
+  Befund                      Das Überspringen des SMART-Langtests hat funktioniert (15:16:04). Danach liefen
+                              Ereignisprotokolle und Absturzabbilder; um 15:16:09 begann "Benchmark: Prozessor", wenige
+                              Sekunden später endete der Arbeitsprozess mit Rückgabecode -532462766 (0xE0434352,
+                              unbehandelte .NET-Ausnahme). Protokoll_ohne_Bericht.txt nennt die Ursache:
+                              AccessViolationException in LibreHardwareMonitor.Interop.AtiAdlxx.
+                              ADL2_Adapter_FrameMetrics_Get, aufgerufen von AmdGpu.Update im Lesethread DiagSensors.
+                              Der AMD-Treiber las beim Abfragen der Bildrate geschützten Speicher.
+  Ursache im Programm         Eine Zugriffsverletzung aus nativem Code ist in .NET 4 eine Ausnahme mit beschädigtem
+                              Prozesszustand. Das catch um mUpdate.Invoke erreichte sie nicht, sie beendete den Prozess.
+                              Unter Windows PowerShell 5.1 nachgestellt (RtlMoveMemory auf eine ungültige Adresse über
+                              Reflexion): ohne Attribut endet der Prozess mit genau dieser Meldung, mit
+                              [HandleProcessCorruptedStateExceptions, SecurityCritical] wird sie abgefangen.
+  Neu                         DiagSensors.SafeUpdate aktualisiert jedes Gerät mit diesem Attribut, ebenso ReadGuarded
+                              (Lesethread) und Open. Endet eine Aktualisierung mit AccessViolationException oder
+                              SEHException, wird das Gerät (Art und Name) für den Rest des Prozesses gesperrt und nicht
+                              mehr aufgerufen; die Sperre überdauert Close. BlockedHardware und BlockedError geben
+                              Auskunft. Get-SensorReadings vermerkt die Sperre einmal als Hinweis, Checkpoint und
+                              INFO-Befund und nimmt GPU-Werte dann aus dem Windows-Grafiktreiber (D3DKMT).
+  Laufansicht                 Rückgabecode 0xE0434352 zeigt "Arbeitsprozess abgestürzt, ohne Bericht beendet
+                              (Fehlermeldung im Protokoll)" statt "Ohne Bericht beendet (Code ...)".
+
+
+2. ABSTURZANALYSE
+  Befund                      Der zweite Lauf fand den PowerShell-Absturz (Application Error 1000 um 15:16:18). Weil
+                              Windows um 17:27 neu gestartet worden war, wertete die Analyse den Abbruch als Neustart
+                              ohne protokollierte Ursache (Stufe Warnung) und ließ "Benchmark: Prozessor" aus.
+  Neu                         Get-ProcessCrashEvents ordnet PowerShell-Abstürze dem Lauf zu, wenn sie höchstens
+                              10 Minuten nach dem letzten Checkpoint und vor dem nächsten Systemstart liegen. Dann
+                              lautet das Ergebnis "Der Arbeitsprozess (PowerShell) ist abgestürzt, Windows lief
+                              weiter", ein späterer Neustart wird als unabhängig genannt, und kein Abschnitt wird
+                              ausgelassen. Get-WorkerExceptionText liest innerste Ausnahme und Fundstelle aus
+                              Protokoll_ohne_Bericht.txt des abgebrochenen Laufs (Zeile "Fehlermeldung").
+                              Nach Systemabstürzen (Bluescreen, Kernel-Power 41, Neustart ohne PowerShell-Fehler)
+                              bleibt das Auslassen wie bisher.
+
+
+GEFUNDEN UND BEHOBEN
+  Die Sperre galt zuerst auch bei geschlossener Bibliothek; ein bestehender Test (Ersatzquellen nur ohne
+  LibreHardwareMonitor) fiel deshalb durch. Get-SensorReadings beachtet die Sperre jetzt nur bei geöffneter Bibliothek.
+
+
+GRENZEN
+  Der Treiberfehler selbst bleibt: Auf dem betroffenen PC fehlen nach dem ersten Fehler die GPU-Werte aus
+  LibreHardwareMonitor (Leistung, Hotspot), die Windows-Werte ersetzen nur Temperatur, Takt und Auslastung.
+  In den Tests wirft die nachgebaute Bibliothek die Zugriffsverletzung aus verwaltetem Code; dass das Attribut eine
+  echte aus nativem Code abfängt, belegt nur der Versuch unter Windows PowerShell 5.1, kein Pester-Test.
+  Ein Lauf auf dem betroffenen PC mit 4.13 steht aus.
+
+
+UMSTIEG
+  Nichts zu tun.
+
+
+QUELLEN
+  Protokoll_ohne_Bericht.txt, Konsole.log, Anhang.zip (Checkpoint_unterbrochener_Lauf.log) und Diagnosebericht.txt
+  der beiden Läufe vom 20.11.2026; Microsoft-Dokumentation zu HandleProcessCorruptedStateExceptionsAttribute.

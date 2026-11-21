@@ -2,6 +2,15 @@
 
 Alle wesentlichen Änderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v4.13 (21.11.2026)
+
+Rückmeldung aus einem Praxistest auf einem fremden PC (Ryzen 5 5600XT, Radeon RX 9060 XT).
+
+### Behoben
+* **Lauf ohne Bericht beim CPU-Benchmark:** Ein Speicherfehler im AMD-Grafiktreiber beim Auslesen der Sensoren (LibreHardwareMonitor, ADL2_Adapter_FrameMetrics_Get) beendete den Arbeitsprozess. Das Gerät wird jetzt für den Rest des Laufs nicht mehr abgefragt, GPU-Werte kommen aus dem Windows-Grafiktreiber, der Lauf geht weiter.
+* **Absturzanalyse:** Ein Absturz des Arbeitsprozesses galt als Systemabsturz, wenn Windows später neu gestartet wurde, und der nächste Lauf ließ den CPU-Benchmark aus. Jetzt wird der Prozessabsturz mit Fehlermeldung genannt und nichts ausgelassen.
+* **Laufansicht:** nennt einen Absturz des Arbeitsprozesses als solchen.
+
 ## v4.12 (19.11.2026)
 
 Rückmeldungen aus dem ersten Praxistest mit 4.11.

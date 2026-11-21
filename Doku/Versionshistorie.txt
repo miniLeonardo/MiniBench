@@ -5,6 +5,12 @@ Neueste Version zuerst. Einzelheiten je Version in Doku\Änderungen_vX.Y.txt (ab
 keine Änderungsdateien mehr; die Einträge nennen nur, was im Quelltext und in den Änderungen zu 2.2 belegt ist.
 Die Liste steht auch im Programm (Info-Knopf oben rechts, Quelle: src\Oberflaeche\Versionen.cs).
 
+VERSION 4.13  (21.11.2026)  PRAXISTEST VOM 20.11.2026: SENSORFEHLER IM GRAFIKTREIBER BEENDET DEN LAUF NICHT MEHR
+================================================================================================================
+• Behoben: Ein Speicherfehler im AMD-Grafiktreiber beim Auslesen der Sensoren (LibreHardwareMonitor, Radeon RX 9060 XT) beendete den Arbeitsprozess beim Start des CPU-Benchmarks; der Lauf endete ohne Bericht. Jetzt wird das betroffene Gerät für den Rest des Laufs nicht mehr abgefragt, GPU-Werte kommen aus dem Windows-Grafiktreiber, der Lauf geht weiter.
+• Behoben, Absturzanalyse: Ein Absturz des Arbeitsprozesses galt als Systemabsturz, wenn Windows später neu gestartet wurde, und der nächste Lauf ließ den betroffenen Abschnitt aus (hier den CPU-Benchmark). Jetzt nennt die Analyse den Prozessabsturz mit Fehlermeldung und lässt nichts aus.
+• Laufansicht: Stürzt der Arbeitsprozess ab, steht das so da („Arbeitsprozess abgestürzt“) statt nur „Ohne Bericht beendet (Code …)“.
+
 VERSION 4.12  (19.11.2026)  PRAXISTEST 4.11: KÜRZERE LÄUFE, PAWNIO STILL, EIGENER SCHRITT FÜR WINDOWS.OLD
 =========================================================================================================
 • Neu, Wartung: „Papierkorb, Windows.old und ESD-Dateien löschen“ als eigener Schritt (nicht vorausgewählt, nicht umkehrbar). Die Datenträgerbereinigung bleibt ohne diese drei Kategorien.

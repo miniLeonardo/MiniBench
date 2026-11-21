@@ -528,7 +528,9 @@ public partial class DiagGui
         else
         {
             lastStepText = lblStep.Text + "   ·   " + lblSub.Text;
-            lblStep.Text = cancelled ? "Abgebrochen" : "Ohne Bericht beendet (Code " + code + ")";
+            // 0xE0434352: unbehandelte .NET-Ausnahme im Arbeitsprozess (ab v4.13 benannt; Praxistest vom 20.11.2026 hielt den Abbruch für
+            // eine Folge von "Test beenden", die Ausnahme stand nur im Protokoll)
+            lblStep.Text = cancelled ? "Abgebrochen" : (code == unchecked((int)0xE0434352) ? "Arbeitsprozess abgestürzt, ohne Bericht beendet (Fehlermeldung im Protokoll)" : "Ohne Bericht beendet (Code " + code + ")");
             lblStep.ForeColor = UI.Crit; lblCounter.Text = "";
             CleanupDriver();
             string saved = SaveFailureLog(code);

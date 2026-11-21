@@ -249,7 +249,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
 }
 #endregion
 
-$ScriptVersion = '4.12'
+$ScriptVersion = '4.13'
 $AppName       = 'Leos Minibench'
 # Eingebettete Referenzprofile für Leos Minibench (v3.0)
 $script:EmbeddedReferences = @{
@@ -18026,7 +18026,9 @@ public partial class DiagGui
         else
         {
             lastStepText = lblStep.Text + "   ·   " + lblSub.Text;
-            lblStep.Text = cancelled ? "Abgebrochen" : "Ohne Bericht beendet (Code " + code + ")";
+            // 0xE0434352: unbehandelte .NET-Ausnahme im Arbeitsprozess (ab v4.13 benannt; Praxistest vom 20.11.2026 hielt den Abbruch für
+            // eine Folge von "Test beenden", die Ausnahme stand nur im Protokoll)
+            lblStep.Text = cancelled ? "Abgebrochen" : (code == unchecked((int)0xE0434352) ? "Arbeitsprozess abgestürzt, ohne Bericht beendet (Fehlermeldung im Protokoll)" : "Ohne Bericht beendet (Code " + code + ")");
             lblStep.ForeColor = UI.Crit; lblCounter.Text = "";
             CleanupDriver();
             string saved = SaveFailureLog(code);
@@ -23855,6 +23857,10 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.13", "21.11.2026", "Praxistest vom 20.11.2026: Sensorfehler im Grafiktreiber beendet den Lauf nicht mehr",
+            "• Behoben: Ein Speicherfehler im AMD-Grafiktreiber beim Auslesen der Sensoren (LibreHardwareMonitor, Radeon RX 9060 XT) beendete den Arbeitsprozess beim Start des CPU-Benchmarks; der Lauf endete ohne Bericht. Jetzt wird das betroffene Gerät für den Rest des Laufs nicht mehr abgefragt, GPU-Werte kommen aus dem Windows-Grafiktreiber, der Lauf geht weiter.\r\n" +
+            "• Behoben, Absturzanalyse: Ein Absturz des Arbeitsprozesses galt als Systemabsturz, wenn Windows später neu gestartet wurde, und der nächste Lauf ließ den betroffenen Abschnitt aus (hier den CPU-Benchmark). Jetzt nennt die Analyse den Prozessabsturz mit Fehlermeldung und lässt nichts aus.\r\n" +
+            "• Laufansicht: Stürzt der Arbeitsprozess ab, steht das so da („Arbeitsprozess abgestürzt“) statt nur „Ohne Bericht beendet (Code …)“."),
         new Eintrag("4.12", "19.11.2026", "Praxistest 4.11: kürzere Läufe, PawnIO still, eigener Schritt für Windows.old",
             "• Neu, Wartung: „Papierkorb, Windows.old und ESD-Dateien löschen“ als eigener Schritt (nicht vorausgewählt, nicht umkehrbar). Die Datenträgerbereinigung bleibt ohne diese drei Kategorien.\r\n" +
             "• Kürzer: Hat die Diagnose den Komponentenspeicher geprüft, übernimmt die Wartung das Ergebnis, statt DISM ScanHealth ein zweites Mal auszuführen (2 bis 20 Minuten).\r\n" +
@@ -32543,6 +32549,30 @@ function Get-TestHint([string]$Step) {
     }
 }
 
+# Abstürze von PowerShell (Application Error 1000), die zum abgebrochenen Lauf gehören: nach Beginn des Absturzzeitraums,
+# höchstens 10 Minuten nach dem letzten Checkpoint und vor dem nächsten Systemstart (ab v4.13)
+function Get-ProcessCrashEvents($Events, [datetime]$From, [datetime]$LastTime, $Boot) {
+    @(@($Events) | Where-Object { $_ -and $_.TimeCreated -ge $From -and $_.TimeCreated -le $LastTime.AddMinutes(10) -and ($null -eq $Boot -or $_.TimeCreated -lt [datetime]$Boot) })
+}
+
+# Erste Zeile der unbehandelten Ausnahme aus dem Protokoll, das die Oberfläche bei einem Lauf ohne Bericht schreibt:
+# innerste Ausnahme und die Stelle, an der sie auftrat (ab v4.13)
+function Get-WorkerExceptionText([string]$Path) {
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { return '' }
+    $lines = @(); try { $lines = @(Get-Content -LiteralPath $Path -Encoding UTF8) } catch { return '' }
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -notmatch '^(Unbehandelte Ausnahme|Unhandled Exception):\s*(.+)$') { continue }
+        $teile = @($Matches[2] -split '\s*--->\s*')
+        $innen = $teile[-1].Trim()
+        $stelle = ''
+        if ($i + 1 -lt $lines.Count -and $lines[$i + 1] -match '^\s*(bei|at)\s+([^\(]+)') { $stelle = $Matches[2].Trim() }
+        $t = $(if ($stelle) { '{0} in {1}' -f $innen, $stelle } else { $innen })
+        if ($t.Length -gt 240) { $t = $t.Substring(0, 237) + '...' }
+        return $t
+    }
+    return ''
+}
+
 # Welcher Abschnitt soll nach einem Absturz beim nächsten Lauf ausgelassen werden
 function Get-SkipSwitch([string]$Step) {
     switch -Regex ($Step) {
@@ -32613,10 +32643,18 @@ function Invoke-CrashAnalysis {
     if ($kp.Count) { try { $code = [int64]$kp[0].Properties[0].Value } catch { } }
     if (-not $code -and $bsod.Count -and $bsod[0].Message -match '0x([0-9a-fA-F]{8})') { $code = [Convert]::ToInt64($Matches[1], 16) }
 
+    # ab v4.13: Ein Absturz von PowerShell kurz nach dem letzten Checkpoint und vor dem nächsten Systemstart ist ein
+    # Absturz des Arbeitsprozesses, auch wenn Windows später neu gestartet wurde. Praxistest vom 20.11.2026: Der Prozess endete um
+    # 15:16 an einer Zugriffsverletzung im AMD-Treiber, der PC wurde erst um 17:27 neu gestartet. Bis v4.12 galt das als
+    # Neustart ohne Ursache, und der nächste Lauf ließ den CPU-Benchmark aus, obwohl die Hardware nicht beteiligt war.
+    $psCrash = @(Get-ProcessCrashEvents $psErr $from $lastTime $(if ($rebooted) { $boot } else { $null }))
     $level = 'KRITISCH'
-    if (-not $rebooted) {
-        if ($psErr.Count) { $cause = 'PowerShell selbst ist abgestürzt, Windows lief weiter (kein Systemabsturz).'; $level = 'WARNUNG' }
-        else { $cause = 'Seitdem gab es keinen Neustart. Der Lauf wurde vermutlich von Hand beendet (Fenster geschlossen oder Strg+C).'; $level = 'INFO' }
+    if ($psCrash.Count) {
+        $cause = 'Der Arbeitsprozess (PowerShell) ist abgestürzt, Windows lief weiter (kein Systemabsturz).'
+        if ($rebooted) { $cause += (' Der Neustart um {0:dd.MM. HH:mm} kam später und hat mit dem Abbruch nichts zu tun.' -f $boot) }
+        $level = 'WARNUNG'
+    } elseif (-not $rebooted) {
+        $cause = 'Seitdem gab es keinen Neustart. Der Lauf wurde vermutlich von Hand beendet (Fenster geschlossen oder Strg+C).'; $level = 'INFO'
     } elseif ($code) {
         $cause = 'Bluescreen mit Stoppcode 0x{0:X} {1}.' -f $code, (Get-BugcheckName $code)
     } elseif ($kp.Count) {
@@ -32628,11 +32666,13 @@ function Invoke-CrashAnalysis {
     } else {
         $cause = 'Seitdem wurde neu gestartet, Windows hat aber keine Ursache protokolliert.'; $level = 'WARNUNG'
     }
-    $hint = Get-TestHint $stepName
+    $hint = $(if ($psCrash.Count) { 'Programmfehler oder Treiberfehler beim Auslesen, kein Hinweis auf instabile Hardware. Der Abschnitt wird beim nächsten Lauf nicht ausgelassen.' } else { Get-TestHint $stepName })
+    $ausnahme = $(if ($psCrash.Count -and $flag -and $flag.OutputDir) { Get-WorkerExceptionText (Join-Path $flag.OutputDir 'Protokoll_ohne_Bericht.txt') } else { '' })
 
     Add-Section 'Absturzanalyse des letzten Laufs'
     Add-Line ('  Ergebnis               : {0}' -f $cause)
     if ($level -ne 'INFO') { Add-Line ('  Einordnung             : {0}' -f $hint) }
+    if ($ausnahme) { Add-Line ('  Fehlermeldung          : {0}' -f $ausnahme) }
     if ($smartBg -and $level -ne 'INFO') { Add-Line '  Zusätzlich aktiv       : SMART-Langtest im Hintergrund (Laufwerksfirmware)' }
     Add-Line ('  Letzter Lauf gestartet : {0} (Version {1}, Modus {2})' -f $flag.Start, $flag.Version, $flag.Modus)
     Add-Line ('  Letzter Checkpoint     : {0:dd.MM.yyyy HH:mm:ss}' -f $lastTime)
@@ -32680,7 +32720,7 @@ function Invoke-CrashAnalysis {
     Remove-Item $script:CpFlag -Force -ErrorAction SilentlyContinue
 
     # Absturzursache nicht erneut auslösen
-    if ($rebooted -and $level -ne 'INFO' -and -not $AnalyzeLastRun) {
+    if ($rebooted -and $level -ne 'INFO' -and -not $psCrash.Count -and -not $AnalyzeLastRun) {
         $sk = Get-SkipSwitch $stepName
         if ($sk -and (Test-StepEnabled $sk)) {
             # Ist der Abschnitt das Einzige, was dieser Lauf tun soll, läuft er trotzdem: sonst entstünde ein leerer Bericht
@@ -37110,7 +37150,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
+using System.Security;
 
 // Ein Messwert eines Sensors. Key ist über die Laufzeit stabil (bei LibreHardwareMonitor der Identifier).
 public class SensorReading
@@ -37164,6 +37206,9 @@ public static class DiagSensors
     }
 
     // Bibliothek laden und Computer öffnen. Rückgabe false mit LastError, wenn etwas fehlt oder scheitert.
+    // HandleProcessCorruptedStateExceptions (ab v4.13): Eine Zugriffsverletzung im Treiber eines Geräts ließe sich sonst
+    // nicht abfangen und beendete den ganzen Arbeitsprozess (siehe SafeUpdate).
+    [HandleProcessCorruptedStateExceptions, SecurityCritical]
     public static bool Open(string dllPath, bool cpu, bool gpu, bool board, bool memory, bool storage, bool battery, bool controller)
     {
         LastError = "";
@@ -37261,7 +37306,7 @@ public static class DiagSensors
                 if (fresh)
                 {
                     readResult = null; readStarted = DateTime.UtcNow; readDoneAt = DateTime.MinValue; slowCounted = false;
-                    System.Threading.Thread t = new System.Threading.Thread(delegate() { SensorReading[] r; try { r = Read(); } catch { r = new SensorReading[0]; } readResult = r; readDoneAt = DateTime.UtcNow; });
+                    System.Threading.Thread t = new System.Threading.Thread(delegate() { readResult = ReadGuarded(); readDoneAt = DateTime.UtcNow; });
                     t.IsBackground = true; t.Name = "LHM Read"; t.Priority = System.Threading.ThreadPriority.Highest;
                     try { t.Start(); } catch (Exception ex) { LastError = "LibreHardwareMonitor: Lesethread startet nicht (" + ex.Message + ")"; return new SensorReading[0]; }
                     readThread = t;
@@ -37384,7 +37429,7 @@ public static class DiagSensors
             object[] list = disks.ToArray();
             t = new System.Threading.Thread(delegate()
             {
-                foreach (object hw in list) { try { mUpdate.Invoke(hw, null); } catch { UpdateErrors++; } }
+                foreach (object hw in list) { if (!IsBlocked(hw)) SafeUpdate(hw); }
                 storageDone = true;
             });
             t.IsBackground = true; t.Name = "LHM Datenträger";
@@ -37392,6 +37437,66 @@ public static class DiagSensors
             t.Start();
         }
         if (StorageWaitMs > 0 && t != null && t.IsAlive) t.Join(StorageWaitMs);
+    }
+
+    // Geräte, deren Aktualisierung mit einer Zugriffsverletzung geendet hat (ab v4.13). Praxistest vom 20.11.2026 (Radeon RX 9060 XT,
+    // LibreHardwareMonitor 0.9.6): ADL2_Adapter_FrameMetrics_Get im AMD-Treiber las beim Start des CPU-Benchmarks
+    // geschützten Speicher. Die AccessViolationException ist in .NET 4 eine Ausnahme mit beschädigtem Prozesszustand,
+    // die ein gewöhnliches catch nicht erreicht; sie beendete den Arbeitsprozess (Rückgabecode 0xE0434352), der Lauf
+    // endete ohne Bericht. SafeUpdate fängt sie ab; das Gerät wird für den Rest des Laufs nicht mehr abgefragt (ein
+    // zweiter Aufruf griffe wieder in den Treiber), die übrigen Sensoren arbeiten weiter. Die Sperre gilt über Art und
+    // Name des Geräts und bleibt nach Close bestehen: Öffnet der Lauf die Bibliothek neu, entstehen neue Geräteobjekte.
+    static readonly object blockGate = new object();
+    static List<string> blocked = new List<string>();
+    static List<string> blockedNames = new List<string>();
+    public static string BlockedError = "";
+    public static string[] BlockedHardware { get { lock (blockGate) return blockedNames.ToArray(); } }
+
+    static string HwKey(object hw)
+    {
+        try { return Convert.ToString(pHwType.GetValue(hw, null)) + "|" + Convert.ToString(pHwName.GetValue(hw, null)); } catch { return ""; }
+    }
+
+    static bool IsBlocked(object hw)
+    {
+        lock (blockGate) { if (blocked.Count == 0) return false; }
+        string k = HwKey(hw);
+        lock (blockGate) return k.Length > 0 && blocked.Contains(k);
+    }
+
+    // Gerät aktualisieren; false, wenn die Bibliothek dabei einen Fehler gemeldet hat
+    [HandleProcessCorruptedStateExceptions, SecurityCritical]
+    static bool SafeUpdate(object hw)
+    {
+        try { mUpdate.Invoke(hw, null); return true; }
+        catch (Exception ex)
+        {
+            UpdateErrors++;
+            Exception x = ex; while (x is TargetInvocationException && x.InnerException != null) x = x.InnerException;
+            if (x is AccessViolationException || x is SEHException)
+            {
+                string name = "";
+                try { name = Convert.ToString(pHwName.GetValue(hw, null)); } catch { }
+                if (String.IsNullOrEmpty(name)) name = "unbekanntes Gerät";
+                string frame = "";
+                try { if (!String.IsNullOrEmpty(x.StackTrace)) { frame = x.StackTrace.Split('\n')[0].Trim(); int i = frame.IndexOf(' '); if (i > 0) frame = frame.Substring(i + 1).Trim(); } } catch { }
+                lock (blockGate)
+                {
+                    string k = HwKey(hw);
+                    if (k.Length > 0 && !blocked.Contains(k)) { blocked.Add(k); blockedNames.Add(name); }
+                    BlockedError = name + ": " + x.GetType().Name + (frame.Length > 0 ? " in " + frame : "");
+                }
+            }
+            return false;
+        }
+    }
+
+    // Lesen im Lesethread: Auch eine Zugriffsverletzung außerhalb von Update darf den Prozess nicht beenden
+    [HandleProcessCorruptedStateExceptions, SecurityCritical]
+    static SensorReading[] ReadGuarded()
+    {
+        try { return Read(); }
+        catch (Exception ex) { UpdateErrors++; LastError = "LibreHardwareMonitor: " + ex.GetType().Name + ": " + ex.Message; return new SensorReading[0]; }
     }
 
     // Alle Hardware aktualisieren und die Werte der unterstützten Sensorarten liefern
@@ -37418,9 +37523,9 @@ public static class DiagSensors
 
     static void ReadHardware(object hw, string parentName, List<SensorReading> res, int depth, bool update)
     {
-        if (hw == null || depth > 3) return;
+        if (hw == null || depth > 3 || IsBlocked(hw)) return;
         string type = "", name = "";
-        if (update) { try { mUpdate.Invoke(hw, null); } catch { UpdateErrors++; } }
+        if (update && !SafeUpdate(hw) && IsBlocked(hw)) return;
         try { type = Convert.ToString(pHwType.GetValue(hw, null)); name = Convert.ToString(pHwName.GetValue(hw, null)); } catch { return; }
         string grp = Group(type);
         // Unterhardware (z. B. SuperIO-Chip am Mainboard) gehört zur Gruppe des übergeordneten Geräts, sofern sie selbst keine hat
@@ -38480,6 +38585,7 @@ function ConvertFrom-CpuSampleReadings($Sample) {
 function Get-SensorReadings([switch]$MitDatentraeger, $CpuSample = $null) {
     $s = $script:Sens
     $all = New-Object System.Collections.Generic.List[object]
+    $gesperrt = @()
     if ($s -and $s.Lhm) {
         # Datenträger: für die Momentaufnahme bis 15 s auf die erste Aktualisierung warten, sonst nur die letzten Werte
         try { [DiagSensors]::StorageWaitMs = $(if ($MitDatentraeger) { 15000 } else { 0 }) } catch { }
@@ -38491,6 +38597,14 @@ function Get-SensorReadings([switch]$MitDatentraeger, $CpuSample = $null) {
             $s.LhmVerzoegert = $true
             Write-Checkpoint 'INFO' ('Sensoren: {0}, letzte Werte gelten weiter' -f [DiagSensors]::LastError)
         }
+        # ab v4.13: Gerät mit Zugriffsverletzung im Treiber (Praxistest vom 20.11.2026, AMD-Grafik) einmal vermerken
+        try { if ([DiagSensors]::IsOpen) { $gesperrt = @([DiagSensors]::BlockedHardware) } } catch { }
+        foreach ($g in $gesperrt) {
+            if ($s.Hinweise -contains ('Sensoren von {0} abgeschaltet' -f $g)) { continue }
+            $s.Hinweise.Add(('Sensoren von {0} abgeschaltet' -f $g))
+            Write-Checkpoint 'INFO' ('Sensoren: Zugriffsverletzung beim Lesen ({0}); das Gerät wird in diesem Lauf nicht mehr abgefragt, der Lauf geht weiter' -f [DiagSensors]::BlockedError)
+            if (Get-Command Add-Finding -ErrorAction SilentlyContinue) { Add-Finding INFO 'Sensoren' ('Der Treiber von {0} hat beim Auslesen der Sensoren einen Speicherfehler ausgelöst. Die Sensoren dieses Geräts wurden für den Rest des Laufs abgeschaltet, Messungen und Bericht laufen weiter. Abhilfe: aktuellen Treiber des Geräts installieren.' -f $g) }
+        }
     }
     $has = { param($g, $a) @($all | Where-Object { $_.Gruppe -eq $g -and $_.Art -eq $a -and -not [double]::IsNaN($_.Wert) }).Count -gt 0 }
     if (-not $CpuSample) { $CpuSample = Get-CpuSample }
@@ -38498,9 +38612,12 @@ function Get-SensorReadings([switch]$MitDatentraeger, $CpuSample = $null) {
     foreach ($r in (Get-AcpiReadings)) { $all.Add($r) }
     if ($s -and $s.NvSmi -and -not (& $has 'GPU' 'Temperatur')) { foreach ($r in (ConvertFrom-NvidiaSmi (Invoke-NvidiaSmi $s.NvSmi))) { $all.Add($r) } }
     # ohne LibreHardwareMonitor: Grafiktreiber-Werte über Windows und CPU-Leistung aus dem Energiezähler (ab v2.8)
-    if (-not ($s -and $s.Lhm)) {
+    # ab v4.13 auch, wenn LibreHardwareMonitor ein Gerät nach einem Treiberfehler abgeschaltet hat
+    if (-not ($s -and $s.Lhm) -or $gesperrt.Count) {
         $gpuNow = @($all | Where-Object { $_.Gruppe -eq 'GPU' })
         foreach ($r in (ConvertFrom-KmtAdapters (Get-WindowsGpuAdapters) $gpuNow)) { $all.Add($r) }
+    }
+    if (-not ($s -and $s.Lhm)) {
         if (-not (& $has 'CPU' 'Leistung')) { $cw = Get-WindowsCpuPowerReading; if ($cw) { $all.Add($cw) } }
     }
     if (-not (& $has 'Akku' 'Spannung')) { foreach ($r in (Get-BatteryReadings)) { $all.Add($r) } }

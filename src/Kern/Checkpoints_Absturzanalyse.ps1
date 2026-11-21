@@ -138,6 +138,30 @@ function Get-TestHint([string]$Step) {
     }
 }
 
+# Abstürze von PowerShell (Application Error 1000), die zum abgebrochenen Lauf gehören: nach Beginn des Absturzzeitraums,
+# höchstens 10 Minuten nach dem letzten Checkpoint und vor dem nächsten Systemstart (ab v4.13)
+function Get-ProcessCrashEvents($Events, [datetime]$From, [datetime]$LastTime, $Boot) {
+    @(@($Events) | Where-Object { $_ -and $_.TimeCreated -ge $From -and $_.TimeCreated -le $LastTime.AddMinutes(10) -and ($null -eq $Boot -or $_.TimeCreated -lt [datetime]$Boot) })
+}
+
+# Erste Zeile der unbehandelten Ausnahme aus dem Protokoll, das die Oberfläche bei einem Lauf ohne Bericht schreibt:
+# innerste Ausnahme und die Stelle, an der sie auftrat (ab v4.13)
+function Get-WorkerExceptionText([string]$Path) {
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { return '' }
+    $lines = @(); try { $lines = @(Get-Content -LiteralPath $Path -Encoding UTF8) } catch { return '' }
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -notmatch '^(Unbehandelte Ausnahme|Unhandled Exception):\s*(.+)$') { continue }
+        $teile = @($Matches[2] -split '\s*--->\s*')
+        $innen = $teile[-1].Trim()
+        $stelle = ''
+        if ($i + 1 -lt $lines.Count -and $lines[$i + 1] -match '^\s*(bei|at)\s+([^\(]+)') { $stelle = $Matches[2].Trim() }
+        $t = $(if ($stelle) { '{0} in {1}' -f $innen, $stelle } else { $innen })
+        if ($t.Length -gt 240) { $t = $t.Substring(0, 237) + '...' }
+        return $t
+    }
+    return ''
+}
+
 # Welcher Abschnitt soll nach einem Absturz beim nächsten Lauf ausgelassen werden
 function Get-SkipSwitch([string]$Step) {
     switch -Regex ($Step) {
@@ -208,10 +232,18 @@ function Invoke-CrashAnalysis {
     if ($kp.Count) { try { $code = [int64]$kp[0].Properties[0].Value } catch { } }
     if (-not $code -and $bsod.Count -and $bsod[0].Message -match '0x([0-9a-fA-F]{8})') { $code = [Convert]::ToInt64($Matches[1], 16) }
 
+    # ab v4.13: Ein Absturz von PowerShell kurz nach dem letzten Checkpoint und vor dem nächsten Systemstart ist ein
+    # Absturz des Arbeitsprozesses, auch wenn Windows später neu gestartet wurde. Praxistest vom 20.11.2026: Der Prozess endete um
+    # 15:16 an einer Zugriffsverletzung im AMD-Treiber, der PC wurde erst um 17:27 neu gestartet. Bis v4.12 galt das als
+    # Neustart ohne Ursache, und der nächste Lauf ließ den CPU-Benchmark aus, obwohl die Hardware nicht beteiligt war.
+    $psCrash = @(Get-ProcessCrashEvents $psErr $from $lastTime $(if ($rebooted) { $boot } else { $null }))
     $level = 'KRITISCH'
-    if (-not $rebooted) {
-        if ($psErr.Count) { $cause = 'PowerShell selbst ist abgestürzt, Windows lief weiter (kein Systemabsturz).'; $level = 'WARNUNG' }
-        else { $cause = 'Seitdem gab es keinen Neustart. Der Lauf wurde vermutlich von Hand beendet (Fenster geschlossen oder Strg+C).'; $level = 'INFO' }
+    if ($psCrash.Count) {
+        $cause = 'Der Arbeitsprozess (PowerShell) ist abgestürzt, Windows lief weiter (kein Systemabsturz).'
+        if ($rebooted) { $cause += (' Der Neustart um {0:dd.MM. HH:mm} kam später und hat mit dem Abbruch nichts zu tun.' -f $boot) }
+        $level = 'WARNUNG'
+    } elseif (-not $rebooted) {
+        $cause = 'Seitdem gab es keinen Neustart. Der Lauf wurde vermutlich von Hand beendet (Fenster geschlossen oder Strg+C).'; $level = 'INFO'
     } elseif ($code) {
         $cause = 'Bluescreen mit Stoppcode 0x{0:X} {1}.' -f $code, (Get-BugcheckName $code)
     } elseif ($kp.Count) {
@@ -223,11 +255,13 @@ function Invoke-CrashAnalysis {
     } else {
         $cause = 'Seitdem wurde neu gestartet, Windows hat aber keine Ursache protokolliert.'; $level = 'WARNUNG'
     }
-    $hint = Get-TestHint $stepName
+    $hint = $(if ($psCrash.Count) { 'Programmfehler oder Treiberfehler beim Auslesen, kein Hinweis auf instabile Hardware. Der Abschnitt wird beim nächsten Lauf nicht ausgelassen.' } else { Get-TestHint $stepName })
+    $ausnahme = $(if ($psCrash.Count -and $flag -and $flag.OutputDir) { Get-WorkerExceptionText (Join-Path $flag.OutputDir 'Protokoll_ohne_Bericht.txt') } else { '' })
 
     Add-Section 'Absturzanalyse des letzten Laufs'
     Add-Line ('  Ergebnis               : {0}' -f $cause)
     if ($level -ne 'INFO') { Add-Line ('  Einordnung             : {0}' -f $hint) }
+    if ($ausnahme) { Add-Line ('  Fehlermeldung          : {0}' -f $ausnahme) }
     if ($smartBg -and $level -ne 'INFO') { Add-Line '  Zusätzlich aktiv       : SMART-Langtest im Hintergrund (Laufwerksfirmware)' }
     Add-Line ('  Letzter Lauf gestartet : {0} (Version {1}, Modus {2})' -f $flag.Start, $flag.Version, $flag.Modus)
     Add-Line ('  Letzter Checkpoint     : {0:dd.MM.yyyy HH:mm:ss}' -f $lastTime)
@@ -275,7 +309,7 @@ function Invoke-CrashAnalysis {
     Remove-Item $script:CpFlag -Force -ErrorAction SilentlyContinue
 
     # Absturzursache nicht erneut auslösen
-    if ($rebooted -and $level -ne 'INFO' -and -not $AnalyzeLastRun) {
+    if ($rebooted -and $level -ne 'INFO' -and -not $psCrash.Count -and -not $AnalyzeLastRun) {
         $sk = Get-SkipSwitch $stepName
         if ($sk -and (Test-StepEnabled $sk)) {
             # Ist der Abschnitt das Einzige, was dieser Lauf tun soll, läuft er trotzdem: sonst entstünde ein leerer Bericht

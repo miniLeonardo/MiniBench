@@ -754,6 +754,7 @@ function ConvertFrom-CpuSampleReadings($Sample) {
 function Get-SensorReadings([switch]$MitDatentraeger, $CpuSample = $null) {
     $s = $script:Sens
     $all = New-Object System.Collections.Generic.List[object]
+    $gesperrt = @()
     if ($s -and $s.Lhm) {
         # Datenträger: für die Momentaufnahme bis 15 s auf die erste Aktualisierung warten, sonst nur die letzten Werte
         try { [DiagSensors]::StorageWaitMs = $(if ($MitDatentraeger) { 15000 } else { 0 }) } catch { }
@@ -765,6 +766,14 @@ function Get-SensorReadings([switch]$MitDatentraeger, $CpuSample = $null) {
             $s.LhmVerzoegert = $true
             Write-Checkpoint 'INFO' ('Sensoren: {0}, letzte Werte gelten weiter' -f [DiagSensors]::LastError)
         }
+        # ab v4.13: Gerät mit Zugriffsverletzung im Treiber (Praxistest vom 20.11.2026, AMD-Grafik) einmal vermerken
+        try { if ([DiagSensors]::IsOpen) { $gesperrt = @([DiagSensors]::BlockedHardware) } } catch { }
+        foreach ($g in $gesperrt) {
+            if ($s.Hinweise -contains ('Sensoren von {0} abgeschaltet' -f $g)) { continue }
+            $s.Hinweise.Add(('Sensoren von {0} abgeschaltet' -f $g))
+            Write-Checkpoint 'INFO' ('Sensoren: Zugriffsverletzung beim Lesen ({0}); das Gerät wird in diesem Lauf nicht mehr abgefragt, der Lauf geht weiter' -f [DiagSensors]::BlockedError)
+            if (Get-Command Add-Finding -ErrorAction SilentlyContinue) { Add-Finding INFO 'Sensoren' ('Der Treiber von {0} hat beim Auslesen der Sensoren einen Speicherfehler ausgelöst. Die Sensoren dieses Geräts wurden für den Rest des Laufs abgeschaltet, Messungen und Bericht laufen weiter. Abhilfe: aktuellen Treiber des Geräts installieren.' -f $g) }
+        }
     }
     $has = { param($g, $a) @($all | Where-Object { $_.Gruppe -eq $g -and $_.Art -eq $a -and -not [double]::IsNaN($_.Wert) }).Count -gt 0 }
     if (-not $CpuSample) { $CpuSample = Get-CpuSample }
@@ -772,9 +781,12 @@ function Get-SensorReadings([switch]$MitDatentraeger, $CpuSample = $null) {
     foreach ($r in (Get-AcpiReadings)) { $all.Add($r) }
     if ($s -and $s.NvSmi -and -not (& $has 'GPU' 'Temperatur')) { foreach ($r in (ConvertFrom-NvidiaSmi (Invoke-NvidiaSmi $s.NvSmi))) { $all.Add($r) } }
     # ohne LibreHardwareMonitor: Grafiktreiber-Werte über Windows und CPU-Leistung aus dem Energiezähler (ab v2.8)
-    if (-not ($s -and $s.Lhm)) {
+    # ab v4.13 auch, wenn LibreHardwareMonitor ein Gerät nach einem Treiberfehler abgeschaltet hat
+    if (-not ($s -and $s.Lhm) -or $gesperrt.Count) {
         $gpuNow = @($all | Where-Object { $_.Gruppe -eq 'GPU' })
         foreach ($r in (ConvertFrom-KmtAdapters (Get-WindowsGpuAdapters) $gpuNow)) { $all.Add($r) }
+    }
+    if (-not ($s -and $s.Lhm)) {
         if (-not (& $has 'CPU' 'Leistung')) { $cw = Get-WindowsCpuPowerReading; if ($cw) { $all.Add($cw) } }
     }
     if (-not (& $has 'Akku' 'Spannung')) { foreach ($r in (Get-BatteryReadings)) { $all.Add($r) } }

@@ -5,9 +5,14 @@ Seit 4.07 steht hier nur noch, was für die nächste Version gebraucht wird: Sta
 abgelehnte Vorschläge, Fallstricke. Was eine Version geändert hat, steht in CHANGELOG.md (kurz), in
 Doku\Versionshistorie.txt und in Doku\Änderungen_vX.Y.txt (ausführlich); es wird hier nicht wiederholt.
 
-## Stand: Version 4.12 (19.11.2026)
-Release-Commit "Release v4.12: Praxistest 4.11: kürzere Läufe, PawnIO still, eigener Schritt für Windows.old", unter
-Windows (ULB-PC10039) mit Bauen.cmd gebaut. 4.11 (594bd08) wurde nie veröffentlicht; 4.12 baut darauf auf.
+## Stand: Version 4.13 (21.11.2026)
+Release-Commit "Release v4.13: Praxistest vom 20.11.2026: Sensorfehler im Grafiktreiber beendet den Lauf nicht mehr",
+unter Windows (ULB-PC10039) mit Bauen.cmd gebaut.
+
+Inhalt von 4.13 (Doku\Änderungen_v4.13.txt): Eine Zugriffsverletzung im AMD-Treiber (LibreHardwareMonitor,
+ADL2_Adapter_FrameMetrics_Get) beendete den Arbeitsprozess; jetzt fängt DiagSensors.SafeUpdate sie ab und sperrt das
+Gerät. Die Absturzanalyse wertet einen PowerShell-Absturz vor einem späteren Neustart als Prozessabsturz und lässt
+keinen Abschnitt mehr aus.
 
 Inhalt von 4.12 (Doku\Änderungen_v4.12.txt): Rückmeldungen aus dem ersten Praxistest. Wartung übernimmt DISM ScanHealth
 der Diagnose, ACPI-Thermalzonen mit 5 s Zeitlimit (erste WMI-Abfrage dauerte 102 s), PawnIO still und nur im Abschluss
@@ -55,7 +60,8 @@ Neue Seite: eigene Datei DiagGui_<Name>.cs ohne using-Zeilen, in Oberflaeche.ps1
 (Get-GuiText in tests\Hilfen.ps1), nicht in einer bestimmten Datei.
 
 ## Versionen bisher (je eine Zeile, neueste zuerst)
-4.12 Praxistest 4.11: kürzere Läufe, PawnIO still, eigener Schritt für Windows.old. 4.11 Sicherheit und Rücknahme: Befunde der Gesamtprüfung behoben (594bd08, nicht veröffentlicht). 4.10 Sensoren, Datenbank und Änderungen im Stil der übrigen Seiten (05ca12f).
+4.13 Sensorfehler im Grafiktreiber beendet den Lauf nicht mehr, Absturzanalyse erkennt Prozessabstürze.
+4.12 Praxistest 4.11: kürzere Läufe, PawnIO still, eigener Schritt für Windows.old (c4a9829). 4.11 Sicherheit und Rücknahme: Befunde der Gesamtprüfung behoben (594bd08, nicht veröffentlicht). 4.10 Sensoren, Datenbank und Änderungen im Stil der übrigen Seiten (05ca12f).
 4.09 Lasttest und System-Umzug im Stil der übrigen Seiten, Schalter ohne Beschnitt (34f5ef3).
 4.08 Ergebnis als Seite, Benchmark und Diagnose im Stil der übrigen Seiten (c9a16bb). 4.07 Eine Datei je Seite,
 kürzerer Start, Akzentfarbe, dezente Bewegung (ba3489b). 4.06 Update-Prüfung und Referenz
@@ -109,6 +115,9 @@ Weitere offene Befunde aus der Gesamtprüfung vom 19.11.2026: Doku\Pruefung_4.10
    mit Fortschritt, Tastenkürzel, Computerschutz mit Administratorrechten, DDU holen).
 16. 4.12 von Hand bestätigen: Wartungsschritt AltinstallationPapierkorb auf einem PC mit Windows.old; Lauf mit Diagnose
     (Integrität) und Wartung DismRestore ohne zweiten ScanHealth; keine Pause vor dem CPU-Benchmark.
+17. 4.13 auf dem PC des Praxistests vom 20.11.2026 (Radeon RX 9060 XT) bestätigen: Lauf mit Benchmark endet mit Bericht,
+    Befund "Sensoren von ... abgeschaltet" falls der Treiberfehler wieder auftritt. Neuere LibreHardwareMonitor-Version
+    prüfen, ob sie FrameMetrics auf RDNA 4 meidet.
 
 ## Abgelehnte Vorschläge (Entscheidung Leonardo, 10.11.2026): nicht umsetzen und nicht erneut vorschlagen
 GitHub Actions bzw. CI; Diagnosepaket (Logs als ZIP); Szenario-Kacheln auf der Startseite; Vorher-Nachher-Messung;
@@ -166,8 +175,12 @@ Schnelltest für Peripherie, sicheres Löschen, Testmatrix-Dateien.
     OnClosing vier Minuten auf den Arbeitsprozess.
 21. Die erste Abfrage einer WMI-Leistungsklasse (Win32_PerfFormatted*) kann minutenlang hängen, wenn WMI die Zählerliste
     neu aufbaut. Neue Abfragen dieser Art mit Zeitlimit (Muster Get-ThermalZoneData, Get-StorageTempReadings) oder über PDH.
+22. Aufrufe in native Treiber (LibreHardwareMonitor, P/Invoke) können eine AccessViolationException auslösen, die ein
+    gewöhnliches catch in .NET 4 nicht erreicht: Der Prozess endet mit 0xE0434352. Solche Aufrufe in eine Methode mit
+    [HandleProcessCorruptedStateExceptions, SecurityCritical] legen (Muster DiagSensors.SafeUpdate).
 
 ## Letzter Commit
-Release-Commit v4.12 (lokal von Bauen.cmd, Tag und Übertragung mit Veroeffentlichen.ps1). Vorgänger:
+Release-Commit v4.13 (lokal von Bauen.cmd, Tag und Übertragung mit Veroeffentlichen.ps1). Vorgänger:
+c4a9829 Release v4.12: Praxistest 4.11: kürzere Läufe, PawnIO still, eigener Schritt für Windows.old,
 594bd08 Release v4.11: Sicherheit und Rücknahme: Befunde der Gesamtprüfung behoben (nicht veröffentlicht),
 05ca12f Release v4.10: Sensoren, Datenbank und Änderungen im Stil der übrigen Seiten, Protokoll aufräumen

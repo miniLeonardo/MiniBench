@@ -11,6 +11,10 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.13", "21.11.2026", "Praxistest vom 20.11.2026: Sensorfehler im Grafiktreiber beendet den Lauf nicht mehr",
+            "• Behoben: Ein Speicherfehler im AMD-Grafiktreiber beim Auslesen der Sensoren (LibreHardwareMonitor, Radeon RX 9060 XT) beendete den Arbeitsprozess beim Start des CPU-Benchmarks; der Lauf endete ohne Bericht. Jetzt wird das betroffene Gerät für den Rest des Laufs nicht mehr abgefragt, GPU-Werte kommen aus dem Windows-Grafiktreiber, der Lauf geht weiter.\r\n" +
+            "• Behoben, Absturzanalyse: Ein Absturz des Arbeitsprozesses galt als Systemabsturz, wenn Windows später neu gestartet wurde, und der nächste Lauf ließ den betroffenen Abschnitt aus (hier den CPU-Benchmark). Jetzt nennt die Analyse den Prozessabsturz mit Fehlermeldung und lässt nichts aus.\r\n" +
+            "• Laufansicht: Stürzt der Arbeitsprozess ab, steht das so da („Arbeitsprozess abgestürzt“) statt nur „Ohne Bericht beendet (Code …)“."),
         new Eintrag("4.12", "19.11.2026", "Praxistest 4.11: kürzere Läufe, PawnIO still, eigener Schritt für Windows.old",
             "• Neu, Wartung: „Papierkorb, Windows.old und ESD-Dateien löschen“ als eigener Schritt (nicht vorausgewählt, nicht umkehrbar). Die Datenträgerbereinigung bleibt ohne diese drei Kategorien.\r\n" +
             "• Kürzer: Hat die Diagnose den Komponentenspeicher geprüft, übernimmt die Wartung das Ergebnis, statt DISM ScanHealth ein zweites Mal auszuführen (2 bis 20 Minuten).\r\n" +

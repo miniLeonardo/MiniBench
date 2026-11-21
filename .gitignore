@@ -47,3 +47,6 @@ Desktop.ini
 *.bin
 Aktueller Build/*.exe
 Archiv/**/*.exe
+
+# Fremde Datenordner zur Fehlersuche (z. B. "Minibench-Daten Matthias")
+Minibench-Daten */

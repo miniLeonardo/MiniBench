@@ -4,7 +4,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
+using System.Security;
 
 // Ein Messwert eines Sensors. Key ist über die Laufzeit stabil (bei LibreHardwareMonitor der Identifier).
 public class SensorReading
@@ -58,6 +60,9 @@ public static class DiagSensors
     }
 
     // Bibliothek laden und Computer öffnen. Rückgabe false mit LastError, wenn etwas fehlt oder scheitert.
+    // HandleProcessCorruptedStateExceptions (ab v4.13): Eine Zugriffsverletzung im Treiber eines Geräts ließe sich sonst
+    // nicht abfangen und beendete den ganzen Arbeitsprozess (siehe SafeUpdate).
+    [HandleProcessCorruptedStateExceptions, SecurityCritical]
     public static bool Open(string dllPath, bool cpu, bool gpu, bool board, bool memory, bool storage, bool battery, bool controller)
     {
         LastError = "";
@@ -155,7 +160,7 @@ public static class DiagSensors
                 if (fresh)
                 {
                     readResult = null; readStarted = DateTime.UtcNow; readDoneAt = DateTime.MinValue; slowCounted = false;
-                    System.Threading.Thread t = new System.Threading.Thread(delegate() { SensorReading[] r; try { r = Read(); } catch { r = new SensorReading[0]; } readResult = r; readDoneAt = DateTime.UtcNow; });
+                    System.Threading.Thread t = new System.Threading.Thread(delegate() { readResult = ReadGuarded(); readDoneAt = DateTime.UtcNow; });
                     t.IsBackground = true; t.Name = "LHM Read"; t.Priority = System.Threading.ThreadPriority.Highest;
                     try { t.Start(); } catch (Exception ex) { LastError = "LibreHardwareMonitor: Lesethread startet nicht (" + ex.Message + ")"; return new SensorReading[0]; }
                     readThread = t;
@@ -278,7 +283,7 @@ public static class DiagSensors
             object[] list = disks.ToArray();
             t = new System.Threading.Thread(delegate()
             {
-                foreach (object hw in list) { try { mUpdate.Invoke(hw, null); } catch { UpdateErrors++; } }
+                foreach (object hw in list) { if (!IsBlocked(hw)) SafeUpdate(hw); }
                 storageDone = true;
             });
             t.IsBackground = true; t.Name = "LHM Datenträger";
@@ -286,6 +291,66 @@ public static class DiagSensors
             t.Start();
         }
         if (StorageWaitMs > 0 && t != null && t.IsAlive) t.Join(StorageWaitMs);
+    }
+
+    // Geräte, deren Aktualisierung mit einer Zugriffsverletzung geendet hat (ab v4.13). Praxistest vom 20.11.2026 (Radeon RX 9060 XT,
+    // LibreHardwareMonitor 0.9.6): ADL2_Adapter_FrameMetrics_Get im AMD-Treiber las beim Start des CPU-Benchmarks
+    // geschützten Speicher. Die AccessViolationException ist in .NET 4 eine Ausnahme mit beschädigtem Prozesszustand,
+    // die ein gewöhnliches catch nicht erreicht; sie beendete den Arbeitsprozess (Rückgabecode 0xE0434352), der Lauf
+    // endete ohne Bericht. SafeUpdate fängt sie ab; das Gerät wird für den Rest des Laufs nicht mehr abgefragt (ein
+    // zweiter Aufruf griffe wieder in den Treiber), die übrigen Sensoren arbeiten weiter. Die Sperre gilt über Art und
+    // Name des Geräts und bleibt nach Close bestehen: Öffnet der Lauf die Bibliothek neu, entstehen neue Geräteobjekte.
+    static readonly object blockGate = new object();
+    static List<string> blocked = new List<string>();
+    static List<string> blockedNames = new List<string>();
+    public static string BlockedError = "";
+    public static string[] BlockedHardware { get { lock (blockGate) return blockedNames.ToArray(); } }
+
+    static string HwKey(object hw)
+    {
+        try { return Convert.ToString(pHwType.GetValue(hw, null)) + "|" + Convert.ToString(pHwName.GetValue(hw, null)); } catch { return ""; }
+    }
+
+    static bool IsBlocked(object hw)
+    {
+        lock (blockGate) { if (blocked.Count == 0) return false; }
+        string k = HwKey(hw);
+        lock (blockGate) return k.Length > 0 && blocked.Contains(k);
+    }
+
+    // Gerät aktualisieren; false, wenn die Bibliothek dabei einen Fehler gemeldet hat
+    [HandleProcessCorruptedStateExceptions, SecurityCritical]
+    static bool SafeUpdate(object hw)
+    {
+        try { mUpdate.Invoke(hw, null); return true; }
+        catch (Exception ex)
+        {
+            UpdateErrors++;
+            Exception x = ex; while (x is TargetInvocationException && x.InnerException != null) x = x.InnerException;
+            if (x is AccessViolationException || x is SEHException)
+            {
+                string name = "";
+                try { name = Convert.ToString(pHwName.GetValue(hw, null)); } catch { }
+                if (String.IsNullOrEmpty(name)) name = "unbekanntes Gerät";
+                string frame = "";
+                try { if (!String.IsNullOrEmpty(x.StackTrace)) { frame = x.StackTrace.Split('\n')[0].Trim(); int i = frame.IndexOf(' '); if (i > 0) frame = frame.Substring(i + 1).Trim(); } } catch { }
+                lock (blockGate)
+                {
+                    string k = HwKey(hw);
+                    if (k.Length > 0 && !blocked.Contains(k)) { blocked.Add(k); blockedNames.Add(name); }
+                    BlockedError = name + ": " + x.GetType().Name + (frame.Length > 0 ? " in " + frame : "");
+                }
+            }
+            return false;
+        }
+    }
+
+    // Lesen im Lesethread: Auch eine Zugriffsverletzung außerhalb von Update darf den Prozess nicht beenden
+    [HandleProcessCorruptedStateExceptions, SecurityCritical]
+    static SensorReading[] ReadGuarded()
+    {
+        try { return Read(); }
+        catch (Exception ex) { UpdateErrors++; LastError = "LibreHardwareMonitor: " + ex.GetType().Name + ": " + ex.Message; return new SensorReading[0]; }
     }
 
     // Alle Hardware aktualisieren und die Werte der unterstützten Sensorarten liefern
@@ -312,9 +377,9 @@ public static class DiagSensors
 
     static void ReadHardware(object hw, string parentName, List<SensorReading> res, int depth, bool update)
     {
-        if (hw == null || depth > 3) return;
+        if (hw == null || depth > 3 || IsBlocked(hw)) return;
         string type = "", name = "";
-        if (update) { try { mUpdate.Invoke(hw, null); } catch { UpdateErrors++; } }
+        if (update && !SafeUpdate(hw) && IsBlocked(hw)) return;
         try { type = Convert.ToString(pHwType.GetValue(hw, null)); name = Convert.ToString(pHwName.GetValue(hw, null)); } catch { return; }
         string grp = Group(type);
         // Unterhardware (z. B. SuperIO-Chip am Mainboard) gehört zur Gruppe des übergeordneten Geräts, sofern sie selbst keine hat

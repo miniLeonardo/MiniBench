@@ -112,7 +112,8 @@ namespace LibreHardwareMonitor.Hardware {
         public string Name { get; set; } public HardwareType HardwareType { get; set; } public ISensor[] Sensors { get; set; } public IHardware[] SubHardware { get; set; }
         public static int Delay;
         public int OwnDelay;
-        public int Updates; public bool Fail; public void Update() { Updates++; if (Delay + OwnDelay > 0) System.Threading.Thread.Sleep(Delay + OwnDelay); if (Fail) throw new InvalidOperationException("kaputt"); }
+        public static int CrashUpdates;
+        public int Updates; public bool Fail, Crash; public void Update() { Updates++; if (Delay + OwnDelay > 0) System.Threading.Thread.Sleep(Delay + OwnDelay); if (Fail) throw new InvalidOperationException("kaputt"); if (Crash) { CrashUpdates++; throw new AccessViolationException("ADL2_Adapter_FrameMetrics_Get"); } }
     }
     public class Computer {
         public static int Opened, Closed;
@@ -140,7 +141,10 @@ namespace LibreHardwareMonitor.Hardware {
             bad.Sensors = new ISensor[] { Sn("GPU Core", SensorType.Temperature, 40, "/gpu-intel/0/temperature/0", 0) };
             H net = new H(); net.Name = "Ethernet"; net.HardwareType = HardwareType.Network; net.SubHardware = new IHardware[0];
             net.Sensors = new ISensor[] { Sn("Upload Speed", SensorType.Throughput, 5, "/nic/0/throughput/0", 0) };
-            hw.Add(cpu); hw.Add(mb); hw.Add(bad); hw.Add(net);
+            // Praxistest vom 20.11.2026: Zugriffsverletzung im AMD-Treiber beim Aktualisieren
+            H amd = new H(); amd.Name = "AMD Radeon RX 9060 XT"; amd.HardwareType = HardwareType.GpuAmd; amd.Crash = true; amd.SubHardware = new IHardware[0];
+            amd.Sensors = new ISensor[] { Sn("GPU Core", SensorType.Temperature, 55, "/gpu-amd/0/temperature/0", 0) };
+            hw.Add(cpu); hw.Add(mb); hw.Add(bad); hw.Add(amd); hw.Add(net);
             if (IsStorageEnabled) {
                 H ssd = new H(); ssd.Name = "Samsung SSD 980 1TB"; ssd.HardwareType = HardwareType.Storage; ssd.SubHardware = new IHardware[0]; ssd.OwnDelay = StorageDelay;
                 ssd.Sensors = new ISensor[] { Sn("Composite Temperature", SensorType.Temperature, 41, "/nvme/0/temperature/0", 0) };
@@ -202,6 +206,23 @@ namespace LibreHardwareMonitor.PawnIo { public class PawnIo { public static bool
         [double]::IsNaN(($r | Where-Object { $_.Name -eq 'Bus Speed' }).Wert) | Should -BeTrue
         ($r | Where-Object { $_.Key -eq '/gpu-intel/0/temperature/0' }).Wert | Should -Be 40
         [DiagSensors]::UpdateErrors | Should -BeGreaterThan 0
+    }
+    It 'schaltet ein Gerät nach einer Zugriffsverletzung im Treiber ab und liest die übrigen weiter (Praxistest vom 20.11.2026)' {
+        $r = @([DiagSensors]::Read())
+        @($r | Where-Object { $_.Key -like '/gpu-amd/*' }).Count | Should -Be 0
+        ($r | Where-Object { $_.Key -eq '/intelcpu/0/temperature/13' }).Wert | Should -Be 61.5
+        @([DiagSensors]::BlockedHardware) | Should -Be @('AMD Radeon RX 9060 XT')
+        [DiagSensors]::BlockedError | Should -Match 'AccessViolationException'
+        # das Gerät wird nach dem ersten Fehler nicht mehr aufgerufen
+        [LibreHardwareMonitor.Hardware.H]::CrashUpdates | Should -Be 1
+    }
+    It 'Zugriffsverletzungen werden auch als Ausnahme mit beschädigtem Prozesszustand abgefangen' {
+        # Eine echte Zugriffsverletzung aus nativem Code erreicht ein catch in .NET 4 nur mit diesem Attribut
+        $cs = Get-SrcText 'Kern/Sensoren.cs'
+        foreach ($m in 'SafeUpdate', 'ReadGuarded', 'Open') {
+            $cs | Should -Match ('\[HandleProcessCorruptedStateExceptions, SecurityCritical\]\s+(public |)static \w+(\[\])? {0}\(' -f $m)
+        }
+        $cs | Should -Not -Match 'mUpdate\.Invoke\(hw, null\); \} catch'
     }
     It 'schließt die Bibliothek' {
         [DiagSensors]::Close()
