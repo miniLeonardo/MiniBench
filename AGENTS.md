@@ -118,6 +118,19 @@ git log seit dem in Doku\Projektstand.md genannten Commit lesen.
    "Alle Tests bestanden" nur schreiben, wenn ein Lauf das belegt, mit Zahlen.
 4. Vor der Übergabe Codeprüfung auf Fehler, gefundene Fehler im Abschnitt "Gefunden und behoben" der Änderungsdatei nennen.
 
+## Planung im Nextcloud-Deck (Claude)
+Leonardos zentraler Planungsort ist das Deck seiner Nextcloud (Board "PC DiagnoseBench", ID 5, Listen
+Ideen -> ▶ Für Claude -> In Arbeit -> Für Leonardo: testen & prüfen -> Fertig). Die Ideen aus Doku\Ideen.md stehen dort
+als Karten mit derselben Nummer im Titel; neue Ideen bekommen eine Nummer in Ideen.md und eine Karte in "Ideen".
+1. Zu Beginn jedes Chats, ohne dass Leonardo darauf hinweist, die Liste "▶ Für Claude" lesen. Die Karte
+   "ℹ So funktioniert diese Liste" ist kein Auftrag. Liegen Karten dort, Leonardo kurz nennen, was ansteht, und von oben
+   nach unten umsetzen; seine aktuelle Bitte im Chat geht vor, sonst gilt "Vorgehen in jedem Chat" wie oben.
+2. Beim Start die Karte nach "In Arbeit", am Ende nach "Für Leonardo: testen & prüfen" (Praxistest, Entscheidung,
+   Handgriff von ihm) oder "Fertig", jeweils mit kurzer Notiz (Version, Ergebnis).
+3. Zugriff über das Werkzeug ..\_nextcloud-deck\deck.ps1 (außerhalb des Repositorys, Zugangsdaten nur dort, nie ausgeben
+   oder committen): powershell -NoProfile -File ..\_nextcloud-deck\deck.ps1 todo 5 | lists 5 | show ID |
+   move ID "Liste" "Notiz" | add 5 "Liste" "Titel" "Text" "Label". Nach dem Verschieben mit lists 5 gegenprüfen.
+
 ## Abschluss jeder Version
 1. Version in src\Kern\Version.ps1 erhöhen.
 2. Eintrag oben in src\Oberflaeche\Versionen.cs, Doku\Versionshistorie.txt und CHANGELOG.md (Release.Tests.ps1 prüft alle drei).

@@ -47,6 +47,29 @@ Titel). Datei und Deck parallel pflegen, Ablauf in AGENTS.md (Planung im Nextclo
 19. Seite Wartung: Hinweis, wenn "Alte Wiederherstellungspunkte löschen" mit Schritten gewählt ist, deren Rückweg der
     Wiederherstellungspunkt ist.
 
+## Nach Version 4.14 (24.11.2026)
+
+### Daten und Sicherheit
+20. Archiv zurückholen: Entfernte Läufe (Archiv\Entfernt) und archivierte Änderungsprotokolle auf den Seiten Datenbank
+    und Änderungen anzeigen und mit einem Klick zurücklegen (offener Befund 11 im Projektstand). Mittel.
+21. Update zurücknehmen: Die vorige LMB.exe liegt nach einem Update in Archiv\v<alte Version>; die Seite Versionen
+    bietet "Vorige Version wieder einsetzen" über denselben Austausch wie das Update (Update.cmd). Klein bis mittel.
+
+### Bedienung
+22. "Was ist neu" über mehrere Versionen: Wer Versionen überspringt, sieht die Texte aller neueren Releases
+    (GitHub-API /releases), nicht nur den des neuesten. Klein.
+23. Schnell-Scan der Seite System-Umzug im Hintergrund statt im Oberflächen-Thread (offener Befund 6, das Fenster
+    reagiert sonst nicht), als Hintergrundarbeit mit Abbrechen und Sperre wie in 4.14. Mittel.
+24. Tastatur vervollständigen: Strg+A markiert alle Zeilen der Datenbank, Esc hebt Markierung und Haken auf; die
+    Kennzahlkacheln der Seite Sensoren live sind per Tab und Leertaste erreichbar (Grenze aus 4.14). Klein.
+25. Akzentfarbe auch im HTML-Bericht und im Dashboard (offener Befund 13). Klein bis mittel.
+
+### Bau, Test, Release
+26. Veroeffentlichen.ps1 -Pruefen: alle Vorabprüfungen und der Release-Text als Vorschau, ohne Push und ohne Release.
+    Klein.
+27. Abgleich Ideen.md und Deck: ein Befehl im Werkzeug deck.ps1 meldet Nummern, Titel und Listen, die zwischen
+    Datei und Board abweichen (z. B. verworfene Karten, die in Ideen.md noch offen stehen). Klein.
+
 ## Früher vorgeschlagen, nicht gewählt (15.11.2026, nicht abgelehnt)
 "Ergebnis ansehen" für jeden Lauf der Datenbank, Veränderung zum vorigen Lauf, Suchfelder und Filter in Sensorliste,
 Datenbank und Änderungen, wählbares Zeitfenster der Kurven.
