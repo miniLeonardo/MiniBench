@@ -134,7 +134,7 @@ Describe 'Veroeffentlichen.ps1 prüft vor jedem Push (ab v4.11)' {
     BeforeAll {
         $script:Veroeff = Get-RepoText 'Veroeffentlichen.ps1'
         $ast = [Management.Automation.Language.Parser]::ParseInput($script:Veroeff, [ref]$null, [ref]$null)
-        foreach ($fn in $ast.FindAll({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -in 'Get-StandLmbSha', 'Test-StandWindowsTests' }, $true)) {
+        foreach ($fn in $ast.FindAll({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -in 'Get-StandSha', 'Get-StandLmbSha', 'Get-ExeSkriptSha', 'Test-StandWindowsTests' }, $true)) {
             . ([scriptblock]::Create($fn.Extent.Text))
         }
         $script:ErsterPush = $script:Veroeff.IndexOf('push origin HEAD:main')
@@ -142,13 +142,15 @@ Describe 'Veroeffentlichen.ps1 prüft vor jedem Push (ab v4.11)' {
     }
     It 'prüft Zweig, Prüfsumme, Tag und Testzeile vor dem ersten Push' {
         $script:ErsterPush | Should -BeGreaterThan 0
-        foreach ($p in @('rev-parse --abbrev-ref HEAD', 'Get-StandLmbSha $standText', "(`$tag + '^{commit}')", 'Test-StandWindowsTests $standText')) {
+        foreach ($p in @('rev-parse --abbrev-ref HEAD', 'Get-StandLmbSha $standText', "Get-StandSha `$standText 'LeosMinibench.ps1'", 'Get-ExeSkriptSha $exe', "(`$tag + '^{commit}')", 'Test-StandWindowsTests $standText')) {
             $i = $script:Veroeff.IndexOf($p)
             $i | Should -BeGreaterThan 0 -Because $p
             $i | Should -BeLessThan $script:ErsterPush -Because $p
         }
         $script:Veroeff | Should -Match "-ne 'main'\) \{ throw"
         $script:Veroeff | Should -Match '\$standSha -ne \$sha\) \{ throw'
+        $script:Veroeff | Should -Match '\$ps1Sha -ne \$standPs1\) \{ throw'
+        $script:Veroeff | Should -Match '\$exeSkript -ne \$standPs1\) \{ throw'
         $script:Veroeff | Should -Match '\$tagCommit\.Trim\(\) -ne \$head\.Trim\(\)\) \{'
         $script:Veroeff | Should -Match 'param\(\[switch\]\$Entwurf, \[switch\]\$OhnePush, \[switch\]\$OhneWindowsTests\)'
     }
@@ -158,6 +160,28 @@ Describe 'Veroeffentlichen.ps1 prüft vor jedem Push (ab v4.11)' {
         Get-StandLmbSha ("  LMB.exe                  2.817 KB  $h") | Should -Be $h.ToLowerInvariant()
         Get-StandLmbSha "  LeosMinibench.ps1   1 KB  $h" | Should -Be ''
         Get-StandLmbSha '' | Should -Be ''
+        Get-StandSha ("Dateien`r`n  LMB.exe                  2,817 KB  " + ('0' * 64) + "`r`n  LeosMinibench.ps1        2,741 KB  $h`r`n") 'LeosMinibench.ps1' | Should -Be $h.ToLowerInvariant()
+        Get-StandSha "  LMB.exe   1 KB  $h" 'LeosMinibench.ps1' | Should -Be ''
+    }
+    It 'liest das in eine exe eingebettete Skript (ab v4.14)' {
+        if (-not (Test-IstWindows)) { Set-ItResult -Skipped -Because 'CodeDom mit eingebetteter Ressource nur unter Windows'; return }
+        $tmp = Join-Path ([IO.Path]::GetTempPath()) ('Minibench_ExeSkript_' + $PID)
+        New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+        try {
+            $ps1 = Join-Path $tmp 'LeosMinibench.ps1'
+            [IO.File]::WriteAllText($ps1, "`$ScriptVersion = '9.99'`r`n", (New-Object Text.UTF8Encoding($true)))
+            $cp = New-Object System.CodeDom.Compiler.CompilerParameters
+            $cp.GenerateExecutable = $true; $cp.OutputAssembly = Join-Path $tmp 'Probe.exe'
+            [void]$cp.EmbeddedResources.Add($ps1)
+            $r = (New-Object Microsoft.CSharp.CSharpCodeProvider).CompileAssemblyFromSource($cp, 'class P { static void Main() { } }')
+            $r.Errors.HasErrors | Should -BeFalse
+            Get-ExeSkriptSha $cp.OutputAssembly | Should -Be (Get-FileHash -LiteralPath $ps1 -Algorithm SHA256).Hash.ToLowerInvariant()
+            $cp2 = New-Object System.CodeDom.Compiler.CompilerParameters
+            $cp2.GenerateExecutable = $true; $cp2.OutputAssembly = Join-Path $tmp 'Ohne.exe'
+            [void](New-Object Microsoft.CSharp.CSharpCodeProvider).CompileAssemblyFromSource($cp2, 'class P { static void Main() { } }')
+            Get-ExeSkriptSha $cp2.OutputAssembly | Should -Be ''
+            Get-ExeSkriptSha $ps1 | Should -Be ''
+        } finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
     }
     It 'erkennt nur einen Testlauf unter Windows ohne Fehlschläge' {
         Test-StandWindowsTests ("Tests     : 1203 bestanden, 0 fehlgeschlagen, 81 " + $script:Ue + "bersprungen (Pester 6.2.0, PowerShell 5.1.26100.9818) (Laufzeit: 12:34)") | Should -BeTrue

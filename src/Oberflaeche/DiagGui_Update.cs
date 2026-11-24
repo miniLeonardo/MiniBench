@@ -255,7 +255,9 @@ public partial class DiagGui
 
         string msg = "Update auf Version " + AvailableUpdateVersion + " jetzt herunterladen und LMB.exe austauschen?\r\n\r\n" +
                      "Die Datei wird vor dem Austausch mit der SHA-256-Prüfsumme des Releases verglichen. Leos Minibench schließt sich dafür. Die bisherige Programmdatei und ein Skript daneben (LeosMinibench.ps1) werden im Datenordner unter Archiv gesichert, danach startet die neue Version.";
-        if (!UI.Ask(msg, "Minibench Update", this))
+        // ab v4.14: was die neue Version bringt (Text des Releases); ohne Text bleibt die Rückfrage wie bisher
+        string neu = WasIstNeuText(AvailableUpdateBody, AvailableUpdateVersion);
+        if (!UI.AskMitText(msg, "Was ist neu in " + AvailableUpdateVersion.TrimStart('v', 'V') + ":", neu, "Minibench Update", this))
             return;
         if (running || HintergrundBelegt("Das Update")) return;
 
@@ -341,6 +343,38 @@ public partial class DiagGui
         if (updateWc == null) return false;
         if (UI.Ask("Das Update wird gerade heruntergeladen. Herunterladen abbrechen?", "Minibench-Update", this) && hintergrund != null) HintergrundBeenden();
         return true;
+    }
+
+    // ab v4.14: "Was ist neu" für die Update-Rückfrage aus dem Text des Releases. Das ist der Abschnitt aus CHANGELOG.md,
+    // den Veroeffentlichen.ps1 schreibt, gefolgt von der Download- und der Prüfsummenzeile; beide entfallen hier.
+    // Überschriften (##), Fettschrift (**), Code (`), Verweise und Aufzählungszeichen werden Klartext, jeder Punkt
+    // bleibt eine eigene Zeile. Mehr als WasIstNeuZeilen Zeilen werden gekürzt, mit Verweis auf das Release.
+    public const int WasIstNeuZeilen = 15;
+    public static string WasIstNeuText(string body, string tag)
+    {
+        if (String.IsNullOrEmpty(body)) return "";
+        System.Text.RegularExpressions.RegexOptions io = System.Text.RegularExpressions.RegexOptions.IgnoreCase;
+        List<string> z = new List<string>();
+        int inhalt = 0;
+        bool gekuerzt = false;
+        foreach (string roh in body.Replace("\r\n", "\n").Split('\n'))
+        {
+            string l = roh.Trim();
+            if (System.Text.RegularExpressions.Regex.IsMatch(l, @"^[*_]*Download:", io) || System.Text.RegularExpressions.Regex.IsMatch(l, @"SHA-?256\s*\(LMB\.exe\)", io)) continue;
+            if (l.Length == 0) { if (z.Count > 0 && z[z.Count - 1].Length > 0) z.Add(""); continue; }
+            if (inhalt >= WasIstNeuZeilen) { gekuerzt = true; break; }
+            l = System.Text.RegularExpressions.Regex.Replace(l, @"^#+\s*", "");
+            l = System.Text.RegularExpressions.Regex.Replace(l, @"^[*\-+]\s+", "");
+            l = System.Text.RegularExpressions.Regex.Replace(l, @"\[([^\]]+)\]\([^)]*\)", "$1");
+            l = l.Replace("**", "").Replace("__", "").Replace("`", "").Trim();
+            if (l.Length == 0) continue;
+            z.Add(l); inhalt++;
+        }
+        while (z.Count > 0 && z[z.Count - 1].Length == 0) z.RemoveAt(z.Count - 1);
+        if (z.Count == 0) return "";
+        string t = String.Join("\r\n", z.ToArray());
+        if (gekuerzt) t += "\r\n\r\nWeitere Änderungen stehen im Release auf https://github.com/" + UpdateRepo + "/releases" + (String.IsNullOrEmpty(tag) ? "" : "/tag/" + tag) + ".";
+        return t;
     }
 
     public static string UpdateFortschrittText(long geladen, long gesamt)

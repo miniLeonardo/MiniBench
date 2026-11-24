@@ -2,6 +2,20 @@
 
 Alle wesentlichen Änderungen an Leos Minibench werden in diesem Dokument festgehalten.
 
+## v4.14 (24.11.2026)
+
+Sechs Ideen aus der Gesamtprüfung vom 19.11.2026, ausgewählt im Planungsboard.
+
+### Neu
+* **Was ist neu beim Update:** Die Rückfrage vor dem Update zeigt den Text des Releases (höchstens 15 Zeilen, mit Bildlauf).
+* **Datenbank mit der Tastatur:** Entf entfernt die angehakten oder markierten Läufe (mit Rückfrage), die Leertaste hakt alle markierten Läufe an oder ab.
+* **Sensoren live:** Ein Klick auf eine Kennzahl hebt ihre Kurve im Verlauf hervor, ein zweiter Klick nimmt das zurück.
+
+### Verbessert
+* **Startknopf:** Läuft im Hintergrund eine Sicherung, eine Installation oder ein Update-Download, nennt die Fußzeile das vorab, Startknopf und Live-Ansicht sind ausgegraut.
+* **Import:** Ein Lauf desselben Geräts gilt auch unter anderem Computernamen als schon vorhanden (Gerätekennung und Datum).
+* **Veröffentlichen:** prüft zusätzlich das Skript und das in LMB.exe eingebettete Skript gegen Stand.txt.
+
 ## v4.13 (21.11.2026)
 
 Rückmeldung aus einem Praxistest auf einem fremden PC (Ryzen 5 5600XT, Radeon RX 9060 XT).

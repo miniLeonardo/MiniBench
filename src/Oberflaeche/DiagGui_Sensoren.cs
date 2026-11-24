@@ -235,6 +235,31 @@ public partial class DiagGui
         }
     }
 
+    internal const string LiveTipp = "Startet oder beendet die laufende Anzeige aller Sensoren. Während eines Laufs ist die Live-Ansicht aus. Beim Beenden wird ein vorübergehend installierter Treiber wieder entfernt.";
+
+    // ab v4.14: Solange eine Hintergrundarbeit läuft, ist "Live-Ansicht starten" ausgegraut und nennt den Grund
+    bool liveSperreGezeigt;
+    internal void UpdateLiveKnopf()
+    {
+        if (btnLive == null || liveRunning) return;
+        string s = HintergrundSperre("Die Live-Ansicht");
+        btnLive.Enabled = s.Length == 0;
+        Tip(btnLive, s.Length > 0 ? s : LiveTipp);
+        if (lblSensInfo == null) return;
+        if (s.Length > 0) { lblSensInfo.Text = HintergrundKurz() + "."; liveSperreGezeigt = true; }
+        else if (liveSperreGezeigt) { lblSensInfo.Text = "Live-Ansicht nicht gestartet."; liveSperreGezeigt = false; }
+    }
+
+    // ab v4.14: Kachel i hebt die passende Kurve hervor; derselbe Klick noch einmal (oder eine Kachel ohne Kurve) hebt auf
+    internal void WaehleKennzahl(int i)
+    {
+        if (sensKpi == null || chartLive == null) return;
+        int spalte = sensKpi.IstWaehlbar(i) ? kpiSpalte[i] : -1;
+        if (spalte < 0 || chartLive.HervorgehobeneSpalte == spalte) { chartLive.HervorgehobeneSpalte = -1; sensKpi.Hervorgehoben = -1; }
+        else { chartLive.HervorgehobeneSpalte = spalte; sensKpi.Hervorgehoben = i; }
+        chartLive.Invalidate(); sensKpi.Invalidate();
+    }
+
     static string DauerText(double sek)
     {
         if (double.IsNaN(sek) || sek < 0) return "0 s";
@@ -317,11 +342,15 @@ public partial class DiagGui
         sensSeite = NeueModulSeite(f);
         btnLive = UI.Primary("Live-Ansicht starten"); btnLive.Margin = new Padding(0); btnLive.Padding = new Padding(UI.S(14), UI.S(4), UI.S(14), UI.S(4)); btnLive.Font = new Font("Segoe UI Semibold", 9.75f);
         btnLive.Click += delegate { if (liveRunning) StopLive(); else StartLive(); };
-        Tip(btnLive, "Startet oder beendet die laufende Anzeige aller Sensoren. Beim Beenden wird ein vorübergehend installierter Treiber wieder entfernt.");
+        Tip(btnLive, LiveTipp);
         sensSeite.KopfKnopf(btnLive);
 
         sensKpi = new KennzahlZeile(kpiTitel, kpiEinheit, new Color[] { SensorChart.CpuFarbe, SensorChart.CpuFarbe, SensorChart.CpuFarbe, SensorChart.GpuFarbe, SensorChart.GpuFarbe, Color.FromArgb(156, 163, 175) });
-        Tip(sensKpi, "Leitwerte der Live-Ansicht mit dem kleinsten und größten Wert seit dem Start. Ohne Messwert steht \"kein Wert\".");
+        // ab v4.14: Kacheln mit einer Kurve im Verlauf heben sie per Klick hervor (Lüfter hat keine Kurve)
+        sensKpi.Waehlbar = new bool[kpiSpalte.Length];
+        for (int i = 0; i < kpiSpalte.Length; i++) sensKpi.Waehlbar[i] = SensorChart.HatKurve(kpiSpalte[i]);
+        sensKpi.KachelGeklickt += WaehleKennzahl;
+        Tip(sensKpi, "Leitwerte der Live-Ansicht mit dem kleinsten und größten Wert seit dem Start. Ohne Messwert steht \"kein Wert\". Ein Klick auf eine Kachel hebt ihre Kurve im Verlauf hervor, ein zweiter Klick nimmt das zurück.");
         f.Controls.Add(sensKpi); sensSeite.Voll.Add(sensKpi);
         LeereKennzahlen();
         lblSensInfo = Lbl("Live-Ansicht nicht gestartet.", UI.SchriftHinweis, false, UI.Muted); lblSensInfo.Margin = new Padding(0, 0, 0, UI.S(UI.Abstand2));
@@ -480,7 +509,7 @@ public partial class DiagGui
             liveRunning = false; liveStopping = false; liveTimer.Stop();
             btnLive.Enabled = true; btnLive.Text = "Live-Ansicht starten"; btnSensTools.Enabled = true; btnSensSave.Enabled = sensRows.Count > 0;
             if (killed || PawnMarkerExists) CleanupDriver();
-            UpdateSensTools(); UpdateSensStand();
+            UpdateSensTools(); UpdateSensStand(); UpdateLiveKnopf();
             ReloadDb();
         }
     }

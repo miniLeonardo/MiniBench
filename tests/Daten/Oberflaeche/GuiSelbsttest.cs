@@ -91,6 +91,10 @@ public static class GuiSelbsttest
         Fall("Ergebnis.Dauer", ErgebnisDauer);
         Fall("Startseite.Neuaufbau", StartseiteNeuaufbau);
         Fall("Aenderungen.Geraet", AenderungenGeraet);
+        Fall("Update.WasIstNeu", UpdateWasIstNeu);
+        Fall("Datenbank.Tasten", DatenbankTasten);
+        Fall("Sensoren.Hervorhebung", SensorenHervorhebung);
+        Fall("Hintergrund.Startknopf", HintergrundStartknopf);
         foreach (string l in outLines) System.Console.WriteLine(l);
         return 0;
     }
@@ -1736,6 +1740,140 @@ public static class GuiSelbsttest
             DiagGui.AvailableUpdateUrl = altUrl; DiagGui.AvailableUpdateSha256 = altSha; DiagGui.AvailableUpdateVersion = altVer;
             Raeume(d);
         }
+    }
+
+    // ab v4.14 (Idee 11): Die Update-Rückfrage nennt, was die neue Version bringt
+    static void UpdateWasIstNeu()
+    {
+        string body = "Rückmeldung aus einem Praxistest.\n\n### Behoben\n* **Lauf ohne Bericht:** Ein `Speicherfehler` beendete den Lauf.\n* **Absturzanalyse:** nennt [den Prozess](https://x/y).\n\n**Download:** LMB.exe herunterladen und starten.\n\nSHA-256 (LMB.exe): " + new string('a', 64) + "\n";
+        string t = DiagGui.WasIstNeuText(body, "v9.99");
+        Ist(t == "Rückmeldung aus einem Praxistest.\r\n\r\nBehoben\r\nLauf ohne Bericht: Ein Speicherfehler beendete den Lauf.\r\nAbsturzanalyse: nennt den Prozess.", "Klartext ohne Download und Prüfsumme: " + t.Replace("\r\n", "¶"));
+        Ist(DiagGui.WasIstNeuText("", "v9.99") == "" && DiagGui.WasIstNeuText(null, "") == "", "ohne Text leer");
+        Ist(DiagGui.WasIstNeuText("SHA-256 (LMB.exe): " + new string('b', 64), "v9.99") == "", "nur Prüfsumme ergibt leer");
+        System.Text.StringBuilder lang = new System.Text.StringBuilder("### Neu\n");
+        for (int i = 1; i <= 30; i++) lang.Append("* Punkt " + i + "\n");
+        string k = DiagGui.WasIstNeuText(lang.ToString(), "v9.99");
+        Ist(k.Contains("Punkt 14") && !k.Contains("Punkt 15\r\n") && !k.Contains("Punkt 16") && k.EndsWith("releases/tag/v9.99."), "gekürzt auf " + DiagGui.WasIstNeuZeilen + " Zeilen mit Verweis: " + k.Replace("\r\n", "¶"));
+
+        string d = NeuerDatenordner();
+        string altUrl = DiagGui.AvailableUpdateUrl, altSha = DiagGui.AvailableUpdateSha256, altVer = DiagGui.AvailableUpdateVersion, altBody = DiagGui.AvailableUpdateBody;
+        System.Collections.Generic.List<string> m = new System.Collections.Generic.List<string>();
+        try
+        {
+            using (DiagGui g = NeueOberflaeche(d, null))
+            {
+                UI.Meldungsprotokoll = m; UI.MeldungsAntwort = false;
+                DiagGui.AvailableUpdateUrl = "https://example.invalid/LMB.exe"; DiagGui.AvailableUpdateSha256 = new string('c', 64); DiagGui.AvailableUpdateVersion = "v9.99"; DiagGui.AvailableUpdateBody = body;
+                g.TriggerUpdateDownload();
+                Ist(m.Count == 1 && m[0].StartsWith("Minibench Update|Update auf Version v9.99") && m[0].Contains("Was ist neu in 9.99:\r\nRückmeldung aus einem Praxistest.") && !m[0].Contains("SHA-256 (LMB.exe)"), "Rückfrage mit Was ist neu: " + (m.Count > 0 ? m[0] : "keine"));
+                Ist(g.hintergrund == null, "Nein lädt nichts");
+                DiagGui.AvailableUpdateBody = "";
+                g.TriggerUpdateDownload();
+                Ist(m.Count == 2 && m[1].StartsWith("Minibench Update|Update auf Version v9.99") && !m[1].Contains("Was ist neu"), "ohne Text die bisherige Rückfrage");
+            }
+        }
+        finally
+        {
+            UI.Meldungsprotokoll = null; UI.MeldungsAntwort = false;
+            DiagGui.AvailableUpdateUrl = altUrl; DiagGui.AvailableUpdateSha256 = altSha; DiagGui.AvailableUpdateVersion = altVer; DiagGui.AvailableUpdateBody = altBody;
+            Raeume(d);
+        }
+    }
+
+    // ab v4.14 (Idee 15): Leertaste hakt alle markierten Läufe an oder ab, Entf entfernt markierte Läufe mit Rückfrage
+    static void DatenbankTasten()
+    {
+        string d = NeuerDatenordner();
+        System.Collections.Generic.List<string> m = new System.Collections.Generic.List<string>();
+        try
+        {
+            SchreibeLauf(d, "2026-11-10 14:20", true, true); SchreibeLauf(d, "2026-11-02 19:05", false, true); SchreibeLauf(d, "2026-10-21 17:36", false, false);
+            using (DiagGui g = NeueOberflaeche(d, null))
+            {
+                UI.Meldungsprotokoll = m; UI.MeldungsAntwort = false;
+                g.lvDb.LoeseAufklappen(DbErste(g, true));
+                Ist(g.lvDb.Zeilen.Count == 3, "aufgeklappt drei Zeilen");
+                g.lvDb.Markiere(g.lvDb.Zeilen[0], true);
+                Ist(!g.DbTaste(Keys.Space) && g.dbHaken.Count == 0, "eine markierte Zeile: Leertaste bleibt bei der Liste");
+                g.lvDb.MarkiereMehrere(new List<ListenZeile>(g.lvDb.Zeilen));
+                Ist(g.DbTaste(Keys.Space) && g.dbHaken.Count == 3 && g.btnDashboard.Text == "Im Dashboard vergleichen (3)", "Leertaste hakt alle drei an: " + g.dbHaken.Count);
+                Ist(g.DbMarkierte().Count == 3, "Markierung bleibt nach dem Neuaufbau");
+                Ist(g.DbTaste(Keys.Space) && g.dbHaken.Count == 0, "zweimal: alle Haken entfallen");
+                g.lvDb.LoeseHaken(g.lvDb.Zeilen[1]);
+                Ist(g.dbHaken.Count == 1 && g.DbTaste(Keys.Space) && g.dbHaken.Count == 3, "teilweise angehakt: alle werden gesetzt");
+                g.dbHaken.Clear(); g.FillDbList();
+                g.lvDb.MarkiereMehrere(new List<ListenZeile> { g.lvDb.Zeilen[1], g.lvDb.Zeilen[2] });
+                Ist(g.DbTaste(Keys.Delete) && m.Count == 1 && m[0].StartsWith("Läufe entfernen|Diese 2 Läufe entfernen?") && m[0].Contains("2026-11-02 19:05") && m[0].Contains("2026-10-21 17:36"), "Entf fragt für beide markierten Läufe: " + (m.Count > 0 ? m[0] : "keine Meldung"));
+                Ist(g.db.Count == 3, "ohne Zustimmung wird nichts entfernt");
+                g.lvDb.LoeseHaken(g.lvDb.Zeilen[0]);
+                Ist(g.DbTaste(Keys.Delete) && m.Count == 2 && m[1].StartsWith("Läufe entfernen|Diesen Lauf entfernen?") && m[1].Contains("2026-11-10 14:20"), "angehakte Läufe gehen vor markierten");
+                // Verdrahtung: die Taste erreicht DbTaste über KeyDown der Liste
+                g.dbHaken.Clear(); g.FillDbList();
+                g.lvDb.MarkiereMehrere(new List<ListenZeile>(g.lvDb.Zeilen));
+                typeof(Control).GetMethod("OnKeyDown", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(g.lvDb, new object[] { new KeyEventArgs(Keys.Space) });
+                Ist(g.dbHaken.Count == 3, "Leertaste über die Liste: " + g.dbHaken.Count);
+                Ist(g.tip.GetToolTip(g.lvDb).Contains("Entf"), "Hinweis der Liste nennt die Tasten");
+            }
+        }
+        finally { UI.Meldungsprotokoll = null; UI.MeldungsAntwort = false; Raeume(d); }
+    }
+
+    // ab v4.14 (Idee 14): Klick auf eine Kennzahl hebt ihre Kurve hervor, ein zweiter hebt auf; Lüfter hat keine Kurve
+    static void SensorenHervorhebung()
+    {
+        string d = NeuerDatenordner();
+        try
+        {
+            using (DiagGui g = NeueOberflaeche(d, null))
+            {
+                Ist(g.chartLive.HervorgehobeneSpalte == -1 && g.sensKpi.Hervorgehoben == -1, "anfangs nichts hervorgehoben");
+                Ist(g.sensKpi.IstWaehlbar(0) && g.sensKpi.IstWaehlbar(4) && !g.sensKpi.IstWaehlbar(5), "Kacheln mit Kurve wählbar, Lüfter nicht");
+                g.sensKpi.LoeseKachel(3);
+                Ist(g.chartLive.HervorgehobeneSpalte == 4 && g.sensKpi.Hervorgehoben == 3, "GPU-Temperatur hebt Spalte 4 hervor: " + g.chartLive.HervorgehobeneSpalte);
+                g.sensKpi.LoeseKachel(4);
+                Ist(g.chartLive.HervorgehobeneSpalte == 6 && g.sensKpi.Hervorgehoben == 4, "andere Kachel wechselt: GPU-Leistung Spalte 6");
+                g.sensKpi.LoeseKachel(5);
+                Ist(g.chartLive.HervorgehobeneSpalte == 6, "Lüfter löst nichts aus");
+                g.sensKpi.LoeseKachel(4);
+                Ist(g.chartLive.HervorgehobeneSpalte == -1 && g.sensKpi.Hervorgehoben == -1, "zweiter Klick hebt auf");
+                g.sensKpi.Width = UI.S(800);
+                Ist(g.sensKpi.KachelBei(new Point(g.sensKpi.Kachel(2).X + 5, g.sensKpi.Kachel(2).Y + 5)) == 2 && g.sensKpi.KachelBei(new Point(-1, -1)) == -1, "Treffer nach Lage der Kachel");
+                // Zeichnen mit Hervorhebung wirft nicht
+                g.chartLive.Size = new Size(600, 330);
+                g.HandleLiveLine("@@SENSLEAD|0|61|4200|70|50|1800|120|900");
+                g.HandleLiveLine("@@SENSLEAD|2|66|4300|82|55|1900|150|950");
+                g.sensKpi.LoeseKachel(0);
+                using (Bitmap b = new Bitmap(600, 330)) g.chartLive.DrawToBitmap(b, new Rectangle(0, 0, 600, 330));
+                using (Bitmap b = new Bitmap(g.sensKpi.Width, g.sensKpi.Height)) g.sensKpi.DrawToBitmap(b, new Rectangle(0, 0, b.Width, b.Height));
+            }
+        }
+        finally { Raeume(d); }
+    }
+
+    // ab v4.14 (Idee 12): Fußzeile und Knöpfe zeigen die Sperre durch eine Hintergrundarbeit schon vor dem Klick
+    static void HintergrundStartknopf()
+    {
+        string d = NeuerDatenordner();
+        try
+        {
+            using (DiagGui g = NeueOberflaeche(d, null))
+            {
+                g.nav[2].Checked = true; g.UpdateSummary();
+                Ist(g.btnStart.Enabled && g.btnLive.Enabled, "ohne Hintergrundarbeit startbar: " + g.lblSel.Text + " / Start " + g.btnStart.Enabled + " (" + g.btnStart.Text + ") / Live " + g.btnLive.Enabled + " / Benchmark " + g.nav[2].Checked);
+                string vorher = g.lblSel.Text;
+                DiagGui.HintergrundArbeit h = g.HintergrundBeginnen("Die Sicherung für den System-Umzug");
+                Ist(!g.btnStart.Enabled && g.lblSel.Text == "Die Sicherung für den System-Umzug läuft noch, Start danach möglich", "Fußzeile: " + g.lblSel.Text);
+                Ist(g.tip.GetToolTip(g.btnStart).Contains("Der Lauf startet erst danach"), "Hinweis am Startknopf: " + g.tip.GetToolTip(g.btnStart));
+                Ist(!g.btnLive.Enabled && g.tip.GetToolTip(g.btnLive).Contains("Die Live-Ansicht startet erst danach") && g.lblSensInfo.Text.StartsWith("Die Sicherung für den System-Umzug läuft noch"), "Live-Ansicht gesperrt: " + g.lblSensInfo.Text);
+                g.HintergrundEnde(h);
+                Ist(g.btnStart.Enabled && g.lblSel.Text == vorher && g.btnLive.Enabled && g.tip.GetToolTip(g.btnLive).StartsWith("Startet oder beendet") && g.lblSensInfo.Text == "Live-Ansicht nicht gestartet.", "frei: Live " + g.btnLive.Enabled + " Info " + g.lblSensInfo.Text + " Tipp " + g.tip.GetToolTip(g.btnLive));
+                g.nav[2].Checked = false; g.UpdateSummary();
+                h = g.HintergrundBeginnen("Die Installation über winget");
+                Ist(!g.btnStart.Enabled && g.lblSel.Text == "Noch kein Ablauf gewählt", "ohne Ablauf bleibt der bisherige Text");
+                g.HintergrundEnde(h);
+            }
+        }
+        finally { Raeume(d); }
     }
 
     // C5: F5 und Strg+Eingabe über ProcessCmdKey, damit sie auch mit Fokus in einem Kind wirken

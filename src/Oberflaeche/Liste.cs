@@ -444,6 +444,33 @@ public class KennzahlZeile : Control
     public void Leere() { for (int i = 0; i < titel.Length; i++) { wert[i] = ""; unter[i] = ""; } Invalidate(); }
     int Je { get { return Width >= UI.S(700) ? titel.Length : Width >= UI.S(420) ? (titel.Length + 1) / 2 : 2; } }
     public int ZeilenAnzahl { get { return (titel.Length + Je - 1) / Je; } }
+
+    // ab v4.14: Kacheln mit einer Kurve im Verlauf lassen sich anklicken (Waehlbar); die gewählte bekommt einen Rahmen in
+    // der Akzentfarbe (Hervorgehoben, -1 = keine). Was ein Klick bewirkt, entscheidet die Seite (KachelGeklickt).
+    public bool[] Waehlbar;
+    public int Hervorgehoben = -1;
+    public event Action<int> KachelGeklickt;
+    public bool IstWaehlbar(int i) { return Waehlbar != null && i >= 0 && i < Waehlbar.Length && Waehlbar[i]; }
+    public Rectangle Kachel(int i)
+    {
+        int je = Je, gap = UI.S(8), kh = UI.S(74);
+        int kw = (Width - (je - 1) * gap) / je;
+        return new Rectangle((i % je) * (kw + gap), (i / je) * (kh + gap), kw, kh);
+    }
+    public int KachelBei(Point p) { for (int i = 0; i < titel.Length; i++) if (Kachel(i).Contains(p)) return i; return -1; }
+    public void LoeseKachel(int i) { if (IstWaehlbar(i) && KachelGeklickt != null) KachelGeklickt(i); }
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+        if (e.Button == MouseButtons.Left) LoeseKachel(KachelBei(e.Location));
+    }
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        Cursor c = IstWaehlbar(KachelBei(e.Location)) ? Cursors.Hand : Cursors.Default;
+        if (Cursor != c) Cursor = c;
+    }
+
     protected override void OnResize(EventArgs e)
     {
         base.OnResize(e);
@@ -458,11 +485,12 @@ public class KennzahlZeile : Control
         using (Font ft = new Font("Segoe UI", 8.75f)) using (Font fw = new Font("Segoe UI", 15f, FontStyle.Bold)) using (Font fe = new Font("Segoe UI", 9f)) using (Font fu = new Font("Segoe UI", 8.25f))
             for (int i = 0; i < titel.Length; i++)
             {
-                Rectangle r = new Rectangle((i % je) * (kw + gap), (i / je) * (kh + gap), kw, kh);
-                using (GraphicsPath p = UI.Round(new RectangleF(r.X + 0.5f, r.Y + 0.5f, r.Width - 2, r.Height - 2), UI.SF(8)))
+                Rectangle r = Kachel(i);
+                bool hervor = i == Hervorgehoben;
+                using (GraphicsPath p = UI.Round(new RectangleF(r.X + 1f, r.Y + 1f, r.Width - 3, r.Height - 3), UI.SF(8)))
                 {
-                    using (SolidBrush b = new SolidBrush(ZeilenListe.KopfGrund)) g.FillPath(b, p);
-                    using (Pen pen = new Pen(UI.Line)) g.DrawPath(pen, p);
+                    using (SolidBrush b = new SolidBrush(hervor ? UI.Mix(ZeilenListe.KopfGrund, UI.Accent, 0.08) : ZeilenListe.KopfGrund)) g.FillPath(b, p);
+                    using (Pen pen = new Pen(hervor ? UI.Accent : UI.Line, hervor ? UI.SF(2f) : 1f)) g.DrawPath(pen, p);
                 }
                 int x = r.X + UI.S(12);
                 using (SolidBrush b = new SolidBrush(farbe[i])) g.FillRectangle(b, x, r.Y + UI.S(13), UI.S(8), UI.S(8));

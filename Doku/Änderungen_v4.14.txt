@@ -1,0 +1,104 @@
+﻿LEOS MINIBENCH 4.14: ÄNDERUNGEN
+===============================
+
+Auftrag vom 24.11.2026: die sechs Karten, die Leonardo im Planungsboard (Nextcloud-Deck, Board "PC DiagnoseBench")
+in die Liste "Für Claude" gelegt hat, Ideen 11, 15, 14, 12, 5 und 7 aus Doku\Ideen.md. Ereigniskanal,
+Datenbankformat, Format des Änderungsprotokolls, Vorlagen und Messwerte sind unverändert.
+
+
+1. WAS IST NEU IN DER UPDATE-RÜCKFRAGE (IDEE 11)
+  Bisher                      Die Rückfrage nannte nur die Versionsnummer. Den Text des Releases holte die
+                              Update-Prüfung schon (AvailableUpdateBody, auch im Update-Cache), zeigte ihn aber nicht.
+  Neu                         WasIstNeuText (DiagGui_Update.cs) macht aus dem Text des Releases Klartext: Die Zeilen
+                              "Download:" und "SHA-256 (LMB.exe)" entfallen, Überschriften (##), Fettschrift (**),
+                              Code (`), Verweise und Aufzählungszeichen werden entfernt, jeder Punkt bleibt eine Zeile.
+                              Mehr als 15 Zeilen werden gekürzt, mit Verweis auf das Release bei GitHub.
+                              UI.AskMitText zeigt die Frage wie bisher und darunter "Was ist neu in X:" in einem
+                              Textfeld mit Bildlauf (nur lesen, beide Farbschemata über UI.ThemeDialog). Ohne Text
+                              (Abfrage über die Weiterleitung statt die API) bleibt die Rückfrage wie bisher.
+
+
+2. DATENBANK MIT DER TASTATUR (IDEE 15)
+  Neu                         DbTaste (DiagGui_Vergleich.cs) bündelt die Tasten der Liste. F2 benennt um (wie bisher).
+                              Entf entfernt die angehakten Läufe, ohne Haken alle markierten; die Rückfrage mit der
+                              Liste der Läufe kommt wie beim Verweis "Lauf entfernen …", ohne Zustimmung geschieht
+                              nichts. Leertaste bei mehreren markierten Zeilen: Sind alle angehakt, entfallen die
+                              Haken, sonst werden alle gesetzt. Bei einer Zeile hakt die Liste wie bisher die Zeile
+                              mit dem Fokus an.
+  Gerätezeilen                Die offene Frage der Karte: Die Zeile eines Geräts steht beim Anhaken und Entfernen wie
+                              beim Klick auf ihr Kästchen für den neuesten Lauf dieses Geräts, nicht für alle Läufe.
+  Hinweis                     Der Hinweis der Liste nennt die Tasten.
+
+
+3. KENNZAHL HEBT IHRE KURVE HERVOR (IDEE 14)
+  Neu                         Ein Klick auf eine Kachel der Kennzahlzeile (Seite Sensoren live) hebt die zugehörige
+                              Kurve im Verlauf hervor: dicker und zuletzt gezeichnet, alle übrigen Kurven blasser
+                              (60 % zur Hintergrundfarbe). Die Kachel bekommt einen Rahmen in der Akzentfarbe. Ein
+                              zweiter Klick auf dieselbe Kachel hebt auf, ein Klick auf eine andere wechselt.
+  Lüfter                      Die Kachel Lüfter hat keine Kurve im Verlauf (Spalte 7 von SENSLEAD wird nicht
+                              gezeichnet) und ist nicht anklickbar; der Mauszeiger zeigt das.
+  Technik                     KennzahlZeile (Liste.cs) kennt Waehlbar, Hervorgehoben und das Ereignis KachelGeklickt,
+                              SensorChart (DiagGui_Steuerelemente.cs) die Eigenschaft HervorgehobeneSpalte und
+                              HatKurve. Die Zuordnung Kachel zu Spalte steht wie bisher in kpiSpalte.
+
+
+4. HINWEIS AM STARTKNOPF (IDEE 12)
+  Bisher                      Seit 4.11 verweigerte der Startknopf einen Lauf während einer Hintergrundarbeit
+                              (System-Umzug, winget, Update-Download) mit einem Hinweisfenster, sah vorher aber
+                              normal aus.
+  Neu                         HintergrundBeginnen und HintergrundEnde rechnen Fußzeile und Knopf der Live-Ansicht neu
+                              (HintergrundAnzeigen, bei Bedarf über BeginInvoke). Solange etwas läuft, steht in der
+                              Fußzeile z. B. "Die Sicherung für den System-Umzug läuft noch, Start danach möglich",
+                              der Startknopf ist ausgegraut und sein Hinweis nennt den Grund. "Live-Ansicht starten"
+                              ist ebenso ausgegraut, die Zeile unter den Kennzahlen nennt die Hintergrundarbeit. Das
+                              Hinweisfenster bleibt als Absicherung.
+
+
+5. IMPORT: DUPLIKAT ÜBER GERÄTEKENNUNG UND DATUM (IDEE 5)
+  Bisher                      Doppelt war ein Lauf nur bei gleichem Computernamen und Datum. Nach einer Umbenennung
+                              des PCs oder aus einer Sicherung unter anderem Namen kam er ein zweites Mal hinein.
+  Neu                         Get-DbDuplikatMeldung (Kern\Datenbank.ps1) für alle Importwege (Ordner mit
+                              Datenbank.json, .minibench und .zip über Import-ArchiveRun, einzelne .json, Berichte
+                              älterer Versionen): gleiches Datum und gleiche Gerätekennung (Geraet.Id, ältere
+                              Einträge GeraetId, gelesen mit Get-ImportGeraetId) gelten als doppelt, auch bei
+                              anderem Namen; die Meldung nennt dann beide Namen. Ohne Kennung wie bisher Name und
+                              Datum. Get-DbEntries lieferte die Kennung schon.
+
+
+6. VORABPRÜFUNG IN VEROEFFENTLICHEN.PS1 (IDEE 7)
+  Neu                         Vor dem ersten Push prüft das Skript zusätzlich: Die SHA-256 von Aktueller
+                              Build\LeosMinibench.ps1 passt zur Zeile in Stand.txt (Get-StandSha), und das in LMB.exe
+                              als Ressource "LeosMinibench.ps1" eingebettete Skript hat dieselbe Prüfsumme
+                              (Get-ExeSkriptSha; die exe wird aus ihren Bytes geladen und bleibt nicht gesperrt).
+                              Passt etwas nicht, bricht es mit "neu bauen (Bauen.cmd)" ab. Gegen den Build von 4.13
+                              geprüft: exe, Skript und eingebettetes Skript stimmen überein.
+
+
+GEFUNDEN UND BEHOBEN
+  UpdateSummary (DiagGui_Ablauf.cs) brach ab, solange chkOptRestore fehlte, also ohne Katalog der Optimierung
+  (Skript ohne Modul Optimierung, so im Selbsttest). Fußzeile und Startknopf blieben dann bei "Ablauf wählen". Die
+  Fußzeile braucht das Feld nicht; die Bedingung ist entfernt. Aufgefallen beim neuen Selbsttest Hintergrund.Startknopf.
+  Außerhalb des Projekts: Das Werkzeug für das Planungsboard (Agentenraum\_nextcloud-deck\deck.ps1) meldete "Keine
+  Aufträge", obwohl Karten bereitlagen. Invoke-RestMethod gibt unter Windows PowerShell 5.1 ein JSON-Feld als ein
+  einziges Objekt aus, der Filter auf archivierte Boards verwarf es ganz. Die Antwort wird jetzt über eine Variable
+  in Einzelobjekte zerlegt (dieselbe Einzelobjekt-Falle wie Idee 4).
+
+
+GRENZEN
+  Aussehen von Rückfrage mit Bildlauf, Kachelrahmen, blassen Kurven und ausgegrautem Startknopf ist nur im Selbsttest
+  ohne Anzeige geprüft (Zustände, Zeichnen ohne Fehler), nicht auf dem Bildschirm; die Bildlaufleiste des Textfelds
+  bleibt im dunklen Schema die von Windows.
+  Die Kacheln reagieren nur auf die Maus, nicht auf die Tastatur. Die Hervorhebung gilt nur für die Seite Sensoren
+  live, nicht für die Kurven des Lasttests.
+  Die Update-Rückfrage zeigt nur den Text des neuesten Releases; wer mehrere Versionen überspringt, sieht die
+  Zwischenversionen nicht.
+  Entf auf einer markierten Referenzzeile entfernt sie wie bisher der Verweis "Lauf entfernen …" (ins Archiv).
+
+
+UMSTIEG
+  Nichts zu tun.
+
+
+QUELLEN
+  Karten 109, 111, 115, 116, 118 und 119 im Board "PC DiagnoseBench"; Doku\Ideen.md, Abschnitte Robustheit, Bau,
+  Test, Release und Bedienung.

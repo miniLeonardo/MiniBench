@@ -5,9 +5,16 @@ Seit 4.07 steht hier nur noch, was für die nächste Version gebraucht wird: Sta
 abgelehnte Vorschläge, Fallstricke. Was eine Version geändert hat, steht in CHANGELOG.md (kurz), in
 Doku\Versionshistorie.txt und in Doku\Änderungen_vX.Y.txt (ausführlich); es wird hier nicht wiederholt.
 
-## Stand: Version 4.13 (21.11.2026)
-Release-Commit "Release v4.13: Praxistest vom 20.11.2026: Sensorfehler im Grafiktreiber beendet den Lauf nicht mehr",
-unter Windows (ULB-PC10039) mit Bauen.cmd gebaut.
+## Stand: Version 4.14 (24.11.2026)
+Release-Commit "Release v4.14: Was ist neu beim Update, Tasten in der Datenbank, hervorgehobene Kurven", unter Windows
+(ULB-PC10039) mit Bauen.cmd gebaut.
+
+Inhalt von 4.14 (Doku\Änderungen_v4.14.txt): die sechs Karten aus der Deck-Liste "Für Claude" (Ideen 5, 7, 11, 12, 14,
+15). Update-Rückfrage mit "Was ist neu" (UI.AskMitText), Entf und Leertaste in der Datenbank (DbTaste), Kennzahlkachel
+hebt ihre Kurve hervor (SensorChart.HervorgehobeneSpalte), Hintergrundsperre sichtbar an Startknopf und Live-Ansicht
+(HintergrundAnzeigen), Import-Duplikat über Gerätekennung (Get-DbDuplikatMeldung), Veroeffentlichen.ps1 prüft Skript
+und eingebettetes Skript. Planung: Das Deck liest und ändert Agentenraum\_nextcloud-deck\deck.ps1 (REST, Benutzer
+claude), kein plink mehr nötig.
 
 Inhalt von 4.13 (Doku\Änderungen_v4.13.txt): Eine Zugriffsverletzung im AMD-Treiber (LibreHardwareMonitor,
 ADL2_Adapter_FrameMetrics_Get) beendete den Arbeitsprozess; jetzt fängt DiagSensors.SafeUpdate sie ab und sperrt das
@@ -60,7 +67,8 @@ Neue Seite: eigene Datei DiagGui_<Name>.cs ohne using-Zeilen, in Oberflaeche.ps1
 (Get-GuiText in tests\Hilfen.ps1), nicht in einer bestimmten Datei.
 
 ## Versionen bisher (je eine Zeile, neueste zuerst)
-4.13 Sensorfehler im Grafiktreiber beendet den Lauf nicht mehr, Absturzanalyse erkennt Prozessabstürze.
+4.14 Was ist neu beim Update, Tasten in der Datenbank, hervorgehobene Kurven, Hintergrundsperre sichtbar.
+4.13 Sensorfehler im Grafiktreiber beendet den Lauf nicht mehr, Absturzanalyse erkennt Prozessabstürze (79709e2).
 4.12 Praxistest 4.11: kürzere Läufe, PawnIO still, eigener Schritt für Windows.old (c4a9829). 4.11 Sicherheit und Rücknahme: Befunde der Gesamtprüfung behoben (594bd08, nicht veröffentlicht). 4.10 Sensoren, Datenbank und Änderungen im Stil der übrigen Seiten (05ca12f).
 4.09 Lasttest und System-Umzug im Stil der übrigen Seiten, Schalter ohne Beschnitt (34f5ef3).
 4.08 Ergebnis als Seite, Benchmark und Diagnose im Stil der übrigen Seiten (c9a16bb). 4.07 Eine Datei je Seite,
@@ -119,6 +127,9 @@ Weitere offene Befunde aus der Gesamtprüfung vom 19.11.2026: Doku\Pruefung_4.10
     Befund "Sensoren von ... abgeschaltet" falls der Treiberfehler wieder auftritt. Neuere LibreHardwareMonitor-Version
     prüfen, ob sie FrameMetrics auf RDNA 4 meidet.
 
+18. 4.14 von Hand bestätigen: Update-Rückfrage mit "Was ist neu" (beim nächsten Update von 4.14 auf 4.15, beide
+    Farbschemata, Bildlauf), Entf und Leertaste in der Datenbank, Kachelrahmen und blasse Kurven auf der Seite Sensoren
+    live, ausgegrauter Startknopf während einer Umzugssicherung.
 ## Abgelehnte Vorschläge (Entscheidung Leonardo, 10.11.2026): nicht umsetzen und nicht erneut vorschlagen
 GitHub Actions bzw. CI; Diagnosepaket (Logs als ZIP); Szenario-Kacheln auf der Startseite; Vorher-Nachher-Messung;
 Befehlspalette (Strg+K); Software aktualisieren über winget upgrade; Erweiterungen des Umzugs (Treiber exportieren,
@@ -178,9 +189,14 @@ Schnelltest für Peripherie, sicheres Löschen, Testmatrix-Dateien.
 22. Aufrufe in native Treiber (LibreHardwareMonitor, P/Invoke) können eine AccessViolationException auslösen, die ein
     gewöhnliches catch in .NET 4 nicht erreicht: Der Prozess endet mit 0xE0434352. Solche Aufrufe in eine Methode mit
     [HandleProcessCorruptedStateExceptions, SecurityCritical] legen (Muster DiagSensors.SafeUpdate).
+23. Tip() bricht lange Hinweise um: Im Selbsttest Hinweistexte mit StartsWith oder Contains prüfen, nicht mit ==.
+24. Der Selbsttest startet ohne Skript, die Seite Optimierung hat dann keinen Katalog (chkOptRestore und ihre
+    Einträge fehlen). Gemeinsamer Code wie UpdateSummary darf solche Felder nicht voraussetzen (bis 4.13 blieb die
+    Fußzeile dort leer).
 
 ## Letzter Commit
-Release-Commit v4.13 (lokal von Bauen.cmd, Tag und Übertragung mit Veroeffentlichen.ps1). Vorgänger:
+Release-Commit v4.14 (lokal von Bauen.cmd, Tag und Übertragung mit Veroeffentlichen.ps1). Vorgänger:
+79709e2 Release v4.13: Praxistest vom 20.11.2026: Sensorfehler im Grafiktreiber beendet den Lauf nicht mehr,
 c4a9829 Release v4.12: Praxistest 4.11: kürzere Läufe, PawnIO still, eigener Schritt für Windows.old,
 594bd08 Release v4.11: Sicherheit und Rücknahme: Befunde der Gesamtprüfung behoben (nicht veröffentlicht),
 05ca12f Release v4.10: Sensoren, Datenbank und Änderungen im Stil der übrigen Seiten, Protokoll aufräumen

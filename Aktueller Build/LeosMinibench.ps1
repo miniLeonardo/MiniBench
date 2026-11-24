@@ -249,7 +249,7 @@ if (-not $isAdmin -and -not $Vergleich -and -not $ImportOrdner -and -not $Export
 }
 #endregion
 
-$ScriptVersion = '4.13'
+$ScriptVersion = '4.14'
 $AppName       = 'Leos Minibench'
 # Eingebettete Referenzprofile für Leos Minibench (v3.0)
 $script:EmbeddedReferences = @{
@@ -6750,7 +6750,7 @@ public partial class DiagGui : Form
 #pragma warning disable 414
     int nK, nW, nI, cntK, cntW, cntI, testsOk, benchWarn, benchCount;
     Dictionary<string, ListViewItem> benchHeads = new Dictionary<string, ListViewItem>();
-    List<DbEntry> db = new List<DbEntry>();
+    internal List<DbEntry> db = new List<DbEntry>();
     Font wsBold;
 
     Panel setupView, runView, content, head, body, contentHost, mainArea;
@@ -6866,12 +6866,12 @@ public partial class DiagGui : Form
     DateTime liveExitSeen;
     internal bool liveRunning, liveStopping;
     DateTime liveStopAt;
-    Button btnLive, btnSensTools, btnSensSave;
+    internal Button btnLive; Button btnSensTools, btnSensSave;
     internal ComboBox cmbDriver;
     int psuWattage = 650; bool psuEingegeben;
     string psuRating = "80 PLUS Bronze";
-    Label lblSensInfo;
-    SensorChart chartLive, chartRun;
+    internal Label lblSensInfo;
+    internal SensorChart chartLive, chartRun;
     internal ZeilenListe lvSens;
     Dictionary<int, double[]> sensMinMax = new Dictionary<int, double[]>();
     Dictionary<int, string> sensUnit = new Dictionary<int, string>();
@@ -6928,11 +6928,11 @@ public partial class DiagGui : Form
     internal ZeilenListe lvChg;
     internal Button btnUndo;
     // Fuß
-    Label lblSel;
+    internal Label lblSel;
     LinkLabel lnkAblage;
     Action footLayout = delegate { };
     CheckBox chkAnon;
-    Button btnStart;
+    internal Button btnStart;
     // ab v2.7: Datenpflege beim Start (vom Skript gesetzt) und Schaltfläche Aufräumen auf der Seite Vergleichsdatenbank
     public static string DatenpflegeInfo = "";
     Label lblDbClean;
@@ -7519,7 +7519,7 @@ public partial class DiagGui : Form
         }
         Tip(chkRestorePoint, "Legt vor den Reparaturen einen Systemwiederherstellungspunkt an. Er ist der Weg zurück für alle Eingriffe dieses Laufs.");
         // Sensoren
-        Tip(btnLive, "Öffnet die Sensoren und zeigt die Werte laufend an. Während eines Laufs ist die Live-Ansicht aus.");
+        Tip(btnLive, LiveTipp);
         Tip(btnSensTools, "Holt LibreHardwareMonitor und das PawnIO-Setup aus den offiziellen Releases und prüft sie mit festen SHA-256-Werten. Abgelegt wird nur im Tools-Ordner, installiert wird nichts.");
         Tip(btnSensSave, "Speichert alle Werte der Live-Ansicht als CSV unter Berichte\\Sensoren.");
         Tip(cmbDriver, "PawnIO ist der Treiber, den LibreHardwareMonitor für CPU-Temperatur, CPU-Takt, CPU-Leistung und Mainboard-Lüfter braucht. Standardmäßig aktiv für alle Messungen. Ein bereits installierter PawnIO bleibt immer unverändert.");
@@ -8941,7 +8941,9 @@ public partial class DiagGui
 
         string msg = "Update auf Version " + AvailableUpdateVersion + " jetzt herunterladen und LMB.exe austauschen?\r\n\r\n" +
                      "Die Datei wird vor dem Austausch mit der SHA-256-Prüfsumme des Releases verglichen. Leos Minibench schließt sich dafür. Die bisherige Programmdatei und ein Skript daneben (LeosMinibench.ps1) werden im Datenordner unter Archiv gesichert, danach startet die neue Version.";
-        if (!UI.Ask(msg, "Minibench Update", this))
+        // ab v4.14: was die neue Version bringt (Text des Releases); ohne Text bleibt die Rückfrage wie bisher
+        string neu = WasIstNeuText(AvailableUpdateBody, AvailableUpdateVersion);
+        if (!UI.AskMitText(msg, "Was ist neu in " + AvailableUpdateVersion.TrimStart('v', 'V') + ":", neu, "Minibench Update", this))
             return;
         if (running || HintergrundBelegt("Das Update")) return;
 
@@ -9027,6 +9029,38 @@ public partial class DiagGui
         if (updateWc == null) return false;
         if (UI.Ask("Das Update wird gerade heruntergeladen. Herunterladen abbrechen?", "Minibench-Update", this) && hintergrund != null) HintergrundBeenden();
         return true;
+    }
+
+    // ab v4.14: "Was ist neu" für die Update-Rückfrage aus dem Text des Releases. Das ist der Abschnitt aus CHANGELOG.md,
+    // den Veroeffentlichen.ps1 schreibt, gefolgt von der Download- und der Prüfsummenzeile; beide entfallen hier.
+    // Überschriften (##), Fettschrift (**), Code (`), Verweise und Aufzählungszeichen werden Klartext, jeder Punkt
+    // bleibt eine eigene Zeile. Mehr als WasIstNeuZeilen Zeilen werden gekürzt, mit Verweis auf das Release.
+    public const int WasIstNeuZeilen = 15;
+    public static string WasIstNeuText(string body, string tag)
+    {
+        if (String.IsNullOrEmpty(body)) return "";
+        System.Text.RegularExpressions.RegexOptions io = System.Text.RegularExpressions.RegexOptions.IgnoreCase;
+        List<string> z = new List<string>();
+        int inhalt = 0;
+        bool gekuerzt = false;
+        foreach (string roh in body.Replace("\r\n", "\n").Split('\n'))
+        {
+            string l = roh.Trim();
+            if (System.Text.RegularExpressions.Regex.IsMatch(l, @"^[*_]*Download:", io) || System.Text.RegularExpressions.Regex.IsMatch(l, @"SHA-?256\s*\(LMB\.exe\)", io)) continue;
+            if (l.Length == 0) { if (z.Count > 0 && z[z.Count - 1].Length > 0) z.Add(""); continue; }
+            if (inhalt >= WasIstNeuZeilen) { gekuerzt = true; break; }
+            l = System.Text.RegularExpressions.Regex.Replace(l, @"^#+\s*", "");
+            l = System.Text.RegularExpressions.Regex.Replace(l, @"^[*\-+]\s+", "");
+            l = System.Text.RegularExpressions.Regex.Replace(l, @"\[([^\]]+)\]\([^)]*\)", "$1");
+            l = l.Replace("**", "").Replace("__", "").Replace("`", "").Trim();
+            if (l.Length == 0) continue;
+            z.Add(l); inhalt++;
+        }
+        while (z.Count > 0 && z[z.Count - 1].Length == 0) z.RemoveAt(z.Count - 1);
+        if (z.Count == 0) return "";
+        string t = String.Join("\r\n", z.ToArray());
+        if (gekuerzt) t += "\r\n\r\nWeitere Änderungen stehen im Release auf https://github.com/" + UpdateRepo + "/releases" + (String.IsNullOrEmpty(tag) ? "" : "/tag/" + tag) + ".";
+        return t;
     }
 
     public static string UpdateFortschrittText(long geladen, long gesamt)
@@ -13987,6 +14021,31 @@ public partial class DiagGui
         }
     }
 
+    internal const string LiveTipp = "Startet oder beendet die laufende Anzeige aller Sensoren. Während eines Laufs ist die Live-Ansicht aus. Beim Beenden wird ein vorübergehend installierter Treiber wieder entfernt.";
+
+    // ab v4.14: Solange eine Hintergrundarbeit läuft, ist "Live-Ansicht starten" ausgegraut und nennt den Grund
+    bool liveSperreGezeigt;
+    internal void UpdateLiveKnopf()
+    {
+        if (btnLive == null || liveRunning) return;
+        string s = HintergrundSperre("Die Live-Ansicht");
+        btnLive.Enabled = s.Length == 0;
+        Tip(btnLive, s.Length > 0 ? s : LiveTipp);
+        if (lblSensInfo == null) return;
+        if (s.Length > 0) { lblSensInfo.Text = HintergrundKurz() + "."; liveSperreGezeigt = true; }
+        else if (liveSperreGezeigt) { lblSensInfo.Text = "Live-Ansicht nicht gestartet."; liveSperreGezeigt = false; }
+    }
+
+    // ab v4.14: Kachel i hebt die passende Kurve hervor; derselbe Klick noch einmal (oder eine Kachel ohne Kurve) hebt auf
+    internal void WaehleKennzahl(int i)
+    {
+        if (sensKpi == null || chartLive == null) return;
+        int spalte = sensKpi.IstWaehlbar(i) ? kpiSpalte[i] : -1;
+        if (spalte < 0 || chartLive.HervorgehobeneSpalte == spalte) { chartLive.HervorgehobeneSpalte = -1; sensKpi.Hervorgehoben = -1; }
+        else { chartLive.HervorgehobeneSpalte = spalte; sensKpi.Hervorgehoben = i; }
+        chartLive.Invalidate(); sensKpi.Invalidate();
+    }
+
     static string DauerText(double sek)
     {
         if (double.IsNaN(sek) || sek < 0) return "0 s";
@@ -14069,11 +14128,15 @@ public partial class DiagGui
         sensSeite = NeueModulSeite(f);
         btnLive = UI.Primary("Live-Ansicht starten"); btnLive.Margin = new Padding(0); btnLive.Padding = new Padding(UI.S(14), UI.S(4), UI.S(14), UI.S(4)); btnLive.Font = new Font("Segoe UI Semibold", 9.75f);
         btnLive.Click += delegate { if (liveRunning) StopLive(); else StartLive(); };
-        Tip(btnLive, "Startet oder beendet die laufende Anzeige aller Sensoren. Beim Beenden wird ein vorübergehend installierter Treiber wieder entfernt.");
+        Tip(btnLive, LiveTipp);
         sensSeite.KopfKnopf(btnLive);
 
         sensKpi = new KennzahlZeile(kpiTitel, kpiEinheit, new Color[] { SensorChart.CpuFarbe, SensorChart.CpuFarbe, SensorChart.CpuFarbe, SensorChart.GpuFarbe, SensorChart.GpuFarbe, Color.FromArgb(156, 163, 175) });
-        Tip(sensKpi, "Leitwerte der Live-Ansicht mit dem kleinsten und größten Wert seit dem Start. Ohne Messwert steht \"kein Wert\".");
+        // ab v4.14: Kacheln mit einer Kurve im Verlauf heben sie per Klick hervor (Lüfter hat keine Kurve)
+        sensKpi.Waehlbar = new bool[kpiSpalte.Length];
+        for (int i = 0; i < kpiSpalte.Length; i++) sensKpi.Waehlbar[i] = SensorChart.HatKurve(kpiSpalte[i]);
+        sensKpi.KachelGeklickt += WaehleKennzahl;
+        Tip(sensKpi, "Leitwerte der Live-Ansicht mit dem kleinsten und größten Wert seit dem Start. Ohne Messwert steht \"kein Wert\". Ein Klick auf eine Kachel hebt ihre Kurve im Verlauf hervor, ein zweiter Klick nimmt das zurück.");
         f.Controls.Add(sensKpi); sensSeite.Voll.Add(sensKpi);
         LeereKennzahlen();
         lblSensInfo = Lbl("Live-Ansicht nicht gestartet.", UI.SchriftHinweis, false, UI.Muted); lblSensInfo.Margin = new Padding(0, 0, 0, UI.S(UI.Abstand2));
@@ -14232,7 +14295,7 @@ public partial class DiagGui
             liveRunning = false; liveStopping = false; liveTimer.Stop();
             btnLive.Enabled = true; btnLive.Text = "Live-Ansicht starten"; btnSensTools.Enabled = true; btnSensSave.Enabled = sensRows.Count > 0;
             if (killed || PawnMarkerExists) CleanupDriver();
-            UpdateSensTools(); UpdateSensStand();
+            UpdateSensTools(); UpdateSensStand(); UpdateLiveKnopf();
             ReloadDb();
         }
     }
@@ -14687,10 +14750,8 @@ public partial class DiagGui
         lvDb.AufklappGeklickt += delegate(ListenZeile z) { ToggleGroup(((DbZeile)z).Key); };
         lvDb.Geoeffnet += delegate(ListenZeile z) { DbZeile d = (DbZeile)z; if (d.E != null) OpenEntry(d.E); };
         lvDb.MarkierungGeaendert += delegate { UpdateDbButtons(); };
-        lvDb.KeyDown += delegate(object sender, KeyEventArgs e) {
-            if (e.KeyCode == Keys.F2 && lvDb.Markiert.Count == 1) { RenameSelectedEntry(); e.Handled = true; }
-        };
-        Tip(lvDb, "Datenbank aller gespeicherten Systeme. Ein Klick auf die Spaltenköpfe sortiert nach Datum, Gesamtwertung oder Messwert; nach CPU, GPU und RAM sortiert das Kontextmenü.");
+        lvDb.KeyDown += delegate(object sender, KeyEventArgs e) { if (DbTaste(e.KeyData)) e.Handled = true; };
+        Tip(lvDb, "Datenbank aller gespeicherten Systeme. Ein Klick auf die Spaltenköpfe sortiert nach Datum, Gesamtwertung oder Messwert; nach CPU, GPU und RAM sortiert das Kontextmenü. Tasten: Leertaste hakt die markierten Läufe an oder ab, Entf entfernt sie (mit Rückfrage), F2 benennt um.");
 
         ContextMenu cm = new ContextMenu();
         MenuItem miDashboard = new MenuItem("Im Dashboard vergleichen", delegate { OpenDashboard(); });
@@ -15389,12 +15450,36 @@ public partial class DiagGui
         }
     }
 
-    // ab 3.54: Eintrag und Berichtsordner ins Archiv (Minibench-Daten\Archiv\Entfernt), über den Arbeitsprozess
-    // ab 3.54: Eintrag und Berichtsordner ins Archiv (Minibench-Daten\Archiv\Entfernt), über den Arbeitsprozess
-    void DeleteSelected()
+    // ab v4.14: Tasten der Datenbankliste. F2 benennt um (wie bisher). Entf entfernt die angehakten Läufe, ohne Haken die
+    // markierten (immer mit Rückfrage). Leertaste bei mehreren markierten Zeilen: Sind alle angehakt, entfallen die Haken,
+    // sonst werden alle gesetzt; bei einer Zeile hakt die Liste selbst die Zeile mit dem Fokus an (Liste.cs). Die Zeile
+    // eines Geräts steht wie beim Klick auf ihr Kästchen für seinen neuesten Lauf.
+    internal bool DbTaste(Keys k)
+    {
+        if (lvDb == null) return false;
+        if (k == Keys.F2 && lvDb.Markiert.Count == 1) { RenameSelectedEntry(); return true; }
+        if (k == Keys.Delete && (lvDb.Markiert.Count > 0 || CheckedEntries().Count > 0)) { DeleteSelected(true); return true; }
+        if (k == Keys.Space && lvDb.Markiert.Count > 1)
+        {
+            List<string> pfade = new List<string>();
+            foreach (DbEntry e in DbMarkierte()) if (!String.IsNullOrEmpty(e.Path) && !pfade.Contains(e.Path)) pfade.Add(e.Path);
+            if (pfade.Count == 0) return true;
+            bool alle = true;
+            foreach (string p in pfade) if (!dbHaken.Contains(p)) { alle = false; break; }
+            foreach (string p in pfade) { if (alle) dbHaken.Remove(p); else dbHaken.Add(p); }
+            FillDbList();
+            return true;
+        }
+        return false;
+    }
+
+    // ab 3.54: Eintrag und Berichtsordner ins Archiv (Minibench-Daten\Archiv\Entfernt), über den Arbeitsprozess.
+    // ab v4.14 mit markierteOhneHaken (Taste Entf): ohne angehakte Läufe gelten alle markierten, nicht nur genau einer.
+    void DeleteSelected(bool markierteOhneHaken = false)
     {
         List<DbEntry> sel = CheckedEntries();
-        if (sel.Count == 0 && DbMarkierte().Count == 1) sel.Add(DbMarkierte()[0]);
+        if (sel.Count == 0 && (DbMarkierte().Count == 1 || markierteOhneHaken))
+            foreach (DbEntry m in DbMarkierte()) if (!String.IsNullOrEmpty(m.Path) && !sel.Contains(m)) sel.Add(m);
         if (sel.Count == 0) return;
         StringBuilder sb = new StringBuilder();
         foreach (DbEntry e in sel) sb.AppendLine("·  " + e.DisplayName + "  " + e.Datum);
@@ -16948,12 +17033,13 @@ public partial class DiagGui
         return (min / 60) + " Std." + (min % 60 > 0 ? " " + (min % 60) + " Min." : "");
     }
 
-    void UpdateSummary()
+    internal void UpdateSummary()
     {
         UpdateDiagSummary();
         UpdateBenchSummary();
         UpdateLoadTotal();
-        if (lblSel == null || btnStart == null || diagChk == null || benchChk == null || repChk == null || chkLCpu == null || chkOptRestore == null) return;
+        // ab v4.14 ohne chkOptRestore: Die Fußzeile braucht es nicht, und ohne Katalog der Optimierung blieb sie sonst leer
+        if (lblSel == null || btnStart == null || diagChk == null || benchChk == null || repChk == null || chkLCpu == null) return;
         List<string> m = SelectedModules();
         for (int i = 0; i < 5 && (i + 1) < nav.Count; i++) { string h = nav[i + 1].Checked ? "ca. " + MinText(ModuleMinutes(i)) : ""; if (nav[i + 1].Hint != h) { nav[i + 1].Hint = h; nav[i + 1].Invalidate(); } }
         SetText(btnStart, StartButtonText(m));
@@ -16961,6 +17047,14 @@ public partial class DiagGui
         {
             lblSel.Text = "Noch kein Ablauf gewählt"; lblSel.ForeColor = UI.Muted; btnStart.Enabled = false;
             Tip(btnStart, "Erst eine Aufgabe wählen oder links ein Modul anhaken.");
+            return;
+        }
+        // ab v4.14: Hintergrundarbeit (System-Umzug, winget, Update) sperrt den Start sichtbar, nicht erst nach dem Klick
+        string sperre = HintergrundSperre("Der Lauf");
+        if (sperre.Length > 0)
+        {
+            lblSel.Text = HintergrundKurz(); lblSel.ForeColor = UI.Muted; btnStart.Enabled = false;
+            Tip(btnStart, sperre);
             return;
         }
         int min = EstimateMinutes();
@@ -18120,10 +18214,28 @@ public partial class DiagGui
     {
         if (hintergrund != null) return null;
         hintergrund = new HintergrundArbeit(beschreibung);
+        HintergrundAnzeigen();
         return hintergrund;
     }
 
-    internal void HintergrundEnde(HintergrundArbeit h) { if (h != null && hintergrund == h) hintergrund = null; }
+    internal void HintergrundEnde(HintergrundArbeit h) { if (h != null && hintergrund == h) { hintergrund = null; HintergrundAnzeigen(); } }
+
+    // ab v4.14: Die Sperre zeigt sich vor dem Klick. Fußzeile neben dem Startknopf und Knopf der Live-Ansicht nennen die
+    // laufende Hintergrundarbeit, beide Knöpfe sind solange ausgegraut (bis v4.13 kam der Hinweis erst nach dem Klick).
+    internal void HintergrundAnzeigen()
+    {
+        if (IsDisposed) return;
+        if (InvokeRequired) { try { BeginInvoke(new MethodInvoker(HintergrundAnzeigen)); } catch { } return; }
+        UpdateSummary();
+        UpdateLiveKnopf();
+    }
+
+    // Kurzform für die Fußzeile, leer ohne Hintergrundarbeit
+    internal string HintergrundKurz()
+    {
+        HintergrundArbeit h = hintergrund;
+        return h == null ? "" : h.Beschreibung + " läuft noch, Start danach möglich";
+    }
 
     // Bricht die laufende Hintergrundarbeit ab: Abbruch der Aufgabe (z. B. Download) und Arbeitsprozess samt Kindern beenden
     internal void HintergrundBeenden()
@@ -19520,6 +19632,33 @@ public class KennzahlZeile : Control
     public void Leere() { for (int i = 0; i < titel.Length; i++) { wert[i] = ""; unter[i] = ""; } Invalidate(); }
     int Je { get { return Width >= UI.S(700) ? titel.Length : Width >= UI.S(420) ? (titel.Length + 1) / 2 : 2; } }
     public int ZeilenAnzahl { get { return (titel.Length + Je - 1) / Je; } }
+
+    // ab v4.14: Kacheln mit einer Kurve im Verlauf lassen sich anklicken (Waehlbar); die gewählte bekommt einen Rahmen in
+    // der Akzentfarbe (Hervorgehoben, -1 = keine). Was ein Klick bewirkt, entscheidet die Seite (KachelGeklickt).
+    public bool[] Waehlbar;
+    public int Hervorgehoben = -1;
+    public event Action<int> KachelGeklickt;
+    public bool IstWaehlbar(int i) { return Waehlbar != null && i >= 0 && i < Waehlbar.Length && Waehlbar[i]; }
+    public Rectangle Kachel(int i)
+    {
+        int je = Je, gap = UI.S(8), kh = UI.S(74);
+        int kw = (Width - (je - 1) * gap) / je;
+        return new Rectangle((i % je) * (kw + gap), (i / je) * (kh + gap), kw, kh);
+    }
+    public int KachelBei(Point p) { for (int i = 0; i < titel.Length; i++) if (Kachel(i).Contains(p)) return i; return -1; }
+    public void LoeseKachel(int i) { if (IstWaehlbar(i) && KachelGeklickt != null) KachelGeklickt(i); }
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+        if (e.Button == MouseButtons.Left) LoeseKachel(KachelBei(e.Location));
+    }
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        Cursor c = IstWaehlbar(KachelBei(e.Location)) ? Cursors.Hand : Cursors.Default;
+        if (Cursor != c) Cursor = c;
+    }
+
     protected override void OnResize(EventArgs e)
     {
         base.OnResize(e);
@@ -19534,11 +19673,12 @@ public class KennzahlZeile : Control
         using (Font ft = new Font("Segoe UI", 8.75f)) using (Font fw = new Font("Segoe UI", 15f, FontStyle.Bold)) using (Font fe = new Font("Segoe UI", 9f)) using (Font fu = new Font("Segoe UI", 8.25f))
             for (int i = 0; i < titel.Length; i++)
             {
-                Rectangle r = new Rectangle((i % je) * (kw + gap), (i / je) * (kh + gap), kw, kh);
-                using (GraphicsPath p = UI.Round(new RectangleF(r.X + 0.5f, r.Y + 0.5f, r.Width - 2, r.Height - 2), UI.SF(8)))
+                Rectangle r = Kachel(i);
+                bool hervor = i == Hervorgehoben;
+                using (GraphicsPath p = UI.Round(new RectangleF(r.X + 1f, r.Y + 1f, r.Width - 3, r.Height - 3), UI.SF(8)))
                 {
-                    using (SolidBrush b = new SolidBrush(ZeilenListe.KopfGrund)) g.FillPath(b, p);
-                    using (Pen pen = new Pen(UI.Line)) g.DrawPath(pen, p);
+                    using (SolidBrush b = new SolidBrush(hervor ? UI.Mix(ZeilenListe.KopfGrund, UI.Accent, 0.08) : ZeilenListe.KopfGrund)) g.FillPath(b, p);
+                    using (Pen pen = new Pen(hervor ? UI.Accent : UI.Line, hervor ? UI.SF(2f) : 1f)) g.DrawPath(pen, p);
                 }
                 int x = r.X + UI.S(12);
                 using (SolidBrush b = new SolidBrush(farbe[i])) g.FillRectangle(b, x, r.Y + UI.S(13), UI.S(8), UI.S(8));
@@ -20197,6 +20337,77 @@ public static class UI
     public static bool Ask(IWin32Window owner, string text, string title)
     {
         return Ask(text, title, owner);
+    }
+
+    // ab v4.14: Rückfrage mit einem längeren Zusatztext in einem Feld mit Bildlauf (Update: "Was ist neu"). Ohne
+    // Zusatztext wie Ask. Im Selbsttest steht "Titel|Frage", danach eine Leerzeile und der Zusatztext im Protokoll.
+    public static bool AskMitText(string text, string zusatzTitel, string zusatz, string title, IWin32Window owner)
+    {
+        if (String.IsNullOrEmpty(zusatz)) return Ask(text, title, owner);
+        if (Meldungsprotokoll != null) { Meldungsprotokoll.Add((title ?? "") + "|" + (text ?? "") + "\r\n\r\n" + (zusatzTitel ?? "") + "\r\n" + zusatz); return MeldungsAntwort; }
+        using (Form f = new Form())
+        {
+            f.Text = title ?? "Frage";
+            f.FormBorderStyle = FormBorderStyle.FixedDialog;
+            f.MaximizeBox = false;
+            f.MinimizeBox = false;
+            f.ShowInTaskbar = false;
+            f.StartPosition = owner != null ? FormStartPosition.CenterParent : FormStartPosition.CenterScreen;
+
+            int w = S(520);
+            Font mf = new Font("Segoe UI", 9.5f);
+            Font tf = new Font("Segoe UI Semibold", 9.5f);
+            Size textSize = TextRenderer.MeasureText(text ?? "", mf, new Size(w - S(40), int.MaxValue), TextFormatFlags.WordBreak);
+            int textH = Math.Max(S(40), Math.Min(S(240), textSize.Height + S(10)));
+            int titelH = TextRenderer.MeasureText(zusatzTitel ?? "", tf).Height;
+            int feldH = S(220);
+
+            Label lbl = new Label();
+            lbl.Text = text ?? "";
+            lbl.Font = mf;
+            lbl.Location = new Point(S(20), S(16));
+            lbl.Size = new Size(w - S(40), textH);
+
+            Label lblTitel = new Label();
+            lblTitel.Text = zusatzTitel ?? "";
+            lblTitel.Font = tf;
+            lblTitel.AutoSize = false;
+            lblTitel.Location = new Point(S(20), lbl.Bottom + S(6));
+            lblTitel.Size = new Size(w - S(40), titelH);
+
+            TextBox feld = new TextBox();
+            feld.Multiline = true;
+            feld.ReadOnly = true;
+            feld.WordWrap = true;
+            feld.ScrollBars = ScrollBars.Vertical;
+            feld.BorderStyle = BorderStyle.FixedSingle;
+            feld.Font = mf;
+            feld.Text = zusatz;
+            feld.TabStop = false;
+            feld.Location = new Point(S(20), lblTitel.Bottom + S(4));
+            feld.Size = new Size(w - S(40), feldH);
+
+            Button btnOk = Primary("Ja");
+            btnOk.DialogResult = DialogResult.Yes;
+            Button btnNo = Secondary("Nein");
+            btnNo.DialogResult = DialogResult.No;
+            int btnY = feld.Bottom + S(16);
+            f.ClientSize = new Size(w, btnY + btnOk.Height + S(14));
+            btnNo.Location = new Point(w - btnNo.Width - S(20), btnY);
+            btnOk.Location = new Point(btnNo.Left - btnOk.Width - S(10), btnY);
+
+            f.Controls.Add(lbl);
+            f.Controls.Add(lblTitel);
+            f.Controls.Add(feld);
+            f.Controls.Add(btnOk);
+            f.Controls.Add(btnNo);
+            f.AcceptButton = btnOk;
+            f.CancelButton = btnNo;
+            f.Shown += delegate { btnOk.Focus(); feld.SelectionLength = 0; };
+
+            UI.ThemeDialog(f);
+            return f.ShowDialog(owner) == DialogResult.Yes;
+        }
     }
 
     // ab v4.0: Thematisierter Hinweisdialog fuer konsistenten Hell- und Dunkelmodus
@@ -22395,6 +22606,11 @@ class SensorChart : Control
     public static Color CpuFarbe { get { return CpuColor; } }
     public static Color GpuFarbe { get { return GpuColor; } }
     public bool Rahmen = true;
+    // ab v4.14: hervorgehobene Spalte (Klick auf eine Kennzahl der Seite Sensoren live): Diese Kurve wird dicker und
+    // zuletzt gezeichnet, alle übrigen blasser. -1 = keine.
+    public int HervorgehobeneSpalte = -1;
+    static readonly int[] gezeichneteSpalten = new int[] { 1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14 };
+    public static bool HatKurve(int spalte) { return Array.IndexOf(gezeichneteSpalten, spalte) >= 0; }
     struct Series { public int Col; public Color Color; public string Label; public bool Dash; public Series(int c, Color k, string l, bool d) { Col = c; Color = k; Label = l; Dash = d; } }
     public SensorChart()
     {
@@ -22536,7 +22752,13 @@ class SensorChart : Control
             DrawLimit(g, plot, GpuLimit, y0, y1, Color.FromArgb(194, 65, 12), DashStyle.Dash);
             if (!double.IsNaN(TjMax) && TjMax != CpuLimit) DrawLimit(g, plot, TjMax, y0, y1, UI.Warn, DashStyle.Dot);
         }
-        for (int i = ser.Length - 1; i >= 0; i--) DrawSeries(g, plot, ser[i].Col, tMin, tMax, y0, y1, ser[i].Color, ser[i].Dash);
+        int hv = HervorgehobeneSpalte;
+        for (int i = ser.Length - 1; i >= 0; i--)
+        {
+            if (ser[i].Col == hv) continue;
+            DrawSeries(g, plot, ser[i].Col, tMin, tMax, y0, y1, hv >= 0 ? UI.Mix(ser[i].Color, BackColor, 0.6) : ser[i].Color, ser[i].Dash, hv >= 0 ? 1.4f : 0f);
+        }
+        foreach (Series sr in ser) if (sr.Col == hv) DrawSeries(g, plot, sr.Col, tMin, tMax, y0, y1, sr.Color, sr.Dash, UI.SF(3f));
     }
 
     static void DrawLimit(Graphics g, Rectangle plot, double v, double y0, double y1, Color c, DashStyle ds)
@@ -22546,10 +22768,11 @@ class SensorChart : Control
         using (Pen p = new Pen(c, 1.5f)) { p.DashStyle = ds; g.DrawLine(p, plot.Left, y, plot.Right, y); }
     }
 
-    void DrawSeries(Graphics g, Rectangle plot, int k, double tMin, double tMax, double y0, double y1, Color c, bool dash)
+    // breite > 0 setzt die Linienstärke (Hervorhebung), sonst die übliche
+    void DrawSeries(Graphics g, Rectangle plot, int k, double tMin, double tMax, double y0, double y1, Color c, bool dash, float breite)
     {
         List<PointF> pts = new List<PointF>();
-        using (Pen p = new Pen(c, dash ? 1.6f : 2f))
+        using (Pen p = new Pen(c, breite > 0 ? breite : dash ? 1.6f : 2f))
         {
             p.LineJoin = LineJoin.Round;
             if (dash) p.DashStyle = DashStyle.Dash;
@@ -23857,6 +24080,13 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.14", "24.11.2026", "Was ist neu beim Update, Tasten in der Datenbank, hervorgehobene Kurven",
+            "• Neu, Update: Die Rückfrage vor dem Update zeigt, was die neue Version bringt (Text des Releases, höchstens 15 Zeilen, mit Bildlauf).\r\n" +
+            "• Neu, Datenbank: Entf entfernt die angehakten oder markierten Läufe (mit Rückfrage), die Leertaste hakt alle markierten Läufe an oder ab.\r\n" +
+            "• Neu, Sensoren live: Ein Klick auf eine Kennzahl hebt ihre Kurve im Verlauf hervor, die übrigen werden blasser; ein zweiter Klick nimmt das zurück.\r\n" +
+            "• Startknopf: Läuft im Hintergrund eine Sicherung, eine Installation oder das Herunterladen eines Updates, steht das schon in der Fußzeile, und Startknopf und Live-Ansicht sind ausgegraut (bisher erst ein Hinweis nach dem Klick).\r\n" +
+            "• Import: Ein Lauf gilt auch dann als schon vorhanden, wenn der PC inzwischen anders heißt (gleiche Gerätekennung und gleiches Datum).\r\n" +
+            "• Veröffentlichen prüft zusätzlich, dass LeosMinibench.ps1 und das in LMB.exe eingebettete Skript zum gebauten Stand passen."),
         new Eintrag("4.13", "21.11.2026", "Praxistest vom 20.11.2026: Sensorfehler im Grafiktreiber beendet den Lauf nicht mehr",
             "• Behoben: Ein Speicherfehler im AMD-Grafiktreiber beim Auslesen der Sensoren (LibreHardwareMonitor, Radeon RX 9060 XT) beendete den Arbeitsprozess beim Start des CPU-Benchmarks; der Lauf endete ohne Bericht. Jetzt wird das betroffene Gerät für den Rest des Laufs nicht mehr abgefragt, GPU-Werte kommen aus dem Windows-Grafiktreiber, der Lauf geht weiter.\r\n" +
             "• Behoben, Absturzanalyse: Ein Absturz des Arbeitsprozesses galt als Systemabsturz, wenn Windows später neu gestartet wurde, und der nächste Lauf ließ den betroffenen Abschnitt aus (hier den CPU-Benchmark). Jetzt nennt die Analyse den Prozessabsturz mit Fehlermeldung und lässt nichts aus.\r\n" +
@@ -35896,6 +36126,28 @@ function Save-DbEntry {
     try { [IO.File]::WriteAllText($file, ($o | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false))); return $file } catch { return '' }
 }
 
+# ab v4.14: Duplikatprüfung für alle Importwege. Ein Lauf ist schon vorhanden, wenn das Datum übereinstimmt und dazu
+# die Gerätekennung (auch wenn der PC inzwischen anders heißt oder der Lauf aus einer Sicherung unter anderem Namen
+# kommt) oder, wie bis v4.13 allein, der Computername. Ohne Kennung (ältere Läufe, Import aus Berichten) zählt nur der Name.
+function Get-ImportGeraetId($Objekt) {
+    if ($null -eq $Objekt) { return '' }
+    if ($Objekt.Geraet -and [string]$Objekt.Geraet.Id) { return [string]$Objekt.Geraet.Id }
+    if ([string]$Objekt.GeraetId) { return [string]$Objekt.GeraetId }
+    return ''
+}
+function Get-DbDuplikatMeldung([string]$Name, [string]$Computer, [string]$Datum, [string]$GeraetId = '') {
+    foreach ($e in @(Get-DbEntries)) {
+        if ([string]$e.Datum -ne $Datum) { continue }
+        $gleichesGeraet = $GeraetId -and [string]$e.GeraetId -eq $GeraetId
+        if (-not $gleichesGeraet -and [string]$e.Computer -ne $Computer) { continue }
+        if ([string]$e.Computer -and [string]$e.Computer -ne $Computer) {
+            return ('{0}: {1} vom {2} ist bereits in der Datenbank (dasselbe Gerät, dort unter dem Namen {3}).' -f $Name, $Computer, $Datum, $e.Computer)
+        }
+        return ('{0}: {1} vom {2} ist bereits in der Datenbank.' -f $Name, $Computer, $Datum)
+    }
+    return ''
+}
+
 # Ältere Ausgabeordner (Version 1.x) in die Datenbank übernehmen
 function Import-LegacyRun([string]$Folder) {
     $name = Split-Path $Folder -Leaf
@@ -35954,7 +36206,8 @@ function Import-LegacyRun([string]$Folder) {
         if ($txt -match 'ERGEBNIS:\s*(\d+) kritisch, (\d+) Warnungen, (\d+) Hinweise') { $nk = [int]$Matches[1]; $nw = [int]$Matches[2]; $ni = [int]$Matches[3] }
         $list = @([regex]::Matches($txt, '(?m)^  \[(KRITISCH|WARNUNG|INFO)\s*\]\s+(\S+)\s+(.+?)\s*$') | ForEach-Object { '[{0}] {1}: {2}' -f $_.Groups[1].Value, $_.Groups[2].Value, $_.Groups[3].Value })
 
-        foreach ($e in (Get-DbEntries)) { if ($e.Computer -eq $computer -and $e.Datum -eq $datum) { return ('{0}: {1} vom {2} ist bereits in der Datenbank.' -f $name, $computer, $datum) } }
+        $doppelt = Get-DbDuplikatMeldung $name $computer $datum
+        if ($doppelt) { return $doppelt }
         $kerne = $null; $threads = $null
         if ($txt -match '(?m)^\s*Kerne\s*/\s*Threads\s*:\s*(\d+)\s*/\s*(\d+)') {
             $kerne = [int]$Matches[1]; $threads = [int]$Matches[2]
@@ -36020,11 +36273,8 @@ function Import-RunFromDirWithJson([string]$SourceDir, [string]$DbJsonPath, [str
         $computer = [string]$o.Computer
         $datum = [string]$o.Datum
 
-        foreach ($e in (Get-DbEntries)) {
-            if ($e.Computer -eq $computer -and $e.Datum -eq $datum) {
-                return ('{0}: {1} vom {2} ist bereits in der Datenbank.' -f $OriginalName, $computer, $datum)
-            }
-        }
+        $doppelt = Get-DbDuplikatMeldung $OriginalName $computer $datum (Get-ImportGeraetId $o)
+        if ($doppelt) { return $doppelt }
 
         $stamp = $(if ($datum -match '^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})') { '{0}{1}{2}_{3}{4}00' -f $Matches[1], $Matches[2], $Matches[3], $Matches[4], $Matches[5] } else { Get-Date -Format 'yyyyMMdd_HHmmss' })
         # ab v4.11: Der Ordnername kommt aus der fremden Datenbank.json und wird bereinigt (Get-AblageName: keine Trenn-
@@ -36115,11 +36365,8 @@ function Import-JsonRun([string]$JsonPath) {
         $computer = [string]$o.Computer
         $datum = [string]$o.Datum
 
-        foreach ($e in (Get-DbEntries)) {
-            if ($e.Computer -eq $computer -and $e.Datum -eq $datum) {
-                return ('{0}: {1} vom {2} ist bereits in der Datenbank.' -f $name, $computer, $datum)
-            }
-        }
+        $doppelt = Get-DbDuplikatMeldung $name $computer $datum (Get-ImportGeraetId $o)
+        if ($doppelt) { return $doppelt }
 
         $parent = Split-Path $JsonPath -Parent
         $baseName = [IO.Path]::GetFileNameWithoutExtension($JsonPath)

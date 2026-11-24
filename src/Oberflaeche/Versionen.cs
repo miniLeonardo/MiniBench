@@ -11,6 +11,13 @@ public static class Versionshistorie
     }
 
     public static readonly Eintrag[] Liste = new Eintrag[] {
+        new Eintrag("4.14", "24.11.2026", "Was ist neu beim Update, Tasten in der Datenbank, hervorgehobene Kurven",
+            "• Neu, Update: Die Rückfrage vor dem Update zeigt, was die neue Version bringt (Text des Releases, höchstens 15 Zeilen, mit Bildlauf).\r\n" +
+            "• Neu, Datenbank: Entf entfernt die angehakten oder markierten Läufe (mit Rückfrage), die Leertaste hakt alle markierten Läufe an oder ab.\r\n" +
+            "• Neu, Sensoren live: Ein Klick auf eine Kennzahl hebt ihre Kurve im Verlauf hervor, die übrigen werden blasser; ein zweiter Klick nimmt das zurück.\r\n" +
+            "• Startknopf: Läuft im Hintergrund eine Sicherung, eine Installation oder das Herunterladen eines Updates, steht das schon in der Fußzeile, und Startknopf und Live-Ansicht sind ausgegraut (bisher erst ein Hinweis nach dem Klick).\r\n" +
+            "• Import: Ein Lauf gilt auch dann als schon vorhanden, wenn der PC inzwischen anders heißt (gleiche Gerätekennung und gleiches Datum).\r\n" +
+            "• Veröffentlichen prüft zusätzlich, dass LeosMinibench.ps1 und das in LMB.exe eingebettete Skript zum gebauten Stand passen."),
         new Eintrag("4.13", "21.11.2026", "Praxistest vom 20.11.2026: Sensorfehler im Grafiktreiber beendet den Lauf nicht mehr",
             "• Behoben: Ein Speicherfehler im AMD-Grafiktreiber beim Auslesen der Sensoren (LibreHardwareMonitor, Radeon RX 9060 XT) beendete den Arbeitsprozess beim Start des CPU-Benchmarks; der Lauf endete ohne Bericht. Jetzt wird das betroffene Gerät für den Rest des Laufs nicht mehr abgefragt, GPU-Werte kommen aus dem Windows-Grafiktreiber, der Lauf geht weiter.\r\n" +
             "• Behoben, Absturzanalyse: Ein Absturz des Arbeitsprozesses galt als Systemabsturz, wenn Windows später neu gestartet wurde, und der nächste Lauf ließ den betroffenen Abschnitt aus (hier den CPU-Benchmark). Jetzt nennt die Analyse den Prozessabsturz mit Fehlermeldung und lässt nichts aus.\r\n" +

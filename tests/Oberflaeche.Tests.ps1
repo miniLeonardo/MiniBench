@@ -106,6 +106,10 @@ Describe 'Selbsttest der Oberfläche' {
         @{ Fall = 'Ergebnis.Dauer' }
         @{ Fall = 'Startseite.Neuaufbau' }
         @{ Fall = 'Aenderungen.Geraet' }
+        @{ Fall = 'Update.WasIstNeu' }
+        @{ Fall = 'Datenbank.Tasten' }
+        @{ Fall = 'Sensoren.Hervorhebung' }
+        @{ Fall = 'Hintergrund.Startknopf' }
     ) {
         Assert-GuiSelbsttest $Fall
     }

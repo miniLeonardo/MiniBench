@@ -1,7 +1,8 @@
 ﻿# Veröffentlicht die aktuelle Version in einem Schritt (ab v4.03, ab v4.04 mit Push und Einrichtung von gh):
 #   1. prüft, dass alle Änderungen committet sind und Aktueller Build zur Version passt; ab v4.11 außerdem vor jedem
 #      Push: Zweig main, LMB.exe passt zur Prüfsumme in Stand.txt, ein vorhandener Tag vX.Y zeigt auf HEAD und
-#      Stand.txt nennt einen Testlauf unter Windows ohne Fehlschläge (überspringbar mit -OhneWindowsTests),
+#      Stand.txt nennt einen Testlauf unter Windows ohne Fehlschläge (überspringbar mit -OhneWindowsTests); ab v4.14
+#      passen auch LeosMinibench.ps1 und das in LMB.exe eingebettete Skript zur Prüfsumme in Stand.txt,
 #   2. überträgt main nach GitHub, legt den Tag vX.Y an (falls nötig) und überträgt ihn; ab v4.11 auch ältere
 #      Release-Tags vX.Y, die auf GitHub fehlen, sofern sie auf einen Commit von main zeigen,
 #   3. installiert bei Bedarf die GitHub CLI (winget) und meldet sie an (Browser, einmalig),
@@ -15,11 +16,23 @@ $ErrorActionPreference = 'Continue'
 $root = $PSScriptRoot
 $repo = 'miniLeonardo/MiniBench'
 function Schritt([string]$t) { Write-Host ('  ' + $t) -ForegroundColor Cyan }
-# Prüfsumme von LMB.exe aus Stand.txt (Zeile "  LMB.exe   2,817 KB  <sha256>", geschrieben von Bauen.cmd); leer, wenn sie fehlt.
-function Get-StandLmbSha([string]$StandText) {
-    $m = [regex]::Match([string]$StandText, '(?m)^\s*LMB\.exe\s+[\d.,]+\s*KB\s+([0-9a-fA-F]{64})\s*$')
+# Prüfsumme einer Datei aus Stand.txt (Zeile "  LMB.exe   2,817 KB  <sha256>", geschrieben von Bauen.cmd); leer, wenn sie fehlt.
+function Get-StandSha([string]$StandText, [string]$Datei) {
+    $m = [regex]::Match([string]$StandText, ('(?m)^\s*{0}\s+[\d.,]+\s*KB\s+([0-9a-fA-F]{{64}})\s*$' -f [regex]::Escape($Datei)))
     if ($m.Success) { return $m.Groups[1].Value.ToLowerInvariant() }
     return ''
+}
+function Get-StandLmbSha([string]$StandText) { return (Get-StandSha $StandText 'LMB.exe') }
+# ab v4.14: SHA-256 des Skripts, das Bauen.cmd als Ressource "LeosMinibench.ps1" in LMB.exe einbettet (csc /resource).
+# Die exe wird aus ihren Bytes geladen, damit die Datei nicht gesperrt bleibt; leer, wenn sie kein solches Skript enthält.
+function Get-ExeSkriptSha([string]$Exe) {
+    try {
+        $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($Exe))
+        $s = $asm.GetManifestResourceStream('LeosMinibench.ps1')
+        if (-not $s) { return '' }
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try { return (($sha.ComputeHash($s) | ForEach-Object { $_.ToString('x2') }) -join '') } finally { $s.Dispose(); $sha.Dispose() }
+    } catch { return '' }
 }
 # Stand.txt nennt einen Testlauf von Bauen.cmd unter Windows ohne Fehlschläge: Zeile aus tests\Testen.ps1
 # ("Tests     : 1234 bestanden, 0 fehlgeschlagen, 5 übersprungen (Pester 6.2.0, PowerShell 5.1.x)"). Nicht geladene
@@ -51,6 +64,16 @@ $sha = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant(
 $standSha = Get-StandLmbSha $standText
 if (-not $standSha) { throw 'Stand.txt nennt keine Prüfsumme für LMB.exe. Zuerst neu bauen (Bauen.cmd).' }
 if ($standSha -ne $sha) { throw ('Aktueller Build\LMB.exe passt nicht zu Stand.txt (Datei {0}, Stand.txt {1}). Die exe stammt nicht aus dem letzten Bau; neu bauen (Bauen.cmd).' -f $sha, $standSha) }
+# (b2) ab v4.14: Das Skript neben der exe und das in LMB.exe eingebettete Skript sind beide der gebaute Stand
+$ps1 = Join-Path $root 'Aktueller Build\LeosMinibench.ps1'
+if (-not (Test-Path -LiteralPath $ps1)) { throw 'Aktueller Build\LeosMinibench.ps1 fehlt. Zuerst neu bauen (Bauen.cmd).' }
+$standPs1 = Get-StandSha $standText 'LeosMinibench.ps1'
+if (-not $standPs1) { throw 'Stand.txt nennt keine Prüfsumme für LeosMinibench.ps1. Zuerst neu bauen (Bauen.cmd).' }
+$ps1Sha = (Get-FileHash -LiteralPath $ps1 -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($ps1Sha -ne $standPs1) { throw ('Aktueller Build\LeosMinibench.ps1 passt nicht zu Stand.txt (Datei {0}, Stand.txt {1}); neu bauen (Bauen.cmd).' -f $ps1Sha, $standPs1) }
+$exeSkript = Get-ExeSkriptSha $exe
+if (-not $exeSkript) { throw 'In Aktueller Build\LMB.exe ist kein lesbares Skript LeosMinibench.ps1 eingebettet; neu bauen (Bauen.cmd).' }
+if ($exeSkript -ne $standPs1) { throw ('Das in LMB.exe eingebettete Skript passt nicht zu LeosMinibench.ps1 (eingebettet {0}, Stand.txt {1}); neu bauen (Bauen.cmd).' -f $exeSkript, $standPs1) }
 # (c) ein schon vorhandener Tag vX.Y muss auf HEAD zeigen
 $head = [string](& git -C $root rev-parse HEAD)
 $tagCommit = [string](& git -C $root rev-parse -q --verify ($tag + '^{commit}') 2>$null)
@@ -66,7 +89,7 @@ if (Test-StandWindowsTests $standText) {
     $tz = [regex]::Match($standText, '(?m)^Tests\s*:\s*([^\r\n]*)').Groups[1].Value
     throw ('Stand.txt nennt keinen Testlauf unter Windows ohne Fehlschläge (Tests: {0}). Mit Bauen.cmd unter Windows bauen oder bewusst -OhneWindowsTests angeben.' -f $(if ($tz) { $tz } else { 'keine Angabe' }))
 }
-Schritt ('Stand geprüft: {0}, Zweig main, Aktueller Build passt (SHA-256 wie in Stand.txt)' -f $tag)
+Schritt ('Stand geprüft: {0}, Zweig main, Aktueller Build passt (SHA-256 von exe, Skript und eingebettetem Skript wie in Stand.txt)' -f $tag)
 
 # 2. main und Tag übertragen
 if (-not $OhnePush) {

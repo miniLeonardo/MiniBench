@@ -88,6 +88,28 @@ function Save-DbEntry {
     try { [IO.File]::WriteAllText($file, ($o | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false))); return $file } catch { return '' }
 }
 
+# ab v4.14: Duplikatprüfung für alle Importwege. Ein Lauf ist schon vorhanden, wenn das Datum übereinstimmt und dazu
+# die Gerätekennung (auch wenn der PC inzwischen anders heißt oder der Lauf aus einer Sicherung unter anderem Namen
+# kommt) oder, wie bis v4.13 allein, der Computername. Ohne Kennung (ältere Läufe, Import aus Berichten) zählt nur der Name.
+function Get-ImportGeraetId($Objekt) {
+    if ($null -eq $Objekt) { return '' }
+    if ($Objekt.Geraet -and [string]$Objekt.Geraet.Id) { return [string]$Objekt.Geraet.Id }
+    if ([string]$Objekt.GeraetId) { return [string]$Objekt.GeraetId }
+    return ''
+}
+function Get-DbDuplikatMeldung([string]$Name, [string]$Computer, [string]$Datum, [string]$GeraetId = '') {
+    foreach ($e in @(Get-DbEntries)) {
+        if ([string]$e.Datum -ne $Datum) { continue }
+        $gleichesGeraet = $GeraetId -and [string]$e.GeraetId -eq $GeraetId
+        if (-not $gleichesGeraet -and [string]$e.Computer -ne $Computer) { continue }
+        if ([string]$e.Computer -and [string]$e.Computer -ne $Computer) {
+            return ('{0}: {1} vom {2} ist bereits in der Datenbank (dasselbe Gerät, dort unter dem Namen {3}).' -f $Name, $Computer, $Datum, $e.Computer)
+        }
+        return ('{0}: {1} vom {2} ist bereits in der Datenbank.' -f $Name, $Computer, $Datum)
+    }
+    return ''
+}
+
 # Ältere Ausgabeordner (Version 1.x) in die Datenbank übernehmen
 function Import-LegacyRun([string]$Folder) {
     $name = Split-Path $Folder -Leaf
@@ -146,7 +168,8 @@ function Import-LegacyRun([string]$Folder) {
         if ($txt -match 'ERGEBNIS:\s*(\d+) kritisch, (\d+) Warnungen, (\d+) Hinweise') { $nk = [int]$Matches[1]; $nw = [int]$Matches[2]; $ni = [int]$Matches[3] }
         $list = @([regex]::Matches($txt, '(?m)^  \[(KRITISCH|WARNUNG|INFO)\s*\]\s+(\S+)\s+(.+?)\s*$') | ForEach-Object { '[{0}] {1}: {2}' -f $_.Groups[1].Value, $_.Groups[2].Value, $_.Groups[3].Value })
 
-        foreach ($e in (Get-DbEntries)) { if ($e.Computer -eq $computer -and $e.Datum -eq $datum) { return ('{0}: {1} vom {2} ist bereits in der Datenbank.' -f $name, $computer, $datum) } }
+        $doppelt = Get-DbDuplikatMeldung $name $computer $datum
+        if ($doppelt) { return $doppelt }
         $kerne = $null; $threads = $null
         if ($txt -match '(?m)^\s*Kerne\s*/\s*Threads\s*:\s*(\d+)\s*/\s*(\d+)') {
             $kerne = [int]$Matches[1]; $threads = [int]$Matches[2]
@@ -212,11 +235,8 @@ function Import-RunFromDirWithJson([string]$SourceDir, [string]$DbJsonPath, [str
         $computer = [string]$o.Computer
         $datum = [string]$o.Datum
 
-        foreach ($e in (Get-DbEntries)) {
-            if ($e.Computer -eq $computer -and $e.Datum -eq $datum) {
-                return ('{0}: {1} vom {2} ist bereits in der Datenbank.' -f $OriginalName, $computer, $datum)
-            }
-        }
+        $doppelt = Get-DbDuplikatMeldung $OriginalName $computer $datum (Get-ImportGeraetId $o)
+        if ($doppelt) { return $doppelt }
 
         $stamp = $(if ($datum -match '^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})') { '{0}{1}{2}_{3}{4}00' -f $Matches[1], $Matches[2], $Matches[3], $Matches[4], $Matches[5] } else { Get-Date -Format 'yyyyMMdd_HHmmss' })
         # ab v4.11: Der Ordnername kommt aus der fremden Datenbank.json und wird bereinigt (Get-AblageName: keine Trenn-
@@ -307,11 +327,8 @@ function Import-JsonRun([string]$JsonPath) {
         $computer = [string]$o.Computer
         $datum = [string]$o.Datum
 
-        foreach ($e in (Get-DbEntries)) {
-            if ($e.Computer -eq $computer -and $e.Datum -eq $datum) {
-                return ('{0}: {1} vom {2} ist bereits in der Datenbank.' -f $name, $computer, $datum)
-            }
-        }
+        $doppelt = Get-DbDuplikatMeldung $name $computer $datum (Get-ImportGeraetId $o)
+        if ($doppelt) { return $doppelt }
 
         $parent = Split-Path $JsonPath -Parent
         $baseName = [IO.Path]::GetFileNameWithoutExtension($JsonPath)

@@ -3,6 +3,8 @@
 Gesammelte Vorschläge, die weder abgelehnt (Doku\Projektstand.md, Abgelehnte Vorschläge) noch schon umgesetzt sind.
 Nichts davon ungefragt bauen; Leonardo wählt aus. Gewählte Ideen mit Version markieren, abgelehnte nach
 Projektstand.md (Abgelehnte Vorschläge) verschieben.
+Seit 21.11.2026 stehen alle Ideen auch als Karten im Nextcloud-Deck (Board "PC DiagnoseBench", gleiche Nummer im
+Titel). Datei und Deck parallel pflegen, Ablauf in AGENTS.md (Planung im Nextcloud-Deck).
 
 ## Aus der Gesamtprüfung vom 19.11.2026
 
@@ -16,24 +18,24 @@ Projektstand.md (Abgelehnte Vorschläge) verschieben.
    Undo-ChangeRecord oder Undo-OptChange.
 4. Aufbau-Test gegen die Einzelobjekt-Falle von PS 5.1: `$x = ... | Where-Object` ohne @() gefolgt von `$x[0]` oder
    `.Count` (hätte Befund A5 gefunden).
-5. Import gehärtet: Duplikatprüfung zusätzlich über GeraetId plus Datum.
+5. Import gehärtet: Duplikatprüfung zusätzlich über GeraetId plus Datum. **Umgesetzt in 4.14.**
 6. Änderungsprotokoll mit Status "erneut versuchen" statt endgültigem "fehlgeschlagen" (Teil davon in 4.11).
 
 ### Bau, Test, Release
 7. Vorabprüfung in Veroeffentlichen.ps1: exe-SHA gleich Stand.txt gleich eingebettete .ps1, Tag auf HEAD, Zweig main,
-   Windows-Testzeile mit 0 Fehlschlägen (Teil davon in 4.11).
+   Windows-Testzeile mit 0 Fehlschlägen (Teil davon in 4.11). **Umgesetzt in 4.14.**
 8. Liste bekannter Sandbox-Abweichungen (tests\Sandbox\Erwartet.txt): Sandbox_Testen.ps1 meldet nur Abweichungen und
    endet sonst mit 0.
 9. Bauen.cmd schreibt neue Dateien zuerst in einen Zwischenordner und tauscht am Ende per Umbenennen.
 10. Test in Release.Tests: Zu jeder Version in Versionen.cs ab 3.83 existiert ein git-Tag.
 
 ### Bedienung
-11. "Was ist neu" in der Update-Rückfrage: AvailableUpdateBody wird geholt, aber nirgends gezeigt.
+11. "Was ist neu" in der Update-Rückfrage: AvailableUpdateBody wird geholt, aber nirgends gezeigt. **Umgesetzt in 4.14.**
 12. Hinweis am Startknopf statt stiller Sperre, solange Sicherung oder Installation im Hintergrund läuft
-    ("Start nach Ende der Sicherung möglich").
+    ("Start nach Ende der Sicherung möglich"). **Umgesetzt in 4.14.**
 13. Live-Ansicht: "Min/Max zurücksetzen" an den Kennzahlen, neuer Messabschnitt ohne Neustart samt PawnIO.
-14. Kennzahlkachel der Seite Sensoren live anklickbar: hebt die zugehörige Kurve im Verlauf hervor.
-15. Tastatur in der Datenbank: Entf für "Lauf entfernen …" (mit Rückfrage), Leertaste hakt alle markierten Zeilen an.
+14. Kennzahlkachel der Seite Sensoren live anklickbar: hebt die zugehörige Kurve im Verlauf hervor. **Umgesetzt in 4.14.**
+15. Tastatur in der Datenbank: Entf für "Lauf entfernen …" (mit Rückfrage), Leertaste hakt alle markierten Zeilen an. **Umgesetzt in 4.14.**
 
 ### Daten und Wartung
 16. Herkunft je Wert in Datenbank und Dashboard ("gemessen" oder "geschätzt"), damit Bericht und Dashboard

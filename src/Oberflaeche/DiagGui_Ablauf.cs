@@ -75,12 +75,13 @@ public partial class DiagGui
         return (min / 60) + " Std." + (min % 60 > 0 ? " " + (min % 60) + " Min." : "");
     }
 
-    void UpdateSummary()
+    internal void UpdateSummary()
     {
         UpdateDiagSummary();
         UpdateBenchSummary();
         UpdateLoadTotal();
-        if (lblSel == null || btnStart == null || diagChk == null || benchChk == null || repChk == null || chkLCpu == null || chkOptRestore == null) return;
+        // ab v4.14 ohne chkOptRestore: Die Fußzeile braucht es nicht, und ohne Katalog der Optimierung blieb sie sonst leer
+        if (lblSel == null || btnStart == null || diagChk == null || benchChk == null || repChk == null || chkLCpu == null) return;
         List<string> m = SelectedModules();
         for (int i = 0; i < 5 && (i + 1) < nav.Count; i++) { string h = nav[i + 1].Checked ? "ca. " + MinText(ModuleMinutes(i)) : ""; if (nav[i + 1].Hint != h) { nav[i + 1].Hint = h; nav[i + 1].Invalidate(); } }
         SetText(btnStart, StartButtonText(m));
@@ -88,6 +89,14 @@ public partial class DiagGui
         {
             lblSel.Text = "Noch kein Ablauf gewählt"; lblSel.ForeColor = UI.Muted; btnStart.Enabled = false;
             Tip(btnStart, "Erst eine Aufgabe wählen oder links ein Modul anhaken.");
+            return;
+        }
+        // ab v4.14: Hintergrundarbeit (System-Umzug, winget, Update) sperrt den Start sichtbar, nicht erst nach dem Klick
+        string sperre = HintergrundSperre("Der Lauf");
+        if (sperre.Length > 0)
+        {
+            lblSel.Text = HintergrundKurz(); lblSel.ForeColor = UI.Muted; btnStart.Enabled = false;
+            Tip(btnStart, sperre);
             return;
         }
         int min = EstimateMinutes();

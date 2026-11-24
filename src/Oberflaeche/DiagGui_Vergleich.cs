@@ -251,10 +251,8 @@ public partial class DiagGui
         lvDb.AufklappGeklickt += delegate(ListenZeile z) { ToggleGroup(((DbZeile)z).Key); };
         lvDb.Geoeffnet += delegate(ListenZeile z) { DbZeile d = (DbZeile)z; if (d.E != null) OpenEntry(d.E); };
         lvDb.MarkierungGeaendert += delegate { UpdateDbButtons(); };
-        lvDb.KeyDown += delegate(object sender, KeyEventArgs e) {
-            if (e.KeyCode == Keys.F2 && lvDb.Markiert.Count == 1) { RenameSelectedEntry(); e.Handled = true; }
-        };
-        Tip(lvDb, "Datenbank aller gespeicherten Systeme. Ein Klick auf die Spaltenköpfe sortiert nach Datum, Gesamtwertung oder Messwert; nach CPU, GPU und RAM sortiert das Kontextmenü.");
+        lvDb.KeyDown += delegate(object sender, KeyEventArgs e) { if (DbTaste(e.KeyData)) e.Handled = true; };
+        Tip(lvDb, "Datenbank aller gespeicherten Systeme. Ein Klick auf die Spaltenköpfe sortiert nach Datum, Gesamtwertung oder Messwert; nach CPU, GPU und RAM sortiert das Kontextmenü. Tasten: Leertaste hakt die markierten Läufe an oder ab, Entf entfernt sie (mit Rückfrage), F2 benennt um.");
 
         ContextMenu cm = new ContextMenu();
         MenuItem miDashboard = new MenuItem("Im Dashboard vergleichen", delegate { OpenDashboard(); });
@@ -953,12 +951,36 @@ public partial class DiagGui
         }
     }
 
-    // ab 3.54: Eintrag und Berichtsordner ins Archiv (Minibench-Daten\Archiv\Entfernt), über den Arbeitsprozess
-    // ab 3.54: Eintrag und Berichtsordner ins Archiv (Minibench-Daten\Archiv\Entfernt), über den Arbeitsprozess
-    void DeleteSelected()
+    // ab v4.14: Tasten der Datenbankliste. F2 benennt um (wie bisher). Entf entfernt die angehakten Läufe, ohne Haken die
+    // markierten (immer mit Rückfrage). Leertaste bei mehreren markierten Zeilen: Sind alle angehakt, entfallen die Haken,
+    // sonst werden alle gesetzt; bei einer Zeile hakt die Liste selbst die Zeile mit dem Fokus an (Liste.cs). Die Zeile
+    // eines Geräts steht wie beim Klick auf ihr Kästchen für seinen neuesten Lauf.
+    internal bool DbTaste(Keys k)
+    {
+        if (lvDb == null) return false;
+        if (k == Keys.F2 && lvDb.Markiert.Count == 1) { RenameSelectedEntry(); return true; }
+        if (k == Keys.Delete && (lvDb.Markiert.Count > 0 || CheckedEntries().Count > 0)) { DeleteSelected(true); return true; }
+        if (k == Keys.Space && lvDb.Markiert.Count > 1)
+        {
+            List<string> pfade = new List<string>();
+            foreach (DbEntry e in DbMarkierte()) if (!String.IsNullOrEmpty(e.Path) && !pfade.Contains(e.Path)) pfade.Add(e.Path);
+            if (pfade.Count == 0) return true;
+            bool alle = true;
+            foreach (string p in pfade) if (!dbHaken.Contains(p)) { alle = false; break; }
+            foreach (string p in pfade) { if (alle) dbHaken.Remove(p); else dbHaken.Add(p); }
+            FillDbList();
+            return true;
+        }
+        return false;
+    }
+
+    // ab 3.54: Eintrag und Berichtsordner ins Archiv (Minibench-Daten\Archiv\Entfernt), über den Arbeitsprozess.
+    // ab v4.14 mit markierteOhneHaken (Taste Entf): ohne angehakte Läufe gelten alle markierten, nicht nur genau einer.
+    void DeleteSelected(bool markierteOhneHaken = false)
     {
         List<DbEntry> sel = CheckedEntries();
-        if (sel.Count == 0 && DbMarkierte().Count == 1) sel.Add(DbMarkierte()[0]);
+        if (sel.Count == 0 && (DbMarkierte().Count == 1 || markierteOhneHaken))
+            foreach (DbEntry m in DbMarkierte()) if (!String.IsNullOrEmpty(m.Path) && !sel.Contains(m)) sel.Add(m);
         if (sel.Count == 0) return;
         StringBuilder sb = new StringBuilder();
         foreach (DbEntry e in sel) sb.AppendLine("·  " + e.DisplayName + "  " + e.Datum);

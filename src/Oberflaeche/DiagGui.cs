@@ -47,7 +47,7 @@ public partial class DiagGui : Form
 #pragma warning disable 414
     int nK, nW, nI, cntK, cntW, cntI, testsOk, benchWarn, benchCount;
     Dictionary<string, ListViewItem> benchHeads = new Dictionary<string, ListViewItem>();
-    List<DbEntry> db = new List<DbEntry>();
+    internal List<DbEntry> db = new List<DbEntry>();
     Font wsBold;
 
     Panel setupView, runView, content, head, body, contentHost, mainArea;
@@ -163,12 +163,12 @@ public partial class DiagGui : Form
     DateTime liveExitSeen;
     internal bool liveRunning, liveStopping;
     DateTime liveStopAt;
-    Button btnLive, btnSensTools, btnSensSave;
+    internal Button btnLive; Button btnSensTools, btnSensSave;
     internal ComboBox cmbDriver;
     int psuWattage = 650; bool psuEingegeben;
     string psuRating = "80 PLUS Bronze";
-    Label lblSensInfo;
-    SensorChart chartLive, chartRun;
+    internal Label lblSensInfo;
+    internal SensorChart chartLive, chartRun;
     internal ZeilenListe lvSens;
     Dictionary<int, double[]> sensMinMax = new Dictionary<int, double[]>();
     Dictionary<int, string> sensUnit = new Dictionary<int, string>();
@@ -225,11 +225,11 @@ public partial class DiagGui : Form
     internal ZeilenListe lvChg;
     internal Button btnUndo;
     // Fuß
-    Label lblSel;
+    internal Label lblSel;
     LinkLabel lnkAblage;
     Action footLayout = delegate { };
     CheckBox chkAnon;
-    Button btnStart;
+    internal Button btnStart;
     // ab v2.7: Datenpflege beim Start (vom Skript gesetzt) und Schaltfläche Aufräumen auf der Seite Vergleichsdatenbank
     public static string DatenpflegeInfo = "";
     Label lblDbClean;
@@ -816,7 +816,7 @@ public partial class DiagGui : Form
         }
         Tip(chkRestorePoint, "Legt vor den Reparaturen einen Systemwiederherstellungspunkt an. Er ist der Weg zurück für alle Eingriffe dieses Laufs.");
         // Sensoren
-        Tip(btnLive, "Öffnet die Sensoren und zeigt die Werte laufend an. Während eines Laufs ist die Live-Ansicht aus.");
+        Tip(btnLive, LiveTipp);
         Tip(btnSensTools, "Holt LibreHardwareMonitor und das PawnIO-Setup aus den offiziellen Releases und prüft sie mit festen SHA-256-Werten. Abgelegt wird nur im Tools-Ordner, installiert wird nichts.");
         Tip(btnSensSave, "Speichert alle Werte der Live-Ansicht als CSV unter Berichte\\Sensoren.");
         Tip(cmbDriver, "PawnIO ist der Treiber, den LibreHardwareMonitor für CPU-Temperatur, CPU-Takt, CPU-Leistung und Mainboard-Lüfter braucht. Standardmäßig aktiv für alle Messungen. Ein bereits installierter PawnIO bleibt immer unverändert.");

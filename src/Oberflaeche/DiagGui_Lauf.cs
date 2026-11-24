@@ -622,10 +622,28 @@ public partial class DiagGui
     {
         if (hintergrund != null) return null;
         hintergrund = new HintergrundArbeit(beschreibung);
+        HintergrundAnzeigen();
         return hintergrund;
     }
 
-    internal void HintergrundEnde(HintergrundArbeit h) { if (h != null && hintergrund == h) hintergrund = null; }
+    internal void HintergrundEnde(HintergrundArbeit h) { if (h != null && hintergrund == h) { hintergrund = null; HintergrundAnzeigen(); } }
+
+    // ab v4.14: Die Sperre zeigt sich vor dem Klick. Fußzeile neben dem Startknopf und Knopf der Live-Ansicht nennen die
+    // laufende Hintergrundarbeit, beide Knöpfe sind solange ausgegraut (bis v4.13 kam der Hinweis erst nach dem Klick).
+    internal void HintergrundAnzeigen()
+    {
+        if (IsDisposed) return;
+        if (InvokeRequired) { try { BeginInvoke(new MethodInvoker(HintergrundAnzeigen)); } catch { } return; }
+        UpdateSummary();
+        UpdateLiveKnopf();
+    }
+
+    // Kurzform für die Fußzeile, leer ohne Hintergrundarbeit
+    internal string HintergrundKurz()
+    {
+        HintergrundArbeit h = hintergrund;
+        return h == null ? "" : h.Beschreibung + " läuft noch, Start danach möglich";
+    }
 
     // Bricht die laufende Hintergrundarbeit ab: Abbruch der Aufgabe (z. B. Download) und Arbeitsprozess samt Kindern beenden
     internal void HintergrundBeenden()

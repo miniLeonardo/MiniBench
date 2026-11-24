@@ -9,7 +9,7 @@ BeforeAll {
         -Functions 'Read-JsonFile', 'ConvertTo-ValueTable', 'Get-DbEntries', 'Get-DbLatest', 'Get-SafeName', 'Save-DbEntry', 'Get-CurrentRefValues', 'Import-BenchReference', 'Get-Median', 'Add-Line',
                    'Test-WritableDir', 'Resolve-DataDir', 'Test-IsNetworkPath', 'Initialize-DbDir',
                    'Test-EntryIsNotebook', 'Test-DbEntryIsBattery', 'Update-BenchReferenceMedians',
-                   'Import-LegacyFolder', 'Import-SingleRunItem', 'Import-ArchiveRun', 'Import-JsonRun', 'Import-LegacyRun', 'Import-RunFromDirWithJson', 'Get-DbDeviceRuns', 'Get-AblageName', 'Get-FreierName' `
+                   'Import-LegacyFolder', 'Import-SingleRunItem', 'Import-ArchiveRun', 'Import-JsonRun', 'Import-LegacyRun', 'Import-RunFromDirWithJson', 'Get-ImportGeraetId', 'Get-DbDuplikatMeldung', 'Get-DbDeviceRuns', 'Get-AblageName', 'Get-FreierName' `
         -Setup @'
 $script:DbFormat = 'PC-Diagnose-DB/2'
 $script:Report = New-Object System.Text.StringBuilder
@@ -916,6 +916,37 @@ Describe 'Lauf importieren und Verknüpfung (.minibench, .zip, .json, Ordner)' {
 
         $msg2 = MinibenchTest\Import-SingleRunItem $pkg
         $msg2 | Should -Match 'bereits in der Datenbank'
+    }
+    # ab v4.14 (Idee 5): gleiche Gerätekennung und gleiches Datum gelten auch unter anderem Computernamen als doppelt
+    It 'erkennt einen Lauf desselben Geräts unter anderem Computernamen als doppelt' {
+        $env = New-ImportTestEnv
+        $id = 'a1b2c3d4e5f6'
+        [IO.File]::WriteAllText((Join-Path $env.DbDir 'ALT-NAME_20261020_140000.json'), (@{ Format = 'PC-Diagnose-DB/2'; Name = 'Alt'; Computer = 'ALT-NAME'; Geraet = @{ Id = $id; Guete = 'hoch' }; Datum = '2026-10-20 14:00'; Werte = @{ 'CPU|MT' = 1 } } | ConvertTo-Json -Depth 4))
+        $neu = @{ Format = 'PC-Diagnose-DB/2'; Name = 'Neu'; Computer = 'NEU-NAME'; Geraet = @{ Id = $id; Guete = 'hoch' }; Datum = '2026-10-20 14:00'; Werte = @{ 'CPU|MT' = 1 } }
+        $json = Join-Path (New-TestDir 'dup_json') 'NEU-NAME.json'
+        [IO.File]::WriteAllText($json, ($neu | ConvertTo-Json -Depth 4))
+        $msg = MinibenchTest\Import-JsonRun $json
+        $msg | Should -Match 'bereits in der Datenbank'
+        $msg | Should -Match 'NEU-NAME'
+        $msg | Should -Match 'ALT-NAME'
+        @(Get-ChildItem -LiteralPath $env.DbDir -Filter '*.json').Count | Should -Be 1
+        # ältere Form GeraetId, ebenso über den Ordnerweg
+        $src = New-TestDir 'dup_dir'
+        [IO.File]::WriteAllText((Join-Path $src 'Diagnosebericht.html'), '<html>x</html>')
+        $alt = @{ Format = 'PC-Diagnose-DB/2'; Name = 'Neu'; Computer = 'DRITTER'; GeraetId = $id; Datum = '2026-10-20 14:00'; Werte = @{ 'CPU|MT' = 1 } }
+        [IO.File]::WriteAllText((Join-Path $src 'Datenbank.json'), ($alt | ConvertTo-Json))
+        MinibenchTest\Import-RunFromDirWithJson -SourceDir $src -DbJsonPath (Join-Path $src 'Datenbank.json') | Should -Match 'bereits in der Datenbank'
+    }
+    It 'importiert andere Geräte und andere Zeitpunkte trotz gleichem Namen oder gleicher Kennung' {
+        $env = New-ImportTestEnv
+        [IO.File]::WriteAllText((Join-Path $env.DbDir 'PC1_20261020_140000.json'), (@{ Format = 'PC-Diagnose-DB/2'; Name = 'A'; Computer = 'PC1'; Geraet = @{ Id = 'kennung1' }; Datum = '2026-10-20 14:00'; Werte = @{ 'CPU|MT' = 1 } } | ConvertTo-Json -Depth 4))
+        MinibenchTest\Get-DbDuplikatMeldung 'x' 'PC2' '2026-10-20 14:00' 'kennung2' | Should -Be ''
+        MinibenchTest\Get-DbDuplikatMeldung 'x' 'PC2' '2026-10-20 15:00' 'kennung1' | Should -Be ''
+        MinibenchTest\Get-DbDuplikatMeldung 'x' 'PC2' '2026-10-20 14:00' '' | Should -Be ''
+        MinibenchTest\Get-DbDuplikatMeldung 'x' 'PC1' '2026-10-20 14:00' '' | Should -Match 'bereits in der Datenbank\.$'
+        MinibenchTest\Get-ImportGeraetId ([pscustomobject]@{ Geraet = [pscustomobject]@{ Id = 'k' } }) | Should -Be 'k'
+        MinibenchTest\Get-ImportGeraetId ([pscustomobject]@{ GeraetId = 'g' }) | Should -Be 'g'
+        MinibenchTest\Get-ImportGeraetId ([pscustomobject]@{ Computer = 'c' }) | Should -Be ''
     }
     # ab v4.11 (Befund A6): Ordnername aus der fremden Datenbank.json bereinigt, Ziel nur unterhalb von Berichte,
     # vorhandene Ordner werden nicht überschrieben

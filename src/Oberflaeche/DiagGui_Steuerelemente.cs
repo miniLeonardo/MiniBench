@@ -629,6 +629,77 @@ public static class UI
         return Ask(text, title, owner);
     }
 
+    // ab v4.14: Rückfrage mit einem längeren Zusatztext in einem Feld mit Bildlauf (Update: "Was ist neu"). Ohne
+    // Zusatztext wie Ask. Im Selbsttest steht "Titel|Frage", danach eine Leerzeile und der Zusatztext im Protokoll.
+    public static bool AskMitText(string text, string zusatzTitel, string zusatz, string title, IWin32Window owner)
+    {
+        if (String.IsNullOrEmpty(zusatz)) return Ask(text, title, owner);
+        if (Meldungsprotokoll != null) { Meldungsprotokoll.Add((title ?? "") + "|" + (text ?? "") + "\r\n\r\n" + (zusatzTitel ?? "") + "\r\n" + zusatz); return MeldungsAntwort; }
+        using (Form f = new Form())
+        {
+            f.Text = title ?? "Frage";
+            f.FormBorderStyle = FormBorderStyle.FixedDialog;
+            f.MaximizeBox = false;
+            f.MinimizeBox = false;
+            f.ShowInTaskbar = false;
+            f.StartPosition = owner != null ? FormStartPosition.CenterParent : FormStartPosition.CenterScreen;
+
+            int w = S(520);
+            Font mf = new Font("Segoe UI", 9.5f);
+            Font tf = new Font("Segoe UI Semibold", 9.5f);
+            Size textSize = TextRenderer.MeasureText(text ?? "", mf, new Size(w - S(40), int.MaxValue), TextFormatFlags.WordBreak);
+            int textH = Math.Max(S(40), Math.Min(S(240), textSize.Height + S(10)));
+            int titelH = TextRenderer.MeasureText(zusatzTitel ?? "", tf).Height;
+            int feldH = S(220);
+
+            Label lbl = new Label();
+            lbl.Text = text ?? "";
+            lbl.Font = mf;
+            lbl.Location = new Point(S(20), S(16));
+            lbl.Size = new Size(w - S(40), textH);
+
+            Label lblTitel = new Label();
+            lblTitel.Text = zusatzTitel ?? "";
+            lblTitel.Font = tf;
+            lblTitel.AutoSize = false;
+            lblTitel.Location = new Point(S(20), lbl.Bottom + S(6));
+            lblTitel.Size = new Size(w - S(40), titelH);
+
+            TextBox feld = new TextBox();
+            feld.Multiline = true;
+            feld.ReadOnly = true;
+            feld.WordWrap = true;
+            feld.ScrollBars = ScrollBars.Vertical;
+            feld.BorderStyle = BorderStyle.FixedSingle;
+            feld.Font = mf;
+            feld.Text = zusatz;
+            feld.TabStop = false;
+            feld.Location = new Point(S(20), lblTitel.Bottom + S(4));
+            feld.Size = new Size(w - S(40), feldH);
+
+            Button btnOk = Primary("Ja");
+            btnOk.DialogResult = DialogResult.Yes;
+            Button btnNo = Secondary("Nein");
+            btnNo.DialogResult = DialogResult.No;
+            int btnY = feld.Bottom + S(16);
+            f.ClientSize = new Size(w, btnY + btnOk.Height + S(14));
+            btnNo.Location = new Point(w - btnNo.Width - S(20), btnY);
+            btnOk.Location = new Point(btnNo.Left - btnOk.Width - S(10), btnY);
+
+            f.Controls.Add(lbl);
+            f.Controls.Add(lblTitel);
+            f.Controls.Add(feld);
+            f.Controls.Add(btnOk);
+            f.Controls.Add(btnNo);
+            f.AcceptButton = btnOk;
+            f.CancelButton = btnNo;
+            f.Shown += delegate { btnOk.Focus(); feld.SelectionLength = 0; };
+
+            UI.ThemeDialog(f);
+            return f.ShowDialog(owner) == DialogResult.Yes;
+        }
+    }
+
     // ab v4.0: Thematisierter Hinweisdialog fuer konsistenten Hell- und Dunkelmodus
     public static void Hinweis(string text, string title = "Hinweis", IWin32Window owner = null)
     {
@@ -2825,6 +2896,11 @@ class SensorChart : Control
     public static Color CpuFarbe { get { return CpuColor; } }
     public static Color GpuFarbe { get { return GpuColor; } }
     public bool Rahmen = true;
+    // ab v4.14: hervorgehobene Spalte (Klick auf eine Kennzahl der Seite Sensoren live): Diese Kurve wird dicker und
+    // zuletzt gezeichnet, alle übrigen blasser. -1 = keine.
+    public int HervorgehobeneSpalte = -1;
+    static readonly int[] gezeichneteSpalten = new int[] { 1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14 };
+    public static bool HatKurve(int spalte) { return Array.IndexOf(gezeichneteSpalten, spalte) >= 0; }
     struct Series { public int Col; public Color Color; public string Label; public bool Dash; public Series(int c, Color k, string l, bool d) { Col = c; Color = k; Label = l; Dash = d; } }
     public SensorChart()
     {
@@ -2966,7 +3042,13 @@ class SensorChart : Control
             DrawLimit(g, plot, GpuLimit, y0, y1, Color.FromArgb(194, 65, 12), DashStyle.Dash);
             if (!double.IsNaN(TjMax) && TjMax != CpuLimit) DrawLimit(g, plot, TjMax, y0, y1, UI.Warn, DashStyle.Dot);
         }
-        for (int i = ser.Length - 1; i >= 0; i--) DrawSeries(g, plot, ser[i].Col, tMin, tMax, y0, y1, ser[i].Color, ser[i].Dash);
+        int hv = HervorgehobeneSpalte;
+        for (int i = ser.Length - 1; i >= 0; i--)
+        {
+            if (ser[i].Col == hv) continue;
+            DrawSeries(g, plot, ser[i].Col, tMin, tMax, y0, y1, hv >= 0 ? UI.Mix(ser[i].Color, BackColor, 0.6) : ser[i].Color, ser[i].Dash, hv >= 0 ? 1.4f : 0f);
+        }
+        foreach (Series sr in ser) if (sr.Col == hv) DrawSeries(g, plot, sr.Col, tMin, tMax, y0, y1, sr.Color, sr.Dash, UI.SF(3f));
     }
 
     static void DrawLimit(Graphics g, Rectangle plot, double v, double y0, double y1, Color c, DashStyle ds)
@@ -2976,10 +3058,11 @@ class SensorChart : Control
         using (Pen p = new Pen(c, 1.5f)) { p.DashStyle = ds; g.DrawLine(p, plot.Left, y, plot.Right, y); }
     }
 
-    void DrawSeries(Graphics g, Rectangle plot, int k, double tMin, double tMax, double y0, double y1, Color c, bool dash)
+    // breite > 0 setzt die Linienstärke (Hervorhebung), sonst die übliche
+    void DrawSeries(Graphics g, Rectangle plot, int k, double tMin, double tMax, double y0, double y1, Color c, bool dash, float breite)
     {
         List<PointF> pts = new List<PointF>();
-        using (Pen p = new Pen(c, dash ? 1.6f : 2f))
+        using (Pen p = new Pen(c, breite > 0 ? breite : dash ? 1.6f : 2f))
         {
             p.LineJoin = LineJoin.Round;
             if (dash) p.DashStyle = DashStyle.Dash;
